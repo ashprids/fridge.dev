@@ -28,24 +28,30 @@ this is not just a tiny CSS tweak. it is a separate HTML shell, so shared struct
 
 ## Global Frontend Script
 
-`main.js` is the site-wide behavior blob. it handles a lot:
+`main.js` is the site-wide bootstrap layer. keep it for shared shell basics and cross-page orchestration:
 
-- maintenance/WIP enforcement
 - dev-mode display is server-rendered when the host looks local
 - SPA-ish navigation and route transitions
 - page view footer updates
-- settings load/save
-- mobile-view preference syncing
-- bookmark toggles
-- mini player
-- toast discord bot UI helpers
-- off-topic archive rendering
 - ASCII time / usage widgets
-- route-specific enhancements
-- BBCode mention highlighting for feed-style content
 - on-site popup notices, confirmations, and text prompts
 
 translation: if you change shared ids, buttons, or route transitions, test more than one page or you will summon weird bugs.
+
+larger shared frontend systems live in `/js/`, loaded by both desktop and mobile templates after `/main.js`:
+
+- `/js/settings.js`: themes, settings page behavior, glow, mobile-view cookie syncing, oneko, browser notification preferences, and tooltips
+- `/js/sidebar-player.js`: sidebar visibility, mini player, footer/account state, active sidebar/footer buttons, and Toast listen-along playback support
+- `/js/bookmarks.js`: bookmark/save icons, anonymous bookmark storage, image modal behavior, and `/bookmarks` hydration
+- `/js/bbcode.js`: BBCode editor, inline media players, voice notes, feed generator, and `parseBBCode`
+
+page-specific behavior belongs in a route-local `{page-name}.js` file and the page's `content.html` should include that script. examples:
+
+- `/music/upload` uses `/music/upload/upload.js`
+- `/others/toast-discord-bot` uses `/others/toast-discord-bot/toast-discord-bot.js`
+- `/others/off-topic-archive` uses `/others/off-topic-archive/off-topic-archive.js`
+
+if several pages in the same route family need the same code, put one script at the highest shared route directory and reference that script from each page instead of duplicating it. keep genuinely cross-page helpers in `main.js`.
 
 the mini player is shared chrome. `/music` album cards should open the site popup track picker and send the chosen song into the mini player; do not rebuild album track lists inside the sidebar player.
 
@@ -76,7 +82,7 @@ blackprint is the base/default theme in `/style.css` and `template.html`. its de
 
 the sidebar show/hide control is animated through `body.sidebar-is-hidden`, which `main.js` toggles while preserving the `sidebarVisible` localStorage preference. blackprint and whiteprint keep their desktop `>>` menu prefixes, but mobile nav buttons suppress those prefixes for a cleaner grid.
 
-the homepage FRIDG3.ORG ASCII hero uses the shared `--hero-ascii-*` color variables so each theme can tune the gradient without editing homepage markup. the server-time and resource ASCII use `--time-*` and `--resource-*` variables, which default to the hero palette unless a theme overrides them. resource cards are intentionally unboxed so the ASCII itself carries the theme.
+the homepage FRIDG3.ORG ASCII hero uses the shared `--hero-ascii-*` color variables so each theme can tune the gradient without editing homepage markup. the server-time and resource ASCII use `--time-*` and `--resource-*` variables, which default to the hero palette unless a theme overrides them. the server-time ASCII drops seconds when the homepage is too narrow and rechecks on resize/SPAs so it does not need a refresh. resource cards are intentionally unboxed so the ASCII itself carries the theme.
 
 frdgBeats is theme-aware. its base stylesheet keeps the original default DAW colors, while selected theme stylesheets override `.frdgbeats-daw` `--fdgb-*` variables derived from `--bg`, `--fg`, `--border`, `--subtle`, and `--links`. body-mounted popups copy those variables from the app wrapper so their dialogs stay opaque and themed. synth and effect custom editors keep their own unique styling across every theme. the frdgBeats route also forces the app content area to full width after theme CSS loads.
 
@@ -126,5 +132,7 @@ edit:
 - `content.html` for page-specific markup
 - route `index.php` for server-side data flow
 - `template.html` and `template_mobile.html` for shared shell changes
-- `main.js` for client interaction changes
+- route-local `{page-name}.js` for page-specific client interactions
+- `main.js` for shared shell bootstrap or cross-page orchestration
+- `/js/*.js` for larger shared client systems used across multiple pages
 - `style.css` for shared styling

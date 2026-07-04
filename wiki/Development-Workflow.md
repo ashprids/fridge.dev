@@ -4,8 +4,9 @@
 
 - change one page’s layout or copy: route `content.html`
 - change one page’s server logic: route `index.php`
+- change one page’s client behavior: route-local `{page-name}.js`, included from that page’s `content.html`
 - change shared shell: `template.html` and probably `template_mobile.html`
-- change shared interaction logic: `main.js`
+- change shared interaction logic: `main.js` for bootstrap/orchestration, or the relevant `/js/*.js` shared system file
 - change shared look: `style.css`
 - change persistence or permissions: relevant PHP code plus data contract
 
@@ -39,7 +40,7 @@ this setup is simple but honestly pretty smart for a repo with lots of inline ma
 ## Gotchas
 
 - login/logout footer swap depends on exact HTML strings
-- `main.js` is large and route-sensitive
+- `main.js` is route-sensitive; move clearly page-owned code into route-local scripts, and larger shared systems into `/js/*.js`
 - feed and journal have different storage models
 - bookmarks have both server and localStorage behavior
 - some old code still references legacy bookmark storage patterns

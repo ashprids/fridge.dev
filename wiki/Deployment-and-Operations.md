@@ -74,6 +74,8 @@ when adding routes, APIs, uploads, redirects, or private data folders, check `.n
 
 production nginx needs explicit rewrites for PHP routes that accept path-style ids. without these, nginx falls through to the root `/index.php` fallback before the route can parse the URL.
 
+the generic `location /` fallback should route missing paths to `/error/404`, not `/index.php`, so nonexistent URLs do not quietly render the homepage.
+
 POST-only API directory routes also need POST-safe rewrites when called without `index.php`; otherwise nginx can normalize the directory URL with a redirect and the browser may retry as `GET`. `/api/dev-bootstrap` and `/api/toast-feed-generate` are included in that rewrite list.
 
 the contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access.

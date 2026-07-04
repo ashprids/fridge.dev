@@ -8,12 +8,14 @@ most pages are folder routes:
 - `/journal/posts/12` -> `journal/posts/index.php`
 - `/settings` -> `settings/index.php` + `settings/content.html`
 
-static error pages are the main exception:
+error routes are the main exception:
 
 - `error/403/index.html`
-- `error/404/index.html`
+- `error/404/index.php`
 - `error/50x/index.html`
-- `error/wip/index.html`
+- `error/wip/index.php`
+
+production nginx redirects unknown paths to `/error/404` instead of falling back to the homepage.
 
 ## Upward File Lookup
 
@@ -81,17 +83,16 @@ data-backed routes do real work:
 
 maintenance mode is driven by `data/etc/wip`.
 
-`main.js`:
+`lib/session.php` enforces it during PHP session startup, and `lib/render.php` enforces it again during PHP rendering:
 
-- loads the flag
-- shows the maintenance banner
-- redirects non-admins to `/error/wip`
+- reads the flag from `data/etc/wip`
+- redirects non-admins to `/error/wip` before page content renders or mutating POST handlers continue
 - allows `/account/login` and `/error/wip`
+- shows the maintenance banner from the server-rendered template through `lib/render.php`
+- redirects `/error/wip` back to `/` when maintenance mode is off
+- `/error/wip/wip.js` polls the flag while the WIP page is open and redirects home after maintenance ends
 
-the admin bypass depends on either:
-
-- `is_admin` cookie
-- `/api/account/is-admin`
+the admin bypass uses the server session user `isAdmin` flag, so it still works when JavaScript is disabled.
 
 ## Local Dev Mode
 

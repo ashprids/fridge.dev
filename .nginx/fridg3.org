@@ -134,15 +134,19 @@ server {
 
 
     # Fallback
-    location / { try_files $uri $uri/ /index.php?$args; }
+    location / { try_files $uri $uri/ @site_not_found; }
+
+    location @site_not_found {
+        return 302 /error/404;
+    }
 
     # Custom error redirects
     error_page 403 /error/403;
-    error_page 404 /error/404;
+    error_page 404 =302 /error/404;
     error_page 500 502 503 504 /error/50x;
 
     location = /error/403 { root /var/www/fridg3.org; }
-    location = /error/404 { root /var/www/fridg3.org; }
+    location = /error/404 { rewrite ^ /error/404/index.php last; }
     location = /error/50x { root /var/www/fridg3.org; }
     ssl_certificate /etc/letsencrypt/live/fridg3.org/fullchain.pem; # managed by Certbot
    # Certbot

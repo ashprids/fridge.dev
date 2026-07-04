@@ -59,6 +59,109 @@ if (!function_exists('fridg3_is_local_dev_server')) {
     }
 }
 
+if (!function_exists('fridg3_is_work_in_progress_enabled')) {
+    function fridg3_is_work_in_progress_enabled($startDir): bool {
+        $wipPath = fridg3_find_relative_upward($startDir, 'data/etc/wip');
+        if (!$wipPath || !is_file($wipPath)) {
+            return false;
+        }
+
+        $raw = @file_get_contents($wipPath);
+        if ($raw === false) {
+            return false;
+        }
+
+        return fridg3_is_truthy_value($raw) || strtolower(trim((string)$raw)) === 'wip';
+    }
+}
+
+if (!function_exists('fridg3_get_request_path')) {
+    function fridg3_get_request_path(): string {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+        $path = is_string($path) ? $path : '/';
+        $path = rtrim($path, '/');
+        return $path === '' ? '/' : $path;
+    }
+}
+
+if (!function_exists('fridg3_is_wip_allowed_path')) {
+    function fridg3_is_wip_allowed_path(string $path): bool {
+        $path = rtrim($path, '/');
+        $path = $path === '' ? '/' : $path;
+
+        return in_array($path, [
+            '/error/wip',
+            '/error/wip/index.html',
+            '/error/wip/index.php',
+            '/account/login',
+            '/account/login/index.php',
+        ], true);
+    }
+}
+
+if (!function_exists('fridg3_current_user_is_admin')) {
+    function fridg3_current_user_is_admin(): bool {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            $sessionPath = __DIR__ . DIRECTORY_SEPARATOR . 'session.php';
+            if (is_file($sessionPath)) {
+                require_once $sessionPath;
+                if (function_exists('fridg3_start_session')) {
+                    fridg3_start_session();
+                }
+            }
+        }
+
+        return isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']);
+    }
+}
+
+if (!function_exists('fridg3_enforce_work_in_progress')) {
+    function fridg3_enforce_work_in_progress($startDir): void {
+        if (PHP_SAPI === 'cli' || !fridg3_is_work_in_progress_enabled($startDir)) {
+            return;
+        }
+
+        if (fridg3_current_user_is_admin()) {
+            return;
+        }
+
+        $path = fridg3_get_request_path();
+        if (fridg3_is_wip_allowed_path($path)) {
+            return;
+        }
+
+        if (!headers_sent()) {
+            header('Location: /error/wip', true, 302);
+        }
+        exit;
+    }
+}
+
+if (!function_exists('fridg3_apply_work_in_progress_banner')) {
+    function fridg3_apply_work_in_progress_banner($template, $startDir) {
+        if (!fridg3_is_work_in_progress_enabled($startDir)) {
+            return $template;
+        }
+
+        return preg_replace_callback('/<span id="maintenance-banner"[^>]*>/i', function($matches) {
+            $tag = $matches[0];
+            if (preg_match('/\sstyle=(["\'])(.*?)\1/i', $tag, $styleMatches)) {
+                $quote = $styleMatches[1];
+                $style = $styleMatches[2];
+                if (preg_match('/display\s*:\s*none\s*;?/i', $style)) {
+                    $style = preg_replace('/display\s*:\s*none\s*;?/i', 'display: inline;', $style, 1);
+                } else {
+                    $style = rtrim($style);
+                    $style .= ($style !== '' && substr($style, -1) !== ';' ? ';' : '') . ' display: inline;';
+                }
+                return preg_replace('/\sstyle=(["\'])(.*?)\1/i', ' style=' . $quote . $style . $quote, $tag, 1);
+            }
+
+            return rtrim($tag, '>') . ' style="display: inline;">';
+        }, $template, 1) ?: $template;
+    }
+}
+
 if (!function_exists('fridg3_get_mobile_cookie_domain')) {
     function fridg3_get_mobile_cookie_domain() {
         $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
@@ -351,22 +454,30 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
     }
 
     function apply_preferred_theme_stylesheet($template, $startDir) {
+        fridg3_enforce_work_in_progress($startDir);
+
         $theme = fridg3_get_active_theme($startDir);
         if ($theme === null) {
-            return fridg3_inject_dev_mode_banner(fridg3_apply_body_theme_class($template, 'blackprint-theme'));
+            return fridg3_apply_work_in_progress_banner(
+                fridg3_inject_dev_mode_banner(fridg3_apply_body_theme_class($template, 'blackprint-theme')),
+                $startDir
+            );
         }
 
         $href = htmlspecialchars($theme['cssHref'], ENT_QUOTES, 'UTF-8');
         if (strpos($template, 'href="' . $href . '"') !== false || strpos($template, "href='" . $href . "'") !== false) {
-            return fridg3_inject_dev_mode_banner($template);
+            return fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($template), $startDir);
         }
 
         $themeLink = '    <link rel="stylesheet" href="' . $href . '">' . "\n";
         if (stripos($template, '</head>') !== false) {
-            return fridg3_inject_dev_mode_banner(preg_replace('/<\/head>/i', $themeLink . '</head>', $template, 1));
+            return fridg3_apply_work_in_progress_banner(
+                fridg3_inject_dev_mode_banner(preg_replace('/<\/head>/i', $themeLink . '</head>', $template, 1)),
+                $startDir
+            );
         }
 
-        return fridg3_inject_dev_mode_banner($themeLink . $template);
+        return fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($themeLink . $template), $startDir);
     }
 }
 

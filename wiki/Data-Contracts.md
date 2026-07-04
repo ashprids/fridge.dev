@@ -274,6 +274,8 @@ The `/music/upload` admin page writes audio files to `data/audio/`, cover art to
 ### `wip`
 
 - plain text maintenance flag
+- truthy values such as `true`, `1`, `yes`, `on`, `enabled`, or `wip` enable maintenance mode
+- enforced server-side by `lib/session.php` and `lib/render.php`; non-admin requests redirect to `/error/wip`
 
 ### `webhooks.json`
 
