@@ -113,6 +113,82 @@ function replaceKeys(mixed $value, array $replacements): mixed
     return $value;
 }
 
+function isIpLikeString(string $value): bool
+{
+    $value = trim($value);
+    if ($value === '') {
+        return false;
+    }
+
+    if (filter_var($value, FILTER_VALIDATE_IP) !== false) {
+        return true;
+    }
+
+    return preg_match('/^\[?[a-f0-9:]{2,}\]?$/i', $value) === 1
+        && str_contains($value, ':')
+        && filter_var(trim($value, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+}
+
+function scrubIpValues(mixed $value): mixed
+{
+    if (!is_array($value)) {
+        return is_string($value) && isIpLikeString($value) ? '' : $value;
+    }
+
+    $scrubbed = [];
+    foreach ($value as $key => $childValue) {
+        $stringKey = (string) $key;
+        if (strtolower($stringKey) === 'ip') {
+            $scrubbed[$key] = '';
+            continue;
+        }
+        if (isIpLikeString($stringKey)) {
+            continue;
+        }
+
+        $scrubbed[$key] = scrubIpValues($childValue);
+    }
+
+    return $scrubbed;
+}
+
+function sanitizeFeedReplies(string $root): void
+{
+    $replyDir = pathFor($root, 'feed/replies');
+    ensureDirectory($replyDir);
+
+    foreach (glob($replyDir . '/*.json') ?: [] as $path) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (!is_array($decoded)) {
+            continue;
+        }
+
+        if (isset($decoded['replies']) && is_array($decoded['replies'])) {
+            foreach ($decoded['replies'] as &$reply) {
+                if (!is_array($reply)) {
+                    continue;
+                }
+
+                if (!empty($reply['isGuest'])) {
+                    $reply['ip'] = '';
+                    unset($reply['guestBrowserId']);
+                }
+
+                $reply = scrubIpValues($reply);
+            }
+            unset($reply);
+        }
+
+        $sanitized = scrubIpValues($decoded);
+        $json = json_encode($sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            throw new RuntimeException("failed to encode sanitized feed replies: {$path}");
+        }
+
+        file_put_contents($path, $json . PHP_EOL, LOCK_EX);
+    }
+}
+
 /*
  * Edit this block when new sensitive /data paths need scrubbing.
  * Keep the output useful for local dev, but never ship secrets,
@@ -142,6 +218,8 @@ $webhooks = readJsonObject($root, 'etc/webhooks.json');
 writeJson($root, 'etc/webhooks.json', blankScalarValues($webhooks));
 
 writeJson($root, 'guestbook/ip_index.json', new stdClass());
+writeJson($root, 'feed/banned_ips.json', []);
+sanitizeFeedReplies($root);
 writeJson($root, 'contact/rate_limits.json', new stdClass());
 writeJson($root, 'etc/toast-dm-history.json', new stdClass());
 writeJson($root, 'etc/toast-feed-notify-state.json', [

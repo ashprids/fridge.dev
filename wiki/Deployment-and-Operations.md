@@ -131,7 +131,7 @@ on the same daily schedule as the private backup workflow, this workflow:
 5. keeps only the 10 newest zip files in that folder
 6. removes temporary server and runner files
 
-the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft.
+the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership, feed guest reply IPs/browser tokens, feed IP ban lists, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft.
 
 setup notes live in `/.github/workflows/publish-dev-data-setup.md`.
 

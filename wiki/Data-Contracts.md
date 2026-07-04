@@ -172,6 +172,7 @@ notes:
 - reply bodies can contain image BBCode that points at `/data/images/*`
 - new reply bodies can also contain voice note audio BBCode that points at `/data/audio/voice/*`
 - guest replies include `isGuest: true` plus a plaintext `ip`; guest display names are stored in `username`, default to `Anonymous`, cannot match a registered account username case-insensitively, and are filtered with guest reply bodies through `/feed/filters/*.txt` before storage; matching body text becomes tooltip-wrapped `★` text explaining `this phrase was automatically filtered.`; guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text are locked from later guest edits; admin moderation can purge all guest replies with a matching IP without changing the IP ban list
+- sanitized developer data copies blank guest reply `ip` values, remove guest reply browser notification tokens, and clear the feed IP ban list before the copy is zipped
 - automatic Toast replies are stored as normal `username: "toast"` replies when a user replies to Toast's post or mentions `@toast`; generated Toast replies begin by mentioning the triggering user and are delayed by 1 minute before posting
 
 ### `data/feed/banned_ips.json`
