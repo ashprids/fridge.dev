@@ -103,6 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $replyBody = trim((string)($_POST['reply_content'] ?? ''));
     $replyAction = (string)($_POST['reply_action'] ?? 'create');
     $replyId = trim((string)($_POST['reply_id'] ?? ''));
+    $parentReplyId = trim((string)($_POST['parent_reply_id'] ?? ''));
+    $guestBrowserId = trim((string)($_POST['guest_browser_id'] ?? ''));
     $guestDisplayName = trim((string)($_POST['guest_username'] ?? ''));
     $guestDisplayNameForSave = $guestDisplayName;
     $replyBodyForSave = $replyBody;
@@ -128,11 +130,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $replyBodyForSave = fridg3_feed_apply_guest_filter($replyBodyForSave, true);
     }
     $canModerateReplies = fridg3_feed_current_user_can_moderate_replies($username);
+    $existingReplies = fridg3_feed_load_replies((string)$postIdNoExt);
     $targetReply = null;
-    foreach (fridg3_feed_load_replies((string)$postIdNoExt) as $existingReply) {
+    $parentReply = null;
+    foreach ($existingReplies as $existingReply) {
         if (($existingReply['id'] ?? '') === $replyId) {
             $targetReply = $existingReply;
-            break;
+        }
+        if ($parentReplyId !== '' && ($existingReply['id'] ?? '') === $parentReplyId) {
+            $parentReply = $existingReply;
         }
     }
     $canManageTargetReply = $targetReply !== null
@@ -210,9 +216,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $replyError = 'reply cannot be empty.';
     } elseif (strlen($replyBody) > 4000) {
         $replyError = 'reply is too long.';
-    } elseif ($isLoggedIn && !fridg3_feed_save_reply($postIdNoExt ?? '', (string)$_SESSION['user']['username'], $replyBody)) {
+    } elseif ($parentReplyId !== '' && $parentReply === null) {
+        $replyError = 'could not find the comment you are replying to.';
+    } elseif ($isLoggedIn && !fridg3_feed_save_reply($postIdNoExt ?? '', (string)$_SESSION['user']['username'], $replyBody, $parentReplyId)) {
         $replyError = 'failed to save reply.';
-    } elseif (!$isLoggedIn && !fridg3_feed_save_guest_reply($postIdNoExt ?? '', $guestDisplayNameForSave, $clientIp, $replyBodyForSave)) {
+    } elseif (!$isLoggedIn && !fridg3_feed_save_guest_reply($postIdNoExt ?? '', $guestDisplayNameForSave, $clientIp, $replyBodyForSave, $parentReplyId, $guestBrowserId)) {
         $replyError = 'failed to save reply.';
     } else {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -268,6 +276,17 @@ if (!is_string($guestFilterTermsJson)) {
     $guestFilterTermsJson = '[]';
 }
 $replies = fridg3_feed_load_replies((string)$postIdNoExt);
+$replyParentId = trim((string)($_POST['parent_reply_id'] ?? $_GET['reply_to'] ?? ''));
+$repliesById = [];
+foreach ($replies as $reply) {
+    $replyKey = (string)($reply['id'] ?? '');
+    if ($replyKey !== '') {
+        $repliesById[$replyKey] = $reply;
+    }
+}
+if ($replyParentId !== '' && !isset($repliesById[$replyParentId])) {
+    $replyParentId = '';
+}
 $canModerateReplies = fridg3_feed_current_user_can_moderate_replies($username);
 $editReplyBodyValue = '';
 if ($replyEditTargetId !== '' && isset($_POST['reply_action']) && (string)$_POST['reply_action'] === 'update') {
@@ -408,6 +427,19 @@ if ($replyEditError !== '') {
 }
 
 $replyFormHtml = '';
+$replyTargetHtml = '';
+if ($replyParentId !== '' && isset($repliesById[$replyParentId])) {
+    $targetName = trim((string)($repliesById[$replyParentId]['username'] ?? ''));
+    if ($targetName === '') {
+        $targetName = 'Anonymous';
+    }
+    $replyTargetHtml = '<div class="feed-reply-target" data-feed-reply-target>'
+        . 'replying to <strong>' . htmlspecialchars($targetName, ENT_QUOTES, 'UTF-8') . '</strong>'
+        . ' <a href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-feed-reply-cancel>cancel</a>'
+        . '</div>';
+} else {
+    $replyTargetHtml = '<div class="feed-reply-target" data-feed-reply-target hidden></div>';
+}
 $replyToolbarHtml = '<div class="bbcode-toolbar">'
     . '<button type="button" class="bbcode-btn" data-tag="b" data-tooltip="bold"><i class="fa-solid fa-bold"></i></button>'
     . '<button type="button" class="bbcode-btn" data-tag="i" data-tooltip="italic"><i class="fa-solid fa-italic"></i></button>'
@@ -443,6 +475,9 @@ $replyToolbarHtml = '<div class="bbcode-toolbar">'
 if (!$isClientIpBanned || $isLoggedIn) {
     $replyFormHtml = '<form id="feed-reply-form" method="POST" enctype="multipart/form-data" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '">'
         . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
+        . '<input type="hidden" name="parent_reply_id" value="' . htmlspecialchars($replyParentId, ENT_QUOTES, 'UTF-8') . '" data-feed-reply-parent-input>'
+        . (!$isLoggedIn ? '<input type="hidden" name="guest_browser_id" value="" data-feed-guest-browser-id>' : '')
+        . $replyTargetHtml
         . (!$isLoggedIn ? '<input id="textbox" class="feed-guest-username" name="guest_username" type="text" maxlength="50" placeholder="name (optional)" value="' . $guestUsernameValue . '">' : '')
         . (!$isLoggedIn ? '<br><br>' : '')
         . '<div class="bbcode-editor">'
@@ -458,11 +493,10 @@ if (!$isClientIpBanned || $isLoggedIn) {
     $replyNotice = '<div class="feed-reply-notice error">guest replies from your IP address are banned.</div>';
 }
 
-$repliesHtml = '';
+$canCreateReply = !$isClientIpBanned || $isLoggedIn;
+$visibleReplies = [];
+$visibleRepliesById = [];
 foreach ($replies as $reply) {
-    $replyUser = htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8');
-    $replyDate = htmlspecialchars(fridg3_feed_humanize_datetime((string)$reply['date']), ENT_QUOTES, 'UTF-8');
-    $replyBody = htmlspecialchars((string)$reply['body'], ENT_QUOTES, 'UTF-8');
     $replyId = (string)($reply['id'] ?? '');
     $isGuestReply = ($reply['isGuest'] ?? false) === true;
     $replyIp = (string)($reply['ip'] ?? '');
@@ -470,13 +504,58 @@ foreach ($replies as $reply) {
     if (!$canModerateReplies && $replyIpBanned) {
         continue;
     }
+
+    $visibleReplies[] = $reply;
+    if ($replyId !== '') {
+        $visibleRepliesById[$replyId] = $reply;
+    }
+}
+
+$rootReplies = [];
+$childRepliesByParent = [];
+foreach ($visibleReplies as $reply) {
+    $parentId = (string)($reply['parentId'] ?? '');
+    if ($parentId !== '' && isset($visibleRepliesById[$parentId])) {
+        if (!isset($childRepliesByParent[$parentId])) {
+            $childRepliesByParent[$parentId] = [];
+        }
+        $childRepliesByParent[$parentId][] = $reply;
+    } else {
+        $rootReplies[] = $reply;
+    }
+}
+
+$renderReply = null;
+$renderReply = function (array $reply, int $depth = 0) use (
+    &$renderReply,
+    $childRepliesByParent,
+    $visibleRepliesById,
+    $canCreateReply,
+    $isLoggedIn,
+    $canModerateReplies,
+    $clientIp,
+    $username,
+    $replyEditTargetId,
+    $editReplyBodyValue,
+    $replyEditNotice,
+    $postIdNoExt
+): string {
+    $replyUser = htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8');
+    $replyDate = htmlspecialchars(fridg3_feed_humanize_datetime((string)$reply['date']), ENT_QUOTES, 'UTF-8');
+    $replyBody = htmlspecialchars((string)$reply['body'], ENT_QUOTES, 'UTF-8');
+    $replyId = (string)($reply['id'] ?? '');
+    $isGuestReply = ($reply['isGuest'] ?? false) === true;
+    $replyIp = (string)($reply['ip'] ?? '');
     $canManageThisReply = fridg3_feed_current_visitor_can_manage_reply($username, $reply, $clientIp);
     $guestFilteredEditLocked = !$isLoggedIn && $isGuestReply && fridg3_feed_guest_reply_has_filtered_text($reply);
     $canEditThisReply = $canManageThisReply && !$guestFilteredEditLocked;
     $isEditingReply = $canEditThisReply && $replyEditTargetId !== '' && $replyId === $replyEditTargetId;
     $replyActionsHtml = '';
-    if ($replyId !== '' && ($canManageThisReply || (!empty($_SESSION['user']['isAdmin']) && $isGuestReply && $replyIp !== ''))) {
+    if ($replyId !== '' && ($canCreateReply || $canManageThisReply || (!empty($_SESSION['user']['isAdmin']) && $isGuestReply && $replyIp !== ''))) {
         $replyActionsHtml = '<span class="feed-reply-actions">';
+        if ($canCreateReply) {
+            $replyActionsHtml .= '<a class="feed-reply-action-link feed-reply-target-button" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?reply_to=' . rawurlencode($replyId) . '#feed-reply-form" data-feed-reply-to="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '" data-feed-reply-user="' . htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8') . '" data-tooltip="reply to comment"><i class="fa-solid fa-reply"></i></a>';
+        }
         if ($canEditThisReply) {
             $replyActionsHtml .= '<a class="feed-reply-action-link" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?edit_reply=' . rawurlencode($replyId) . '" data-tooltip="edit reply"><i class="fa-solid fa-pencil"></i></a>';
         }
@@ -557,18 +636,43 @@ foreach ($replies as $reply) {
         : '@' . $replyUser;
     if ($canModerateReplies && $isGuestReply && $replyIp !== '') {
         $replyUserHtml .= ' <span class="feed-reply-ip" style="color: var(--subtle);">(' . htmlspecialchars($replyIp, ENT_QUOTES, 'UTF-8') . ')</span>';
+        $replyIpBanned = fridg3_feed_is_ip_banned($replyIp);
         if ($replyIpBanned) {
             $replyUserHtml .= ' <span class="feed-reply-ip" style="color: var(--subtle);">(banned)</span>';
         }
     }
-    $repliesHtml .= '<div class="feed-reply">'
+    $parentReferenceHtml = '';
+    $parentId = (string)($reply['parentId'] ?? '');
+    if ($parentId !== '' && isset($visibleRepliesById[$parentId])) {
+        $parentReply = $visibleRepliesById[$parentId];
+        $parentUser = trim((string)($parentReply['username'] ?? ''));
+        if ($parentUser === '') {
+            $parentUser = 'Anonymous';
+        }
+        $parentReferenceHtml = '<div class="feed-reply-parent">replying to <a href="#reply-' . htmlspecialchars($parentId, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($parentUser, ENT_QUOTES, 'UTF-8') . '</a></div>';
+    }
+    $replyClasses = 'feed-reply' . ($depth > 0 ? ' feed-reply-child' : '');
+    $replyAnchorId = $replyId !== '' ? ' id="reply-' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '"' : '';
+    $replyHtml = '<div class="' . $replyClasses . '"' . $replyAnchorId . '>'
         . '<div class="feed-reply-header">'
         . '<span class="feed-reply-username">' . $replyUserHtml . '</span>'
         . '<span class="feed-reply-date">' . $replyDate . $replyActionsHtml . '</span>'
         . '</div>'
+        . $parentReferenceHtml
         . '<div class="post-content feed-reply-body">' . $replyBody . '</div>'
         . $replyEditFormHtml
         . '</div>';
+
+    foreach ($childRepliesByParent[$replyId] ?? [] as $childReply) {
+        $replyHtml .= $renderReply($childReply, $depth + 1);
+    }
+
+    return $replyHtml;
+};
+
+$repliesHtml = '';
+foreach ($rootReplies as $reply) {
+    $repliesHtml .= $renderReply($reply, 0);
 }
 $repliesSectionHtml = '';
 if ($repliesHtml !== '') {

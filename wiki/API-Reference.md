@@ -15,7 +15,7 @@ all API routes live under `/api/*` and are handled by PHP.
 
 - requires logged-in user
 - returns current settings from `data/accounts/accounts.json`
-- currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, and `reduceMotion`; `colors` is honored by `classic` for the full palette and by `ambercrt`/`CRT` for the single `links` phosphor color
+- currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `reduceMotion`, `browserNotificationsEnabled`, and `journalBrowserNotificationsEnabled`; `colors` is honored by `classic` for the full palette and by `ambercrt`/`CRT` for the single `links` phosphor color
 - for the hardcoded `toast` session, also returns `toastPersonalityJson`
 
 `POST`
@@ -25,6 +25,8 @@ all API routes live under `/api/*` and are handled by PHP.
 - can set `theme` to `default`, `classic`, or a valid `/themes/*.json` theme id
 - can set the reduced-motion accessibility boolean
 - can set `onekoEnabled` for the optional cursor-following cat
+- can set `browserNotificationsEnabled` for account-backed browser feed notification polling
+- can set `journalBrowserNotificationsEnabled` for account-backed new journal post browser notifications
 - syncs the `theme_pref` cookie so anonymous and first-load rendering can pick the active theme
 - validates color fields as `#RRGGBB`; the settings UI sends the full palette for `classic` and only `links` for `CRT`
 - admin users can also toggle maintenance mode through the settings flow
@@ -90,6 +92,16 @@ route-local JSON endpoints for the `/tools/upload` peer-to-peer transfer page.
 
 - returns parsed feed post JSON for a supplied `?id=`
 - does not expose replies; thread replies are loaded directly by `/feed/posts/{id}` from `data/feed/replies/*.json`
+
+### `/api/feed-notifications`
+
+`GET`, optionally with `guestBrowserId={32 hex chars}` for logged-out browsers.
+
+- returns current browser notification candidates for feed and journal events
+- account events mirror Toast Discord feed DMs: post mentions, reply mentions, and replies to the account's own feed posts
+- guest events cover replies to guest comments created by the same browser token
+- journal events cover new published journal posts for both guests and logged-in users
+- clients keep seen notification keys in localStorage, filter event `type`, and use this endpoint for browser Notification API polling
 
 ### `/api/toast-feed-generate`
 

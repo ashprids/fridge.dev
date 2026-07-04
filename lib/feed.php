@@ -634,10 +634,44 @@ if (!function_exists('fridg3_feed_load_replies')) {
             $normalizedReply['username'] = $username;
             $normalizedReply['date'] = $date;
             $normalizedReply['body'] = $body;
+            if (isset($reply['parentId']) && is_string($reply['parentId'])) {
+                $parentId = trim($reply['parentId']);
+                if ($parentId !== '' && $parentId !== $normalizedReply['id']) {
+                    $normalizedReply['parentId'] = $parentId;
+                } else {
+                    unset($normalizedReply['parentId']);
+                }
+            }
             $normalized[] = $normalizedReply;
         }
 
         return $normalized;
+    }
+}
+
+if (!function_exists('fridg3_feed_reply_exists')) {
+    function fridg3_feed_reply_exists(array $replies, string $replyId): bool
+    {
+        $targetId = trim($replyId);
+        if ($targetId === '') {
+            return false;
+        }
+
+        foreach ($replies as $reply) {
+            if ((string)($reply['id'] ?? '') === $targetId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('fridg3_feed_normalize_guest_browser_id')) {
+    function fridg3_feed_normalize_guest_browser_id(string $browserId): string
+    {
+        $browserId = strtolower(trim($browserId));
+        return preg_match('/^[a-f0-9]{32}$/', $browserId) === 1 ? $browserId : '';
     }
 }
 
@@ -815,7 +849,7 @@ if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
 }
 
 if (!function_exists('fridg3_feed_save_reply')) {
-    function fridg3_feed_save_reply(string $postId, string $username, string $body): bool
+    function fridg3_feed_save_reply(string $postId, string $username, string $body, string $parentId = ''): bool
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         $safeUsername = preg_replace('/[^a-zA-Z0-9_\-]/', '', ltrim($username, '@'));
@@ -832,12 +866,16 @@ if (!function_exists('fridg3_feed_save_reply')) {
 
         $replyFile = $repliesDir . DIRECTORY_SEPARATOR . $safePostId . '.json';
         $existingReplies = fridg3_feed_load_replies($safePostId);
-        $existingReplies[] = [
+        $newReply = [
             'id' => date('YmdHis') . '_' . bin2hex(random_bytes(4)),
             'username' => $safeUsername,
             'date' => date('Y-m-d H:i:s'),
             'body' => $trimmedBody,
         ];
+        if ($parentId !== '' && fridg3_feed_reply_exists($existingReplies, $parentId)) {
+            $newReply['parentId'] = $parentId;
+        }
+        $existingReplies[] = $newReply;
 
         $payload = json_encode(['replies' => $existingReplies], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($payload === false) {
@@ -849,7 +887,7 @@ if (!function_exists('fridg3_feed_save_reply')) {
 }
 
 if (!function_exists('fridg3_feed_save_guest_reply')) {
-    function fridg3_feed_save_guest_reply(string $postId, string $displayName, string $ip, string $body): bool
+    function fridg3_feed_save_guest_reply(string $postId, string $displayName, string $ip, string $body, string $parentId = '', string $guestBrowserId = ''): bool
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         $safeIp = trim($ip);
@@ -870,7 +908,7 @@ if (!function_exists('fridg3_feed_save_guest_reply')) {
         }
 
         $existingReplies = fridg3_feed_load_replies($safePostId);
-        $existingReplies[] = [
+        $newReply = [
             'id' => date('YmdHis') . '_' . bin2hex(random_bytes(4)),
             'username' => $name,
             'date' => date('Y-m-d H:i:s'),
@@ -878,6 +916,14 @@ if (!function_exists('fridg3_feed_save_guest_reply')) {
             'isGuest' => true,
             'ip' => $safeIp,
         ];
+        if ($parentId !== '' && fridg3_feed_reply_exists($existingReplies, $parentId)) {
+            $newReply['parentId'] = $parentId;
+        }
+        $safeGuestBrowserId = fridg3_feed_normalize_guest_browser_id($guestBrowserId);
+        if ($safeGuestBrowserId !== '') {
+            $newReply['guestBrowserId'] = $safeGuestBrowserId;
+        }
+        $existingReplies[] = $newReply;
 
         return fridg3_feed_write_replies($safePostId, $existingReplies);
     }

@@ -68,6 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'colors' => null,
             'onekoEnabled' => null,
             'reduceMotion' => null,
+            'browserNotificationsEnabled' => null,
+            'journalBrowserNotificationsEnabled' => null,
         ],
     ];
     if ($isToast) {
@@ -92,6 +94,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             if (array_key_exists('reduceMotion', $account)) {
                 $result['settings']['reduceMotion'] = is_truthy_setting($account['reduceMotion']);
+            }
+            if (array_key_exists('browserNotificationsEnabled', $account)) {
+                $result['settings']['browserNotificationsEnabled'] = is_truthy_setting($account['browserNotificationsEnabled']);
+            }
+            if (array_key_exists('journalBrowserNotificationsEnabled', $account)) {
+                $result['settings']['journalBrowserNotificationsEnabled'] = is_truthy_setting($account['journalBrowserNotificationsEnabled']);
             }
             break;
         }
@@ -133,6 +141,12 @@ $reduceMotionRaw = $reduceMotionProvided ? (string)$_POST['reduceMotion'] : null
 
 $onekoProvided = array_key_exists('onekoEnabled', $_POST);
 $onekoRaw = $onekoProvided ? (string)$_POST['onekoEnabled'] : null;
+
+$browserNotificationsProvided = array_key_exists('browserNotificationsEnabled', $_POST);
+$browserNotificationsRaw = $browserNotificationsProvided ? (string)$_POST['browserNotificationsEnabled'] : null;
+
+$journalBrowserNotificationsProvided = array_key_exists('journalBrowserNotificationsEnabled', $_POST);
+$journalBrowserNotificationsRaw = $journalBrowserNotificationsProvided ? (string)$_POST['journalBrowserNotificationsEnabled'] : null;
 
 $toastPersonalityProvided = array_key_exists('toastPersonalityJson', $_POST);
 $toastPersonalityRaw = $toastPersonalityProvided ? (string)$_POST['toastPersonalityJson'] : null;
@@ -200,6 +214,84 @@ if ($onekoProvided) {
     foreach ($data['accounts'] as &$account) {
         if (isset($account['username']) && (string)$account['username'] === $username) {
             $account['onekoEnabled'] = $onekoEnabled;
+            $updated = true;
+            break;
+        }
+    }
+    unset($account);
+
+    if ($updated) {
+        if (!save_accounts_data($accountsPath, $data)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'write_failed']);
+            exit;
+        }
+        $didWork = true;
+    }
+}
+
+if ($browserNotificationsProvided) {
+    $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+    $falsy  = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+    $lower = strtolower(trim((string)$browserNotificationsRaw));
+    if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_browser_notifications_value']);
+        exit;
+    }
+
+    $browserNotificationsEnabled = in_array($lower, $truthy, true);
+    $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+    $data = load_accounts_data($accountsPath);
+    if ($data === null) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
+        exit;
+    }
+
+    $updated = false;
+    foreach ($data['accounts'] as &$account) {
+        if (isset($account['username']) && (string)$account['username'] === $username) {
+            $account['browserNotificationsEnabled'] = $browserNotificationsEnabled;
+            $updated = true;
+            break;
+        }
+    }
+    unset($account);
+
+    if ($updated) {
+        if (!save_accounts_data($accountsPath, $data)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'write_failed']);
+            exit;
+        }
+        $didWork = true;
+    }
+}
+
+if ($journalBrowserNotificationsProvided) {
+    $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+    $falsy  = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+    $lower = strtolower(trim((string)$journalBrowserNotificationsRaw));
+    if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_journal_browser_notifications_value']);
+        exit;
+    }
+
+    $journalBrowserNotificationsEnabled = in_array($lower, $truthy, true);
+    $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+    $data = load_accounts_data($accountsPath);
+    if ($data === null) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
+        exit;
+    }
+
+    $updated = false;
+    foreach ($data['accounts'] as &$account) {
+        if (isset($account['username']) && (string)$account['username'] === $username) {
+            $account['journalBrowserNotificationsEnabled'] = $journalBrowserNotificationsEnabled;
             $updated = true;
             break;
         }
@@ -455,7 +547,7 @@ if ($maintenanceProvided) {
     $didWork = true;
 }
 
-if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $reduceMotionProvided || $onekoProvided || $toastPersonalityProvided) {
+if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $reduceMotionProvided || $onekoProvided || $browserNotificationsProvided || $journalBrowserNotificationsProvided || $toastPersonalityProvided) {
     echo json_encode(['ok' => true]);
     exit;
 }

@@ -1521,6 +1521,7 @@ function bindSpaForm(form) {
                 initAsciiUsage();
                 initAsciiTime();
                 initOffTopicArchive();
+                initSettingsPage();
                 syncOnekoPreference();
                 rerunAsciiScalingAfterContent();
                 initTooltips();
@@ -1686,14 +1687,74 @@ function setupSpaForms() {
         if (loginForm && !loginForm.dataset.noSpa) bindSpaForm(loginForm);
 
         const createPostForm = document.getElementById('create-post-form');
-        if (createPostForm) bindSpaForm(createPostForm);
+        if (createPostForm) {
+            const rawPath = (window.location && window.location.pathname) ? window.location.pathname : '/';
+            const path = rawPath.replace(/\/+$/, '') || '/';
+            if (path === '/feed/create' || path === '/feed/create/index.php') {
+                bindFeedNotificationSubmitPrompt(createPostForm, 'post');
+            }
+            bindSpaForm(createPostForm);
+        }
 
         const feedReplyForm = document.getElementById('feed-reply-form');
-        if (feedReplyForm) bindSpaForm(feedReplyForm);
+        if (feedReplyForm) {
+            bindFeedNotificationSubmitPrompt(feedReplyForm, 'comment');
+            bindSpaForm(feedReplyForm);
+        }
+        fillGuestBrowserIdInputs();
+        initFeedReplyTargets();
+        startFeedNotificationPolling();
     } catch (_) { /* no-op */ }
 }
 
 window.addEventListener('DOMContentLoaded', setupSpaForms);
+
+function initFeedReplyTargets() {
+    const form = document.getElementById('feed-reply-form');
+    if (!form || form.dataset.replyTargetsInitialized === '1') return;
+    form.dataset.replyTargetsInitialized = '1';
+
+    const parentInput = form.querySelector('[data-feed-reply-parent-input]');
+    const targetBox = form.querySelector('[data-feed-reply-target]');
+    const textbox = form.querySelector('.feed-reply-textbox');
+    if (!parentInput || !targetBox) return;
+
+    const postPath = window.location.pathname || form.getAttribute('action') || '';
+    const clearTarget = () => {
+        parentInput.value = '';
+        targetBox.hidden = true;
+        targetBox.innerHTML = '';
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(window.history.state, '', postPath);
+        }
+    };
+
+    document.querySelectorAll('[data-feed-reply-to]').forEach(button => {
+        if (button.dataset.replyTargetBound === '1') return;
+        button.dataset.replyTargetBound = '1';
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            const replyId = button.getAttribute('data-feed-reply-to') || '';
+            const username = button.getAttribute('data-feed-reply-user') || 'Anonymous';
+            if (!replyId) return;
+            parentInput.value = replyId;
+            targetBox.hidden = false;
+            targetBox.innerHTML = `replying to <strong>${siteEscapeHtml(username)}</strong> <a href="${siteEscapeHtml(postPath)}" data-feed-reply-cancel>cancel</a>`;
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (textbox) textbox.focus();
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(window.history.state, '', `${postPath}?reply_to=${encodeURIComponent(replyId)}#feed-reply-form`);
+            }
+        });
+    });
+
+    targetBox.addEventListener('click', event => {
+        const cancel = event.target.closest('[data-feed-reply-cancel]');
+        if (!cancel) return;
+        event.preventDefault();
+        clearTarget();
+    });
+}
 
 // Render the #off-topic archive in a Discord-like view
 function initOffTopicArchive() {
@@ -2170,6 +2231,12 @@ const THEME_COLOR_DEFAULTS = {
 const MOBILE_VIEW_COOKIE = 'mobile_friendly_view';
 const MOBILE_VIEW_DOMAIN = '.fridg3.org';
 const ONEKO_ENABLED_KEY = 'onekoEnabled';
+const BROWSER_NOTIFICATIONS_ENABLED_KEY = 'browserNotificationsEnabled';
+const JOURNAL_BROWSER_NOTIFICATIONS_ENABLED_KEY = 'journalBrowserNotificationsEnabled';
+const FEED_NOTIFICATION_SEEN_KEY = 'feedNotificationSeenKeys';
+const FEED_GUEST_BROWSER_ID_KEY = 'feedGuestBrowserId';
+const FEED_NOTIFICATION_PROMPT_SEEN_KEY = 'feedNotificationPromptSeen';
+const FEED_NOTIFICATION_POLL_MS = 30000;
 const ACCESSIBILITY_PREFS_KEY = 'accessibilityPrefs';
 const ACCESSIBILITY_DEFAULTS = {
     reduceMotion: false,
@@ -2181,6 +2248,7 @@ const ONEKO_FRAME_MS = 100;
 const ONEKO_SLEEP_AFTER_MS = 15000;
 const ONEKO_SLEEP_FRAME_TICKS = 4;
 let onekoController = null;
+let feedNotificationPollTimer = null;
 
 // Apply saved color prefs early on page load for themes that expose color controls.
 (() => {
@@ -2327,6 +2395,272 @@ function saveLocalOnekoEnabled(enabled) {
     try {
         localStorage.setItem(ONEKO_ENABLED_KEY, enabled ? '1' : '0');
     } catch (_) { /* ignore */ }
+}
+
+function readLocalBrowserNotificationsEnabled() {
+    try {
+        const value = localStorage.getItem(BROWSER_NOTIFICATIONS_ENABLED_KEY);
+        if (value === null) return false;
+        return ['1', 'true', 'yes', 'y', 'on', 'enabled'].includes(String(value).trim().toLowerCase());
+    } catch (_) {
+        return false;
+    }
+}
+
+function saveLocalBrowserNotificationsEnabled(enabled) {
+    try {
+        localStorage.setItem(BROWSER_NOTIFICATIONS_ENABLED_KEY, enabled ? '1' : '0');
+    } catch (_) { /* ignore */ }
+}
+
+function readLocalJournalBrowserNotificationsEnabled() {
+    try {
+        const value = localStorage.getItem(JOURNAL_BROWSER_NOTIFICATIONS_ENABLED_KEY);
+        if (value === null) return false;
+        return ['1', 'true', 'yes', 'y', 'on', 'enabled'].includes(String(value).trim().toLowerCase());
+    } catch (_) {
+        return false;
+    }
+}
+
+function saveLocalJournalBrowserNotificationsEnabled(enabled) {
+    try {
+        localStorage.setItem(JOURNAL_BROWSER_NOTIFICATIONS_ENABLED_KEY, enabled ? '1' : '0');
+    } catch (_) { /* ignore */ }
+}
+
+function hasAnyBrowserNotificationChannelEnabled() {
+    return readLocalBrowserNotificationsEnabled() || readLocalJournalBrowserNotificationsEnabled();
+}
+
+function readFeedNotificationPromptSeen(kind) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(FEED_NOTIFICATION_PROMPT_SEEN_KEY) || '{}');
+        return !!(parsed && parsed[kind]);
+    } catch (_) {
+        return false;
+    }
+}
+
+function saveFeedNotificationPromptSeen(kind) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(FEED_NOTIFICATION_PROMPT_SEEN_KEY) || '{}');
+        const next = parsed && typeof parsed === 'object' ? parsed : {};
+        next[kind] = true;
+        localStorage.setItem(FEED_NOTIFICATION_PROMPT_SEEN_KEY, JSON.stringify(next));
+    } catch (_) { /* ignore */ }
+}
+
+function getFeedGuestBrowserId() {
+    try {
+        let id = localStorage.getItem(FEED_GUEST_BROWSER_ID_KEY);
+        if (/^[a-f0-9]{32}$/i.test(id || '')) {
+            return String(id).toLowerCase();
+        }
+        const bytes = new Uint8Array(16);
+        if (window.crypto && window.crypto.getRandomValues) {
+            window.crypto.getRandomValues(bytes);
+            id = Array.from(bytes).map(byte => byte.toString(16).padStart(2, '0')).join('');
+        } else {
+            id = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        }
+        localStorage.setItem(FEED_GUEST_BROWSER_ID_KEY, id);
+        return id;
+    } catch (_) {
+        return '';
+    }
+}
+
+function readFeedNotificationSeenKeys() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(FEED_NOTIFICATION_SEEN_KEY) || '[]');
+        return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+    } catch (_) {
+        return new Set();
+    }
+}
+
+function saveFeedNotificationSeenKeys(keys) {
+    try {
+        localStorage.setItem(FEED_NOTIFICATION_SEEN_KEY, JSON.stringify(Array.from(keys).slice(-1000)));
+    } catch (_) { /* ignore */ }
+}
+
+async function fetchFeedNotificationEvents() {
+    if (!window.fetch) return [];
+    const params = new URLSearchParams();
+    if (!document.getElementById('user-greeting')) {
+        const guestBrowserId = getFeedGuestBrowserId();
+        if (guestBrowserId) params.append('guestBrowserId', guestBrowserId);
+    }
+    const url = params.toString() ? `/api/feed-notifications?${params.toString()}` : '/api/feed-notifications';
+    const res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => null);
+    return data && data.ok && Array.isArray(data.events) ? data.events : [];
+}
+
+async function baselineFeedNotifications() {
+    const events = await fetchFeedNotificationEvents();
+    const seen = readFeedNotificationSeenKeys();
+    events.forEach(event => {
+        if (event && event.key) seen.add(String(event.key));
+    });
+    saveFeedNotificationSeenKeys(seen);
+}
+
+function showFeedBrowserNotification(event) {
+    if (!event || !event.key || !('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+        const notification = new Notification(event.title || 'fridg3.org', {
+            body: event.body || '',
+            tag: event.key,
+        });
+        notification.onclick = () => {
+            window.focus();
+            if (event.url) window.location.href = event.url;
+            notification.close();
+        };
+    } catch (_) { /* ignore */ }
+}
+
+async function pollFeedNotifications() {
+    if (!hasAnyBrowserNotificationChannelEnabled()) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const events = await fetchFeedNotificationEvents();
+    const seen = readFeedNotificationSeenKeys();
+    let changed = false;
+    events.forEach(event => {
+        const key = event && event.key ? String(event.key) : '';
+        const type = event && event.type ? String(event.type) : 'feed';
+        if (type === 'journal' && !readLocalJournalBrowserNotificationsEnabled()) return;
+        if (type !== 'journal' && !readLocalBrowserNotificationsEnabled()) return;
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        changed = true;
+        showFeedBrowserNotification(event);
+    });
+    if (changed) saveFeedNotificationSeenKeys(seen);
+}
+
+function startFeedNotificationPolling() {
+    if (feedNotificationPollTimer !== null) {
+        window.clearInterval(feedNotificationPollTimer);
+        feedNotificationPollTimer = null;
+    }
+    if (!hasAnyBrowserNotificationChannelEnabled()) return;
+    pollFeedNotifications();
+    feedNotificationPollTimer = window.setInterval(pollFeedNotifications, FEED_NOTIFICATION_POLL_MS);
+}
+
+async function setBrowserNotificationsEnabled(enabled, opts = {}) {
+    if (!enabled) {
+        if (feedNotificationPollTimer !== null) {
+            window.clearInterval(feedNotificationPollTimer);
+            feedNotificationPollTimer = null;
+        }
+        return false;
+    }
+    if (!('Notification' in window)) {
+        if (opts.report !== false) await showSiteNotice('browser notifications unavailable', 'this browser does not support notifications.');
+        return false;
+    }
+    let permission = Notification.permission;
+    if (permission === 'default') {
+        permission = await Notification.requestPermission();
+    }
+    if (permission !== 'granted') {
+        if (opts.report !== false) await showSiteNotice('browser notifications blocked', 'enable notifications in your browser to use this.');
+        return false;
+    }
+    if (opts.baseline !== false) {
+        await baselineFeedNotifications();
+    }
+    startFeedNotificationPolling();
+    return true;
+}
+
+function fillGuestBrowserIdInputs() {
+    if (document.getElementById('user-greeting')) return;
+    const inputs = document.querySelectorAll('[data-feed-guest-browser-id]');
+    if (!inputs.length) return;
+    const guestBrowserId = getFeedGuestBrowserId();
+    inputs.forEach(input => {
+        input.value = guestBrowserId;
+    });
+}
+
+function shouldPromptForFeedNotifications(kind) {
+    if (readLocalBrowserNotificationsEnabled()) return false;
+    if (readFeedNotificationPromptSeen(kind)) return false;
+    return true;
+}
+
+function saveBrowserNotificationsAccountPreference(feedEnabled, journalEnabled = null) {
+    if (!document.getElementById('user-greeting') || !window.fetch) {
+        return Promise.resolve(false);
+    }
+    const params = new URLSearchParams();
+    params.append('browserNotificationsEnabled', feedEnabled ? 'on' : 'off');
+    if (journalEnabled !== null) {
+        params.append('journalBrowserNotificationsEnabled', journalEnabled ? 'on' : 'off');
+    }
+    return fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: params.toString(),
+    }).then(response => response.ok).catch(() => false);
+}
+
+function bindFeedNotificationSubmitPrompt(form, kind) {
+    if (!form || form.dataset.notificationPromptBound === '1') return;
+    form.dataset.notificationPromptBound = '1';
+
+    form.addEventListener('submit', function(event) {
+        if (event.defaultPrevented || form.dataset.notificationPromptReady === '1') return;
+        if (!shouldPromptForFeedNotifications(kind)) return;
+        const textBox = form.querySelector('textarea[name="content"], textarea[name="reply_content"]');
+        if (textBox && !String(textBox.value || '').trim()) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const submitter = event.submitter || null;
+        const isPost = kind === 'post';
+        showSitePopup({
+            title: 'notify you of replies?',
+            detail: isPost
+                ? 'fridg3.org can send browser notifications when people reply to your feed post.'
+                : 'fridg3.org can send browser notifications when people reply to your comment.',
+            okText: 'notify me',
+            cancelText: 'not now',
+        }).then(async (accepted) => {
+            saveFeedNotificationPromptSeen(kind);
+            if (accepted) {
+                const enabled = await setBrowserNotificationsEnabled(true, { baseline: true });
+                if (enabled) {
+                    saveLocalBrowserNotificationsEnabled(true);
+                    await saveBrowserNotificationsAccountPreference(true);
+                }
+            }
+            form.dataset.notificationPromptReady = '1';
+            if (form.requestSubmit) {
+                form.requestSubmit(submitter);
+            } else {
+                form.submit();
+            }
+            window.setTimeout(() => {
+                delete form.dataset.notificationPromptReady;
+            }, 0);
+        });
+    });
 }
 
 function normalizeAccessibilityPrefs(prefs) {
@@ -2521,6 +2855,15 @@ function syncOnekoPreference() {
         if (!data || !data.ok || !data.settings) return;
         if (typeof data.settings.onekoEnabled === 'boolean') {
             setOnekoEnabled(data.settings.onekoEnabled);
+        }
+        if (typeof data.settings.browserNotificationsEnabled === 'boolean') {
+            saveLocalBrowserNotificationsEnabled(data.settings.browserNotificationsEnabled);
+        }
+        if (typeof data.settings.journalBrowserNotificationsEnabled === 'boolean') {
+            saveLocalJournalBrowserNotificationsEnabled(data.settings.journalBrowserNotificationsEnabled);
+        }
+        if (hasAnyBrowserNotificationChannelEnabled()) {
+            startFeedNotificationPolling();
         }
         const accessibilityPrefs = {};
         ['reduceMotion'].forEach(key => {
@@ -2726,7 +3069,8 @@ function initSettingsPage() {
     try {
         const rawPath = (window.location && window.location.pathname) ? window.location.pathname : '/';
         const path = rawPath.replace(/\/+$/, '') || '/';
-        if (!path.startsWith('/settings')) return;
+        const saveBtn = document.getElementById('settings-save');
+        if (!path.startsWith('/settings') && !saveBtn) return;
 
         const glowGroup = document.getElementById('text-glow-group');
         const glowToggle = document.getElementById('text-glow-toggle');
@@ -2738,8 +3082,9 @@ function initSettingsPage() {
         const colorResetBtn = document.getElementById('color-reset');
         const mobileViewToggle = document.getElementById('mobile-friendly-toggle');
         const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+        const feedNotificationsToggle = document.getElementById('feed-notifications-toggle');
+        const journalNotificationsToggle = document.getElementById('journal-notifications-toggle');
         const onekoToggle = document.getElementById('oneko-toggle');
-        const saveBtn = document.getElementById('settings-save');
         const sitemapBtn = document.querySelector('[data-action="generate-sitemap"]');
         const devDataBootstrapBtn = document.querySelector('[data-action="dev-data-bootstrap"]');
         const toastPersonalityTextarea = document.getElementById('toast-personality-json');
@@ -2783,6 +3128,16 @@ function initSettingsPage() {
         const setOnekoToggle = (enabled) => {
             if (!onekoToggle) return;
             onekoToggle.checked = enabled === true;
+        };
+
+        const setFeedNotificationsToggle = (enabled) => {
+            if (!feedNotificationsToggle) return;
+            feedNotificationsToggle.checked = enabled === true;
+        };
+
+        const setJournalNotificationsToggle = (enabled) => {
+            if (!journalNotificationsToggle) return;
+            journalNotificationsToggle.checked = enabled === true;
         };
 
         const getAccessibilityValues = () => {
@@ -3381,6 +3736,8 @@ function initSettingsPage() {
         setMobileViewToggle(readMobileViewCookie());
         setAccessibilityToggles(readLocalAccessibilityPrefs());
         setOnekoToggle(readLocalOnekoEnabled());
+        setFeedNotificationsToggle(readLocalBrowserNotificationsEnabled());
+        setJournalNotificationsToggle(readLocalJournalBrowserNotificationsEnabled());
 
         if (window.fetch) {
             fetch('/api/themes', {
@@ -3441,6 +3798,17 @@ function initSettingsPage() {
                     setOnekoToggle(data.settings.onekoEnabled);
                     setOnekoEnabled(data.settings.onekoEnabled);
                 }
+                if (typeof data.settings.browserNotificationsEnabled === 'boolean') {
+                    setFeedNotificationsToggle(data.settings.browserNotificationsEnabled);
+                    saveLocalBrowserNotificationsEnabled(data.settings.browserNotificationsEnabled);
+                }
+                if (typeof data.settings.journalBrowserNotificationsEnabled === 'boolean') {
+                    setJournalNotificationsToggle(data.settings.journalBrowserNotificationsEnabled);
+                    saveLocalJournalBrowserNotificationsEnabled(data.settings.journalBrowserNotificationsEnabled);
+                }
+                if (hasAnyBrowserNotificationChannelEnabled()) {
+                    startFeedNotificationPolling();
+                }
                 if (typeof data.settings.glowIntensity === 'string') {
                     const serverGlowIntensity = data.settings.glowIntensity === 'none' ? 'none' : 'medium';
                     glowToggle.checked = serverGlowIntensity !== 'none';
@@ -3475,7 +3843,7 @@ function initSettingsPage() {
             });
         }
 
-        saveBtn.addEventListener('click', function() {
+        saveBtn.addEventListener('click', async function() {
             const selected = glowToggle.checked ? 'medium' : 'none';
 
             const mobileViewEnabled = !!(mobileViewToggle && mobileViewToggle.checked);
@@ -3523,6 +3891,19 @@ function initSettingsPage() {
             }
             const onekoEnabled = !!(onekoToggle && onekoToggle.checked);
             setOnekoEnabled(onekoEnabled);
+            const feedNotificationsEnabled = !!(feedNotificationsToggle && feedNotificationsToggle.checked);
+            const journalNotificationsEnabled = !!(journalNotificationsToggle && journalNotificationsToggle.checked);
+            const anyNotificationsEnabled = feedNotificationsEnabled || journalNotificationsEnabled;
+            const browserNotificationsReady = await setBrowserNotificationsEnabled(anyNotificationsEnabled);
+            const savedFeedNotificationsEnabled = browserNotificationsReady && feedNotificationsEnabled;
+            const savedJournalNotificationsEnabled = browserNotificationsReady && journalNotificationsEnabled;
+            saveLocalBrowserNotificationsEnabled(savedFeedNotificationsEnabled);
+            saveLocalJournalBrowserNotificationsEnabled(savedJournalNotificationsEnabled);
+            setFeedNotificationsToggle(savedFeedNotificationsEnabled);
+            setJournalNotificationsToggle(savedJournalNotificationsEnabled);
+            if (browserNotificationsReady && (savedFeedNotificationsEnabled || savedJournalNotificationsEnabled)) {
+                startFeedNotificationPolling();
+            }
 
             if (isLoggedIn && window.fetch) {
                 const params = new URLSearchParams();
@@ -3530,6 +3911,8 @@ function initSettingsPage() {
                 params.append('theme', selectedTheme);
                 params.append('reduceMotion', accessibilityPrefs.reduceMotion ? 'on' : 'off');
                 params.append('onekoEnabled', onekoEnabled ? 'on' : 'off');
+                params.append('browserNotificationsEnabled', savedFeedNotificationsEnabled ? 'on' : 'off');
+                params.append('journalBrowserNotificationsEnabled', savedJournalNotificationsEnabled ? 'on' : 'off');
 
                 if (themeSupportsColorPrefs(selectedTheme) && Object.keys(mergedColors).length) {
                     // flatten colors into separate fields (merged so defaults persist server-side)

@@ -102,6 +102,7 @@ local/browser state used by the site includes:
 - `is_admin` cookie
 - localStorage bookmarks for anonymous users
 - localStorage dismissal state for some prompts
+- localStorage feed/journal browser notification preferences, first-submit notification prompt state, notification seen keys, and the guest feed comment browser token
 
 server-backed user state is exposed through:
 

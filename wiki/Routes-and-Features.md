@@ -11,6 +11,7 @@ homepage with dynamic latest feed, latest journal, and music cards.
 - list/search/paginate feed posts from `data/feed/*.txt`
 - create visibility depends on admin or `allowedPages` containing `feed`
 - create composer supports recorded voice notes; accepted recordings request browser noise suppression, echo cancellation, and auto gain when available, are previewed before posting, capped at 2 minutes, transcoded to compressed `.m4a`, stored under `data/audio/voice/`, and played with inline controls that include a `1x`/`1.5x`/`2x` speed toggle
+- the first time a browser submits a new feed post, an in-site popup asks whether to enable browser notifications for replies
 - deleting a feed post removes voice note files referenced by the post body and its replies
 - writes derived `index.toml`
 - `@mentions` in BBCode are highlighted client-side for notification-aware feed posts
@@ -31,11 +32,13 @@ Related:
 ### `/feed/posts/{id}`
 
 - single-post thread view for a feed item
-- logged-in users can reply with BBCode, image uploads, and recorded voice notes using the same inline speed-toggle playback controls
-- guests can reply without creating feed posts; they are identified by plaintext IP, may enter an optional display name that falls back to italic `Anonymous`, cannot use a registered account username as that display name, can link images but cannot upload files or voice notes, and do not get heading or tooltip BBCode controls; guest display names and reply bodies are filtered through `/feed/filters/*.txt`, matching body text is replaced with `★` plus the tooltip `this phrase was automatically filtered.`, and the BBCode preview shows the same filtering
+- logged-in users can reply to the post or to an individual comment with BBCode, image uploads, and recorded voice notes using the same inline speed-toggle playback controls
+- guests can reply to the post or to an individual comment without creating feed posts; they are identified by plaintext IP, may enter an optional display name that falls back to italic `Anonymous`, cannot use a registered account username as that display name, can link images but cannot upload files or voice notes, and do not get heading or tooltip BBCode controls; guest display names and reply bodies are filtered through `/feed/filters/*.txt`, matching body text is replaced with `★` plus the tooltip `this phrase was automatically filtered.`, and the BBCode preview shows the same filtering
+- the first time a browser submits a comment, an in-site popup asks whether to enable browser notifications for replies to comments
 - guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text cannot be edited by guests after posting
 - reply edit/delete is allowed for the reply author, same-IP guest replies, admins, the original post owner, or accounts with `allowedPages` containing `comments`
-- replies persist under `data/feed/replies/{postId}.json`
+- replies persist under `data/feed/replies/{postId}.json`; comment replies stay in the same flat list with optional `parentId` metadata and render directly beneath their parent comment
+- guest replies can store a same-browser notification token so logged-out visitors can receive browser notifications when someone replies to their comments
 - deleting a reply removes voice note files referenced by that reply
 - admin IP moderation actions appear beside guest reply edit/delete icons; admins can ban an IP or purge guest replies by exact plaintext IP without deleting the feed post or changing the IP ban list
 - when a non-Toast user replies to a Toast-owned post or mentions `@toast` in a reply, Toast may automatically reply after a 1 minute delay with a short old-style Twitter-sized response and starts by mentioning that user
@@ -100,7 +103,8 @@ Related:
 
 - UI shell only
 - persistence handled by `/api/settings`
-- includes accessibility toggles for mobile view and reduced motion, plus theme selection, a text glow toggle, and optional cursor cat
+- includes accessibility toggles for mobile view and reduced motion, notification toggles for feed events and new journal posts, plus theme selection, a text glow toggle, and optional cursor cat
+- browser notifications use the Notification API while the site is open; logged-in users can receive feed mention/reply events matching Toast Discord feed DMs, guests can receive replies to comments made from the same browser, and both can receive new journal post alerts
 - developer mode can bootstrap a blank-password `admin` / `Administrator` account when no admin accounts exist, and can download the latest sanitized developer data zip, delete local `data/`, and install the new copy
 - shows a Discord linking action for logged-in users and disables it once `discordUserId` is already linked
 - when logged in as hardcoded `toast`, shows a JSON editor for shared Toast personalities stored in `data/etc/toast-personality.json`

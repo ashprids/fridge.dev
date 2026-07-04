@@ -34,6 +34,8 @@ expected top-level shape:
       "glowIntensity": "none|medium",
       "onekoEnabled": true,
       "reduceMotion": false,
+      "browserNotificationsEnabled": true,
+      "journalBrowserNotificationsEnabled": true,
       "colors": {
         "bg": "#RRGGBB",
         "fg": "#RRGGBB",
@@ -55,6 +57,7 @@ notes:
 - legacy `blackprint` normalizes to `default`, `custom` normalizes to `classic`, `newsprint` normalizes to `whiteprint`, `crt` normalizes to `ambercrt`, and removed `liminal`/`syswave` preferences normalize to `default`
 - text glow is stored in `glowIntensity`; the settings UI writes `none` for off and `medium` for on, while legacy `low`/`high` values are treated as enabled medium glow when saved again
 - accessibility toggles are stored as account booleans such as `reduceMotion`; logged-out browsers keep the same preferences in localStorage
+- `browserNotificationsEnabled` stores the account-backed preference for browser feed notifications; `journalBrowserNotificationsEnabled` stores the account-backed preference for new journal post browser notifications; logged-out browsers keep the same preferences and dedupe state in localStorage
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes
 - `discordUserId` links a site account to a Discord member for bot DMs and notifications
 - `allowedPages` currently includes functional grants like `feed`, `journal`, `comments`, and `chat`
@@ -152,8 +155,10 @@ per-post replies live in `{postId}.json` files shaped roughly like:
       "username": "Anonymous",
       "date": "2026-04-13 15:30:00",
       "body": "reply body with BBCode",
+      "parentId": "optional parent reply id for comment replies",
       "isGuest": true,
-      "ip": "203.0.113.10"
+      "ip": "203.0.113.10",
+      "guestBrowserId": "optional same-browser notification token"
     }
   ]
 }
@@ -162,6 +167,8 @@ per-post replies live in `{postId}.json` files shaped roughly like:
 notes:
 
 - reply ids are generated on write; older data may be normalized into `legacy_*` ids at read time
+- replies to individual comments are stored in the same flat array with optional `parentId`; older top-level replies simply omit it
+- guest replies may include `guestBrowserId`, a random browser-local token used only so guests can receive browser notifications when someone replies to their comments from another browser/account
 - reply bodies can contain image BBCode that points at `/data/images/*`
 - new reply bodies can also contain voice note audio BBCode that points at `/data/audio/voice/*`
 - guest replies include `isGuest: true` plus a plaintext `ip`; guest display names are stored in `username`, default to `Anonymous`, cannot match a registered account username case-insensitively, and are filtered with guest reply bodies through `/feed/filters/*.txt` before storage; matching body text becomes tooltip-wrapped `★` text explaining `this phrase was automatically filtered.`; guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text are locked from later guest edits; admin moderation can purge all guest replies with a matching IP without changing the IP ban list
