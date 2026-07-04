@@ -9,6 +9,10 @@ fridg3_start_session();
 
 $title = 'music';
 $description = 'songs made or published by fridg3.org';
+$musicUploadArtists = [
+    'frdg3' => 'frdg3',
+    'cactile' => 'Cactile',
+];
 
 
 function find_template_file($filename) {
@@ -69,6 +73,22 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+
+function music_is_admin(): bool {
+    return isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']);
+}
+
+function music_upload_button(string $artistKey, string $artistLabel): string {
+    if (!music_is_admin()) {
+        return '';
+    }
+
+    $safeArtistKey = htmlspecialchars($artistKey, ENT_QUOTES, 'UTF-8');
+    $safeArtistLabel = htmlspecialchars($artistLabel, ENT_QUOTES, 'UTF-8');
+    return '<a style="text-decoration: none;" href="/music/upload?artist=' . $safeArtistKey . '">'
+        . '<button id="form-button" type="button">upload music for ' . $safeArtistLabel . '</button>'
+        . '</a>';
+}
 
 // Helper to build an album grid from a folder of JSON files
 function build_album_grid($folder) {
@@ -157,8 +177,18 @@ function build_album_grid($folder) {
 // Build grids
 $frdg3_grid_html = build_album_grid('frdg3');
 $cactile_grid_html = build_album_grid('cactile');
+$music_admin_notice = '';
+if (isset($_GET['uploaded'])) {
+    $uploadedArtist = strtolower(trim((string)$_GET['uploaded']));
+    if (isset($musicUploadArtists[$uploadedArtist])) {
+        $music_admin_notice = '<div class="music-upload-notice">uploaded music for ' . htmlspecialchars($musicUploadArtists[$uploadedArtist], ENT_QUOTES, 'UTF-8') . '.</div>';
+    }
+}
 
 // Inject generated grids into placeholders in content.html
+$content = str_replace('{music_admin_notice}', $music_admin_notice, $content);
+$content = str_replace('{frdg3_upload_button}', music_upload_button('frdg3', 'frdg3'), $content);
+$content = str_replace('{cactile_upload_button}', music_upload_button('cactile', 'Cactile'), $content);
 $content = str_replace('{frdg3_grid}', $frdg3_grid_html, $content);
 $content = str_replace('{cactile_grid}', $cactile_grid_html, $content);
 
@@ -167,4 +197,3 @@ $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);
 echo $html;
 ?>
-    

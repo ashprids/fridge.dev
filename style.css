@@ -1411,6 +1411,222 @@ a.grid-subcaption {
     text-decoration: none !important;
 }
 
+.music-upload-form {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0 0 16px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 86%, var(--fg) 14%);
+}
+
+.music-upload-heading {
+    margin-bottom: 10px;
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 14px;
+}
+
+.music-upload-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.music-upload-form label {
+    display: block;
+    color: var(--subtle);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 12px;
+}
+
+.music-upload-form input[type="text"],
+.music-upload-form input[type="number"],
+.music-upload-form select {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 14px;
+}
+
+.music-upload-form input[type="file"] {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    height: 38px;
+    margin-top: 4px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.music-upload-form input[type="file"]::file-selector-button {
+    box-sizing: border-box;
+    max-width: 82px;
+    height: 24px;
+    margin: 0 8px 0 0;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.music-upload-form input[type="file"]::-webkit-file-upload-button {
+    box-sizing: border-box;
+    max-width: 82px;
+    height: 24px;
+    margin: 0 8px 0 0;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.music-upload-form input:focus,
+.music-upload-form select:focus {
+    outline: none;
+    border-color: var(--links);
+}
+
+.music-upload-file {
+    margin-bottom: 10px;
+}
+
+.music-upload-notice {
+    box-sizing: border-box;
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--links) 18%, var(--bg) 82%);
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 14px;
+}
+
+.music-upload-error {
+    background: color-mix(in srgb, #bb6c79 28%, var(--bg) 72%);
+}
+
+.music-upload-tracks {
+    margin-bottom: 10px;
+}
+
+.music-upload-track {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 12px;
+    align-items: end;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.music-upload-track label {
+    min-width: 0;
+}
+
+.music-upload-track-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    grid-row: 1 / 3;
+    align-self: stretch;
+    min-height: 38px;
+    border: 1px solid var(--border);
+    color: var(--subtle);
+}
+
+.music-upload-track-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-column: 2 / -1;
+    gap: 14px;
+}
+
+.music-upload-form #two-buttons.music-upload-action-button,
+.music-upload-form #form-button.music-upload-submit-button {
+    display: block;
+    width: 100%;
+    height: 38px;
+    min-height: 38px;
+    margin-left: 0;
+    margin-bottom: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    box-shadow: none;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.music-upload-form #form-button.music-upload-submit-button {
+    margin-top: 10px;
+}
+
+.music-upload-form #two-buttons.music-upload-action-button + #two-buttons.music-upload-action-button {
+    margin-left: 0;
+}
+
+.music-upload-form #two-buttons.music-upload-action-button:hover,
+.music-upload-form #form-button.music-upload-submit-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--fg);
+}
+
+.music-upload-form #two-buttons.music-upload-action-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+body.blackprint-theme .music-upload-form #two-buttons.music-upload-action-button,
+body.blackprint-theme .music-upload-form #form-button.music-upload-submit-button {
+    background: var(--bg);
+    color: var(--fg);
+    border-color: var(--border);
+    box-shadow: none;
+}
+
+body.blackprint-theme .music-upload-form #two-buttons.music-upload-action-button:hover,
+body.blackprint-theme .music-upload-form #form-button.music-upload-submit-button:hover {
+    background: rgba(236, 231, 220, 0.1);
+    color: var(--fg);
+}
+
+@media (max-width: 760px) {
+    .music-upload-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .music-upload-track {
+        grid-template-columns: 42px minmax(0, 1fr);
+        align-items: stretch;
+    }
+
+    .music-upload-track-handle {
+        grid-row: span 2;
+    }
+}
+
 hr {
     width: 100%;
     height: 0;

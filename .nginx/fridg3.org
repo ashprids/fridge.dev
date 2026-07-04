@@ -4,7 +4,7 @@ server {
 
     root /var/www/fridg3.org;
     index index.html index.php;
-    client_max_body_size 20M;
+    client_max_body_size 0;
 
     location ~ \.php$ {
         root /var/www/fridg3.org;
@@ -102,6 +102,16 @@ server {
 
     location /tools/upload/ {
         try_files $uri $uri/ /tools/upload/index.php?$args;
+    }
+
+    # Music upload route: avoid trailing-slash redirects that drop POST bodies.
+    # Music files can be very large, so do not set a request body cap here.
+    location = /music/upload {
+        rewrite ^ /music/upload/index.php?$args last;
+    }
+
+    location /music/upload/ {
+        try_files $uri $uri/ /music/upload/index.php?$args;
     }
 
     # Chat clean URLs + POST-safe dashboard route

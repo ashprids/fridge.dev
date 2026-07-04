@@ -244,6 +244,8 @@ album JSON shape:
 
 `album_art_directory` is preferred by current code.
 
+The `/music/upload` admin page writes audio files to `data/audio/`, cover art to `data/images/`, and creates release JSON in the selected artist folder. `single`, `remix`, and `album` uploads can store multiple tracks, preserving the submitted row order in `songs`. Release `order` is assigned automatically as one higher than the current highest order in that artist folder. Uploaded audio accepts `mp3`, `wav`, `m4a`, `ogg`, and `flac` with no app-level size cap; uploaded cover art accepts `jpg`, `png`, `gif`, and `webp`. The deployed nginx and PHP-FPM config must also allow unlimited request bodies; local PHP dev servers may need equivalent `-d upload_max_filesize=0 -d post_max_size=0` startup flags because they do not always read `.user.ini`.
+
 ## `data/audio/`
 
 - track files referenced by music metadata

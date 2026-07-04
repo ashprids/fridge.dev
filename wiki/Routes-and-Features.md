@@ -73,7 +73,9 @@ Related:
 
 - builds album grids from `data/music/frdg3/*.json` and `data/music/cactile/*.json`
 - songs reference `data/audio/*`
-- integrates with the shared mini player; album clicks open an on-site popup track picker, while singles/remixes play directly
+- integrates with the shared mini player; album and other multi-track release clicks open an on-site popup track picker, while single-track releases play directly
+- admins see upload buttons for each artist; `/music/upload` saves audio files to `data/audio/` and creates release JSON in that artist's `data/music/{artist}/` folder
+- `/music/upload` supports `single`, `remix`, and `album` release types; all release types can add multiple track rows and reorder them before saving, and release order is assigned automatically from the current highest order for the selected artist
 
 ### `/gallery`
 

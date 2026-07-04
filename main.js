@@ -4729,9 +4729,9 @@ function initMiniPlayer() {
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
 
-                    // For Singles and Remixes: play the first defined track
-                    // directly in the mini player without showing a track list.
-                    if (albumType !== 'album') {
+                    // Single-track releases play directly; multi-track releases
+                    // use the picker so singles/remixes can expose every track.
+                    if (albumType !== 'album' && tracks.length === 1) {
                         if (!tracks.length) return;
 
                         const first = tracks.find(t => t && (t.directory || t.file_directory));
@@ -4770,7 +4770,7 @@ function initMiniPlayer() {
                         return;
                     }
 
-                    // For full Albums: show the track picker in the site popup.
+                    // For full Albums and multi-track releases: show the track picker.
                     clearActiveTracks();
                     if (tracklistEl) {
                         tracklistEl.innerHTML = '';
