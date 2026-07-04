@@ -154,7 +154,7 @@ if (!function_exists('fridg3_apply_work_in_progress_banner')) {
                     $style = rtrim($style);
                     $style .= ($style !== '' && substr($style, -1) !== ';' ? ';' : '') . ' display: inline;';
                 }
-                return preg_replace('/\sstyle=(["\'])(.*?)\1/i', ' style=' . $quote . $style . $quote, $tag, 1);
+                return preg_replace('/\sstyle=(["\'])(.*?)\1/i', ' ' . 'style' . '=' . $quote . $style . $quote, $tag, 1);
             }
 
             return rtrim($tag, '>') . ' style="display: inline;">';
