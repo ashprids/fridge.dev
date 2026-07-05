@@ -114,6 +114,39 @@ function showSitePrompt(title, detail, value) {
 window.showSiteNotice = showSiteNotice;
 window.showSitePrompt = showSitePrompt;
 
+function consumeLegacyDomainRedirectNotice() {
+    try {
+        const currentUrl = new URL(window.location.href);
+        const marker = currentUrl.searchParams.get('legacy_domain');
+        let cameFromLegacyDomain = marker === 'fridg3.org';
+
+        if (!cameFromLegacyDomain && document.referrer) {
+            const referrerUrl = new URL(document.referrer);
+            const referrerHost = referrerUrl.hostname.toLowerCase();
+            cameFromLegacyDomain = referrerHost === 'fridg3.org'
+                || referrerHost === 'www.fridg3.org'
+                || referrerHost === 'm.fridg3.org';
+        }
+
+        if (!cameFromLegacyDomain) return;
+
+        currentUrl.searchParams.delete('legacy_domain');
+        if (marker !== null) {
+            window.history.replaceState(window.history.state, document.title, currentUrl.toString());
+        }
+
+        showSitePopup({
+            title: 'heads up!',
+            html: '<p>you came here through fridg3.org, which now redirects to fridge.dev.</p><p>fridg3.org will expire on 13/01/2027. make sure you update any links or bookmarks!</p>',
+            okText: 'got it'
+        });
+    } catch (_) {
+        /* no-op */
+    }
+}
+
+window.addEventListener('DOMContentLoaded', consumeLegacyDomainRedirectNotice);
+
 async function fetchAdminStatus() {
     try {
         const res = await fetch('/api/account/is-admin', { credentials: 'include' });
@@ -177,7 +210,7 @@ function autoScaleAsciiFont() {
             if (!shouldSwitch) return;
             try {
                 const targetUrl = new URL(window.location.href);
-                targetUrl.hostname = 'm.fridg3.org';
+                targetUrl.hostname = 'm.fridge.dev';
                 setMobileViewCookie(true);
                 hostRedirectInProgress = true;
                 hideSpaLoading();
@@ -285,7 +318,7 @@ function initAsciiTime() {
             };
             if (labelEl) {
                 const tz = londonTzAbbrev(now);
-                labelEl.textContent = `fridg3.org Server Time (${tz})`;
+                labelEl.textContent = `fridge.dev Server Time (${tz})`;
             }
 
             const shortTime = now.toLocaleTimeString('en-GB', timeOptions);
@@ -599,7 +632,7 @@ function refreshAsciiLayoutAfterFontLoad() {
 
 window.addEventListener('DOMContentLoaded', refreshAsciiLayoutAfterFontLoad);
 
-// this script contains a shit ton of functionality for fridg3.org
+// this script contains a shit ton of functionality for fridge.dev
 // it sucks and i refuse to touch it without the guiding hand of AI
 // no code for a website should need to span over 2000 lines of code
 // but it works and thats what matters, right?
@@ -636,14 +669,14 @@ function redirectMobileVisitorsToMobileHost() {
         syncMobileViewCookieWithCurrentHost();
         const mobileViewPreference = readMobileViewCookie();
 
-        if (host === 'fridg3.org' && mobile && mobileViewPreference !== false) {
-            currentUrl.hostname = 'm.fridg3.org';
+        if (host === 'fridge.dev' && mobile && mobileViewPreference !== false) {
+            currentUrl.hostname = 'm.fridge.dev';
             window.location.replace(currentUrl.toString());
             return;
         }
 
-        if (host === 'm.fridg3.org' && !mobile) {
-            currentUrl.hostname = 'fridg3.org';
+        if (host === 'm.fridge.dev' && !mobile) {
+            currentUrl.hostname = 'fridge.dev';
             window.location.replace(currentUrl.toString());
         }
     } catch (_) {
@@ -800,7 +833,7 @@ function isInternalWebsiteUrl(url) {
         const parsed = new URL(url, window.location.href);
         const host = parsed.hostname.toLowerCase();
         if (parsed.origin === window.location.origin) return true;
-        return host === 'fridg3.org' || host === 'www.fridg3.org' || host === 'm.fridg3.org';
+        return host === 'fridge.dev' || host === 'www.fridge.dev' || host === 'm.fridge.dev';
     } catch (_) {
         return true;
     }
@@ -1083,7 +1116,7 @@ function setupSpaNavigation() {
             e.preventDefault();
             const url = anchor.href;
             showSitePopup({
-                title: 'leaving fridg3.org',
+                title: 'leaving fridge.dev',
                 html: '<p>this link opens an external site.</p><p>' + siteEscapeHtml(url) + '</p>',
                 okText: 'open link',
                 cancelText: 'stay here'

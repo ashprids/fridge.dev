@@ -4,7 +4,7 @@ Version v1.45
 
 Made by Ashton "fridge" Prideaux
 
-<https://fridg3.org>
+<https://fridge.dev>
 
 ## Libraries
 
@@ -33,7 +33,7 @@ and work on this project.
 
 Thanks to OpenAI for creating Codex, which has helped massively with frdgBeats and shaved months off its development time.
 
-Thanks to the software behind fridg3.org *(Vultr, Cloudflare, PHP, JavaScript, Nginx)* for allowing me to give this software a platform.
+Thanks to the software behind fridge.dev *(Vultr, Cloudflare, PHP, JavaScript, Nginx)* for allowing me to give this software a platform.
 
 Thanks to Yazmin for tolerating my absolutely insufferable mental state. This isn't really frdgBeats specific, I just feel kinda bad. Maybe mentioning you will help you with employment, who knows :P
 

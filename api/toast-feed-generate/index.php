@@ -302,7 +302,7 @@ function toast_feed_build_payload(array $groq, string $context, string $avoidToa
             [
                 'role' => 'system',
                 'content' => (
-                    "You are writing as @toast for the fridg3.org feed. Return only the post body, no author line, no date, no markdown fences. "
+                    "You are writing as @toast for the fridge.dev feed. Return only the post body, no author line, no date, no markdown fences. "
                     . "BBCode is allowed when useful. Do not attach or reference image files. "
                     . "Length setting: " . $lengthProfile['label'] . ". " . $lengthProfile['instruction'] . " "
                     . "The selected length overrides any general personality rule about always being short. "
@@ -535,12 +535,12 @@ if (!function_exists('curl_init')) {
 
 $userInstruction = $mode === 'prompt'
     ? (
-        "Write a new fridg3.org feed post using this prompt as the primary source of topic and intent. "
+        "Write a new fridge.dev feed post using this prompt as the primary source of topic and intent. "
         . "Do not let existing feed examples steer the subject unless the prompt asks for that.\n"
         . $prompt
     )
     : (
-        "Write a new random fridg3.org feed post with original material. Invent a fresh concrete premise from Toast's own perspective. "
+        "Write a new random fridge.dev feed post with original material. Invent a fresh concrete premise from Toast's own perspective. "
         . "Do not base it on, continue, summarize, or respond to the existing feed examples."
     );
 

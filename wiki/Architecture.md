@@ -36,7 +36,7 @@ mobile/desktop template choice is centralized in `lib/render.php`.
 
 mobile mode is enabled when any of these are true:
 
-- host is `m.fridg3.org`
+- host is `m.fridge.dev`
 - cookie `mobile_friendly_view` is truthy
 
 the `mobile_friendly_view` preference is browser-only and is not stored in account JSON.

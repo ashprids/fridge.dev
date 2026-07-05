@@ -33,7 +33,7 @@ if ($paste !== null && !empty($paste['encrypted']) && $_SERVER['REQUEST_METHOD']
 	}
 }
 
-$title = 'mdpaste | fridg3.org';
+$title = 'mdpaste | fridge.dev';
 $description = 'a markdown file has been shared with you! view it here.';
 header('Content-Type: text/html; charset=utf-8');
 ?>
@@ -49,7 +49,7 @@ header('Content-Type: text/html; charset=utf-8');
 	<link rel="icon" type="image/png" href="/resources/favicon-96x96.png" sizes="96x96">
 	<link rel="shortcut icon" href="/resources/favicon-96x96.png">
 	<link rel="apple-touch-icon" sizes="180x180" href="/resources/apple-touch-icon.png">
-	<meta name="apple-mobile-web-app-title" content="fridg3.org">
+	<meta name="apple-mobile-web-app-title" content="fridge.dev">
 	<link rel="manifest" href="/resources/site.webmanifest">
 </head>
 <body>

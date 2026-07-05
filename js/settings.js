@@ -26,7 +26,7 @@ const THEME_COLOR_DEFAULTS = {
     },
 };
 const MOBILE_VIEW_COOKIE = 'mobile_friendly_view';
-const MOBILE_VIEW_DOMAIN = '.fridg3.org';
+const MOBILE_VIEW_DOMAIN = '.fridge.dev';
 const ONEKO_ENABLED_KEY = 'onekoEnabled';
 const BROWSER_NOTIFICATIONS_ENABLED_KEY = 'browserNotificationsEnabled';
 const JOURNAL_BROWSER_NOTIFICATIONS_ENABLED_KEY = 'journalBrowserNotificationsEnabled';
@@ -165,7 +165,7 @@ function getCookie(name) {
 
 function shouldUseSharedFridg3CookieDomain() {
     const host = ((window.location && window.location.hostname) ? window.location.hostname : '').toLowerCase();
-    return host === 'fridg3.org' || host === 'm.fridg3.org' || host.endsWith('.fridg3.org');
+    return host === 'fridge.dev' || host === 'm.fridge.dev' || host.endsWith('.fridge.dev');
 }
 
 function setMobileViewCookie(enabled) {
@@ -313,7 +313,7 @@ async function baselineFeedNotifications() {
 function showFeedBrowserNotification(event) {
     if (!event || !event.key || !('Notification' in window) || Notification.permission !== 'granted') return;
     try {
-        const notification = new Notification(event.title || 'fridg3.org', {
+        const notification = new Notification(event.title || 'fridge.dev', {
             body: event.body || '',
             tag: event.key,
         });
@@ -434,8 +434,8 @@ function bindFeedNotificationSubmitPrompt(form, kind) {
         showSitePopup({
             title: 'notify you of replies?',
             detail: isPost
-                ? 'fridg3.org can send browser notifications when people reply to your feed post.'
-                : 'fridg3.org can send browser notifications when people reply to your comment.',
+                ? 'fridge.dev can send browser notifications when people reply to your feed post.'
+                : 'fridge.dev can send browser notifications when people reply to your comment.',
             okText: 'notify me',
             cancelText: 'not now',
         }).then(async (accepted) => {
@@ -698,7 +698,7 @@ function syncMobileViewCookieWithCurrentHost() {
     try {
         const host = getCurrentHostName();
         const cookieValue = readMobileViewCookie();
-        if (host === 'm.fridg3.org' && cookieValue === null) {
+        if (host === 'm.fridge.dev' && cookieValue === null) {
             setMobileViewCookie(true);
         }
     } catch (_) { /* ignore */ }

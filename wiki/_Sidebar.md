@@ -1,4 +1,4 @@
-# fridg3.org Wiki
+# fridge.dev Wiki
 
 - [Home](Home)
 - [Architecture](Architecture)

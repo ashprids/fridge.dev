@@ -8,8 +8,8 @@ current chain:
 
 1. push to `main`
 2. `code lint` workflow runs
-3. if lint passes, `deploy to fridg3.org` runs from the successful workflow event
-4. repo is rsynced to `/var/www/fridg3.org`
+3. if lint passes, `deploy to fridge.dev` runs from the successful workflow event
+4. repo is rsynced to `/var/www/fridge.dev`
 5. the Toast Discord bot is gracefully restarted from the deployed copy
 
 ## Deploy Workflow
@@ -22,8 +22,9 @@ main details:
 - only deploys pushes to `main`
 - installs `rsync` and `openssh-client`
 - uses `DEPLOY_KEY`
-- deploy target is `deploy@45.76.134.105:/var/www/fridg3.org`
-- after rsync, ssh stops any `toast` GNU screen session owned by `deploy`, stops any `toast` session owned by `http`, prepares `others/toast-discord-bot/bot/toast-bot.log` for `http`, then runs `/var/www/fridg3.org/others/toast-discord-bot/bot/start.sh` as `http`
+- deploy target is `deploy@45.76.134.105:/var/www/fridge.dev`
+- the workflow verifies `/var/www/fridge.dev` exists and is writable before rsync, and refuses any unexpected target path
+- after rsync, ssh stops any `toast` GNU screen session owned by `deploy`, stops any `toast` session owned by `http`, prepares `others/toast-discord-bot/bot/toast-bot.log` for `http`, then runs `/var/www/fridge.dev/others/toast-discord-bot/bot/start.sh` as `http`
 - the restart step needs passwordless sudo for `deploy` to run the Toast bot as `http`; Toast writes DM history and feed notification state under `/data`, which is owned by `http:http`
 - because the `http` user home is not a normal login home, the workflow sets `SCREENDIR=/tmp/toast-screen-http` for `http`-owned screen commands and creates that socket directory as `http` with mode `700` before start
 
@@ -65,10 +66,12 @@ the workflow prepares `toast-bot.log` as `deploy` with group `http` and mode `66
 the repo-tracked files in `.nginx/` are the source for the production nginx config.
 
 - `.nginx/nginx.conf` corresponds to `/etc/nginx/nginx.conf`
-- `.nginx/fridg3.org` corresponds to `/etc/nginx/sites-enabled/fridg3.org`
+- `.nginx/fridge.dev` corresponds to `/etc/nginx/sites-enabled/fridge.dev`
 - production uses these through symlinks, so edits here are real server config edits, not examples
 
-when adding routes, APIs, uploads, redirects, or private data folders, check `.nginx/fridg3.org` as part of the feature. a correct PHP route can still fail if nginx redirects POSTs, misses a clean-url rewrite, or accidentally exposes/blocklists the wrong `/data` path.
+when adding routes, APIs, uploads, redirects, or private data folders, check `.nginx/fridge.dev` as part of the feature. a correct PHP route can still fail if nginx redirects POSTs, misses a clean-url rewrite, or accidentally exposes/blocklists the wrong `/data` path.
+
+legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled in Cloudflare, not nginx. the frontend detects those landings with `document.referrer` and shows the one-time rebrand popup.
 
 ## Nginx Clean URLs
 
@@ -101,7 +104,7 @@ what it does:
 
 1. ssh to the server
 2. remove stale temporary backup zips from `/home/deploy`
-3. zip `/var/www/fridg3.org/data` into a temporary archive under `/home/deploy`
+3. zip `/var/www/fridge.dev/data` into a temporary archive under `/home/deploy`
 4. download the archive to the runner
 5. upload it to Google Drive using `rclone`
 6. keep only the 10 newest backups
@@ -120,13 +123,15 @@ required secrets:
 
 setup notes live in `/.github/workflows/backup-data-setup.md`.
 
+the backup and developer-data workflows also refuse to run if `TARGET` is anything other than `/var/www/fridge.dev`, so a stale workflow variable cannot accidentally back up or publish the wrong site tree.
+
 ## Developer Data Copy
 
 `/.github/workflows/publish-dev-data.yml`
 
 on the same daily schedule as the private backup workflow, this workflow:
 
-1. copies production `/var/www/fridg3.org/data` into a temporary server workspace
+1. copies production `/var/www/fridge.dev/data` into a temporary server workspace
 2. runs `/.github/scripts/sanitize-dev-data.php` against the copy
 3. zips the sanitized directory as `DD-MM-YY_hh-mm-ss.zip`
 4. uploads it to the public Google Drive developer data folder

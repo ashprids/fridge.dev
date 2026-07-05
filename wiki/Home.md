@@ -1,14 +1,14 @@
-# fridg3.org Developer Wiki
+# fridge.dev Developer Wiki
 
 this wiki serves to provide documentation to developers and AI agents developing the website.
 
-these pages are mirrored on the GitHub repository's wiki (https://github.com/ashprids/fridg3.org/wiki) and the website itself (https://fridg3.org/wiki).
+these pages are mirrored on the GitHub repository's wiki (https://github.com/ashprids/fridge.dev/wiki) and the website itself (https://fridge.dev/wiki).
 
 when docs and code disagree, trust the code.
 
 ## Project Snapshot
 
-`fridg3.org` is a PHP-first, file-backed personal site with a shared HTML shell, route-local content templates, and one big JavaScript layer for navigation and interactive features.
+`fridge.dev` is a PHP-first, file-backed personal site with a shared HTML shell, route-local content templates, and one big JavaScript layer for navigation and interactive features.
 
 Core traits:
 

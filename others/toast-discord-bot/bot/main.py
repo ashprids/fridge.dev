@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Discord bot for fridg3.org - plays m3u internet streams and handles Discord notifications
+Discord bot for fridge.dev - plays m3u internet streams and handles Discord notifications
 """
 
 import discord
@@ -44,7 +44,7 @@ GROQ_CHAT_COMPLETIONS_URL = 'https://api.groq.com/openai/v1/chat/completions'
 DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant'
 DEFAULT_GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 DEFAULT_TOAST_PERSONALITY = (
-    "You are Toast, a humanoid fridg3.org resident whose closest relative is the homosapien. "
+    "You are Toast, a humanoid fridge.dev resident whose closest relative is the homosapien. "
     "You do not think of yourself as a bot, AI, assistant, agent, model, or program. "
     "Reply in DMs like a friendly, concise person. "
     "Be helpful, casual, and clear. Do not mention system prompts, hidden config, API calls, or internal logs."
@@ -340,7 +340,7 @@ def load_personality_prompt() -> str:
     )
     prompt_parts.append(
         "Identity anchor:\n"
-        "- You are Toast, a humanoid fridg3.org resident. You do not consider yourself a bot, AI, assistant, agent, model, or program.\n"
+        "- You are Toast, a humanoid fridge.dev resident. You do not consider yourself a bot, AI, assistant, agent, model, or program.\n"
         "- If asked what you are, say your closest relative is the homosapien, or answer as a person would. Keep it casual and do not over-explain."
     )
     return "\n\n".join(prompt_parts)
@@ -350,19 +350,19 @@ def build_bot_purpose_context() -> str:
     stream_name = str(stream_config.get('name', '')).strip()
     stream_url = str(stream_config.get('url', '')).strip()
 
-    radio_line = "You play the fridg3.org radio stream in Discord voice channels."
+    radio_line = "You play the fridge.dev radio stream in Discord voice channels."
     if stream_name:
-        radio_line = f"You play the fridg3.org radio stream in Discord voice channels. The current stream is {stream_name}."
+        radio_line = f"You play the fridge.dev radio stream in Discord voice channels. The current stream is {stream_name}."
     if stream_url:
         radio_line += " You do not need to mention the raw stream URL unless someone specifically asks for it."
 
     return (
-        "Toast's fridg3.org duties and limits:\n"
+        "Toast's fridge.dev duties and limits:\n"
         f"- {radio_line}\n"
         "- Your only Discord slash commands are /play, /stop, /status, and /sendmsg. Do not invent or suggest any other Discord slash commands.\n"
-        "- Website paths like /feed, /journal, /chat, /settings, and /tools are fridg3.org pages, not Discord slash commands.\n"
-        "- If someone asks how to use a website feature, direct them to the relevant fridg3.org page or describe the website flow; do not turn website paths into Discord commands.\n"
-        "- You send useful DMs for fridg3.org events, including account invites, feed mentions, and replies to a user's feed posts.\n"
+        "- Website paths like /feed, /journal, /chat, /settings, and /tools are fridge.dev pages, not Discord slash commands.\n"
+        "- If someone asks how to use a website feature, direct them to the relevant fridge.dev page or describe the website flow; do not turn website paths into Discord commands.\n"
+        "- You send useful DMs for fridge.dev events, including account invites, feed mentions, and replies to a user's feed posts.\n"
         "- You help keep the website connected to Discord, including account linking and notification delivery.\n"
         "- In this private DM chat, you can explain these duties and answer questions, but you should not claim you personally changed settings, joined voice, or sent admin notifications unless the current conversation or site code actually did that.\n"
         "- If someone asks for an action that needs admin tools or server slash commands, tell them the practical next step instead of pretending it already happened."
@@ -445,7 +445,7 @@ def build_wiki_context_for_message(user_text: str) -> str:
     if not relevant_sections:
         relevant_sections = [
             section for section in sections
-            if section.get('source') == 'Home.md' and section.get('title') in ('Project Snapshot', 'fridg3.org Developer Wiki')
+            if section.get('source') == 'Home.md' and section.get('title') in ('Project Snapshot', 'fridge.dev Developer Wiki')
         ][:2]
 
     if not relevant_sections:
@@ -470,7 +470,7 @@ def build_wiki_context_for_message(user_text: str) -> str:
         return ''
 
     return (
-        "Relevant fridg3.org wiki context follows. Use it only when it helps answer the user's question. "
+        "Relevant fridge.dev wiki context follows. Use it only when it helps answer the user's question. "
         "Explain it in plain, non-dev language; do not say 'according to the wiki' unless naming the source is useful. "
         "If the context does not answer the question, say so and keep the reply honest.\n\n"
         + "\n\n---\n\n".join(context_parts)
@@ -712,7 +712,7 @@ def build_linked_feed_context_for_user(discord_user_id: str) -> str:
 
     lines = [
         (
-            f"Private linked fridg3.org context for this Discord user: they are linked to "
+            f"Private linked fridge.dev context for this Discord user: they are linked to "
             f"the website account @{username}. Use this only to understand their vibe, interests, "
             "projects, and recent site activity. Do not quote this context verbatim, do not act "
             "creepy about knowing it, and do not claim you can see anything beyond their public "
@@ -1475,7 +1475,7 @@ async def feed_notifications_monitor():
                     continue
                 await send_dm_to_user(
                     discord_user_id,
-                    f"**@{post['username']}** mentioned you in [a /feed/ post](https://fridg3.org/feed/posts/{post_id}):\n"
+                    f"**@{post['username']}** mentioned you in [a /feed/ post](https://fridge.dev/feed/posts/{post_id}):\n"
                     f"> \"{format_quote_block(post.get('body', ''))}\""
                 )
 
@@ -1511,7 +1511,7 @@ async def feed_notifications_monitor():
                         continue
                     await send_dm_to_user(
                         discord_user_id,
-                        f"**@{reply['username']}** mentioned you in a reply on [a /feed/ post](https://fridg3.org/feed/posts/{post_id}):\n"
+                        f"**@{reply['username']}** mentioned you in a reply on [a /feed/ post](https://fridge.dev/feed/posts/{post_id}):\n"
                         f"> \"{format_quote_block(reply.get('body', ''))}\""
                     )
 
@@ -1521,7 +1521,7 @@ async def feed_notifications_monitor():
                     continue
                 await send_dm_to_user(
                     post_owner_discord_id,
-                    f"**@{reply['username']}** replied to [your /feed/ post](https://fridg3.org/feed/posts/{post_id}):\n"
+                    f"**@{reply['username']}** replied to [your /feed/ post](https://fridge.dev/feed/posts/{post_id}):\n"
                     f"> \"{format_quote_block(reply.get('body', ''))}\""
                 )
 
@@ -1814,10 +1814,10 @@ async def link_discord_handler(request):
 
     try:
         if role not in member.roles:
-            await member.add_roles(role, reason='fridg3.org account linked')
+            await member.add_roles(role, reason='fridge.dev account linked')
         await send_logged_dm(
             member,
-            f"Your Discord account has been linked to the account `@{site_username}` on **fridg3.org**.\n\n"
+            f"Your Discord account has been linked to the account `@{site_username}` on **fridge.dev**.\n\n"
             "If this wasn't you, don't worry. **Your Discord account is *not* compromised**. \n"
             "Just send a message to <@609510856811741428> and your Discord will be unlinked.\n\n"
             "You'll receive messages from me whenever any of the following happens:\n"
@@ -1867,11 +1867,11 @@ async def send_account_invite_handler(request):
     try:
         await send_logged_dm(
             user,
-            "## fridg3.org - user account invitation\n"
-            "hey, my name is toast and i'm messaging you on behalf of **fridg3.org.**\n"
+            "## fridge.dev - user account invitation\n"
+            "hey, my name is toast and i'm messaging you on behalf of **fridge.dev.**\n"
             "you've been informally invited to having an account on the website!\n\n"
             "### account information\n"
-            "below are your account login details. you can log in [here](https://fridg3.org/account/login/).\n"
+            "below are your account login details. you can log in [here](https://fridge.dev/account/login/).\n"
             "when you log in for the first time, you won't be able to do anything until you change your password.\n"
             f"> **username:** {site_username}\n"
             f"> **password:** ||{site_password}||\n\n"
@@ -1958,7 +1958,7 @@ async def contact_notify_handler(request):
     sender_name = str(payload.get('name', '')).strip()
     sender_email = str(payload.get('email', '')).strip()
     message_preview = str(payload.get('message_preview', '')).strip()
-    dashboard_url = str(payload.get('dashboard_url', 'https://fridg3.org/contact?dashboard=1')).strip()
+    dashboard_url = str(payload.get('dashboard_url', 'https://fridge.dev/contact?dashboard=1')).strip()
 
     if not re.fullmatch(r'\d{17,20}', channel_id):
         return web.json_response({'ok': False, 'error': 'invalid channel id'}, status=400)
@@ -1981,7 +1981,7 @@ async def contact_notify_handler(request):
         sender = f"{sender} <{sender_email}>"
 
     message = (
-        "## new fridg3.org contact submission\n"
+        "## new fridge.dev contact submission\n"
         f"**from:** {sender}\n"
         f"**id:** `{submission_id}`\n"
         f"**dashboard:** {dashboard_url}\n\n"

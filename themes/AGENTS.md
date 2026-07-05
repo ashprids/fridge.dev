@@ -1,6 +1,6 @@
 # Theme Creation Instructions
 
-this directory contains selectable website themes for fridg3.org.
+this directory contains selectable website themes for fridge.dev.
 
 if a user says something like "using this AGENTS.md, create an x based theme", you should be able to make the whole theme from this file plus the existing examples. do the work directly unless the request is dangerously unclear.
 
@@ -99,7 +99,7 @@ translation: go wild aesthetically, but do not strand users on a pretty page wit
 
 ## Mobile Behavior
 
-mobile view uses `/template_mobile.html`, not the theme HTML file. this is easy to forget and then the theme looks half-baked on `m.fridg3.org`, so treat mobile CSS as required theme work, not a nice extra.
+mobile view uses `/template_mobile.html`, not the theme HTML file. this is easy to forget and then the theme looks half-baked on `m.fridge.dev`, so treat mobile CSS as required theme work, not a nice extra.
 
 when mobile-friendly view is active:
 

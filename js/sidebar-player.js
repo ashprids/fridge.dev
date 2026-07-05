@@ -896,7 +896,7 @@ function syncAccountFooterButton() {
 
         const isLoggedInNow = !!document.getElementById('user-greeting');
         accountLink.setAttribute('href', isLoggedInNow ? '/account/logout' : '/account');
-        accountButton.setAttribute('data-tooltip', isLoggedInNow ? 'log out' : 'access your fridg3.org account');
+        accountButton.setAttribute('data-tooltip', isLoggedInNow ? 'log out' : 'access your fridge.dev account');
         accountButton.innerHTML = isLoggedInNow
             ? '<i class="fa-solid fa-right-from-bracket"></i>'
             : '<i class="fa-solid fa-user"></i>';

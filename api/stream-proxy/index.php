@@ -83,7 +83,7 @@ if (function_exists('curl_init')) {
         CURLOPT_RETURNTRANSFER => false,
         CURLOPT_HEADER => false,
         CURLOPT_HTTPHEADER => [
-            'User-Agent: fridg3.org-stream-proxy'
+            'User-Agent: fridge.dev-stream-proxy'
         ],
         // Do not cap total time; streaming should run indefinitely
         CURLOPT_TIMEOUT => 0,
@@ -121,7 +121,7 @@ if (function_exists('curl_init')) {
 $context = stream_context_create([
     'http' => [
         'method' => 'GET',
-        'header' => "User-Agent: fridg3.org-stream-proxy\r\n",
+        'header' => "User-Agent: fridge.dev-stream-proxy\r\n",
         // keep the connection open; stream_set_timeout below guards reads
         'timeout' => 0,
     ],
@@ -149,7 +149,7 @@ if (!$stream) {
     $headers = [
         "GET {$path} HTTP/1.0",
         "Host: {$host}",
-        'User-Agent: fridg3.org-stream-proxy',
+        'User-Agent: fridge.dev-stream-proxy',
         'Connection: close',
         '',
         ''

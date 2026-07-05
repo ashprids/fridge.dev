@@ -31,7 +31,7 @@ jobs:
             exit 1
           fi
 
-          git clone "https://x-access-token:${WIKI_PUSH_TOKEN}@github.com/ashprids/fridg3.org.wiki.git" wiki-repo
+          git clone "https://x-access-token:${WIKI_PUSH_TOKEN}@github.com/ashprids/fridge.dev.wiki.git" wiki-repo
 
       - name: sync wiki files
         run: |

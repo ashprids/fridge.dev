@@ -1,4 +1,4 @@
-# fridg3.org Firefox Theme
+# fridge.dev Firefox Theme
 
 This folder has two separate pieces:
 
@@ -8,7 +8,7 @@ This folder has two separate pieces:
 ## Recommended User Setup
 
 1. Install the signed theme from Mozilla Add-ons.
-2. Download and unzip `fridg3-firefox-userchrome.zip` from the fridg3.org theme page.
+2. Download and unzip `fridg3-firefox-userchrome.zip` from the fridge.dev theme page.
 3. Run the installer for your OS and choose whether to install or uninstall the userChrome layer.
 4. Restart Firefox.
 
@@ -26,7 +26,7 @@ install-windows.bat
 
 When installing, the scripts copy this theme to `chrome/fridg3-theme.userChrome.css`, add an `@import` line to the profile `userChrome.css`, and enable `toolkit.legacyUserProfileCustomizations.stylesheets` through `user.js`.
 
-When uninstalling, the scripts remove `chrome/fridg3-theme.userChrome.css` and remove only the fridg3.org `@import` line from profile `userChrome.css`. Other custom Firefox CSS is left alone.
+When uninstalling, the scripts remove `chrome/fridg3-theme.userChrome.css` and remove only the fridge.dev `@import` line from profile `userChrome.css`. Other custom Firefox CSS is left alone.
 
 ## Building Downloads
 

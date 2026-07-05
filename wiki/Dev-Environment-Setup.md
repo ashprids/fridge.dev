@@ -17,8 +17,8 @@ good enough. no need to summon docker or kubernetes for a personal PHP site. tha
 ## 1. Clone The Repo
 
 ```bash
-git clone https://github.com/ashprids/fridg3.org.git
-cd fridg3.org
+git clone https://github.com/ashprids/fridge.dev.git
+cd fridge.dev
 ```
 
 ## 2. Install PHP

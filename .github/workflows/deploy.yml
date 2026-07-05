@@ -1,4 +1,4 @@
-name: deploy to fridg3.org
+name: deploy to fridge.dev
 
 on:
   workflow_run:
@@ -9,6 +9,9 @@ jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
+    env:
+      REMOTE: deploy@45.76.134.105
+      TARGET: /var/www/fridge.dev
 
     steps:
       - name: checkout repo
@@ -22,18 +25,33 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rsync openssh-client
 
       - name: set up ssh
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H 45.76.134.105 >> ~/.ssh/known_hosts
 
+      - name: verify remote deploy target
+        run: |
+          set -euo pipefail
+
+          ssh "$REMOTE" TARGET="$TARGET" bash -s <<'EOF'
+          set -euo pipefail
+
+          [ "$TARGET" = "/var/www/fridge.dev" ] || { echo "refusing to deploy to unexpected target: $TARGET" >&2; exit 1; }
+          [ -d "$TARGET" ] || { echo "deploy target does not exist: $TARGET" >&2; exit 1; }
+          [ -w "$TARGET" ] || { echo "deploy target is not writable by deploy user: $TARGET" >&2; exit 1; }
+          EOF
+
       - name: deploy with rsync
         env:
-          REMOTE: deploy@45.76.134.105
-          TARGET: /var/www/fridg3.org
-          DEPLOY_DIR: .   
+          DEPLOY_DIR: .
         run: |
+          set -euo pipefail
+
           rsync -az --delete \
             --filter='merge .rsyncignore' \
             --exclude ".git" \
@@ -44,9 +62,6 @@ jobs:
             "$DEPLOY_DIR"/ "$REMOTE":"$TARGET"/
 
       - name: restart toast bot
-        env:
-          REMOTE: deploy@45.76.134.105
-          TARGET: /var/www/fridg3.org
         run: |
           ssh "$REMOTE" TARGET="$TARGET" bash -s <<'EOF'
           set -euo pipefail

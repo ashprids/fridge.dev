@@ -1,5 +1,5 @@
-# fridg3.org
-This repository is for a website hosted at https://fridg3.org and https://m.fridg3.org (a URL specifically for the mobile view). 
+# fridge.dev
+This repository is for a website hosted at https://fridge.dev and https://m.fridge.dev (a URL specifically for the mobile view).
 
 All information regarding how the website works and how to develop for it is available within all the `*.md` files in `/wiki/`.
 
@@ -41,7 +41,7 @@ Bundled frdgBeats synth presets must use tagged names: `[BA]` bass, `[FX]` effec
 ## Environment
 When deployed, the website is running on an Nginx webserver with PHP and Python installed. The operating system is Arch Linux, so all implementations should be made with this in mind.
 
-The Nginx configurations on the web server can be found at `/etc/nginx/nginx.conf` and `/etc/nginx/sites-enabled/fridg3.org`.
+The Nginx configurations on the web server can be found at `/etc/nginx/nginx.conf` and `/etc/nginx/sites-enabled/fridge.dev`.
 
 ## AI Workflow
 

@@ -7,7 +7,7 @@ This repository includes a workflow at `.github/workflows/sync-wiki.yml` that mi
 Each run:
 
 1. Checks out the main repository
-2. Clones `https://github.com/ashprids/fridg3.org.wiki.git`
+2. Clones `https://github.com/ashprids/fridge.dev.wiki.git`
 3. Syncs `/wiki` into the wiki repo with deletion enabled
 4. Commits only if something changed
 5. Pushes the updated wiki back to GitHub
@@ -28,13 +28,13 @@ Create this repository secret in `Settings` -> `Secrets and variables` -> `Actio
 This should be a GitHub token that can push to:
 
 ```text
-ashprids/fridg3.org.wiki
+ashprids/fridge.dev.wiki
 ```
 
 Safest options:
 
 1. A classic personal access token with `repo` scope
-2. A fine-grained token with write access to repository contents for `ashprids/fridg3.org`
+2. A fine-grained token with write access to repository contents for `ashprids/fridge.dev`
 
 ## Notes
 

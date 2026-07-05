@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "fridg3.org Blackprint",
+  "name": "fridge.dev Blackprint",
   "version": "1.0.2",
-  "description": "A calm Firefox theme based on fridg3.org's blackprint purple-to-teal gradient and compact clickable-object styling.",
+  "description": "A calm Firefox theme based on fridge.dev's blackprint purple-to-teal gradient and compact clickable-object styling.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "firefox-theme@fridg3.org",
+      "id": "firefox-theme@fridge.dev",
       "strict_min_version": "128.0",
       "data_collection_permissions": {
         "required": [

@@ -13,7 +13,7 @@ jobs:
 
     env:
       REMOTE: deploy@45.76.134.105
-      TARGET: /var/www/fridg3.org
+      TARGET: /var/www/fridge.dev
       REMOTE_BACKUP_DIR: /home/deploy
       GDRIVE_REMOTE: gdrive
       GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_BACKUP_FOLDER_ID }}
@@ -43,6 +43,8 @@ jobs:
             ssh "$REMOTE" TARGET="$TARGET" REMOTE_BACKUP_DIR="$REMOTE_BACKUP_DIR" bash -s <<'EOF'
               set -euo pipefail
 
+              [ "$TARGET" = "/var/www/fridge.dev" ] || { echo "refusing to back up unexpected target: $TARGET" >&2; exit 1; }
+              [ -d "$TARGET" ] || { echo "site directory not found: $TARGET" >&2; exit 1; }
               cd "$TARGET"
               command -v zip >/dev/null 2>&1 || { echo "zip is not installed on the server" >&2; exit 1; }
               [ -d data ] || { echo "data directory not found at $TARGET/data" >&2; exit 1; }

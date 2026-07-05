@@ -44,7 +44,7 @@ function render_toast_messages_page(string $title, string $description, string $
         $templatePath = find_template_file('template.html');
     }
     if (!$templatePath) {
-        die('page template not found. report this issue to me@fridg3.org.');
+        die('page template not found. report this issue to me@fridge.dev.');
     }
 
     $template = (string) file_get_contents($templatePath);
@@ -61,7 +61,7 @@ function render_toast_messages_page(string $title, string $description, string $
         $userGreeting = '<div id="user-greeting">Hello, '
             . htmlspecialchars((string) $_SESSION['user']['name'], ENT_QUOTES, 'UTF-8')
             . '!</div>';
-        $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridg3.org account"><i class="fa-solid fa-user"></i></div></a>';
+        $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridge.dev account"><i class="fa-solid fa-user"></i></div></a>';
         $logoutBtn = '<a href="/account/logout"><div id="footer-button" data-tooltip="log out"><i class="fa-solid fa-right-from-bracket"></i></div></a>';
         $html = str_replace($accountBtn, $logoutBtn, $html);
     }
@@ -522,7 +522,7 @@ if ($selectedUserId !== '') {
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridg3.org.');
+    die('content.html not found. report this issue to me@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);

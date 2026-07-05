@@ -39,7 +39,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridg3.org.');
+    die('page template not found. report this issue to me@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -61,7 +61,7 @@ if (!isset($_SESSION['user'])) {
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridg3.org.');
+    die('content.html not found. report this issue to me@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);
