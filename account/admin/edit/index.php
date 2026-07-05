@@ -45,7 +45,7 @@ if ($selectedUsername === '' || $accountIndex === null) {
 }
 
 $account = $accountsData['accounts'][$accountIndex];
-$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages'];
+$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages', 'emailAddress'];
 $extraData = $account;
 foreach ($managedKeys as $managedKey) {
     unset($extraData[$managedKey]);
@@ -56,6 +56,7 @@ if ($extraData === []) {
 
 $formUsername = (string)($account['username'] ?? '');
 $formName = (string)($account['name'] ?? '');
+$formEmailAddress = (string)($account['emailAddress'] ?? '');
 $formIsAdmin = !empty($account['isAdmin']);
 $allowedPages = array_values(array_map('strval', (array)($account['allowedPages'] ?? [])));
 $formAllowFeed = in_array('feed', $allowedPages, true);
@@ -216,6 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $formUsername = trim((string)($_POST['username'] ?? ''));
             $formName = trim((string)($_POST['name'] ?? ''));
+            $formEmailAddress = strtolower(trim((string)($_POST['emailAddress'] ?? '')));
             $formIsAdmin = isset($_POST['isAdmin']);
             $formAllowFeed = isset($_POST['allowFeed']);
             $formAllowJournal = isset($_POST['allowJournal']);
@@ -235,6 +237,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errorMessage = 'username must be 1-50 characters (letters, numbers, underscores, hyphens).';
             } elseif (strlen($formName) > 100) {
                 $errorMessage = 'name is too long (max 100 characters).';
+            } elseif ($formEmailAddress !== '' && (
+                filter_var($formEmailAddress, FILTER_VALIDATE_EMAIL) === false
+                || !str_ends_with($formEmailAddress, '@fridge.dev')
+            )) {
+                $errorMessage = 'email address must be a valid @fridge.dev address.';
             } else {
                 $decodedExtra = json_decode($extraJson, true);
                 if (!is_array($decodedExtra)) {
@@ -254,6 +261,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                         if (isset($existingAccount['username']) && strcasecmp((string)$existingAccount['username'], $formUsername) === 0) {
                             $errorMessage = 'username already exists.';
+                            break;
+                        }
+                        if (
+                            $formEmailAddress !== ''
+                            && isset($existingAccount['emailAddress'])
+                            && strcasecmp((string)$existingAccount['emailAddress'], $formEmailAddress) === 0
+                        ) {
+                            $errorMessage = 'email address is already assigned to another account.';
                             break;
                         }
                     }
@@ -280,6 +295,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $updatedAccount['mustResetPassword'] = !empty($account['mustResetPassword']);
                         $updatedAccount['allowedPages'] = $newAllowedPages;
                         $updatedAccount['password'] = (string)($account['password'] ?? '');
+                        if ($formEmailAddress !== '') {
+                            $updatedAccount['emailAddress'] = $formEmailAddress;
+                        }
 
                         if ($resetPassword) {
                             $generatedPassword = account_admin_generate_password(15);
@@ -303,6 +321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
                                     return htmlspecialchars((string)$page, ENT_QUOTES, 'UTF-8');
                                 }, $newAllowedPages);
+                                $_SESSION['user']['emailAddress'] = htmlspecialchars($formEmailAddress, ENT_QUOTES, 'UTF-8');
                             }
 
                             $selectedUsername = $formUsername;
@@ -318,7 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages'];
+$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages', 'emailAddress'];
 $extraData = $account;
 foreach ($managedKeys as $managedKey) {
     unset($extraData[$managedKey]);
@@ -338,6 +357,7 @@ $formAllowChat = in_array('chat', $allowedPages, true);
 $formIsAdmin = !empty($account['isAdmin']);
 $formUsername = (string)($account['username'] ?? $formUsername);
 $formName = (string)($account['name'] ?? $formName);
+$formEmailAddress = (string)($account['emailAddress'] ?? $formEmailAddress);
 
 $contentPath = __DIR__ . DIRECTORY_SEPARATOR . 'content.html';
 $content = (string)file_get_contents($contentPath);
@@ -353,6 +373,7 @@ $content = str_replace(
         '{self_delete_disabled}',
         '{form_username}',
         '{form_name}',
+        '{form_email_address}',
         '{is_admin_checked}',
         '{allow_feed_checked}',
         '{allow_journal_checked}',
@@ -376,6 +397,7 @@ $content = str_replace(
         (isset($_SESSION['user']['username']) && (string)$_SESSION['user']['username'] === $selectedUsername) ? 'disabled' : '',
         htmlspecialchars($formUsername, ENT_QUOTES, 'UTF-8'),
         htmlspecialchars($formName, ENT_QUOTES, 'UTF-8'),
+        htmlspecialchars($formEmailAddress, ENT_QUOTES, 'UTF-8'),
         $formIsAdmin ? 'checked' : '',
         $formAllowFeed ? 'checked' : '',
         $formAllowJournal ? 'checked' : '',

@@ -15,6 +15,8 @@ desktop shell with:
 - mini player markup
 - page view footer
 
+`lib/render.php` post-processes the shared shell for logged-in users whose account has a valid `emailAddress`: the footer Discord icon button is replaced with an email button linking to `/account/email`, and route renderers separately keep swapping the account button to logout where that behavior exists.
+
 ### `template_mobile.html`
 
 mobile shell with:

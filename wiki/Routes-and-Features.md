@@ -140,6 +140,7 @@ destroys session and auth cookies, then redirects back to login.
 admin-only account creation flow that writes to `data/accounts/accounts.json`.
 
 - can seed `discordUserId`
+- can seed an optional `emailAddress` for fridge.dev mailboxes
 - can grant `comments` and `chat` permissions
 - newly created accounts are flagged with `mustResetPassword`
 - username `toast` is reserved and cannot be created as a normal account
@@ -170,7 +171,7 @@ not covered in the older references, but very real.
 ### `/account/admin/edit`
 
 - admin-only account editor
-- supports rename, display-name change, permission changes, reset password, and delete
+- supports rename, display-name change, optional `emailAddress`, permission changes, reset password, and delete
 - delete confirmation plays a centered rip-in-half account card animation before the destructive POST continues
 - the `purge user content` danger button must purge all user-owned content; currently this includes feed posts, attached images, voice notes, and reply data
 - preserves unknown extra account fields through an editable JSON object field
@@ -179,6 +180,12 @@ not covered in the older references, but very real.
 - password resets now preserve the account and flip `mustResetPassword` back on
 
 Helpers live in `account/admin/helpers.php`.
+
+### `/account/email`
+
+- shows fridge.dev email web-client and custom-client setup details
+- if the logged-in account has a valid `emailAddress`, the page shows that assigned fridge.dev address near the top
+- shared shell rendering swaps the footer Discord button to this route only for accounts with a valid `emailAddress`
 
 ## Private Chat Routes
 

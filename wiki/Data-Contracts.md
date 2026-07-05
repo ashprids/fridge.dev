@@ -28,6 +28,7 @@ expected top-level shape:
       "isAdmin": true,
       "mustResetPassword": false,
       "discordUserId": "optional discord snowflake string",
+      "emailAddress": "optional @fridge.dev email address",
       "allowedPages": ["feed", "journal", "comments", "chat"],
       "bookmarks": ["2026-01-01_12-00-00", "journal:12"],
       "theme": "default|classic|theme-id",
@@ -60,6 +61,7 @@ notes:
 - `browserNotificationsEnabled` stores the account-backed preference for browser feed notifications; `journalBrowserNotificationsEnabled` stores the account-backed preference for new journal post browser notifications; logged-out browsers keep the same preferences and dedupe state in localStorage
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes
 - `discordUserId` links a site account to a Discord member for bot DMs and notifications
+- `emailAddress` marks accounts with a fridge.dev email mailbox; when present and valid, shared chrome swaps the footer Discord button to `/account/email`, and `/account/email` shows the assigned address
 - `allowedPages` currently includes functional grants like `feed`, `journal`, `comments`, and `chat`
 
 ## `data/chat/`

@@ -453,31 +453,98 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         return preg_replace('/<body\b/i', '<body class="' . $className . '"', $template, 1);
     }
 
+    function fridg3_current_user_email_address($startDir): string {
+        if (!isset($_SESSION['user']['username'])) {
+            return '';
+        }
+
+        $username = (string)$_SESSION['user']['username'];
+        $accountsPath = fridg3_find_relative_upward($startDir, 'data/accounts/accounts.json');
+        if ($accountsPath && is_file($accountsPath)) {
+            $raw = @file_get_contents($accountsPath);
+            $data = json_decode((string)$raw, true);
+
+            if (is_array($data) && isset($data['accounts']) && is_array($data['accounts'])) {
+                foreach ($data['accounts'] as $account) {
+                    if (!isset($account['username']) || (string)$account['username'] !== $username) {
+                        continue;
+                    }
+
+                    $emailAddress = trim((string)($account['emailAddress'] ?? ''));
+                    $_SESSION['user']['emailAddress'] = $emailAddress;
+                    return $emailAddress;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    function fridg3_user_has_email_account($startDir): bool {
+        $emailAddress = fridg3_current_user_email_address($startDir);
+        return $emailAddress !== ''
+            && filter_var($emailAddress, FILTER_VALIDATE_EMAIL) !== false
+            && str_ends_with(strtolower($emailAddress), '@fridge.dev');
+    }
+
+    function fridg3_replace_logged_in_discord_footer_button($template, $startDir) {
+        if (!fridg3_user_has_email_account($startDir)) {
+            return $template;
+        }
+
+        return preg_replace_callback(
+            '/<a\b([^>]*\bhref=(["\'])\/discord\2[^>]*)>\s*<div\b([^>]*\bid=(["\'])footer-button\4[^>]*)>\s*<i\b[^>]*\bclass=(["\'])fa-brands fa-discord\5[^>]*><\/i>\s*<\/div>\s*<\/a>/i',
+            function ($matches) {
+                $anchorAttrs = preg_replace('/\bhref=(["\'])\/discord\1/i', 'href="/account/email"', $matches[1], 1);
+                $divAttrs = preg_replace('/\bdata-tooltip=(["\']).*?\1/i', 'data-tooltip="access fridge.dev email"', $matches[3], 1);
+
+                if ($divAttrs === $matches[3]) {
+                    $divAttrs .= ' data-tooltip="access fridge.dev email"';
+                }
+
+                return '<a' . $anchorAttrs . '><div' . $divAttrs . '><i class="fa-solid fa-envelope"></i></div></a>';
+            },
+            $template
+        );
+    }
+
     function apply_preferred_theme_stylesheet($template, $startDir) {
         fridg3_enforce_work_in_progress($startDir);
 
         $theme = fridg3_get_active_theme($startDir);
         if ($theme === null) {
-            return fridg3_apply_work_in_progress_banner(
-                fridg3_inject_dev_mode_banner(fridg3_apply_body_theme_class($template, 'blackprint-theme')),
+            return fridg3_replace_logged_in_discord_footer_button(
+                fridg3_apply_work_in_progress_banner(
+                    fridg3_inject_dev_mode_banner(fridg3_apply_body_theme_class($template, 'blackprint-theme')),
+                    $startDir
+                ),
                 $startDir
             );
         }
 
         $href = htmlspecialchars($theme['cssHref'], ENT_QUOTES, 'UTF-8');
         if (strpos($template, 'href="' . $href . '"') !== false || strpos($template, "href='" . $href . "'") !== false) {
-            return fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($template), $startDir);
-        }
-
-        $themeLink = '    <link rel="stylesheet" href="' . $href . '">' . "\n";
-        if (stripos($template, '</head>') !== false) {
-            return fridg3_apply_work_in_progress_banner(
-                fridg3_inject_dev_mode_banner(preg_replace('/<\/head>/i', $themeLink . '</head>', $template, 1)),
+            return fridg3_replace_logged_in_discord_footer_button(
+                fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($template), $startDir),
                 $startDir
             );
         }
 
-        return fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($themeLink . $template), $startDir);
+        $themeLink = '    <link rel="stylesheet" href="' . $href . '">' . "\n";
+        if (stripos($template, '</head>') !== false) {
+            return fridg3_replace_logged_in_discord_footer_button(
+                fridg3_apply_work_in_progress_banner(
+                    fridg3_inject_dev_mode_banner(preg_replace('/<\/head>/i', $themeLink . '</head>', $template, 1)),
+                    $startDir
+                ),
+                $startDir
+            );
+        }
+
+        return fridg3_replace_logged_in_discord_footer_button(
+            fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($themeLink . $template), $startDir),
+            $startDir
+        );
     }
 }
 

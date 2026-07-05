@@ -33,6 +33,9 @@ foreach ($accountsData['accounts'] as $account) {
     if ($isAdmin) {
         $tags[] = '<span class="account-admin-badge">admin</span>';
     }
+    if (trim((string)($account['emailAddress'] ?? '')) !== '') {
+        $tags[] = '<span class="account-page-badge">email</span>';
+    }
     foreach ($allowedPages as $page) {
         $tags[] = '<span class="account-page-badge">' . htmlspecialchars($page, ENT_QUOTES, 'UTF-8') . '</span>';
     }

@@ -144,6 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     'name' => htmlspecialchars($account['name'], ENT_QUOTES, 'UTF-8'),
                                     'isAdmin' => (bool)($account['isAdmin'] ?? false),
                                     'mustResetPassword' => !empty($account['mustResetPassword']),
+                                    'emailAddress' => htmlspecialchars((string)($account['emailAddress'] ?? ''), ENT_QUOTES, 'UTF-8'),
                                     'allowedPages' => array_map(function ($page) {
                                         return htmlspecialchars($page, ENT_QUOTES, 'UTF-8');
                                     }, (array)($account['allowedPages'] ?? []))

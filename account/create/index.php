@@ -45,6 +45,7 @@ $resultPassword = '';
 $formUsername = '';
 $formName = '';
 $formDiscordUserId = '';
+$formEmailAddress = '';
 $formIsAdmin = false;
 $formAllowFeed = false;
 $formAllowJournal = false;
@@ -86,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formUsername = trim($_POST['username'] ?? '');
     $formName = trim($_POST['name'] ?? '');
     $formDiscordUserId = trim($_POST['discordUserId'] ?? '');
+    $formEmailAddress = strtolower(trim((string)($_POST['emailAddress'] ?? '')));
     $formIsAdmin = isset($_POST['isAdmin']);
     $formAllowFeed = isset($_POST['allowFeed']);
     $formAllowJournal = isset($_POST['allowJournal']);
@@ -106,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $formUsername = 'user' . $accountNumber;
         $formName = 'User #' . $accountNumber;
         $formDiscordUserId = '';
+        $formEmailAddress = '';
         $formIsAdmin = false;
         $formAllowFeed = true;
         $formAllowJournal = false;
@@ -124,10 +127,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMessage = 'name is too long (max 100 characters).';
     } elseif ($formDiscordUserId !== '' && !preg_match('/^\d{17,20}$/', $formDiscordUserId)) {
         $errorMessage = 'discord user id must be 17-20 digits.';
+    } elseif ($formEmailAddress !== '' && (
+        filter_var($formEmailAddress, FILTER_VALIDATE_EMAIL) === false
+        || !str_ends_with($formEmailAddress, '@fridge.dev')
+    )) {
+        $errorMessage = 'email address must be a valid @fridge.dev address.';
     } else {
         foreach ($accountsData['accounts'] as $account) {
             if (isset($account['username']) && strcasecmp((string)$account['username'], $formUsername) === 0) {
                 $errorMessage = 'username already exists.';
+                break;
+            }
+            if (
+                $formEmailAddress !== ''
+                && isset($account['emailAddress'])
+                && strcasecmp((string)$account['emailAddress'], $formEmailAddress) === 0
+            ) {
+                $errorMessage = 'email address is already assigned to another account.';
                 break;
             }
         }
@@ -160,6 +176,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             if ($formDiscordUserId !== '') {
                 $newAccount['discordUserId'] = $formDiscordUserId;
+            }
+            if ($formEmailAddress !== '') {
+                $newAccount['emailAddress'] = $formEmailAddress;
             }
 
             $accountsData['accounts'][] = $newAccount;
@@ -239,6 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $formUsername = '';
                 $formName = '';
                 $formDiscordUserId = '';
+                $formEmailAddress = '';
                 $formIsAdmin = false;
                 $formAllowFeed = false;
                 $formAllowJournal = false;
@@ -300,6 +320,7 @@ $content = str_replace([
     '{form_username}',
     '{form_name}',
     '{form_discord_user_id}',
+    '{form_email_address}',
     '{is_admin_checked}',
     '{allow_feed_checked}',
     '{allow_journal_checked}',
@@ -315,6 +336,7 @@ $content = str_replace([
     htmlspecialchars($formUsername, ENT_QUOTES, 'UTF-8'),
     htmlspecialchars($formName, ENT_QUOTES, 'UTF-8'),
     htmlspecialchars($formDiscordUserId, ENT_QUOTES, 'UTF-8'),
+    htmlspecialchars($formEmailAddress, ENT_QUOTES, 'UTF-8'),
     $formIsAdmin ? 'checked' : '',
     $formAllowFeed ? 'checked' : '',
     $formAllowJournal ? 'checked' : '',

@@ -1403,6 +1403,95 @@ a:hover {
     text-decoration-color: var(--links);
 }
 
+.email-config-table-wrap {
+    width: 100%;
+    max-width: 640px;
+    overflow-x: visible;
+    margin: 0 0 18px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--bg) 88%, var(--fg) 12%);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+}
+
+.email-account-notice {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    text-align: center;
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--border) 24%, transparent), color-mix(in srgb, var(--links) 16%, transparent)),
+        color-mix(in srgb, var(--bg) 84%, var(--fg) 16%);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.22);
+}
+
+.email-account-notice span {
+    color: var(--subtle);
+    font-family: "MainItalic", var(--emoji-font), monospace;
+    font-size: 12px;
+}
+
+.email-account-notice strong {
+    color: var(--fg);
+    font-family: "MainBold", var(--emoji-font), monospace;
+    font-size: 17px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.email-config-table {
+    width: 100%;
+    min-width: 0;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.email-config-table th,
+.email-config-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 54%, transparent);
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.email-config-table th {
+    background: color-mix(in srgb, var(--border) 24%, var(--bg) 76%);
+    color: var(--fg);
+    font-family: "MainBold", var(--emoji-font), monospace;
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: lowercase;
+}
+
+.email-config-table td:first-child {
+    width: 34%;
+    color: var(--subtle);
+}
+
+.email-config-table td:last-child {
+    color: var(--fg);
+}
+
+.email-config-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.email-config-table tbody tr:hover {
+    background: color-mix(in srgb, var(--links) 10%, transparent);
+}
+
 /* Remove underline on hyperlinked grid captions/subcaptions only */
 .grid-caption a,
 .grid-subcaption a,
@@ -2608,6 +2697,7 @@ hr {
 
 /* Account creation form inputs (match textbox styling) */
 #create-account-form input[type="text"],
+#create-account-form input[type="email"],
 #chat-create-form input[type="text"] {
     width: 100%;
     height: 32px;
@@ -2622,12 +2712,14 @@ hr {
 }
 
 #create-account-form input[type="text"]:focus,
+#create-account-form input[type="email"]:focus,
 #chat-create-form input[type="text"]:focus {
     outline: none;
     border-color: rgb(77, 118, 201);
 }
 
 #admin-account-form input[type="text"],
+#admin-account-form input[type="email"],
 #admin-account-form textarea {
     width: 100%;
     font-family: "MainRegular", var(--emoji-font), monospace;
@@ -2640,7 +2732,8 @@ hr {
     border-radius: 3px;
 }
 
-#admin-account-form input[type="text"] {
+#admin-account-form input[type="text"],
+#admin-account-form input[type="email"] {
     height: 32px;
 }
 
@@ -2650,6 +2743,7 @@ hr {
 }
 
 #admin-account-form input[type="text"]:focus,
+#admin-account-form input[type="email"]:focus,
 #admin-account-form textarea:focus {
     outline: none;
     border-color: rgb(77, 118, 201);
@@ -5202,7 +5296,9 @@ body.blackprint-theme .bbcode-btn,
 body.blackprint-theme #bbcode-textbox,
 body.blackprint-theme #bbcode-preview,
 body.blackprint-theme #create-account-form input[type="text"],
+body.blackprint-theme #create-account-form input[type="email"],
 body.blackprint-theme #admin-account-form input[type="text"],
+body.blackprint-theme #admin-account-form input[type="email"],
 body.blackprint-theme #admin-account-form textarea{
     background: rgba(24, 28, 30, 0.94);
     color: var(--fg);
@@ -6620,7 +6716,9 @@ body.blackprint-theme .bbcode-btn,
 body.blackprint-theme #bbcode-textbox,
 body.blackprint-theme #bbcode-preview,
 body.blackprint-theme #create-account-form input[type="text"],
+body.blackprint-theme #create-account-form input[type="email"],
 body.blackprint-theme #admin-account-form input[type="text"],
+body.blackprint-theme #admin-account-form input[type="email"],
 body.blackprint-theme #admin-account-form textarea{
     background: rgba(11, 13, 15, 0.96) !important;
     color: var(--fg) !important;
