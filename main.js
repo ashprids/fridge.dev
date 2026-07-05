@@ -118,22 +118,10 @@ function consumeLegacyDomainRedirectNotice() {
     try {
         const currentUrl = new URL(window.location.href);
         const marker = currentUrl.searchParams.get('legacy_domain');
-        let cameFromLegacyDomain = marker === 'fridg3.org';
-
-        if (!cameFromLegacyDomain && document.referrer) {
-            const referrerUrl = new URL(document.referrer);
-            const referrerHost = referrerUrl.hostname.toLowerCase();
-            cameFromLegacyDomain = referrerHost === 'fridg3.org'
-                || referrerHost === 'www.fridg3.org'
-                || referrerHost === 'm.fridg3.org';
-        }
-
-        if (!cameFromLegacyDomain) return;
+        if (marker !== 'fridg3.org') return;
 
         currentUrl.searchParams.delete('legacy_domain');
-        if (marker !== null) {
-            window.history.replaceState(window.history.state, document.title, currentUrl.toString());
-        }
+        window.history.replaceState(window.history.state, document.title, currentUrl.toString());
 
         showSitePopup({
             title: 'heads up!',

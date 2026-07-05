@@ -67,7 +67,29 @@ use the on-site popup helpers in `main.js`, not native browser `alert()`, `confi
 
 all clicked `http(s)` links that leave `fridge.dev`, `www.fridge.dev`, or `m.fridge.dev` automatically show a safety popup before navigation. use `data-no-external-popup` only for a deliberately exempt link, and document why because bypassing safety popups is usually sus.
 
-Cloudflare handles legacy `fridg3.org` redirects to `fridge.dev`. `main.js` shows the one-time rebrand popup when `document.referrer` points at `fridg3.org`, `www.fridg3.org`, or `m.fridg3.org`; it also accepts an optional `legacy_domain=fridg3.org` query marker and removes that marker with `history.replaceState()`.
+Cloudflare handles legacy `fridg3.org` redirects to `fridge.dev`. the redirect must add `legacy_domain=fridg3.org` to the destination URL so `main.js` can show the one-time rebrand popup; browser referrers are not reliable for detecting a 301 hop. after showing the popup, `main.js` removes the marker with `history.replaceState()`.
+
+Cloudflare dynamic redirects need two rules because the target URL expression editor supports `concat(...)` but not `if(...)`.
+
+rule for requests without an existing query string:
+
+- match: `(http.host eq "fridg3.org" or http.host eq "www.fridg3.org") and http.request.uri.query eq ""`
+- target URL expression:
+
+```text
+concat("https://fridge.dev", http.request.uri.path, "?legacy_domain=fridg3.org")
+```
+
+rule for requests with an existing query string:
+
+- match: `(http.host eq "fridg3.org" or http.host eq "www.fridg3.org") and http.request.uri.query ne ""`
+- target URL expression:
+
+```text
+concat("https://fridge.dev", http.request.uri.path, "?", http.request.uri.query, "&legacy_domain=fridg3.org")
+```
+
+turn off Cloudflare's separate `preserve query string` toggle for both rules, because the expressions build the final query string themselves.
 
 ## Styling
 
