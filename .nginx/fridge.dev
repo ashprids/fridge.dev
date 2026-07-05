@@ -1,13 +1,13 @@
 server {
     listen 443 ssl; # managed by Certbot
-    server_name fridg3.org www.fridg3.org m.fridg3.org;
+    server_name fridge.dev www.fridge.dev m.fridge.dev;
 
-    root /var/www/fridg3.org;
+    root /var/www/fridge.dev;
     index index.html index.php;
-    client_max_body_size 0;
+    client_max_body_size 20M;
 
     location ~ \.php$ {
-        root /var/www/fridg3.org;
+        root /var/www/fridge.dev;
         fastcgi_pass unix:/run/php-fpm/php-fpm.sock;  # adjust if your PHP-FPM socket differs
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
@@ -104,16 +104,6 @@ server {
         try_files $uri $uri/ /tools/upload/index.php?$args;
     }
 
-    # Music upload route: avoid trailing-slash redirects that drop POST bodies.
-    # Music files can be very large, so do not set a request body cap here.
-    location = /music/upload {
-        rewrite ^ /music/upload/index.php?$args last;
-    }
-
-    location /music/upload/ {
-        try_files $uri $uri/ /music/upload/index.php?$args;
-    }
-
     # Chat clean URLs + POST-safe dashboard route
     location = /chat {
         rewrite ^ /chat/index.php?$args last;
@@ -134,42 +124,19 @@ server {
 
 
     # Fallback
-    location / { try_files $uri $uri/ @site_not_found; }
-
-    location @site_not_found {
-        return 302 /error/404;
-    }
+    location / { try_files $uri $uri/ /index.php?$args; }
 
     # Custom error redirects
     error_page 403 /error/403;
-    error_page 404 =302 /error/404;
+    error_page 404 /error/404;
     error_page 500 502 503 504 /error/50x;
 
-    location = /error/403 { root /var/www/fridg3.org; }
-    location = /error/404 { rewrite ^ /error/404/index.php last; }
-    location = /error/50x { root /var/www/fridg3.org; }
-    ssl_certificate /etc/letsencrypt/live/fridg3.org/fullchain.pem; # managed by Certbot
-   # Certbot
-    ssl_certificate_key /etc/letsencrypt/live/fridg3.org/privkey.pem; # managed by Certbot
- # Certbot
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    location = /error/403 { root /var/www/fridge.dev; }
+    location = /error/404 { root /var/www/fridge.dev; }
+    location = /error/50x { root /var/www/fridge.dev; }
 
 
 
 
 
-}
-
-server {
-    if ($host = m.fridg3.org) {
-        return 301 https://$host$request_uri;
-    } # managed by Certbot
-
-
-    listen 80;
-    server_name fridg3.org www.fridg3.org m.fridg3.org;
-    if ($host = www.fridg3.org) { return 301 https://$host$request_uri; }
-    if ($host = fridg3.org)     { return 301 https://$host$request_uri; }
-    return 404; # managed by Certbot
 }
