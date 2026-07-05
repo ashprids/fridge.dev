@@ -1591,9 +1591,19 @@ function initLoginPage() {
     }
 
     if (contentDiv && contentDiv.getAttribute('data-login-error')) {
-        errorSpan.textContent = contentDiv.getAttribute('data-login-error');
+        const loginError = contentDiv.getAttribute('data-login-error');
+        errorSpan.textContent = loginError;
         errorSpan.style.color = 'red';
         contentDiv.removeAttribute('data-login-error');
+
+        if (contentDiv.getAttribute('data-login-maintenance-denied') === '1') {
+            showSitePopup({
+                title: 'maintenance mode',
+                detail: loginError || 'you must be an administrator to log in while the website is undergoing maintenance.',
+                okText: 'got it'
+            });
+        }
+        contentDiv.removeAttribute('data-login-maintenance-denied');
     }
 
     form.addEventListener('submit', function(e) {

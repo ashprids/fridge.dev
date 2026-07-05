@@ -12,6 +12,9 @@ $description = 'log into your fridge.dev account.';
 
 $login_error = '';
 $login_success = false;
+$login_maintenance_denied = false;
+$maintenance_mode = function_exists('fridg3_session_work_in_progress_enabled')
+    && fridg3_session_work_in_progress_enabled();
 
 // If already logged in, redirect to homepage
 if (isset($_SESSION['user'])) {
@@ -85,13 +88,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $toastAdminPassword = (string)($_POST['toast_admin_password'] ?? '');
 
                 if (fridg3_toast_verify_admin_credentials($toastAdminUsername, $toastAdminPassword)) {
-                    session_regenerate_id(true);
-                    $_SESSION['user'] = fridg3_toast_session_user();
-                    fridg3_refresh_is_admin_cookie(false);
-                    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-                    $login_success = true;
-                    header('Location: /');
-                    exit();
+                    $toastUser = fridg3_toast_session_user();
+                    if ($maintenance_mode && empty($toastUser['isAdmin'])) {
+                        $login_maintenance_denied = true;
+                        $login_error = 'maintenance mode is admin-only right now.';
+                    } else {
+                        session_regenerate_id(true);
+                        $_SESSION['user'] = $toastUser;
+                        fridg3_refresh_is_admin_cookie(false);
+                        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                        $login_success = true;
+                        header('Location: /');
+                        exit();
+                    }
                 }
             } else {
                 // Load accounts
@@ -120,6 +129,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                             
                             if ($password_valid) {
+                                if ($maintenance_mode && empty($account['isAdmin'])) {
+                                    $login_maintenance_denied = true;
+                                    $login_error = 'maintenance mode is admin-only right now.';
+                                    break;
+                                }
+
                                 // Regenerate session ID to prevent fixation
                                 session_regenerate_id(true);
                                 
@@ -190,9 +205,11 @@ if ($render_helper_path) {
     require_once $render_helper_path;
 }
 
-$template_name = function_exists('get_preferred_template_name')
-    ? get_preferred_template_name(__DIR__)
-    : 'template.html';
+$template_name = $maintenance_mode
+    ? 'error/wip/template.html'
+    : (function_exists('get_preferred_template_name')
+        ? get_preferred_template_name(__DIR__)
+        : 'template.html');
 $template_path = find_template_file($template_name);
 if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
@@ -235,13 +252,14 @@ $content = ob_get_clean();
 $error_attr = htmlspecialchars($login_error, ENT_QUOTES, 'UTF-8');
 $info_msg = (!empty($_GET['logged_out']) && $_GET['logged_out'] === '1') ? 'you\'ve been logged out.' : '';
 $info_attr = htmlspecialchars($info_msg, ENT_QUOTES, 'UTF-8');
+$maintenance_denied_attr = $login_maintenance_denied ? '1' : '0';
 
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);
 
 // Inject login error/info into the page
-$html = str_replace('<div id="content">', '<div id="content" data-login-error="' . $error_attr . '" data-login-info="' . $info_attr . '">', $html);
+$html = str_replace('<div id="content">', '<div id="content" data-login-error="' . $error_attr . '" data-login-info="' . $info_attr . '" data-login-maintenance-denied="' . $maintenance_denied_attr . '">', $html);
 
 echo $html;
 ?>

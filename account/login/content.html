@@ -50,9 +50,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Display any login error from PHP
     if (contentDiv && contentDiv.getAttribute('data-login-error')) {
-        errorSpan.textContent = contentDiv.getAttribute('data-login-error');
+        const loginError = contentDiv.getAttribute('data-login-error');
+        errorSpan.textContent = loginError;
         errorSpan.style.color = 'red';
         contentDiv.removeAttribute('data-login-error');
+
+        if (contentDiv.getAttribute('data-login-maintenance-denied') === '1' && window.showSitePopup) {
+            window.showSitePopup({
+                title: 'maintenance mode',
+                detail: loginError || 'maintenance mode is admin-only right now.',
+                okText: 'got it'
+            });
+        }
+        contentDiv.removeAttribute('data-login-maintenance-denied');
     }
     
     function showToastAdminLoginPopup() {

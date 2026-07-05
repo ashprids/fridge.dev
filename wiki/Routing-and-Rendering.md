@@ -88,6 +88,7 @@ maintenance mode is driven by `data/etc/wip`.
 - reads the flag from `data/etc/wip`
 - redirects non-admins to `/error/wip` before page content renders or mutating POST handlers continue
 - allows `/account/login` and `/error/wip`
+- renders `/account/login` through `error/wip/template.html` while maintenance is active, and only creates sessions for admin accounts; valid non-admin login attempts are rejected with an in-site popup
 - shows the maintenance banner from the server-rendered template through `lib/render.php`
 - redirects `/error/wip` back to `/` when maintenance mode is off
 - `/error/wip/wip.js` polls the flag while the WIP page is open and redirects home after maintenance ends
