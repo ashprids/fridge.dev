@@ -166,9 +166,9 @@ if (!function_exists('fridg3_get_mobile_cookie_domain')) {
     function fridg3_get_mobile_cookie_domain() {
         $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
         $host = preg_replace('/:\d+$/', '', $host);
-        $isSubdomain = strlen($host) > strlen('.fridg3.org') && substr($host, -strlen('.fridg3.org')) === '.fridg3.org';
-        if ($host === 'fridg3.org' || $host === 'm.fridg3.org' || $isSubdomain) {
-            return '.fridg3.org';
+        $isSubdomain = strlen($host) > strlen('.fridge.dev') && substr($host, -strlen('.fridge.dev')) === '.fridge.dev';
+        if ($host === 'fridge.dev' || $host === 'm.fridge.dev' || $isSubdomain) {
+            return '.fridge.dev';
         }
         return null;
     }
@@ -404,7 +404,7 @@ if (!function_exists('should_use_mobile_template')) {
     function should_use_mobile_template($startDir) {
         $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
         $host = preg_replace('/:\d+$/', '', $host);
-        if ($host === 'm.fridg3.org') {
+        if ($host === 'm.fridge.dev') {
             return true;
         }
 

@@ -9,11 +9,11 @@ require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 
 $title = 'contact';
-$description = 'send a message to fridg3.org.';
+$description = 'send a message to fridge.dev.';
 $rootDir = dirname(__DIR__);
 $contactDataDir = $rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'contact';
 $rateLimitPath = $contactDataDir . DIRECTORY_SEPARATOR . 'rate_limits.json';
-const CONTACT_REPLY_EMAIL = 'me@fridg3.org';
+const CONTACT_REPLY_EMAIL = 'me@fridge.dev';
 const CONTACT_NOTIFY_CHANNEL_ID = '1503931489560301609';
 
 function contact_find_template_file(string $filename): ?string {
@@ -154,7 +154,7 @@ function contact_render_page(string $title, string $description, string $content
         $templatePath = contact_find_template_file('template.html');
     }
     if (!$templatePath) {
-        die('page template not found. report this issue to me@fridg3.org.');
+        die('page template not found. report this issue to me@fridge.dev.');
     }
 
     $html = (string)file_get_contents($templatePath);
@@ -165,7 +165,7 @@ function contact_render_page(string $title, string $description, string $content
     $userGreeting = '';
     if (isset($_SESSION['user']['name'])) {
         $userGreeting = '<div id="user-greeting">Hello, ' . contact_h((string)$_SESSION['user']['name']) . '!</div>';
-        $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridg3.org account"><i class="fa-solid fa-user"></i></div></a>';
+        $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridge.dev account"><i class="fa-solid fa-user"></i></div></a>';
         $logoutBtn = '<a href="/account/logout"><div id="footer-button" data-tooltip="log out"><i class="fa-solid fa-right-from-bracket"></i></div></a>';
         $html = str_replace($accountBtn, $logoutBtn, $html);
     }
@@ -244,7 +244,7 @@ function contact_notify_toast(array $submission): ?string {
         'email' => (string)($submission['email'] ?? ''),
         'message_preview' => $preview,
         'created_at' => (int)($submission['createdAt'] ?? time()),
-        'dashboard_url' => 'https://fridg3.org/contact?dashboard=1',
+        'dashboard_url' => 'https://fridge.dev/contact?dashboard=1',
     ];
 
     $responseRaw = null;
@@ -452,7 +452,7 @@ if ($errors !== []) {
 
 $contentPath = contact_find_template_file('content.html');
 if (!$contentPath) {
-    die('content.html not found. report this issue to me@fridg3.org.');
+    die('content.html not found. report this issue to me@fridge.dev.');
 }
 
 $content = (string)file_get_contents($contentPath);

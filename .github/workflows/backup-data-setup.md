@@ -7,7 +7,7 @@ This repository includes a GitHub Actions workflow at `.github/workflows/backup-
 Each run:
 
 1. Connects to `deploy@45.76.134.105` over SSH
-2. Changes directory to `/var/www/fridg3.org`
+2. Changes directory to `/var/www/fridge.dev`
 3. Compresses the `data` directory into a zip file named `DD-MM-YY_hh-mm-ss.zip`
 4. Downloads that zip file to the GitHub Actions runner
 5. Uploads the zip file into a specific Google Drive folder
@@ -117,7 +117,7 @@ Before creating a new archive, the workflow removes stale `DD-MM-YY_hh-mm-ss.zip
 The archive contains the `data` directory from:
 
 ```text
-/var/www/fridg3.org/data
+/var/www/fridge.dev/data
 ```
 
 ## Troubleshooting
@@ -136,7 +136,7 @@ If the workflow fails during Google Drive upload:
 
 If the workflow fails on archive creation:
 
-1. Verify `/var/www/fridg3.org/data` exists on the server
+1. Verify `/var/www/fridge.dev/data` exists on the server
 2. Verify the `deploy` user can read that directory
 3. Verify `zip` is installed on the server
 4. Verify `/home/deploy` is writable and has enough free space for the archive

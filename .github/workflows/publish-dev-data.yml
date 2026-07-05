@@ -13,7 +13,7 @@ jobs:
 
     env:
       REMOTE: deploy@45.76.134.105
-      TARGET: /var/www/fridg3.org
+      TARGET: /var/www/fridge.dev
       REMOTE_WORK_DIR: /home/deploy
       GDRIVE_REMOTE: gdrive
       GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_DEV_DATA_FOLDER_ID }}
@@ -52,6 +52,8 @@ jobs:
             ssh "$REMOTE" TARGET="$TARGET" REMOTE_WORK_DIR="$REMOTE_WORK_DIR" bash -s <<'EOF'
               set -euo pipefail
 
+              [ "$TARGET" = "/var/www/fridge.dev" ] || { echo "refusing to publish data from unexpected target: $TARGET" >&2; exit 1; }
+              [ -d "$TARGET" ] || { echo "site directory not found: $TARGET" >&2; exit 1; }
               cd "$TARGET"
               command -v php >/dev/null 2>&1 || { echo "php is not installed on the server" >&2; exit 1; }
               [ -d data ] || { echo "data directory not found at $TARGET/data" >&2; exit 1; }

@@ -15,7 +15,7 @@ if (!isset($_SESSION['user']) || empty($_SESSION['user']['isAdmin'])) {
 }
 
 $root = dirname(__DIR__, 2);
-$baseUrl = 'https://fridg3.org';
+$baseUrl = 'https://fridge.dev';
 
 $urls = [];
 

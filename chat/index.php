@@ -772,7 +772,7 @@ function chat_render_page(string $title, string $description, string $content): 
         $templatePath = chat_find_template_file('template.html');
     }
     if (!$templatePath) {
-        die('page template not found. report this issue to me@fridg3.org.');
+        die('page template not found. report this issue to me@fridge.dev.');
     }
 
     $html = (string)file_get_contents($templatePath);
@@ -787,7 +787,7 @@ function chat_render_page(string $title, string $description, string $content): 
     $userGreeting = '';
     if (isset($_SESSION['user']['name'])) {
         $userGreeting = '<div id="user-greeting">Hello, ' . chat_h((string)$_SESSION['user']['name']) . '!</div>';
-        $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridg3.org account"><i class="fa-solid fa-user"></i></div></a>';
+        $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridge.dev account"><i class="fa-solid fa-user"></i></div></a>';
         $logoutBtn = '<a href="/account/logout"><div id="footer-button" data-tooltip="log out"><i class="fa-solid fa-right-from-bracket"></i></div></a>';
         $html = str_replace($accountBtn, $logoutBtn, $html);
     }
@@ -1382,7 +1382,7 @@ if ($conversationId !== '') {
                 chat_set_participant_cookie($conversationId, $secret);
 
                 $authUrl = '/chat/' . rawurlencode($conversationId);
-                chat_render_page('chat invite', "you've been invited to a private, secure chat on fridg3.org.", '<h1>joining chat...</h1><h2>locking this chat to your browser.</h2><br><script>setTimeout(function(){ window.location.href = ' . json_encode($authUrl) . '; }, 900);</script><p><a href="' . chat_h($authUrl) . '">continue</a></p>');
+                chat_render_page('chat invite', "you've been invited to a private, secure chat on fridge.dev.", '<h1>joining chat...</h1><h2>locking this chat to your browser.</h2><br><script>setTimeout(function(){ window.location.href = ' . json_encode($authUrl) . '; }, 900);</script><p><a href="' . chat_h($authUrl) . '">continue</a></p>');
                 exit;
             }
             }
@@ -1519,7 +1519,7 @@ function initChat(){
         });
     }
     function renderMessages(data,force){if(!messagesEl||!data||!data.ok)return;var revision=data.revision||"";if((revision&&revision!==lastRevision)||data.lastMessageId!==lastMessageId||messagesEl.innerHTML===""){trackIncomingMessages(data,force);messagesEl.innerHTML=data.html;initChatMediaPlayers();lastMessageId=data.lastMessageId||"";lastMessageCount=Number(data.count||0);lastRevision=revision;scrollMessages(force);if(isChatActive())clearUnread();}}
-    function showRecipientIntro(){if(root.getAttribute("data-show-recipient-intro")!=="1"||typeof window.showSitePopup!=="function")return;root.setAttribute("data-show-recipient-intro","0");var accountLinked=root.getAttribute("data-account-linked-recipient")==="1";window.showSitePopup({title:"private chat secured",html:accountLinked?"<p>this invite is linked to your fridg3.org account, so you can reopen it while logged in without relying on a browser cookie.</p><p>messages and attachments are stored in an encrypted chat file, and ending the chat deletes that file from the server.</p><p>click or tap any message to reply to it or react with an emoji.</p>":"<p>this invite is locked to this browser after you open it. other browsers that try the same link get denied.</p><p>messages and attachments are stored in an encrypted chat file, and ending the chat deletes that file from the server.</p><p>click or tap any message to reply to it or react with an emoji.</p>",okText:"got it"});}
+    function showRecipientIntro(){if(root.getAttribute("data-show-recipient-intro")!=="1"||typeof window.showSitePopup!=="function")return;root.setAttribute("data-show-recipient-intro","0");var accountLinked=root.getAttribute("data-account-linked-recipient")==="1";window.showSitePopup({title:"private chat secured",html:accountLinked?"<p>this invite is linked to your fridge.dev account, so you can reopen it while logged in without relying on a browser cookie.</p><p>messages and attachments are stored in an encrypted chat file, and ending the chat deletes that file from the server.</p><p>click or tap any message to reply to it or react with an emoji.</p>":"<p>this invite is locked to this browser after you open it. other browsers that try the same link get denied.</p><p>messages and attachments are stored in an encrypted chat file, and ending the chat deletes that file from the server.</p><p>click or tap any message to reply to it or react with an emoji.</p>",okText:"got it"});}
     function syncFileIndicator(){if(!fileIndicator||!fileInput)return;var file=fileInput.files&&fileInput.files[0]?fileInput.files[0]:null;var isVoice=attachmentKindInput&&attachmentKindInput.value==="voice";fileIndicator.textContent=file?((isVoice?"voice note: ":"attached: ")+file.name):"";fileIndicator.style.display=file?"block":"none";}
     function jsonFetch(url,options){return fetch(url,options).then(function(response){return response.json().then(function(data){if(!response.ok){data.ok=false;}return data;});});}
     function presenceBody(typingOverride){var body=new URLSearchParams();var active=isChatActive();var typing=typeof typingOverride==="boolean"?typingOverride:currentlyTyping;body.append("state",active?"online":"away");body.append("typing",(active&&typing)?"1":"0");return body;}
@@ -1624,7 +1624,7 @@ foreach ($conversations as $conversation) {
     }
 
     $sharePath = '/chat/' . $id;
-    $shareUrl = 'https://fridg3.org' . $sharePath;
+    $shareUrl = 'https://fridge.dev' . $sharePath;
     $claimed = !empty($conversation['participantHash']) || !empty($conversation['participantUsername']);
     $messageCount = count((array)($conversation['messages'] ?? []));
     $cards[] = '<article class="chat-admin-card">'
@@ -1640,7 +1640,7 @@ $contentPath = __DIR__ . DIRECTORY_SEPARATOR . 'content.html';
 $content = (string)file_get_contents($contentPath);
 $createdNotice = '';
 if ($createdId !== '') {
-    $url = 'https://fridg3.org/chat/' . $createdId;
+    $url = 'https://fridge.dev/chat/' . $createdId;
     $createdNotice = '<div id="result">chat created. share this one-time link:<br><button class="chat-copy-link chat-created-link" type="button" data-copy-url="' . chat_h($url) . '" data-tooltip="copy chat link">' . chat_h($url) . '</button></div><br>';
 }
 if ($deleted) {

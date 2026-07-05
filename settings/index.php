@@ -120,7 +120,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridg3.org.');
+    die('page template not found. report this issue to me@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -135,7 +135,7 @@ if (isset($_SESSION['user'])) {
     $user_greeting = '<div id="user-greeting">Hello, ' . $user_name . '!</div>';
     
     // Swap Account button to Logout
-    $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridg3.org account"><i class="fa-solid fa-user"></i></div></a>';
+    $accountBtn = '<a href="/account"><div id="footer-button" data-tooltip="access your fridge.dev account"><i class="fa-solid fa-user"></i></div></a>';
     $logoutBtn = '<a href="/account/logout"><div id="footer-button" data-tooltip="log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></div></a>';
     $template = str_replace($accountBtn, $logoutBtn, $template);
 }
@@ -145,7 +145,7 @@ $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridg3.org.');
+    die('content.html not found. report this issue to me@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);

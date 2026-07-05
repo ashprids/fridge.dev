@@ -14,7 +14,7 @@ require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPAR
 account_admin_require_admin();
 
 $title = 'edit account';
-$description = 'configure an existing fridg3.org account.';
+$description = 'configure an existing fridge.dev account.';
 $errorMessage = '';
 $successMessage = '';
 $generatedPassword = '';

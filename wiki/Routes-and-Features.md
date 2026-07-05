@@ -189,7 +189,7 @@ one-time private conversation manager.
 - requires admin or `allowedPages` containing `chat`
 - creates conversations with a recipient label
 - lists active conversation files from `data/chat/*.json`
-- shows canonical share links shaped like `https://fridg3.org/chat/{conversationId}` that copy to clipboard when clicked
+- shows canonical share links shaped like `https://fridge.dev/chat/{conversationId}` that copy to clipboard when clicked
 - can end a conversation through an in-site confirmation popup, which deletes the encrypted JSON file immediately
 
 ### `/chat/{conversationId}`
@@ -219,7 +219,7 @@ one-to-one conversation view.
 ### `/contact`
 
 - public contact form with name, email, message, and server-side anti-spam checks
-- replies are sent manually from `me@fridg3.org`
+- replies are sent manually from `me@fridge.dev`
 - accepted submissions are stored under `data/contact/*.json`
 - after storage, PHP asks the local toast service to send a Discord channel notification
 
@@ -257,11 +257,11 @@ Subroutes:
 
 ### `/others/firefox-theme`
 
-- public page for the fridg3.org blackprint Firefox theme
+- public page for the fridge.dev blackprint Firefox theme
 - explains the two-step install flow: install the signed theme from Mozilla Add-ons, then run the local userChrome setup for square chrome styling
 - `build-downloads.sh` refreshes the downloadable userChrome setup package and the AMO-ready source zip
 - the userChrome setup package extracts to a `fridg3-firefox-userchrome` folder containing `userChrome.css`, `install-linux.sh`, `install-windows.bat`, and `install-windows.ps1`
-- userChrome setup scripts prompt for install/update or uninstall; uninstall removes only the fridg3.org profile CSS file and import line
+- userChrome setup scripts prompt for install/update or uninstall; uninstall removes only the fridge.dev profile CSS file and import line
 - `userChrome.css` remains outside the add-ons upload package because Firefox WebExtension themes cannot install profile chrome stylesheets
 
 ### `/wiki`
@@ -312,10 +312,10 @@ It also scans `/feed` activity for linked Discord accounts and sends DMs for pos
 - admin-only DM inbox/sender for toast with a thread inbox and full-page conversation view with a back button
 - renders through the normal site template and mobile/desktop theme selection instead of a standalone Discord-style shell
 - reads tracked DM history, resolves linked website usernames to Discord ids, and can send outbound DMs through the local bot service
-- inbound user DMs are logged and can receive Groq-powered Toast replies using the local `personality.json`; when users ask about fridg3.org, the bot can include small relevant snippets from the wiki and explain them in plain language
+- inbound user DMs are logged and can receive Groq-powered Toast replies using the local `personality.json`; when users ask about fridge.dev, the bot can include small relevant snippets from the wiki and explain them in plain language
 - rapid inbound DMs from the same user are batched into one AI prompt; if Toast is still generating or pacing an unsent reply chunk when another DM arrives, it cancels the unfinished reply and regenerates from the queued messages
 - admins can toggle an "air them" state per thread; aired users are still logged, but Toast does not generate AI replies for them
-- if the Discord user is linked to a fridg3.org account, AI replies also receive compact context from that account's own recent feed posts and replies
+- if the Discord user is linked to a fridge.dev account, AI replies also receive compact context from that account's own recent feed posts and replies
 - image and GIF DMs are sent to Groq's configured vision model as Discord attachment URLs, capped at 5 images and 20 MB per image
 - AI replies are split into natural 2-4 sentence chunks and wait at least 5 seconds before each chunk is sent
 - a user can send exactly `CLEARMEMORY` in DM to make Toast react and ignore older DM history for future AI context
