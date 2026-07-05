@@ -2,6 +2,11 @@ server {
     listen 443 ssl; # managed by Certbot
     server_name fridge.dev www.fridge.dev m.fridge.dev;
 
+    ssl_certificate /etc/letsencrypt/live/fridge.dev/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/fridge.dev/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
     root /var/www/fridge.dev;
     index index.html index.php;
     client_max_body_size 20M;
@@ -139,4 +144,16 @@ server {
 
 
 
+}
+
+server {
+    if ($host = m.fridge.dev) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    server_name fridge.dev www.fridge.dev m.fridge.dev;
+    if ($host = www.fridge.dev) { return 301 https://$host$request_uri; }
+    if ($host = fridge.dev)     { return 301 https://$host$request_uri; }
+    return 404; # managed by Certbot
 }
