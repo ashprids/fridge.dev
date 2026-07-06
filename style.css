@@ -1532,6 +1532,7 @@ a.grid-subcaption {
 
 .music-upload-form input[type="text"],
 .music-upload-form input[type="number"],
+.music-upload-form input[type="datetime-local"],
 .music-upload-form select {
     box-sizing: border-box;
     display: block;

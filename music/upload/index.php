@@ -182,6 +182,22 @@ function music_upload_old(string $key, string $default = ''): string {
     return htmlspecialchars((string)($_POST[$key] ?? $_GET[$key] ?? $default), ENT_QUOTES, 'UTF-8');
 }
 
+function music_upload_schedule_value(string $value, string &$error): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value);
+    $errors = DateTimeImmutable::getLastErrors();
+    if ($date === false || ($errors !== false && ((int)$errors['warning_count'] > 0 || (int)$errors['error_count'] > 0))) {
+        $error = 'publish date/time must be a valid date and time.';
+        return '';
+    }
+
+    return $date->format(DateTimeInterface::ATOM);
+}
+
 function music_upload_track_rows(array $trackNames): string {
     if (!$trackNames) {
         $trackNames = [''];
@@ -220,6 +236,10 @@ function music_upload_handle(array $artists, array $releaseTypes, string &$error
     $albumName = trim((string)($_POST['album_name'] ?? ''));
     $albumType = trim((string)($_POST['album_type'] ?? 'Single'));
     $albumCaption = trim((string)($_POST['album_caption'] ?? ''));
+    $scheduledAt = music_upload_schedule_value((string)($_POST['scheduled_at'] ?? ''), $error);
+    if ($error !== '') {
+        return;
+    }
     $albumArt = '';
     $trackNames = array_values(array_map('trim', (array)($_POST['track_names'] ?? [])));
     $files = $_FILES['audio'] ?? null;
@@ -340,6 +360,9 @@ function music_upload_handle(array $artists, array $releaseTypes, string &$error
         'order' => $order,
         'songs' => $songs,
     ];
+    if ($scheduledAt !== '') {
+        $release['scheduled_at'] = $scheduledAt;
+    }
 
     $json = json_encode($release, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
     if (@file_put_contents($jsonPath, $json, LOCK_EX) === false) {
@@ -427,6 +450,7 @@ $replacements = [
     '{release_type_options}' => $releaseTypeOptions,
     '{album_name}' => music_upload_old('album_name'),
     '{album_caption}' => music_upload_old('album_caption'),
+    '{scheduled_at}' => music_upload_old('scheduled_at'),
     '{track_rows}' => music_upload_track_rows($trackNames),
 ];
 

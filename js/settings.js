@@ -1319,17 +1319,7 @@ function initSettingsPage() {
             percent.className = 'dev-bootstrap-progress-percent';
             percent.textContent = '0%';
 
-            const actions = document.createElement('div');
-            actions.className = 'site-popup-actions';
-            const close = document.createElement('button');
-            close.type = 'button';
-            close.className = 'site-popup-button site-popup-ok';
-            close.textContent = 'close';
-            close.disabled = true;
-            actions.appendChild(close);
-
-            close.addEventListener('click', () => overlay.remove());
-            dialog.append(title, detail, logLine, meter, percent, actions);
+            dialog.append(title, detail, logLine, meter, percent);
             overlay.append(dialog);
             document.body.append(overlay);
 
@@ -1347,8 +1337,6 @@ function initSettingsPage() {
                 },
                 finish(message, isError = false) {
                     this.setProgress(100, message, isError, isError ? 'failed: ' + message : 'done: ' + message);
-                    close.disabled = false;
-                    close.focus();
                 },
             };
         };

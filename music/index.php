@@ -90,6 +90,16 @@ function music_upload_button(string $artistKey, string $artistLabel): string {
         . '</a>';
 }
 
+function music_release_is_scheduled(array $release): bool {
+    $scheduledAt = trim((string)($release['scheduled_at'] ?? ''));
+    if ($scheduledAt === '') {
+        return false;
+    }
+
+    $timestamp = strtotime($scheduledAt);
+    return $timestamp !== false && $timestamp > time();
+}
+
 // Helper to build an album grid from a folder of JSON files
 function build_album_grid($folder) {
     // Use new data/music path for frdg3 and cactile
@@ -122,10 +132,18 @@ function build_album_grid($folder) {
         if (!is_array($data)) {
             continue;
         }
+        $isScheduled = music_release_is_scheduled($data);
+        if ($isScheduled && !music_is_admin()) {
+            continue;
+        }
 
         $album_name = htmlspecialchars($data['album_name'] ?? basename($album_file, '.json'), ENT_QUOTES, 'UTF-8');
         $album_caption = htmlspecialchars($data['album_caption'] ?? '', ENT_QUOTES, 'UTF-8');
         $album_type = htmlspecialchars($data['album_type'] ?? '', ENT_QUOTES, 'UTF-8');
+        if ($isScheduled) {
+            $scheduledLabel = date('Y-m-d H:i', (int)strtotime((string)$data['scheduled_at']));
+            $album_caption = trim($album_caption . ($album_caption !== '' ? ' - ' : '') . 'scheduled for ' . htmlspecialchars($scheduledLabel, ENT_QUOTES, 'UTF-8'));
+        }
         // Support both "album_art_directory" (preferred) and legacy "album_art" keys
         $album_art_value = $data['album_art_directory'] ?? ($data['album_art'] ?? '');
         $album_art = htmlspecialchars($album_art_value, ENT_QUOTES, 'UTF-8');
