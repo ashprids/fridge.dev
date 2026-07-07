@@ -886,12 +886,50 @@ function syncSpaPageAssets(doc) {
     } catch (_) { /* no-op */ }
 }
 
+const SPA_SHARED_SCRIPT_PATHS = new Set([
+    '/main.js',
+    '/js/settings.js',
+    '/js/sidebar-player.js',
+    '/js/bookmarks.js',
+    '/js/bbcode.js',
+    'cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js'
+]);
+
+function normalizeSpaScriptKey(src) {
+    try {
+        const url = new URL(src, window.location.href);
+        if (url.hostname === 'cdnjs.cloudflare.com') {
+            return url.hostname + url.pathname;
+        }
+        return url.pathname;
+    } catch (_) {
+        return String(src || '').split('?')[0].split('#')[0];
+    }
+}
+
+function isAlreadyLoadedSharedScript(script) {
+    const src = script && (script.src || script.getAttribute('src') || '');
+    if (!src) return false;
+    const key = normalizeSpaScriptKey(src);
+    if (!SPA_SHARED_SCRIPT_PATHS.has(key)) return false;
+
+    return Array.from(document.scripts).some(existing => {
+        if (!existing || existing === script) return false;
+        const existingSrc = existing.src || existing.getAttribute('src') || '';
+        return existingSrc && normalizeSpaScriptKey(existingSrc) === key;
+    });
+}
+
 function executeContentScripts(rootEl) {
     try {
         if (!rootEl) return;
         const scripts = rootEl.querySelectorAll('script');
         scripts.forEach((oldScript) => {
             if (!oldScript) return;
+            if (isAlreadyLoadedSharedScript(oldScript)) {
+                oldScript.remove();
+                return;
+            }
             const newScript = document.createElement('script');
             Array.from(oldScript.attributes).forEach((attr) => {
                 newScript.setAttribute(attr.name, attr.value);

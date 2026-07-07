@@ -7,6 +7,60 @@ if (!function_exists('fridg3_get_persistent_login_lifetime')) {
     }
 }
 
+if (!function_exists('fridg3_session_is_secure_request')) {
+    function fridg3_session_is_secure_request(): bool
+    {
+        if (isset($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) === 'on') {
+            return true;
+        }
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+            return true;
+        }
+        if (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_SSL']) === 'on') {
+            return true;
+        }
+        return (string)($_SERVER['SERVER_PORT'] ?? '') === '443';
+    }
+}
+
+if (!function_exists('fridg3_session_cookie_domain')) {
+    function fridg3_session_cookie_domain(): string
+    {
+        $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+        $host = preg_replace('/:\d+$/', '', $host);
+        $host = trim($host, '[]');
+
+        if ($host === 'fridge.dev' || $host === 'www.fridge.dev' || $host === 'm.fridge.dev' || str_ends_with($host, '.fridge.dev')) {
+            return '.fridge.dev';
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('fridg3_session_cookie_options')) {
+    function fridg3_session_cookie_options(?int $expires = null, bool $httpOnly = true): array
+    {
+        $options = [
+            'path' => '/',
+            'secure' => fridg3_session_is_secure_request(),
+            'httponly' => $httpOnly,
+            'samesite' => 'Lax',
+        ];
+
+        if ($expires !== null) {
+            $options['expires'] = $expires;
+        }
+
+        $domain = fridg3_session_cookie_domain();
+        if ($domain !== '') {
+            $options['domain'] = $domain;
+        }
+
+        return $options;
+    }
+}
+
 if (!function_exists('fridg3_session_truthy_value')) {
     function fridg3_session_truthy_value($value): bool
     {
@@ -118,13 +172,13 @@ if (!function_exists('fridg3_start_session')) {
 
         ini_set('session.cookie_httponly', '1');
         ini_set('session.use_only_cookies', '1');
-        ini_set('session.cookie_samesite', 'Strict');
         ini_set('session.cookie_lifetime', (string)$persistentLoginLifetime);
         ini_set('session.gc_maxlifetime', (string)$persistentLoginLifetime);
 
-        if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
-            ini_set('session.cookie_secure', '1');
-        }
+        session_set_cookie_params(array_merge(
+            fridg3_session_cookie_options(null, true),
+            ['lifetime' => $persistentLoginLifetime]
+        ));
 
         session_start();
 
@@ -161,14 +215,10 @@ if (!function_exists('fridg3_start_session')) {
 if (!function_exists('fridg3_refresh_is_admin_cookie')) {
     function fridg3_refresh_is_admin_cookie(bool $isAdmin): void
     {
-        $secureFlag = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
-
-        setcookie('is_admin', $isAdmin ? '1' : '0', [
-            'expires' => time() + fridg3_get_persistent_login_lifetime(),
-            'path' => '/',
-            'secure' => $secureFlag,
-            'httponly' => false,
-            'samesite' => 'Lax'
-        ]);
+        setcookie(
+            'is_admin',
+            $isAdmin ? '1' : '0',
+            fridg3_session_cookie_options(time() + fridg3_get_persistent_login_lifetime(), false)
+        );
     }
 }

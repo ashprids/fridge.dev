@@ -128,6 +128,7 @@ currently just redirects:
 - login throttling via `data/accounts/login_attempts.json`
 - reads `data/accounts/accounts.json`
 - sets session user payload and `is_admin` cookie
+- session cookies last 90 days, use `SameSite=Lax`, and are shared across `fridge.dev`, `www.fridge.dev`, `m.fridge.dev`, and other `*.fridge.dev` hosts so mobile/desktop host switches do not look like a logout
 - username `toast` is reserved for a hardcoded virtual account; it prompts for admin credentials, then logs in as non-admin Toast with fixed `feed` and `comments` permissions
 - users with `mustResetPassword` are redirected into the password-change flow before using the rest of the site
 

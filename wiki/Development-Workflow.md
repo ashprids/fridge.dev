@@ -40,6 +40,7 @@ this setup is simple but honestly pretty smart for a repo with lots of inline ma
 ## Gotchas
 
 - login/logout footer swap depends on exact HTML strings
+- account sessions use shared `.fridge.dev` cookies on production hosts; keep logout clearing both shared-domain and legacy host-only cookies
 - `main.js` is route-sensitive; move clearly page-owned code into route-local scripts, and larger shared systems into `/js/*.js`
 - feed and journal have different storage models
 - bookmarks have both server and localStorage behavior
