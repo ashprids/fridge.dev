@@ -902,6 +902,7 @@ function initSettingsPage() {
         const isLoggedIn = !!document.getElementById('user-greeting');
         const isToastSession = !!(toastSettingsSection && toastSettingsSection.dataset.toastSession === '1');
         let currentTheme = loadLocalThemePref();
+        let lastSavedTheme = currentTheme;
         let themeOptions = [];
         let themePicker = null;
         let themePickerButton = null;
@@ -1537,6 +1538,7 @@ function initSettingsPage() {
                     setThemeSelection(currentTheme);
                     saveLocalThemePref(currentTheme);
                     applyThemeSelection(currentTheme);
+                    lastSavedTheme = currentTheme;
                 } else {
                     setThemeSelection(currentTheme);
                 }
@@ -1554,6 +1556,7 @@ function initSettingsPage() {
                 setThemeSelection(currentTheme);
                 saveLocalThemePref(currentTheme);
                 setThemeCookie(currentTheme);
+                lastSavedTheme = currentTheme;
 
                 if (data.settings.colors) {
                     const serverColors = {};
@@ -1666,6 +1669,7 @@ function initSettingsPage() {
             applyGlowIntensity(selected);
 
             const selectedTheme = getThemeSelection();
+            const themeChanged = selectedTheme !== lastSavedTheme;
             saveLocalThemePref(selectedTheme);
             setThemeCookie(selectedTheme);
 
@@ -1724,15 +1728,17 @@ function initSettingsPage() {
                         },
                         body: params.toString(),
                     });
+                    lastSavedTheme = selectedTheme;
                 } catch (_) {
                     /* local settings already applied */
                 }
             } else {
                 /* local settings already applied */
+                lastSavedTheme = selectedTheme;
             }
 
             lastSavedMobileViewEnabled = mobileViewEnabled;
-            if (shouldReloadForMobileView) {
+            if (shouldReloadForMobileView || themeChanged) {
                 window.location.reload();
             }
         });

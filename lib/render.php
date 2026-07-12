@@ -508,6 +508,33 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         );
     }
 
+    function fridg3_inject_shared_runtime_scripts($template) {
+        $scripts = [
+            '/js/settings.js',
+            '/js/sidebar-player.js',
+            '/js/bookmarks.js',
+            '/js/bbcode.js',
+        ];
+
+        $missing = [];
+        foreach ($scripts as $src) {
+            if (stripos($template, $src) === false) {
+                $missing[] = '    <script src="' . $src . '"></script>';
+            }
+        }
+
+        if (empty($missing)) {
+            return $template;
+        }
+
+        $scriptBlock = "\n" . implode("\n", $missing) . "\n";
+        if (stripos($template, '</body>') !== false) {
+            return preg_replace('/<\/body>/i', $scriptBlock . '</body>', $template, 1) ?: ($template . $scriptBlock);
+        }
+
+        return $template . $scriptBlock;
+    }
+
     function apply_preferred_theme_stylesheet($template, $startDir) {
         fridg3_enforce_work_in_progress($startDir);
 
@@ -534,7 +561,11 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         if (stripos($template, '</head>') !== false) {
             return fridg3_replace_logged_in_discord_footer_button(
                 fridg3_apply_work_in_progress_banner(
-                    fridg3_inject_dev_mode_banner(preg_replace('/<\/head>/i', $themeLink . '</head>', $template, 1)),
+                    fridg3_inject_dev_mode_banner(
+                        fridg3_inject_shared_runtime_scripts(
+                            preg_replace('/<\/head>/i', $themeLink . '</head>', $template, 1)
+                        )
+                    ),
                     $startDir
                 ),
                 $startDir
@@ -542,7 +573,12 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         }
 
         return fridg3_replace_logged_in_discord_footer_button(
-            fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($themeLink . $template), $startDir),
+            fridg3_apply_work_in_progress_banner(
+                fridg3_inject_dev_mode_banner(
+                    fridg3_inject_shared_runtime_scripts($themeLink . $template)
+                ),
+                $startDir
+            ),
             $startDir
         );
     }

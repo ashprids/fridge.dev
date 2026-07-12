@@ -1,5 +1,6 @@
 ####################################################################################################################
 # WARNING: Do not store sensitive information in this file, as its contents will be included in the Qodana report. #
+# Excludes are here because they tend to report false positives and are not/don't need to be actionable.           #
 ####################################################################################################################
 version: "1.0"
 linter: qodana-php
