@@ -1471,52 +1471,68 @@ def split_text_by_lines(lines: list, max_length: int) -> list:
     current = ''
 
     for line in lines:
+        line = str(line or '').strip()
         if not line:
             continue
 
-        candidate = line if not current else current + '\n' + line
+        candidate = line if not current else current + '\n\n' + line
         if len(candidate) <= max_length:
             current = candidate
             continue
 
         if current:
             chunks.append(current)
-            current = line
-        else:
-            chunks.append(line[:max_length - 3].rstrip() + '...')
             current = ''
+
+        while len(line) > max_length:
+            split_at = line.rfind('\n', 0, max_length + 1)
+            if split_at <= 0:
+                split_at = line.rfind(' ', 0, max_length + 1)
+            if split_at <= 0:
+                split_at = max_length
+
+            chunks.append(line[:split_at].rstrip())
+            line = line[split_at:].lstrip()
+
+        current = line
 
     if current:
         chunks.append(current)
 
     return chunks
 
-def format_patch_notice_commit_line(commit: dict) -> str:
-    sha = str(commit.get('sha', '')).strip()
-    subject = discord.utils.escape_markdown(discord.utils.escape_mentions(str(commit.get('subject', '')).strip()))
-    body = str(commit.get('body', '')).strip()
-    url = str(commit.get('url', '')).strip()
+def split_patch_notice_body_notes(body: str) -> list:
+    if not body:
+        return []
 
-    if sha and url:
-        line = f"• [`{sha[:7]}`]({url}) {subject}"
-    elif sha:
-        line = f"• `{sha[:7]}` {subject}"
+    if re.search(r'\n\s*\n', body):
+        raw_notes = re.split(r'\n\s*\n+', body)
     else:
-        line = f"• {subject}"
+        raw_notes = body.splitlines()
 
-    if body:
-        body_lines = []
-        for raw_line in body.splitlines():
-            cleaned = ' '.join(raw_line.strip().split())
-            if not cleaned:
-                continue
-            body_lines.append(discord.utils.escape_markdown(discord.utils.escape_mentions(cleaned)))
-            if len(body_lines) == 2:
-                break
-        if body_lines:
-            line += '\n  ' + '\n  '.join(body_lines)
+    notes = []
+    for raw_note in raw_notes:
+        cleaned_lines = [' '.join(line.strip().split()) for line in raw_note.splitlines()]
+        cleaned = ' '.join(line for line in cleaned_lines if line)
+        if cleaned:
+            notes.append(cleaned)
 
-    return line
+    return notes
+
+def format_patch_notice_note(note: str) -> str:
+    escaped = discord.utils.escape_markdown(discord.utils.escape_mentions(str(note or '').strip()))
+    return f"• {escaped}" if escaped else ''
+
+def format_patch_notice_commit_line(commit: dict) -> str:
+    subject = str(commit.get('subject', '')).strip()
+    body = str(commit.get('body', '')).strip()
+
+    notes = []
+    if subject:
+        notes.append(subject)
+    notes.extend(split_patch_notice_body_notes(body))
+
+    return '\n\n'.join(note for note in (format_patch_notice_note(note) for note in notes) if note)
 
 def build_patch_notice_embed(payload: dict) -> discord.Embed:
     commit_sha = str(payload.get('commit_sha', '')).strip()
@@ -1553,7 +1569,7 @@ def build_patch_notice_embed(payload: dict) -> discord.Embed:
         embed.add_field(name='source', value=f'[{pr_label}]({pr_url})', inline=True)
 
     commit_lines = [format_patch_notice_commit_line(commit) for commit in commits]
-    for index, chunk in enumerate(split_text_by_lines(commit_lines, 950), start=1):
+    for index, chunk in enumerate(split_text_by_lines(commit_lines, 1024), start=1):
         field_name = 'patch notes' if len(commit_lines) <= 1 and index == 1 else f'patch notes ({index})'
         embed.add_field(name=field_name, value=chunk, inline=False)
 
@@ -1607,7 +1623,6 @@ def build_manual_patch_notice_payload(commit_ref: str) -> dict:
     sha, subject, body = (record.split('\x1f') + ['', ''])[:3]
     sha = sha.strip()
     subject = ' '.join(subject.split())
-    body_lines = [line.strip() for line in body.splitlines() if line.strip()]
     repo_url = get_repository_url()
     branch = 'main'
 
@@ -1626,7 +1641,7 @@ def build_manual_patch_notice_payload(commit_ref: str) -> dict:
         'commits': [{
             'sha': sha,
             'subject': subject or sha[:7],
-            'body': '\n'.join(body_lines[:2]),
+            'body': body.strip(),
             'url': f'{repo_url}/commit/{sha}',
         }],
         'pr_url': '',

@@ -31,12 +31,14 @@ main details:
 
 ## Toast Patch Notice Commit Format
 
-after a successful `main` deploy, the workflow sends Toast a list of non-merge commits using each commit's subject (`git log %s`) and body (`git log %b`). Toast turns each commit into one patch-note item in Discord:
+after a successful `main` deploy, the workflow sends Toast a list of non-merge commits using each commit's subject (`git log %s`) and full body (`git log %b`). Toast turns each commit into Discord patch-note bullets:
 
 ```text
-- `abc1234` commit subject
-  first body line
-  second body line
+• commit subject
+
+• first body note
+
+• second body note
 ```
 
 format commits like this when the Discord patch notice should read cleanly:
@@ -45,15 +47,16 @@ format commits like this when the Discord patch notice should read cleanly:
 Short user-facing summary
 
 Concrete patch note detail
+
 Second useful detail, if needed
 ```
 
 rules to keep in mind:
 
-- the first commit line is the visible summary beside the linked short SHA
-- only the first two non-empty body lines are shown under that summary
-- blank lines in the body are ignored
-- extra body lines are dropped from the Discord patch notice
+- the first bullet is the commit subject and does not include the commit ID
+- body notes are separated by blank lines in the commit body
+- every body note starts with its own bullet
+- long patch notes are split across multiple Discord embed fields instead of being cut off
 - Markdown and Discord mentions are escaped by Toast, so write plain text instead of relying on formatting or pings
 - merge commits are excluded from the shipped commit list
 
@@ -71,10 +74,11 @@ same message as plain text for VS Code's source control commit message box:
 Add a settings system info dashboard
 
 Give admins a live view of server, PHP, storage, and site health.
+
 Load shared runtime scripts through rendered pages so settings controls keep working.
 ```
 
-that appears in Toast's Discord embed as one patch-note item with the subject on the first line and those two body lines indented beneath it.
+that appears in Toast's Discord embed as three patch-note bullets: one for the subject and one for each body note.
 
 admins can manually post the same style of update from Discord with Toast's `/shareupdate` command:
 

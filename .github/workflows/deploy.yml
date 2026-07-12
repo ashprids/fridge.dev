@@ -191,11 +191,10 @@ jobs:
                   continue
               sha, subject, body = (record.split('\x1f') + ['', ''])[:3]
               subject = ' '.join(subject.split())
-              body_lines = [line.strip() for line in body.splitlines() if line.strip()]
               commits.append({
                   'sha': sha.strip(),
                   'subject': subject,
-                  'body': '\n'.join(body_lines[:2]),
+                  'body': body.strip(),
                   'url': f'{repo_url}/commit/{sha.strip()}',
               })
 
