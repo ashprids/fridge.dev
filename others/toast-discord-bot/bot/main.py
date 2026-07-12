@@ -10,6 +10,7 @@ import json
 import os
 import logging
 import signal
+import subprocess
 from aiohttp import ClientSession, ClientTimeout, web
 from pathlib import Path
 import re
@@ -66,6 +67,7 @@ WIKI_CONTEXT_MAX_CHARS = 5200
 PATCH_NOTICE_CHANNEL_ID = '1455194403642802309'
 PATCH_NOTICE_ROLE_ID = '1408064850688475197'
 PATCH_NOTICE_EMBED_COLOR = 0x3C7895
+DEFAULT_REPOSITORY_URL = 'https://github.com/ashprids/fridge.dev'
 WIKI_CONTEXT_TRIGGER_TERMS = {
     'fridg3', 'site', 'website', 'page', 'pages', 'feature', 'features', 'account', 'accounts',
     'login', 'password', 'settings', 'feed', 'post', 'posts', 'reply', 'journal', 'guestbook',
@@ -87,6 +89,19 @@ def find_wiki_dir():
     return Path(__file__).resolve().parents[2] / 'wiki'
 
 WIKI_DIR = find_wiki_dir()
+
+def find_repository_root():
+    cur = Path(__file__).resolve().parent
+    root = cur
+    while True:
+        if (root / '.git').exists():
+            return root
+        if root.parent == root:
+            break
+        root = root.parent
+    return Path(__file__).resolve().parents[3]
+
+REPOSITORY_ROOT = find_repository_root()
 
 def find_ffmpeg_executable():
     """Locate ffmpeg executable on the system.
@@ -362,7 +377,7 @@ def build_bot_purpose_context() -> str:
     return (
         "Toast's fridge.dev duties and limits:\n"
         f"- {radio_line}\n"
-        "- Your only Discord slash commands are /play, /stop, /status, and /sendmsg. Do not invent or suggest any other Discord slash commands.\n"
+        "- Your only Discord slash commands are /play, /stop, /status, /sendmsg, and /shareupdate. Do not invent or suggest any other Discord slash commands.\n"
         "- Website paths like /feed, /journal, /chat, /settings, and /tools are fridge.dev pages, not Discord slash commands.\n"
         "- If someone asks how to use a website feature, direct them to the relevant fridge.dev page or describe the website flow; do not turn website paths into Discord commands.\n"
         "- You send useful DMs for fridge.dev events, including account invites, feed mentions, and replies to a user's feed posts.\n"
@@ -1545,6 +1560,91 @@ def build_patch_notice_embed(payload: dict) -> discord.Embed:
     embed.set_footer(text='main branch update // fridge.dev')
     return embed
 
+def run_git_command(args: list, timeout: int = 8) -> str:
+    result = subprocess.run(
+        ['git'] + args,
+        cwd=str(REPOSITORY_ROOT),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=timeout,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or 'git command failed'
+        raise RuntimeError(detail)
+
+    return result.stdout.strip()
+
+def normalize_repository_url(url: str) -> str:
+    cleaned = str(url or '').strip()
+    if not cleaned:
+        return DEFAULT_REPOSITORY_URL
+    if cleaned.startswith('git@github.com:'):
+        cleaned = 'https://github.com/' + cleaned[len('git@github.com:'):]
+    if cleaned.endswith('.git'):
+        cleaned = cleaned[:-4]
+    return cleaned or DEFAULT_REPOSITORY_URL
+
+def get_repository_url() -> str:
+    try:
+        return normalize_repository_url(run_git_command(['remote', 'get-url', 'origin'], timeout=4))
+    except Exception as e:
+        logger.warning(f"Could not resolve repository URL for patch notice: {e}")
+        return DEFAULT_REPOSITORY_URL
+
+def build_manual_patch_notice_payload(commit_ref: str) -> dict:
+    ref = str(commit_ref or '').strip()
+    if ref.lower() == 'latest':
+        ref = 'HEAD'
+    elif not re.fullmatch(r'[0-9a-fA-F]{7,40}', ref):
+        raise ValueError('enter `latest` or a 7-40 character commit SHA.')
+
+    commit_sha = run_git_command(['rev-parse', '--verify', f'{ref}^{{commit}}'])
+    raw_commit = run_git_command(['show', '--no-patch', '--format=%H%x1f%s%x1f%b%x1e', commit_sha])
+    record = raw_commit.strip().rstrip('\x1e')
+    sha, subject, body = (record.split('\x1f') + ['', ''])[:3]
+    sha = sha.strip()
+    subject = ' '.join(subject.split())
+    body_lines = [line.strip() for line in body.splitlines() if line.strip()]
+    repo_url = get_repository_url()
+    branch = 'main'
+
+    if ref == 'HEAD':
+        try:
+            branch = run_git_command(['rev-parse', '--abbrev-ref', 'HEAD'], timeout=4) or 'main'
+            if branch == 'HEAD':
+                branch = 'main'
+        except Exception:
+            branch = 'main'
+
+    return {
+        'branch': branch,
+        'commit_sha': sha,
+        'commit_url': f'{repo_url}/commit/{sha}',
+        'commits': [{
+            'sha': sha,
+            'subject': subject or sha[:7],
+            'body': '\n'.join(body_lines[:2]),
+            'url': f'{repo_url}/commit/{sha}',
+        }],
+        'pr_url': '',
+        'pr_number': '',
+    }
+
+async def send_patch_notice_payload(payload: dict, channel_id: str = PATCH_NOTICE_CHANNEL_ID):
+    channel = await resolve_sendable_channel(channel_id)
+    if channel is None:
+        raise RuntimeError('could not resolve the patch notice channel.')
+
+    embed = build_patch_notice_embed(payload)
+    return await channel.send(
+        content=f'<@&{PATCH_NOTICE_ROLE_ID}>',
+        embed=embed,
+        allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=True, replied_user=False),
+    )
+
 def save_notify_state(state: dict):
     try:
         with open(feed_notify_state_path, 'w', encoding='utf-8') as f:
@@ -1928,6 +2028,44 @@ async def slash_sendmsg(interaction: discord.Interaction, role_id: str, message:
         ephemeral=True
     )
 
+@bot.tree.command(name="shareupdate", description="Post a fridge.dev patch update for a commit")
+@app_commands.default_permissions(administrator=True)
+@app_commands.describe(commit_id="Use `latest` for HEAD, or pass a 7-40 character commit SHA")
+async def slash_shareupdate(interaction: discord.Interaction, commit_id: str):
+    if interaction.guild is None:
+        await interaction.response.send_message("this command only works in a server.", ephemeral=True)
+        return
+
+    guild_permissions = getattr(interaction.user, 'guild_permissions', None)
+    if not guild_permissions or not guild_permissions.administrator:
+        await interaction.response.send_message("you need administrator permissions to use this command.", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        payload = await asyncio.to_thread(build_manual_patch_notice_payload, commit_id)
+        sent_message = await send_patch_notice_payload(payload)
+    except ValueError as e:
+        await interaction.followup.send(str(e), ephemeral=True)
+        return
+    except subprocess.TimeoutExpired:
+        await interaction.followup.send("git took too long while resolving that commit.", ephemeral=True)
+        return
+    except RuntimeError as e:
+        await interaction.followup.send(f"couldn't post that update: {e}", ephemeral=True)
+        return
+    except Exception as e:
+        logger.warning(f"Manual shareupdate failed for {commit_id}: {e}")
+        await interaction.followup.send("couldn't post that update because something unexpected happened.", ephemeral=True)
+        return
+
+    commit_sha = str(payload.get('commit_sha', '')).strip()
+    await interaction.followup.send(
+        f"posted update for `{commit_sha[:7]}` in <#{PATCH_NOTICE_CHANNEL_ID}>: {sent_message.jump_url}",
+        ephemeral=True
+    )
+
 async def status_handler(request):
     return web.json_response({
         'online': bot_online and not bot.is_closed(),
@@ -2176,14 +2314,14 @@ async def patch_notice_handler(request):
         return web.json_response({'ok': False, 'error': 'forbidden'}, status=403)
 
     try:
-        payload = await request.json()
+        request_payload = await request.json()
     except Exception:
         return web.json_response({'ok': False, 'error': 'invalid json'}, status=400)
 
-    channel_id = str(payload.get('channel_id', PATCH_NOTICE_CHANNEL_ID) or PATCH_NOTICE_CHANNEL_ID).strip() or PATCH_NOTICE_CHANNEL_ID
-    commit_sha = str(payload.get('commit_sha') or '').strip()
-    commit_url = str(payload.get('commit_url') or '').strip()
-    commits = normalize_patch_notice_commits(payload.get('commits', []))
+    channel_id = str(request_payload.get('channel_id', PATCH_NOTICE_CHANNEL_ID) or PATCH_NOTICE_CHANNEL_ID).strip() or PATCH_NOTICE_CHANNEL_ID
+    commit_sha = str(request_payload.get('commit_sha') or '').strip()
+    commit_url = str(request_payload.get('commit_url') or '').strip()
+    commits = normalize_patch_notice_commits(request_payload.get('commits', []))
 
     if not re.fullmatch(r'\d{17,20}', channel_id):
         return web.json_response({'ok': False, 'error': 'invalid channel id'}, status=400)
@@ -2194,32 +2332,26 @@ async def patch_notice_handler(request):
     if not commits and not commit_sha:
         return web.json_response({'ok': False, 'error': 'missing commit details'}, status=400)
 
-    channel = await resolve_sendable_channel(channel_id)
-    if channel is None:
-        return web.json_response({'ok': False, 'error': 'could not resolve discord channel'}, status=404)
-
-    embed = build_patch_notice_embed({
-        'branch': payload.get('branch', 'main'),
+    notice_payload = {
+        'branch': request_payload.get('branch', 'main'),
         'commit_sha': commit_sha,
         'commit_url': commit_url,
         'commits': commits,
-        'pr_url': payload.get('pr_url') or '',
-        'pr_number': payload.get('pr_number') or '',
-    })
+        'pr_url': request_payload.get('pr_url') or '',
+        'pr_number': request_payload.get('pr_number') or '',
+    }
 
     try:
-        sent_message = await channel.send(
-            content=f'<@&{PATCH_NOTICE_ROLE_ID}>',
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=True, replied_user=False),
-        )
+        sent_message = await send_patch_notice_payload(notice_payload, channel_id=channel_id)
+    except RuntimeError as e:
+        return web.json_response({'ok': False, 'error': str(e)}, status=404)
     except Exception as e:
         logger.warning(f"Failed to send patch notice to {channel_id}: {e}")
         return web.json_response({'ok': False, 'error': 'failed to send channel message'}, status=500)
 
     logger.info(
         f"Sent patch notice to {channel_id} for {commit_sha or 'unknown commit'}"
-        + (f" with PR {payload.get('pr_number')}" if payload.get('pr_url') else "")
+        + (f" with PR {notice_payload.get('pr_number')}" if notice_payload.get('pr_url') else "")
     )
     return web.json_response({
         'ok': True,

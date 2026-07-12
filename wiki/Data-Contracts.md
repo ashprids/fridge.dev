@@ -325,7 +325,7 @@ The website Toast feed generator and auto replies add feed-only wording rails to
 
 AI DM replies are split into sentence-aware Discord messages, usually 2-4 sentences per send depending on sentence length, while still staying below Discord's hard message limit. Toast waits at least 5 seconds before every AI reply chunk so the visible typing state never flashes and instantly dumps a response. Each Discord user has one active AI reply task: if another DM arrives while Toast is generating or pacing an unsent chunk, Toast cancels the unfinished reply and regenerates from the queued inbound DMs combined into one chronological prompt.
 
-Toast's AI prompt includes an exact Discord slash-command allow-list: `/play`, `/stop`, `/status`, and `/sendmsg`. Website paths such as `/feed` must be described as fridge.dev pages, not Discord slash commands.
+Toast's AI prompt includes an exact Discord slash-command allow-list: `/play`, `/stop`, `/status`, `/sendmsg`, and `/shareupdate`. Website paths such as `/feed` must be described as fridge.dev pages, not Discord slash commands.
 
 ### `toast-personality.json`
 

@@ -317,6 +317,7 @@ UI shell for toast bot status, controls, and stream playback.
 The bot also exposes localhost-only service endpoints on `127.0.0.1:8765`, including contact submission notifications to Discord channel `1503931489560301609`.
 It also scans `/feed` activity for linked Discord accounts and sends DMs for post mentions, reply mentions, and replies to a user's own feed posts.
 It also receives deploy-time patch notices and posts them as Discord embed patch notes to channel `1455194403642802309`, pinging role `1408064850688475197` on each update.
+Admins can also use `/shareupdate latest` or `/shareupdate <commit ID>` in Discord to manually post a patch notice for the deployed `HEAD` commit or a specific commit SHA.
 
 ### `/others/toast-discord-bot/messages`
 

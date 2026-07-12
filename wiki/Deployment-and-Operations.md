@@ -29,6 +29,60 @@ main details:
 - the restart step needs passwordless sudo for `deploy` to run the Toast bot as `http`; Toast writes DM history and feed notification state under `/data`, which is owned by `http:http`
 - because the `http` user home is not a normal login home, the workflow sets `SCREENDIR=/tmp/toast-screen-http` for `http`-owned screen commands and creates that socket directory as `http` with mode `700` before start
 
+## Toast Patch Notice Commit Format
+
+after a successful `main` deploy, the workflow sends Toast a list of non-merge commits using each commit's subject (`git log %s`) and body (`git log %b`). Toast turns each commit into one patch-note item in Discord:
+
+```text
+- `abc1234` commit subject
+  first body line
+  second body line
+```
+
+format commits like this when the Discord patch notice should read cleanly:
+
+```text
+Short user-facing summary
+
+Concrete patch note detail
+Second useful detail, if needed
+```
+
+rules to keep in mind:
+
+- the first commit line is the visible summary beside the linked short SHA
+- only the first two non-empty body lines are shown under that summary
+- blank lines in the body are ignored
+- extra body lines are dropped from the Discord patch notice
+- Markdown and Discord mentions are escaped by Toast, so write plain text instead of relying on formatting or pings
+- merge commits are excluded from the shipped commit list
+
+example:
+
+```bash
+git commit -m "Add a settings system info dashboard" \
+  -m "Give admins a live view of server, PHP, storage, and site health." \
+  -m "Load shared runtime scripts through rendered pages so settings controls keep working."
+```
+
+same message as plain text for VS Code's source control commit message box:
+
+```text
+Add a settings system info dashboard
+
+Give admins a live view of server, PHP, storage, and site health.
+Load shared runtime scripts through rendered pages so settings controls keep working.
+```
+
+that appears in Toast's Discord embed as one patch-note item with the subject on the first line and those two body lines indented beneath it.
+
+admins can manually post the same style of update from Discord with Toast's `/shareupdate` command:
+
+- `/shareupdate latest` posts the currently deployed `HEAD` commit from the bot's local repo
+- `/shareupdate <commit ID>` posts a specific 7-40 character commit SHA
+
+the command uses the same embed formatter and update channel as deploy notices, so it also pings role `1408064850688475197`.
+
 ## What Does Not Deploy
 
 deployment uses `.rsyncignore`, so these are excluded:
