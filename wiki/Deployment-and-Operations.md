@@ -11,6 +11,7 @@ current chain:
 3. if lint passes, `deploy to fridge.dev` runs from the successful workflow event
 4. repo is rsynced to `/var/www/fridge.dev`
 5. the Toast Discord bot is gracefully restarted from the deployed copy
+6. the deploy workflow sends a patch notice embed to Discord channel `1455194403642802309` with the shipped commit list and a PR link when applicable, and pings role `1408064850688475197`
 
 ## Deploy Workflow
 

@@ -63,6 +63,9 @@ LINKED_FEED_CONTEXT_MAX_CHARS = 3500
 LINKED_FEED_CONTEXT_SNIPPET_CHARS = 420
 WIKI_CONTEXT_FILES = ('Home.md', 'Routes-and-Features.md')
 WIKI_CONTEXT_MAX_CHARS = 5200
+PATCH_NOTICE_CHANNEL_ID = '1455194403642802309'
+PATCH_NOTICE_ROLE_ID = '1408064850688475197'
+PATCH_NOTICE_EMBED_COLOR = 0x3C7895
 WIKI_CONTEXT_TRIGGER_TERMS = {
     'fridg3', 'site', 'website', 'page', 'pages', 'feature', 'features', 'account', 'accounts',
     'login', 'password', 'settings', 'feed', 'post', 'posts', 'reply', 'journal', 'guestbook',
@@ -1377,6 +1380,171 @@ def build_dm_error_response(error: Exception, action: str):
         status=500,
     )
 
+async def resolve_sendable_channel(channel_id: str):
+    if not re.fullmatch(r'\d{17,20}', str(channel_id).strip()):
+        return None
+
+    channel = bot.get_channel(int(channel_id))
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(int(channel_id))
+        except Exception as e:
+            logger.warning(f"Failed to fetch Discord channel {channel_id}: {e}")
+            return None
+
+    if not hasattr(channel, 'send'):
+        logger.warning(f"Discord channel {channel_id} cannot receive messages")
+        return None
+
+    return channel
+
+def normalize_patch_notice_commits(commits) -> list:
+    normalized = []
+
+    if not isinstance(commits, list):
+        return normalized
+
+    for entry in commits:
+        if isinstance(entry, str):
+            message = ' '.join(entry.strip().split())
+            if not message:
+                continue
+            normalized.append({
+                'sha': '',
+                'subject': message,
+                'body': '',
+                'url': '',
+            })
+            continue
+
+        if not isinstance(entry, dict):
+            continue
+
+        sha = str(entry.get('sha', '')).strip()
+        url = str(entry.get('url', '')).strip()
+        subject = str(entry.get('subject', '')).strip()
+        body = str(entry.get('body', '')).strip()
+        message = str(entry.get('message', '')).strip()
+
+        if not subject and message:
+            message_lines = [line.strip() for line in message.splitlines() if line.strip()]
+            subject = message_lines[0] if message_lines else ''
+            if not body and len(message_lines) > 1:
+                body = '\n'.join(message_lines[1:])
+
+        if not subject and body:
+            body_lines = [line.strip() for line in body.splitlines() if line.strip()]
+            subject = body_lines[0] if body_lines else ''
+
+        if not subject and sha:
+            subject = sha[:7]
+
+        if not subject:
+            continue
+
+        normalized.append({
+            'sha': sha,
+            'subject': subject,
+            'body': body,
+            'url': url,
+        })
+
+    return normalized
+
+def split_text_by_lines(lines: list, max_length: int) -> list:
+    chunks = []
+    current = ''
+
+    for line in lines:
+        if not line:
+            continue
+
+        candidate = line if not current else current + '\n' + line
+        if len(candidate) <= max_length:
+            current = candidate
+            continue
+
+        if current:
+            chunks.append(current)
+            current = line
+        else:
+            chunks.append(line[:max_length - 3].rstrip() + '...')
+            current = ''
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+def format_patch_notice_commit_line(commit: dict) -> str:
+    sha = str(commit.get('sha', '')).strip()
+    subject = discord.utils.escape_markdown(discord.utils.escape_mentions(str(commit.get('subject', '')).strip()))
+    body = str(commit.get('body', '')).strip()
+    url = str(commit.get('url', '')).strip()
+
+    if sha and url:
+        line = f"• [`{sha[:7]}`]({url}) {subject}"
+    elif sha:
+        line = f"• `{sha[:7]}` {subject}"
+    else:
+        line = f"• {subject}"
+
+    if body:
+        body_lines = []
+        for raw_line in body.splitlines():
+            cleaned = ' '.join(raw_line.strip().split())
+            if not cleaned:
+                continue
+            body_lines.append(discord.utils.escape_markdown(discord.utils.escape_mentions(cleaned)))
+            if len(body_lines) == 2:
+                break
+        if body_lines:
+            line += '\n  ' + '\n  '.join(body_lines)
+
+    return line
+
+def build_patch_notice_embed(payload: dict) -> discord.Embed:
+    commit_sha = str(payload.get('commit_sha', '')).strip()
+    commit_url = str(payload.get('commit_url') or '').strip()
+    branch = str(payload.get('branch', 'main')).strip() or 'main'
+    pr_url = str(payload.get('pr_url') or '').strip()
+    pr_number = str(payload.get('pr_number', '')).strip()
+    commits = normalize_patch_notice_commits(payload.get('commits', []))
+    if not commits and commit_sha:
+        commits = [{
+            'sha': commit_sha,
+            'subject': commit_sha[:7],
+            'body': '',
+            'url': commit_url,
+        }]
+
+    embed = discord.Embed(
+        title='patch notice // fridge.dev',
+        description=(
+            f'new build landed on `{branch}`. '
+            'here’s the patch log from the latest rollout.'
+        ),
+        color=PATCH_NOTICE_EMBED_COLOR,
+        url=commit_url or None,
+    )
+    embed.timestamp = discord.utils.utcnow()
+
+    if commit_sha:
+        build_line = f"[`{commit_sha[:7]}`]({commit_url})" if commit_url else f"`{commit_sha[:7]}`"
+        embed.add_field(name='build', value=build_line, inline=True)
+
+    if pr_url:
+        pr_label = f'pull request #{pr_number}' if pr_number else 'pull request'
+        embed.add_field(name='source', value=f'[{pr_label}]({pr_url})', inline=True)
+
+    commit_lines = [format_patch_notice_commit_line(commit) for commit in commits]
+    for index, chunk in enumerate(split_text_by_lines(commit_lines, 950), start=1):
+        field_name = 'patch notes' if len(commit_lines) <= 1 and index == 1 else f'patch notes ({index})'
+        embed.add_field(name=field_name, value=chunk, inline=False)
+
+    embed.set_footer(text='main branch update // fridge.dev')
+    return embed
+
 def save_notify_state(state: dict):
     try:
         with open(feed_notify_state_path, 'w', encoding='utf-8') as f:
@@ -2003,6 +2171,62 @@ async def contact_notify_handler(request):
         'message_id': str(sent_message.id),
     })
 
+async def patch_notice_handler(request):
+    if request.remote not in ('127.0.0.1', '::1'):
+        return web.json_response({'ok': False, 'error': 'forbidden'}, status=403)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({'ok': False, 'error': 'invalid json'}, status=400)
+
+    channel_id = str(payload.get('channel_id', PATCH_NOTICE_CHANNEL_ID) or PATCH_NOTICE_CHANNEL_ID).strip() or PATCH_NOTICE_CHANNEL_ID
+    commit_sha = str(payload.get('commit_sha') or '').strip()
+    commit_url = str(payload.get('commit_url') or '').strip()
+    commits = normalize_patch_notice_commits(payload.get('commits', []))
+
+    if not re.fullmatch(r'\d{17,20}', channel_id):
+        return web.json_response({'ok': False, 'error': 'invalid channel id'}, status=400)
+    if commit_sha and not re.fullmatch(r'[0-9a-fA-F]{7,40}', commit_sha):
+        return web.json_response({'ok': False, 'error': 'invalid commit sha'}, status=400)
+    if commit_url and not commit_url.startswith(('https://', 'http://')):
+        return web.json_response({'ok': False, 'error': 'invalid commit url'}, status=400)
+    if not commits and not commit_sha:
+        return web.json_response({'ok': False, 'error': 'missing commit details'}, status=400)
+
+    channel = await resolve_sendable_channel(channel_id)
+    if channel is None:
+        return web.json_response({'ok': False, 'error': 'could not resolve discord channel'}, status=404)
+
+    embed = build_patch_notice_embed({
+        'branch': payload.get('branch', 'main'),
+        'commit_sha': commit_sha,
+        'commit_url': commit_url,
+        'commits': commits,
+        'pr_url': payload.get('pr_url') or '',
+        'pr_number': payload.get('pr_number') or '',
+    })
+
+    try:
+        sent_message = await channel.send(
+            content=f'<@&{PATCH_NOTICE_ROLE_ID}>',
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=True, replied_user=False),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send patch notice to {channel_id}: {e}")
+        return web.json_response({'ok': False, 'error': 'failed to send channel message'}, status=500)
+
+    logger.info(
+        f"Sent patch notice to {channel_id} for {commit_sha or 'unknown commit'}"
+        + (f" with PR {payload.get('pr_number')}" if payload.get('pr_url') else "")
+    )
+    return web.json_response({
+        'ok': True,
+        'channel_id': str(channel_id),
+        'message_id': str(sent_message.id),
+    })
+
 
 async def start_status_server():
     status_app.router.add_get('/status', status_handler)
@@ -2011,6 +2235,7 @@ async def start_status_server():
     status_app.router.add_post('/messages/send', send_message_handler)
     status_app.router.add_post('/messages/ai-mute', set_ai_mute_handler)
     status_app.router.add_post('/contact/notify', contact_notify_handler)
+    status_app.router.add_post('/patch-notice', patch_notice_handler)
     runner = web.AppRunner(status_app)
     await runner.setup()
     site = web.TCPSite(runner, '127.0.0.1', 8765)

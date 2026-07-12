@@ -181,3 +181,4 @@ route-local JSON endpoints for the `/tools/upload` peer-to-peer transfer page.
 - some account, contact, and toast integrations also talk to a localhost-only bot HTTP service on `127.0.0.1:8765`, but those are not public `/api/*` routes
 - the toast DM inbox uses that local bot service to send manual DMs and toggle per-thread AI reply muting
 - contact submissions call `POST /contact/notify` on that local toast service after successful storage so toast can notify the configured Discord channel
+- deploys call `POST /patch-notice` on that same local service after a successful `main` deploy so toast can post a Discord patch notice embed and ping role `1408064850688475197`

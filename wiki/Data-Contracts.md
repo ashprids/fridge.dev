@@ -386,6 +386,14 @@ legacy Discord bot fallback. The bot now prefers `data/etc/toast-personality.jso
 - `/contact` calls it after saving a submission
 - toast sends the alert to Discord channel `1503931489560301609`
 
+### patch notice endpoint
+
+- the toast bot exposes localhost-only `POST /patch-notice` on `127.0.0.1:8765`
+- the deploy workflow calls it after a successful deploy to `main`
+- toast sends a Discord embed patch note to channel `1455194403642802309`
+- each patch notice pings role `1408064850688475197` so the update gets the right attention
+- the payload includes the shipped commit range plus a PR link when the update came from a merged pull request
+
 ### `off-topic-archive.json`
 
 - Discord export blob used by the archive viewer
