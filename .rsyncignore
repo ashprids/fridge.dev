@@ -10,3 +10,4 @@
 - .codex/**
 - /others/toast-discord-bot/bot/venv/**
 - /scripts/**
+- qodana.yaml

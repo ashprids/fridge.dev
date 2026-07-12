@@ -1,0 +1,50 @@
+####################################################################################################################
+# WARNING: Do not store sensitive information in this file, as its contents will be included in the Qodana report. #
+####################################################################################################################
+version: "1.0"
+linter: qodana-php
+profile:
+  name: qodana.recommended
+include:
+  - name: CheckDependencyLicenses
+exclude:
+  - name: HardcodedPasswords
+    paths:
+      - .github/workflows/sync-wiki.yml
+  - name: PhpElementIsNotAvailableInCurrentPhpVersionInspection
+  - name: UnnecessaryReturnJS
+  - name: UnnecessaryLocalVariableJS
+  - name: PhpStatementHasEmptyBodyInspection
+    paths:
+      - api/stream-proxy
+      - feed/posts/index.php
+  - name: RegExpRedundantEscape
+  - name: ExceptionCaughtLocallyJS
+  - name: All
+    paths:
+      - .github/scripts/sanitize-dev-data.php
+      - main.js
+  - name: PhpUndefinedClassInspection
+  - name: JSUnusedAssignment
+  - name: JSUnusedLocalSymbols
+  - name: PhpArrayIsAlwaysEmptyInspection
+  - name: PhpMethodParametersCountMismatchInspection
+  - name: PhpUnnecessaryStringCastInspection
+  - name: PhpRedundantOptionalArgumentInspection
+  - name: PhpUnnecessaryLocalVariableInspection
+  - name: PhpIfWithCommonPartsInspection
+  - name: PhpConditionAlreadyCheckedInspection
+  - name: PhpUnhandledExceptionInspection
+  - name: DuplicatedCode
+  - name: PhpIncludeInspection
+  - name: RegExpSimplifiable
+  - name: PhpRegExpRedundantModifierInspection
+  - name: PhpUnusedLocalVariableInspection
+  - name: PhpUnusedParameterInspection
+  - name: PhpIssetCanCheckNestedAccessDirectlyInspection
+  - name: PhpRedundantClosingTagInspection
+  - name: PhpCastIsUnnecessaryInspection
+  - name: PhpVariableIsUsedOnlyInClosureInspection
+  - name: ES6MissingAwait
+  - name: JSIgnoredPromiseFromCall
+  - name: RegExpUnnecessaryNonCapturingGroup
