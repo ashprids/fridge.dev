@@ -393,8 +393,8 @@ function fillGuestBrowserIdInputs() {
 
 function shouldPromptForFeedNotifications(kind) {
     if (readLocalBrowserNotificationsEnabled()) return false;
-    if (readFeedNotificationPromptSeen(kind)) return false;
-    return true;
+    return !readFeedNotificationPromptSeen(kind);
+
 }
 
 function saveBrowserNotificationsAccountPreference(feedEnabled, journalEnabled = null) {
