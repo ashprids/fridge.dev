@@ -76,6 +76,36 @@ if (!function_exists('fridg3_session_truthy_value')) {
     }
 }
 
+if (!function_exists('fridg3_session_extract_save_path_dir')) {
+    function fridg3_session_extract_save_path_dir(string $savePath): ?string
+    {
+        $savePath = trim($savePath);
+        if ($savePath === '') {
+            return null;
+        }
+
+        $parts = explode(';', $savePath);
+        $dir = trim((string)end($parts));
+        if ($dir === '') {
+            return null;
+        }
+
+        return $dir;
+    }
+}
+
+if (!function_exists('fridg3_session_prepare_local_save_path')) {
+    function fridg3_session_prepare_local_save_path(): ?string
+    {
+        $fallbackDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'fridge.dev-sessions';
+        if (!is_dir($fallbackDir)) {
+            @mkdir($fallbackDir, 0700, true);
+        }
+
+        return is_dir($fallbackDir) && is_writable($fallbackDir) ? $fallbackDir : null;
+    }
+}
+
 if (!function_exists('fridg3_session_find_relative_upward')) {
     function fridg3_session_find_relative_upward(string $startDir, string $relativePath): ?string
     {
@@ -169,6 +199,14 @@ if (!function_exists('fridg3_start_session')) {
         }
 
         $persistentLoginLifetime = fridg3_get_persistent_login_lifetime();
+
+        $currentSavePath = fridg3_session_extract_save_path_dir((string)ini_get('session.save_path'));
+        if ($currentSavePath === null || !is_dir($currentSavePath) || !is_writable($currentSavePath)) {
+            $fallbackSavePath = fridg3_session_prepare_local_save_path();
+            if ($fallbackSavePath !== null) {
+                session_save_path($fallbackSavePath);
+            }
+        }
 
         ini_set('session.cookie_httponly', '1');
         ini_set('session.use_only_cookies', '1');

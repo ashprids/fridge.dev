@@ -85,25 +85,25 @@
 
 @font-face {
     font-family: 'MainRegular';
-    src: url('resources/IosevkaFixedSS03-Regular.woff2');
+    src: url('/resources/IosevkaFixedSS03-Regular.woff2');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'MainBold';
-    src: url('resources/IosevkaFixedSS03-Bold.woff2');
+    src: url('/resources/IosevkaFixedSS03-Bold.woff2');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'MainItalic';
-    src: url('resources/IosevkaFixedSS03-Italic.woff2');
+    src: url('/resources/IosevkaFixedSS03-Italic.woff2');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'MainBoldItalic';
-    src: url('resources/IosevkaFixedSS03-BoldItalic.woff2');
+    src: url('/resources/IosevkaFixedSS03-BoldItalic.woff2');
     font-display: swap;
 }
 

@@ -48,3 +48,5 @@ exclude:
   - name: ES6MissingAwait
   - name: JSIgnoredPromiseFromCall
   - name: RegExpUnnecessaryNonCapturingGroup
+  - name: PhpUnnecessaryCurlyVarSyntaxInspection
+  - name: BadExpressionStatementJS

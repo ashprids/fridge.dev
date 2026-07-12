@@ -240,6 +240,8 @@ quick checks before spiraling:
 
 - does `php -v` work?
 - are you serving through PHP, not just opening `index.php` as a file?
+- if PHP complains about `/var/lib/php/sessions`, the app now falls back to a writable temp session directory automatically for local preview
+- if PhpStorm’s built-in preview shows missing fonts/images/CSS, that preview is usually not mapped like a real site root; use a real PHP server such as `php -S localhost:8000` so `/resources`, `/style.css`, and `/js/*` resolve correctly
 - does `/data` exist locally?
 - are the required JSON files valid JSON?
 - is `data/etc/wip` accidentally set to true?
