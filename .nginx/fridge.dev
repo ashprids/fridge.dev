@@ -68,6 +68,15 @@ server {
     location /contact/ {
         try_files $uri $uri/ /contact/index.php?$args;
     }
+
+    # Account routes: avoid trailing-slash redirects on POST
+    location ~ ^/account/(login|create|change-password|password|email|link-discord)/?$ {
+        rewrite ^/account/(login|create|change-password|password|email|link-discord)/?$ /account/$1/index.php?$args last;
+    }
+
+    location ~ ^/account/admin/edit/?$ {
+        rewrite ^/account/admin/edit/?$ /account/admin/edit/index.php?$args last;
+    }
 	
 	# Guestbook clean URLs
     location ~ ^/guestbook/posts/[^/]+$ {

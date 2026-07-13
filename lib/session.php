@@ -97,7 +97,10 @@ if (!function_exists('fridg3_session_extract_save_path_dir')) {
 if (!function_exists('fridg3_session_prepare_local_save_path')) {
     function fridg3_session_prepare_local_save_path(): ?string
     {
-        $fallbackDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'fridge.dev-sessions';
+        $effectiveUser = function_exists('posix_geteuid') ? (string)posix_geteuid() : get_current_user();
+        $siteRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__)) ?: dirname(__DIR__);
+        $sessionDirKey = substr(hash('sha256', $siteRoot . '|' . $effectiveUser), 0, 16);
+        $fallbackDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'fridge.dev-sessions-' . $sessionDirKey;
         if (!is_dir($fallbackDir)) {
             @mkdir($fallbackDir, 0700, true);
         }

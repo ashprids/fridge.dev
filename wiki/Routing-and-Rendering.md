@@ -47,6 +47,8 @@ theme selection also runs through `lib/render.php`. `default` is blackprint and 
 
 some routes also pull in extra shared libs like `lib/feed.php` for route-specific persistence helpers instead of keeping all that logic inline.
 
+`lib/session.php` uses the configured PHP session save path when it is writable. If that path is missing or unwritable, it falls back to a per-site, per-Unix-user directory under the system temp directory. This avoids production logins failing because a shared fallback directory was created by `deploy` while PHP-FPM runs as `http`.
+
 ## Homepage Special Case
 
 root `index.php` is more dynamic than the wrapper routes.

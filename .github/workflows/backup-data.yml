@@ -50,6 +50,16 @@ jobs:
               [ -d data ] || { echo "data directory not found at $TARGET/data" >&2; exit 1; }
               [ -w "$REMOTE_BACKUP_DIR" ] || { echo "remote backup directory is not writable: $REMOTE_BACKUP_DIR" >&2; exit 1; }
 
+              unreadable_paths="$(
+                find data \( -type f ! -readable -o -type d \( ! -readable -o ! -executable \) \) -print 2>&1 | head -50 || true
+              )"
+              if [ -n "$unreadable_paths" ]; then
+                echo "data contains paths the deploy user cannot archive:" >&2
+                echo "$unreadable_paths" >&2
+                echo "fix ownership/permissions on $TARGET/data, then rerun this workflow" >&2
+                exit 1
+              fi
+
               echo "Removing stale remote backup archives from $REMOTE_BACKUP_DIR" >&2
               find "$REMOTE_BACKUP_DIR" -maxdepth 1 -type f \
                 -regextype posix-extended \

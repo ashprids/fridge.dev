@@ -140,7 +140,7 @@ the generic `location /` fallback should route missing paths to `/error/404`, no
 
 POST-only API directory routes also need POST-safe rewrites when called without `index.php`; otherwise nginx can normalize the directory URL with a redirect and the browser may retry as `GET`. `/api/dev-bootstrap` and `/api/toast-feed-generate` are included in that rewrite list.
 
-the contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access.
+the contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access. account form routes such as `/account/login`, `/account/change-password`, and `/account/admin/edit` are also rewritten directly to their PHP handlers so POST bodies are not lost to trailing-slash redirects.
 
 the upload API posts to `/tools/upload/?api=*`; keep the exact `/tools/upload` nginx rewrite so stale no-slash requests hit PHP directly instead of losing their POST body to a trailing-slash redirect. cursed but real.
 
@@ -163,11 +163,12 @@ what it does:
 
 1. ssh to the server
 2. remove stale temporary backup zips from `/home/deploy`
-3. zip `/var/www/fridge.dev/data` into a temporary archive under `/home/deploy`
-4. download the archive to the runner
-5. upload it to Google Drive using `rclone`
-6. keep only the 10 newest backups
-7. delete temp archives from runner and server
+3. verify `deploy` can read/traverse `/var/www/fridge.dev/data`
+4. zip `/var/www/fridge.dev/data` into a temporary archive under `/home/deploy`
+5. download the archive to the runner
+6. upload it to Google Drive using `rclone`
+7. keep only the 10 newest backups
+8. delete temp archives from runner and server
 
 triggers:
 
@@ -181,6 +182,8 @@ required secrets:
 - `RCLONE_CONFIG`
 
 setup notes live in `/.github/workflows/backup-data-setup.md`.
+
+if archive creation fails with `zip` exit code `18`, at least one path under `/data` was unreadable to `deploy`. run the unreadable-path check from `/.github/workflows/backup-data-setup.md`, then fix ownership/permissions before rerunning the workflow.
 
 the backup and developer-data workflows also refuse to run if `TARGET` is anything other than `/var/www/fridge.dev`, so a stale workflow variable cannot accidentally back up or publish the wrong site tree.
 

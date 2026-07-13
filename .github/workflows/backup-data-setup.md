@@ -111,7 +111,7 @@ The backup archive is created in:
 /home/deploy
 ```
 
-During archive creation, the workflow prints the target archive path, backup filesystem disk usage, and the zip error log if compression fails.
+During archive creation, the workflow checks that the `deploy` user can read every file and read/traverse every directory under `data`, then prints the target archive path, backup filesystem disk usage, and the zip error log if compression fails.
 Before creating a new archive, the workflow removes stale `DD-MM-YY_hh-mm-ss.zip` files from `/home/deploy`; the server copy is temporary, while Google Drive is the retained backup store.
 
 The archive contains the `data` directory from:
@@ -137,6 +137,23 @@ If the workflow fails during Google Drive upload:
 If the workflow fails on archive creation:
 
 1. Verify `/var/www/fridge.dev/data` exists on the server
-2. Verify the `deploy` user can read that directory
+2. Verify the `deploy` user can read every file and read/traverse every directory under `/var/www/fridge.dev/data`
 3. Verify `zip` is installed on the server
 4. Verify `/home/deploy` is writable and has enough free space for the archive
+
+`zip` exit code `18` means at least one file was unreadable and skipped. To diagnose it on the server, run:
+
+```sh
+sudo -u deploy find /var/www/fridge.dev/data \( -type f ! -readable -o -type d \( ! -readable -o ! -executable \) \) -print
+```
+
+The usual repair is to keep `/data` owned by the runtime user/group and make it group-readable to `deploy`:
+
+```sh
+sudo usermod -aG http deploy
+sudo chown -R http:http /var/www/fridge.dev/data
+sudo find /var/www/fridge.dev/data -type d -exec chmod 750 {} +
+sudo find /var/www/fridge.dev/data -type f -exec chmod 640 {} +
+```
+
+After changing `deploy` group membership, start a new SSH session before rerunning the workflow.
