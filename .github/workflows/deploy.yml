@@ -68,9 +68,26 @@ jobs:
           set -euo pipefail
 
           RUNTIME_USER="http"
+          SOURCE_DIR="$TARGET/data/etc/banlists"
+          INDEX_DIR="$SOURCE_DIR/index"
           [ "$TARGET" = "/var/www/fridge.dev" ] || { echo "refusing to warm index for unexpected target: $TARGET" >&2; exit 1; }
+          [ -d "$SOURCE_DIR" ] || { echo "hard-ban source directory does not exist: $SOURCE_DIR" >&2; exit 1; }
 
-          sudo -n -u "$RUNTIME_USER" php -d memory_limit=128M -r '
+          if ! sudo -n -u "$RUNTIME_USER" mkdir -p "$INDEX_DIR"; then
+            echo "could not create hard-ban index directory as $RUNTIME_USER: $INDEX_DIR" >&2
+            ls -ld "$TARGET/data" "$TARGET/data/etc" "$SOURCE_DIR" 2>&1 || true
+            df -h "$SOURCE_DIR" 2>&1 || true
+            exit 1
+          fi
+
+          if ! sudo -n -u "$RUNTIME_USER" test -r "$SOURCE_DIR" || ! sudo -n -u "$RUNTIME_USER" test -w "$INDEX_DIR"; then
+            echo "$RUNTIME_USER must be able to read $SOURCE_DIR and write $INDEX_DIR" >&2
+            ls -ld "$SOURCE_DIR" "$INDEX_DIR" 2>&1 || true
+            df -h "$INDEX_DIR" 2>&1 || true
+            exit 1
+          fi
+
+          if ! sudo -n -u "$RUNTIME_USER" php -d memory_limit=128M -r '
           $root = $argv[1];
           require $root . "/lib/hard-ban.php";
           $index = fridg3_hard_ban_source_index();
@@ -79,7 +96,13 @@ jobs:
               exit(1);
           }
           echo "hard-ban source index ready: " . $index . "\n";
-          ' "$TARGET"
+          ' "$TARGET"; then
+            echo "hard-ban index build failed; runtime diagnostics:" >&2
+            ls -ld "$SOURCE_DIR" "$INDEX_DIR" 2>&1 || true
+            find "$INDEX_DIR" -maxdepth 2 -type f -printf '%s %p\n' 2>&1 | sort -nr | head -20 || true
+            df -h "$INDEX_DIR" 2>&1 || true
+            exit 1
+          fi
           EOF
 
       - name: restart toast bot

@@ -28,7 +28,8 @@ main details:
 - uses `DEPLOY_KEY`
 - deploy target is `deploy@45.76.134.105:/var/www/fridge.dev`
 - the workflow verifies `/var/www/fridge.dev` exists and is writable before rsync, and refuses any unexpected target path
-- after rsync, the workflow asks PHP running as `http` to build or reuse the hard-ban source index so a public request does not pay the one-time rebuild cost
+- after rsync, the workflow creates `data/etc/banlists/index` as `http`, verifies that `http` can read the source directory and write the index directory, then asks PHP running as `http` to build or reuse the hard-ban source index so a public request does not pay the one-time rebuild cost
+- if index preparation or construction fails, the workflow prints the relevant directory permissions, largest partial index files, and filesystem usage to distinguish ownership from capacity failures
 - after rsync, ssh stops any `toast` GNU screen session owned by `deploy`, stops any `toast` session owned by `http`, prepares `others/toast-discord-bot/bot/toast-bot.log` for `http`, then runs `/var/www/fridge.dev/others/toast-discord-bot/bot/start.sh` as `http`
 - the restart step needs passwordless sudo for `deploy` to run the Toast bot as `http`; Toast writes DM history, feed notification state, and patch approval state under `/data`, which is owned by `http:http`
 - because the `http` user home is not a normal login home, the workflow sets `SCREENDIR=/tmp/toast-screen-http` for `http`-owned screen commands and creates that socket directory as `http` with mode `700` before start
