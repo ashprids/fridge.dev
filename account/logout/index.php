@@ -31,6 +31,10 @@ if (ini_get('session.use_cookies')) {
             'samesite' => $params['samesite'] ?? 'Lax',
         ]);
     }
+
+    if (function_exists('fridg3_clear_legacy_session_cookie')) {
+        fridg3_clear_legacy_session_cookie();
+    }
 }
 
 // Clear admin flag cookie

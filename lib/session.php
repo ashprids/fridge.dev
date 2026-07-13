@@ -7,6 +7,13 @@ if (!function_exists('fridg3_get_persistent_login_lifetime')) {
     }
 }
 
+if (!function_exists('fridg3_session_cookie_name')) {
+    function fridg3_session_cookie_name(): string
+    {
+        return 'fridg3_session';
+    }
+}
+
 if (!function_exists('fridg3_session_is_secure_request')) {
     function fridg3_session_is_secure_request(): bool
     {
@@ -58,6 +65,26 @@ if (!function_exists('fridg3_session_cookie_options')) {
         }
 
         return $options;
+    }
+}
+
+if (!function_exists('fridg3_expire_cookie')) {
+    function fridg3_expire_cookie(string $name, bool $httpOnly = true): void
+    {
+        $expiredOptions = fridg3_session_cookie_options(time() - 3600, $httpOnly);
+        setcookie($name, '', $expiredOptions);
+
+        if (!empty($expiredOptions['domain'])) {
+            unset($expiredOptions['domain']);
+            setcookie($name, '', $expiredOptions);
+        }
+    }
+}
+
+if (!function_exists('fridg3_clear_legacy_session_cookie')) {
+    function fridg3_clear_legacy_session_cookie(): void
+    {
+        fridg3_expire_cookie('PHPSESSID', true);
     }
 }
 
@@ -202,6 +229,8 @@ if (!function_exists('fridg3_start_session')) {
         }
 
         $persistentLoginLifetime = fridg3_get_persistent_login_lifetime();
+
+        session_name(fridg3_session_cookie_name());
 
         $currentSavePath = fridg3_session_extract_save_path_dir((string)ini_get('session.save_path'));
         if ($currentSavePath === null || !is_dir($currentSavePath) || !is_writable($currentSavePath)) {

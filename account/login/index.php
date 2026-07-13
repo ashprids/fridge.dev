@@ -96,8 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         session_regenerate_id(true);
                         $_SESSION['user'] = $toastUser;
                         fridg3_refresh_is_admin_cookie(false);
+                        if (function_exists('fridg3_clear_legacy_session_cookie')) {
+                            fridg3_clear_legacy_session_cookie();
+                        }
                         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                         $login_success = true;
+                        session_write_close();
                         header('Location: /');
                         exit();
                     }
@@ -152,11 +156,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                                 // Expose admin flag to client for WIP bypass (non-HttpOnly)
                                 fridg3_refresh_is_admin_cookie($_SESSION['user']['isAdmin']);
+                                if (function_exists('fridg3_clear_legacy_session_cookie')) {
+                                    fridg3_clear_legacy_session_cookie();
+                                }
 
                                 // Rotate CSRF token after a successful login
                                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                                 
                                 $login_success = true;
+                                session_write_close();
                                 header('Location: /');
                                 exit();
                             }
