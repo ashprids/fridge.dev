@@ -25,6 +25,7 @@ exclude:
     paths:
       - .github/scripts/sanitize-dev-data.php
       - main.js
+      - settings/sysinfo/index.php
   - name: PhpUndefinedClassInspection
   - name: JSUnusedAssignment
   - name: JSUnusedLocalSymbols
@@ -51,3 +52,4 @@ exclude:
   - name: RegExpUnnecessaryNonCapturingGroup
   - name: PhpUnnecessaryCurlyVarSyntaxInspection
   - name: BadExpressionStatementJS
+  - name: PhpTernaryExpressionCanBeReplacedWithConditionInspection

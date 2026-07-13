@@ -1,6 +1,9 @@
 {
   "name": "fridge.dev",
   "short_name": "fridge.dev",
+  "id": "https://m.fridge.dev/",
+  "start_url": "https://m.fridge.dev/",
+  "scope": "https://m.fridge.dev/",
   "icons": [
     {
       "src": "/resources/web-app-manifest-192x192.png",

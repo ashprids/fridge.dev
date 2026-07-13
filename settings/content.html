@@ -95,6 +95,32 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
     <option value="default">blackprint</option>
 </select>
 <br><br>
+<h4>title animation</h4>
+<div class="title-animation-settings" id="title-animation-section">
+    <p class="title-animation-disabled-message" id="title-animation-disabled-message" hidden>you cannot configure this feature while reduce motion is enabled.</p>
+    <label for="title-animation-select">animation</label>
+    <select class="dropdown" id="title-animation-select">
+        <option value="wobble">wobble</option>
+        <option value="bounce">bounce</option>
+        <option value="pinball">pinball</option>
+        <option value="rubberhose">rubberhose</option>
+        <option value="bubble">bubble</option>
+        <option value="slot-machine">slot machine</option>
+        <option value="moonwalk">moonwalk</option>
+        <option value="heartbeat">heartbeat</option>
+    </select>
+    <div class="checkbox-group">
+        <label class="checkbox-label">
+            <input type="checkbox" class="checkbox" id="title-animation-desync-toggle" checked>
+            <span data-tooltip="start each letter at a different point in the animation">desync characters</span>
+        </label>
+        <label class="checkbox-label">
+            <input type="checkbox" class="checkbox" id="title-animation-always-toggle">
+            <span data-tooltip="play the selected title animation without requiring hover">always playing</span>
+        </label>
+    </div>
+</div>
+<br><br>
 <div id="color-scheme-section" style="display:none">
 <h3>color scheme</h3>
 <div id="color-scheme-group">

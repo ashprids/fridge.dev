@@ -27,17 +27,6 @@ A /data/ directory is recommended for previewing the website with high accuracy.
 
 If a /data/ directory is absent, the user can download a developer copy of the current production /data/ directory from Google Drive.
 
-### /tools/frdgbeats
-frdgBeats has its own wiki in /tools/frdgbeats/wiki. Make sure the
-wiki is kept up-to-date with any changes made; update it whenever you
-make a change wherever necessary.
-
-frdgBeats includes an `automate` tab next to the mixer. Automation is stored per channel in `.frdgbeats` project JSON as `automation` lanes. Each lane targets channel `volume`/`pan`, a numeric synth param, or a numeric effect param, and stores pattern-specific 16/32 step-aligned values in `valuesByPattern` plus `enabled` and `mode` (`step` or `smooth`).
-
-When changing synths, effects, demos, presets, import/export, or project hydration, preserve the automation contract. Numeric params declared in synth/effect `params` become automation targets, so keep param ids stable and include sensible `min`, `max`, `step`, and `default` values. Automation must apply only to the currently selected/playing pattern, never globally across every pattern on a channel.
-
-Bundled frdgBeats synth presets must use tagged names: `[BA]` bass, `[FX]` effects, `[LD]` leads, `[PD]` pads, `[PL]` plucks, `[SQ]` sequences when the synth supports sequencing, and `[SY]` general synth patches. Production synths should provide 10 unique presets for each applicable type.
-
 ## Environment
 When deployed, the website is running on an Nginx webserver with PHP and Python installed. The operating system is Arch Linux, so all implementations should be made with this in mind.
 

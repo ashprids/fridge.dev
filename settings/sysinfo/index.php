@@ -197,7 +197,6 @@ function sysinfo_collect_environment(): array
                 : get_current_user(),
             'uptime' => $uptime,
             'load' => is_array($load) ? $load : null,
-            'cpu_model' => null,
             'memory_total' => $meminfo['MemTotal'] ?? null,
             'memory_available' => $meminfo['MemAvailable'] ?? ($meminfo['MemFree'] ?? null),
             'memory_swap_total' => $meminfo['SwapTotal'] ?? null,

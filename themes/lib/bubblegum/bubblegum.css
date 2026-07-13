@@ -827,45 +827,6 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
     text-overflow: clip !important;
 }
 
-/* frdgBeats app theme support */
-.frdgbeats-daw {
-    --fdgb-panel: color-mix(in srgb, var(--bg) 88%, var(--fg) 12%);
-    --fdgb-panel-soft: color-mix(in srgb, var(--bg) 94%, var(--fg) 6%);
-    --fdgb-panel-strong: color-mix(in srgb, var(--bg) 80%, var(--fg) 20%);
-    --fdgb-popover: color-mix(in srgb, var(--bg) 96%, var(--fg) 4%);
-    --fdgb-canvas: color-mix(in srgb, var(--bg) 92%, var(--fg) 8%);
-    --fdgb-hover: color-mix(in srgb, var(--bg) 88%, var(--fg) 12%);
-    --fdgb-grid: color-mix(in srgb, var(--fg) 4%, transparent);
-    --fdgb-grid-strong: color-mix(in srgb, var(--fg) 8%, transparent);
-    --fdgb-line: color-mix(in srgb, var(--border) 90%, transparent);
-    --fdgb-border-strong: color-mix(in srgb, var(--border) 82%, transparent);
-    --fdgb-border-medium: color-mix(in srgb, var(--border) 62%, transparent);
-    --fdgb-border-soft: color-mix(in srgb, var(--border) 42%, transparent);
-    --fdgb-border-faint: color-mix(in srgb, var(--border) 24%, transparent);
-    --fdgb-swatch-border: color-mix(in srgb, var(--fg) 38%, transparent);
-    --fdgb-hot: var(--links);
-    --fdgb-warm: var(--subtle);
-    --fdgb-muted: var(--subtle);
-    --fdgb-danger-base: #cf6c6c;
-    --fdgb-danger: color-mix(in srgb, var(--fdgb-danger-base) 72%, var(--fg) 28%);
-    --fdgb-danger-fg: color-mix(in srgb, var(--fdgb-danger) 28%, var(--fg) 72%);
-    --fdgb-danger-contrast: var(--bg);
-    --fdgb-hot-soft: color-mix(in srgb, var(--fdgb-hot) 12%, transparent);
-    --fdgb-hot-mid: color-mix(in srgb, var(--fdgb-hot) 34%, transparent);
-    --fdgb-hot-strong: color-mix(in srgb, var(--fdgb-hot) 82%, transparent);
-    --fdgb-warm-soft: color-mix(in srgb, var(--fdgb-warm) 12%, transparent);
-    --fdgb-warm-mid: color-mix(in srgb, var(--fdgb-warm) 34%, transparent);
-    --fdgb-focus: color-mix(in srgb, var(--fdgb-hot) 70%, var(--fg) 30%);
-    --fdgb-note-fill: linear-gradient(180deg, color-mix(in srgb, var(--fdgb-hot) 86%, var(--fg) 14%), color-mix(in srgb, var(--fdgb-hot) 62%, var(--bg) 38%));
-    --fdgb-note-fill-slide: linear-gradient(135deg, color-mix(in srgb, var(--fdgb-hot) 82%, var(--fg) 18%), color-mix(in srgb, var(--fdgb-warm) 82%, var(--fg) 18%));
-    --fdgb-note-fg: var(--bg);
-    --fdgb-piano-white: color-mix(in srgb, var(--fg) 86%, var(--bg) 14%);
-    --fdgb-piano-black: color-mix(in srgb, var(--bg) 86%, var(--fg) 14%);
-    --fdgb-shadow: color-mix(in srgb, var(--bg) 38%, transparent);
-    --fdgb-shadow-soft: color-mix(in srgb, var(--bg) 22%, transparent);
-    --fdgb-overlay: color-mix(in srgb, var(--bg) 58%, transparent);
-    --fdgb-code-bg: color-mix(in srgb, var(--fg) 8%, transparent);
-}
 
 /* theme ascii/resource cleanup */
 #usage-grid .usage-card,

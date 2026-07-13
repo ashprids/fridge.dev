@@ -434,26 +434,6 @@ input[type="range"] {
     --chat-other-fg: #edfaff;
 }
 
-.frdgbeats-daw {
-    --fdgb-bg: #07141f;
-    --fdgb-panel: rgba(8, 31, 44, 0.9);
-    --fdgb-panel-soft: rgba(88, 200, 226, 0.13);
-    --fdgb-panel-strong: rgba(88, 200, 226, 0.22);
-    --fdgb-border: rgba(163, 239, 255, 0.5);
-    --fdgb-border-faint: rgba(163, 239, 255, 0.22);
-    --fdgb-text: var(--fg);
-    --fdgb-muted: var(--subtle);
-    --fdgb-hot: #82f0d8;
-    --fdgb-hot-soft: rgba(130, 240, 216, 0.18);
-    --fdgb-warm: #58c8e2;
-    --fdgb-warm-soft: rgba(88, 200, 226, 0.16);
-    --fdgb-danger: #ff6b7a;
-    --fdgb-danger-contrast: #09131d;
-    --fdgb-grid: rgba(163, 239, 255, 0.16);
-    --fdgb-code-bg: rgba(3, 20, 30, 0.86);
-    --fdgb-note-fill: linear-gradient(180deg, rgba(130, 240, 216, 0.9), rgba(88, 200, 226, 0.68));
-    --fdgb-note-fill-slide: linear-gradient(135deg, rgba(130, 240, 216, 0.96), rgba(119, 100, 144, 0.9));
-}
 
 body.mobile-template {
     background:

@@ -35,6 +35,9 @@ expected top-level shape:
       "glowIntensity": "none|medium",
       "onekoEnabled": true,
       "reduceMotion": false,
+      "titleAnimation": "wobble",
+      "titleAnimationAlways": false,
+      "titleAnimationDesync": true,
       "browserNotificationsEnabled": true,
       "journalBrowserNotificationsEnabled": true,
       "colors": {
@@ -57,6 +60,7 @@ notes:
 - `theme: default` is blackprint and uses the base template plus `/style.css`; `theme: classic` enables saved `colors` for `bg`/`fg`/`border`/`subtle`/`links`; `theme: ambercrt` is shown as `CRT` and uses only saved `colors.links` as its main phosphor color; any other valid value refers to a `/themes/{theme-id}.json` file with `name`, `description`, `thumbnail`, `html`, and `css`
 - legacy `blackprint` normalizes to `default`, `custom` normalizes to `classic`, `newsprint` normalizes to `whiteprint`, `crt` normalizes to `ambercrt`, and removed `liminal`/`syswave` preferences normalize to `default`
 - text glow is stored in `glowIntensity`; the settings UI writes `none` for off and `medium` for on, while legacy `low`/`high` values are treated as enabled medium glow when saved again
+- title motion is stored in `titleAnimation` (`wobble`, `bounce`, `pinball`, `rubberhose`, `bubble`, `slot-machine`, `moonwalk`, or `heartbeat`), `titleAnimationAlways` (boolean), and `titleAnimationDesync` (boolean, default `true`); legacy `orbit`, `domino`, and `lava-lamp` values migrate to `bubble`; removed `tidal-wave`, `accordion`, and `typewriter` values migrate to `slot-machine`, while `helicopter`, `haunted`, and `juggle` migrate to `moonwalk`; guests keep the same values in local storage
 - accessibility toggles are stored as account booleans such as `reduceMotion`; logged-out browsers keep the same preferences in localStorage
 - `browserNotificationsEnabled` stores the account-backed preference for browser feed notifications; `journalBrowserNotificationsEnabled` stores the account-backed preference for new journal post browser notifications; logged-out browsers keep the same preferences and dedupe state in localStorage
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes

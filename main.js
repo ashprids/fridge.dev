@@ -1,3 +1,7 @@
+/* ==========================================================================
+   Shared dialogs and notices
+   ========================================================================== */
+
 let hostRedirectInProgress = false;
 
 function siteEscapeHtml(value) {
@@ -145,6 +149,10 @@ async function fetchAdminStatus() {
         return false;
     }
 }
+
+/* ==========================================================================
+   ASCII widgets and responsive sizing
+   ========================================================================== */
 
 // Dynamically scale #ascii font size to fit container
 function autoScaleAsciiFont() {
@@ -620,10 +628,9 @@ function refreshAsciiLayoutAfterFontLoad() {
 
 window.addEventListener('DOMContentLoaded', refreshAsciiLayoutAfterFontLoad);
 
-// this script contains a shit ton of functionality for fridge.dev
-// it sucks and i refuse to touch it without the guiding hand of AI
-// no code for a website should need to span over 2000 lines of code
-// but it works and thats what matters, right?
+/* ==========================================================================
+   Syntax highlighting and mobile behavior
+   ========================================================================== */
 
 // Highlight.js initialization
 if (typeof hljs !== 'undefined') {
@@ -774,7 +781,11 @@ window.addEventListener('load', function() {
     setTimeout(fitMobileAsciiLayout, 0);
 });
 
-// Simple SPA-style navigation: load internal pages into #content
+/* ==========================================================================
+   SPA navigation and page lifecycle
+   ========================================================================== */
+
+// Load internal pages into #content
 // so the sidebar and mini player stay mounted (continuous audio).
 function getSpaLoadingEl() {
     let el = document.getElementById('spa-loading');
@@ -872,17 +883,6 @@ function syncSpaPageAssets(doc) {
             document.head.appendChild(link.cloneNode(true));
         });
 
-        doc.head.querySelectorAll('style').forEach((style) => {
-            const css = style.textContent || '';
-            if (!css.includes('frdgbeats-daw')) return;
-            const key = 'spa-style:' + css.trim();
-            const exists = Array.from(document.head.querySelectorAll('style[data-spa-style-key]'))
-                .some(existing => existing.dataset.spaStyleKey === key);
-            if (exists) return;
-            const cloned = style.cloneNode(true);
-            cloned.dataset.spaStyleKey = key;
-            document.head.appendChild(cloned);
-        });
     } catch (_) { /* no-op */ }
 }
 
@@ -1241,6 +1241,10 @@ document.addEventListener('submit', function(e) {
     });
 });
 
+/* ==========================================================================
+   Account, feed, and chat interactions
+   ========================================================================== */
+
 function playAccountDeleteRipAnimation(form) {
     return new Promise(function(resolve) {
         try {
@@ -1378,6 +1382,10 @@ document.addEventListener('click', function(e) {
 
     showSitePrompt('copy chat link', 'grab the link below.', url);
 });
+
+/* ==========================================================================
+   SPA-aware forms and page initializers
+   ========================================================================== */
 
 // Intercept specific forms (login, create post) and submit via fetch
 // so the page content updates without a full reload, keeping the

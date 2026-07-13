@@ -38,6 +38,11 @@ const ACCESSIBILITY_PREFS_KEY = 'accessibilityPrefs';
 const ACCESSIBILITY_DEFAULTS = {
     reduceMotion: false,
 };
+const TITLE_ANIMATION_KEY = 'titleAnimation';
+const TITLE_ANIMATION_ALWAYS_KEY = 'titleAnimationAlways';
+const TITLE_ANIMATION_DESYNC_KEY = 'titleAnimationDesync';
+const TITLE_ANIMATIONS = ['wobble', 'bounce', 'pinball', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'];
+const TITLE_ANIMATION_DEFAULT = 'wobble';
 const ONEKO_ASSET_URL = '/resources/oneko.gif';
 const ONEKO_SIZE = 32;
 const ONEKO_SPEED = 10;
@@ -46,6 +51,346 @@ const ONEKO_SLEEP_AFTER_MS = 15000;
 const ONEKO_SLEEP_FRAME_TICKS = 4;
 let onekoController = null;
 let feedNotificationPollTimer = null;
+
+function normalizeTitleAnimation(value) {
+    if (value === 'orbit' || value === 'domino' || value === 'lava-lamp') return 'bubble';
+    if (value === 'tidal-wave' || value === 'accordion' || value === 'typewriter') return 'slot-machine';
+    if (value === 'helicopter' || value === 'haunted' || value === 'juggle') return 'moonwalk';
+    return TITLE_ANIMATIONS.includes(value) ? value : TITLE_ANIMATION_DEFAULT;
+}
+
+function readLocalTitleAnimationPrefs() {
+    try {
+        return {
+            animation: normalizeTitleAnimation(localStorage.getItem(TITLE_ANIMATION_KEY)),
+            always: localStorage.getItem(TITLE_ANIMATION_ALWAYS_KEY) === 'true',
+            desync: localStorage.getItem(TITLE_ANIMATION_DESYNC_KEY) !== 'false',
+        };
+    } catch (_) {
+        return { animation: TITLE_ANIMATION_DEFAULT, always: false, desync: true };
+    }
+}
+
+function saveLocalTitleAnimationPrefs(prefs) {
+    const normalized = {
+        animation: normalizeTitleAnimation(prefs && prefs.animation),
+        always: !!(prefs && prefs.always),
+        desync: !prefs || prefs.desync !== false,
+    };
+    try {
+        localStorage.setItem(TITLE_ANIMATION_KEY, normalized.animation);
+        localStorage.setItem(TITLE_ANIMATION_ALWAYS_KEY, normalized.always ? 'true' : 'false');
+        localStorage.setItem(TITLE_ANIMATION_DESYNC_KEY, normalized.desync ? 'true' : 'false');
+    } catch (_) { /* ignore */ }
+    return normalized;
+}
+
+function clearTitleLetterSettling(title) {
+    if (!title) return;
+    if (title._titleSettleTimeout) {
+        window.clearTimeout(title._titleSettleTimeout);
+        title._titleSettleTimeout = null;
+    }
+    title.querySelectorAll('.title-letter').forEach(letter => {
+        letter.style.removeProperty('transition');
+        letter.style.removeProperty('transform');
+        letter.style.removeProperty('opacity');
+        letter.style.removeProperty('filter');
+    });
+}
+
+function trackTitleLetterFrames(title) {
+    if (!title || title._titleTrackingTimer) return;
+    const tick = () => {
+        const active = title.matches(':hover') || title.classList.contains('title-animation-always');
+        if (!active) {
+            title._titleTrackingTimer = null;
+            return;
+        }
+        if (document.hidden) {
+            title._titleTrackingTimer = window.setTimeout(tick, 250);
+            return;
+        }
+        title._titleLetterSnapshots = [...title.querySelectorAll('.title-letter')].map(letter => {
+            const style = getComputedStyle(letter);
+            return { letter, transform: style.transform, opacity: style.opacity, filter: style.filter };
+        });
+        title._titleTrackingTimer = window.setTimeout(tick, 80);
+    };
+    tick();
+}
+
+function stopSlotMachineRoll(container, restore = true) {
+    if (!container) return;
+    (container._slotMachineTimers || []).forEach(timer => window.clearTimeout(timer));
+    if (container._slotMachineInterval) window.clearInterval(container._slotMachineInterval);
+    container._slotMachineTimers = [];
+    container._slotMachineInterval = null;
+    container._slotMachineRunning = false;
+    container.classList.remove('slot-machine-rolling');
+    container.style.removeProperty('--slot-machine-inline-size');
+    container.style.removeProperty('--slot-machine-block-size');
+    container.querySelectorAll('.slot-machine-word-incoming, .slot-machine-extra-reel').forEach(letter => letter.remove());
+    container.querySelectorAll('.slot-machine-freezer-ejected, .slot-machine-reroll').forEach(letter => {
+        letter.classList.remove('slot-machine-freezer-ejected', 'slot-machine-reroll', 'slot-machine-reel');
+    });
+    if (restore) {
+        container.querySelectorAll('.title-letter:not(.slot-machine-extra-reel)').forEach(letter => {
+            if (letter.dataset.titleCharacter) letter.textContent = letter.dataset.titleCharacter;
+        });
+    }
+}
+
+function runSlotMachineRoll(container) {
+    if (
+        !container
+        || document.body.classList.contains('mobile-template')
+        || container.dataset.titleAnimation !== 'slot-machine'
+        || container._slotMachineRunning
+    ) return;
+    const letters = [...container.querySelectorAll('.title-letter:not(.slot-machine-extra-reel)')];
+    const baseReels = letters.slice(0, 6);
+    if (baseReels.length < 6) return;
+    baseReels.forEach(letter => {
+        if (!letter.dataset.titleCharacter) letter.dataset.titleCharacter = letter.textContent;
+    });
+
+    const containerRect = container.getBoundingClientRect();
+    stopSlotMachineRoll(container, false);
+    container.style.setProperty('--slot-machine-inline-size', `${containerRect.width}px`);
+    container.style.setProperty('--slot-machine-block-size', `${containerRect.height}px`);
+    container._slotMachineRunning = true;
+    container._slotMachineTimers = [];
+    const glyphs = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const rareRoll = Math.random();
+    const rareFridg3 = rareRoll < 0.05;
+    const rareFreezer = rareRoll >= 0.05 && rareRoll < 0.10;
+    const targets = rareFreezer
+        ? ['f', 'r', 'e', 'e', 'z', 'e', 'r']
+        : ['f', 'r', 'i', 'd', 'g', rareFridg3 ? '3' : 'e'];
+    const rollLeadInMs = 760;
+    const reelLockStepMs = 145;
+    const rollSettlePaddingMs = 270;
+    const easterEggHoldMs = 420;
+    const reels = [...baseReels];
+    if (rareFreezer) {
+        const extraReel = document.createElement('span');
+        extraReel.className = 'title-letter slot-machine-extra-reel';
+        extraReel.setAttribute('aria-hidden', 'true');
+        baseReels[5].insertAdjacentElement('afterend', extraReel);
+        reels.push(extraReel);
+    }
+    reels.forEach(reel => reel.classList.add('slot-machine-reel'));
+
+    container.classList.remove('slot-machine-rolling');
+    void container.offsetWidth;
+    container.classList.add('slot-machine-rolling');
+    container._slotMachineInterval = window.setInterval(() => {
+        reels.forEach(reel => {
+            if (reel.dataset.reelLocked !== '1') {
+                reel.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+            }
+        });
+    }, 55);
+
+    reels.forEach((reel, index) => {
+        reel.dataset.reelLocked = '0';
+        const timer = window.setTimeout(() => {
+            reel.textContent = targets[index];
+            reel.dataset.reelLocked = '1';
+        }, rollLeadInMs + index * reelLockStepMs);
+        container._slotMachineTimers.push(timer);
+    });
+
+    const settleTimer = window.setTimeout(() => {
+        if (container._slotMachineInterval) window.clearInterval(container._slotMachineInterval);
+        container._slotMachineInterval = null;
+        if (!rareFridg3 && !rareFreezer) {
+            reels.forEach(reel => reel.classList.remove('slot-machine-reel'));
+            container.classList.remove('slot-machine-rolling');
+            container._slotMachineRunning = false;
+            scheduleSlotMachineReplay(container);
+            return;
+        }
+
+        if (rareFreezer) {
+            const incomingWord = document.createElement('span');
+            incomingWord.className = 'slot-machine-word-incoming';
+            incomingWord.setAttribute('aria-hidden', 'true');
+            incomingWord.textContent = 'fridge';
+            const containerBox = container.getBoundingClientRect();
+            const firstReelBox = reels[0].getBoundingClientRect();
+            incomingWord.style.left = `${firstReelBox.left - containerBox.left}px`;
+            incomingWord.style.top = `${firstReelBox.top - containerBox.top + firstReelBox.height / 2}px`;
+            container.appendChild(incomingWord);
+            reels.forEach(reel => reel.classList.add('slot-machine-freezer-ejected'));
+            const freezerReplaceTimer = window.setTimeout(() => {
+                baseReels.forEach((reel, index) => {
+                    reel.textContent = ['f', 'r', 'i', 'd', 'g', 'e'][index];
+                    reel.classList.remove('slot-machine-freezer-ejected', 'slot-machine-reel');
+                });
+                reels[6].remove();
+                incomingWord.remove();
+                container.classList.remove('slot-machine-rolling');
+                container._slotMachineRunning = false;
+                scheduleSlotMachineReplay(container);
+            }, 740);
+            container._slotMachineTimers.push(freezerReplaceTimer);
+            return;
+        }
+
+        reels[5].dataset.reelLocked = '0';
+        reels[5].classList.add('slot-machine-reroll');
+        container._slotMachineInterval = window.setInterval(() => {
+            reels[5].textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+        }, 55);
+        const replaceTimer = window.setTimeout(() => {
+            if (container._slotMachineInterval) window.clearInterval(container._slotMachineInterval);
+            container._slotMachineInterval = null;
+            reels[5].textContent = 'e';
+            reels[5].dataset.reelLocked = '1';
+            reels[5].classList.remove('slot-machine-reroll');
+            reels.forEach(reel => reel.classList.remove('slot-machine-reel'));
+            container.classList.remove('slot-machine-rolling');
+            container._slotMachineRunning = false;
+            scheduleSlotMachineReplay(container);
+        }, 520);
+        container._slotMachineTimers.push(replaceTimer);
+    }, rollLeadInMs
+        + (reels.length - 1) * reelLockStepMs
+        + rollSettlePaddingMs
+        + ((rareFridg3 || rareFreezer) ? easterEggHoldMs : 0));
+    container._slotMachineTimers.push(settleTimer);
+}
+
+function scheduleSlotMachineReplay(container) {
+    if (!container || (!container.classList.contains('title-animation-always') && !container.classList.contains('title-animation-preview'))) return;
+    const timer = window.setTimeout(() => runSlotMachineRoll(container), 1400);
+    container._slotMachineTimers = container._slotMachineTimers || [];
+    container._slotMachineTimers.push(timer);
+}
+
+function settleTitleLetters(title, releaseAnimationState) {
+    if (!title) {
+        if (typeof releaseAnimationState === 'function') releaseAnimationState();
+        return;
+    }
+
+    const reduceMotion = document.documentElement.classList.contains('access-reduced-motion')
+        || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const letters = [...title.querySelectorAll('.title-letter')];
+    if (reduceMotion || !letters.length) {
+        if (typeof releaseAnimationState === 'function') releaseAnimationState();
+        return;
+    }
+
+    const snapshots = title._titleLetterSnapshots || letters.map(letter => {
+        const style = getComputedStyle(letter);
+        return {
+            letter,
+            transform: style.transform,
+            opacity: style.opacity,
+            filter: style.filter,
+        };
+    });
+
+    if (typeof releaseAnimationState === 'function') releaseAnimationState();
+    letters.forEach(letter => letter.getAnimations().forEach(animation => animation.cancel()));
+    snapshots.forEach(({ letter, transform, opacity, filter }) => {
+        letter.style.transition = 'none';
+        letter.style.transform = transform;
+        letter.style.opacity = opacity;
+        letter.style.filter = filter;
+    });
+
+    void title.offsetWidth;
+    requestAnimationFrame(() => {
+        snapshots.forEach(({ letter }) => {
+            letter.style.removeProperty('transition');
+            letter.style.transform = 'none';
+            letter.style.opacity = '1';
+            letter.style.filter = 'none';
+        });
+    });
+
+    title._titleLetterSnapshots = null;
+    title._titleSettleTimeout = window.setTimeout(() => {
+        snapshots.forEach(({ letter }) => {
+            letter.style.removeProperty('transform');
+            letter.style.removeProperty('opacity');
+            letter.style.removeProperty('filter');
+        });
+        title._titleSettleTimeout = null;
+    }, 420);
+}
+
+function applyTitleAnimationPrefs(prefs) {
+    const normalized = saveLocalTitleAnimationPrefs(prefs || readLocalTitleAnimationPrefs());
+    const title = document.getElementById('title');
+    if (title) {
+        const mobileView = document.body.classList.contains('mobile-template');
+        if (mobileView) {
+            stopSlotMachineRoll(title);
+            clearTitleLetterSettling(title);
+            title.dataset.titleAnimation = normalized.animation;
+            title.classList.remove('title-animation-always');
+            title.classList.toggle('title-animation-desync', normalized.desync);
+            return normalized;
+        }
+        const wasAlwaysPlaying = title.classList.contains('title-animation-always');
+        const previousAnimation = title.dataset.titleAnimation;
+        const switchingWhileActive = !!previousAnimation
+            && previousAnimation !== normalized.animation
+            && (title.matches(':hover') || wasAlwaysPlaying);
+        if (previousAnimation === 'slot-machine' && normalized.animation !== 'slot-machine') {
+            stopSlotMachineRoll(title);
+        }
+        if (title._titleAnimationSwitchTimeout) {
+            window.clearTimeout(title._titleAnimationSwitchTimeout);
+            title._titleAnimationSwitchTimeout = null;
+        }
+        if (switchingWhileActive) {
+            settleTitleLetters(title, () => {
+                title.dataset.titleAnimation = '';
+            });
+            title._titleAnimationSwitchTimeout = window.setTimeout(() => {
+                title.dataset.titleAnimation = normalized.animation;
+                title._titleAnimationSwitchTimeout = null;
+                if (normalized.animation === 'slot-machine' && (normalized.always || title.matches(':hover'))) {
+                    runSlotMachineRoll(title);
+                }
+                if (normalized.always || title.matches(':hover')) trackTitleLetterFrames(title);
+            }, 440);
+        } else {
+            title.dataset.titleAnimation = normalized.animation;
+        }
+        if (wasAlwaysPlaying && !normalized.always && !title.matches(':hover')) {
+            settleTitleLetters(title, () => title.classList.remove('title-animation-always'));
+        } else {
+            title.classList.toggle('title-animation-always', normalized.always);
+        }
+        title.classList.toggle('title-animation-desync', normalized.desync);
+        if (normalized.always) trackTitleLetterFrames(title);
+        if (!switchingWhileActive && normalized.animation === 'slot-machine' && (normalized.always || title.matches(':hover'))) {
+            runSlotMachineRoll(title);
+        }
+        if (title.dataset.titleSettleBound !== '1') {
+            title.dataset.titleSettleBound = '1';
+            title.addEventListener('mouseenter', () => {
+                clearTitleLetterSettling(title);
+                trackTitleLetterFrames(title);
+                runSlotMachineRoll(title);
+            });
+            title.addEventListener('mouseleave', () => {
+                if (!title.classList.contains('title-animation-always')) {
+                    stopSlotMachineRoll(title);
+                    settleTitleLetters(title);
+                }
+            });
+        }
+    }
+    return normalized;
+}
 
 // Apply saved color prefs early on page load for themes that expose color controls.
 (() => {
@@ -659,6 +1004,13 @@ function syncOnekoPreference() {
         if (typeof data.settings.journalBrowserNotificationsEnabled === 'boolean') {
             saveLocalJournalBrowserNotificationsEnabled(data.settings.journalBrowserNotificationsEnabled);
         }
+        if (typeof data.settings.titleAnimation === 'string' || typeof data.settings.titleAnimationAlways === 'boolean' || typeof data.settings.titleAnimationDesync === 'boolean') {
+            applyTitleAnimationPrefs({
+                animation: data.settings.titleAnimation,
+                always: data.settings.titleAnimationAlways === true,
+                desync: data.settings.titleAnimationDesync !== false,
+            });
+        }
         if (hasAnyBrowserNotificationChannelEnabled()) {
             startFeedNotificationPolling();
         }
@@ -860,6 +1212,7 @@ function initTooltips() {
 
 window.addEventListener('DOMContentLoaded', initTooltips);
 window.addEventListener('DOMContentLoaded', syncOnekoPreference);
+window.addEventListener('DOMContentLoaded', () => applyTitleAnimationPrefs(readLocalTitleAnimationPrefs()));
 
 // Settings page: text glow toggle
 function initSettingsPage() {
@@ -874,6 +1227,11 @@ function initSettingsPage() {
         const maintenanceGroup = document.getElementById('maintenance-mode-group');
         const adminSection = document.getElementById('admin-settings');
         const themeSelect = document.getElementById('theme-select');
+        const titleAnimationSelect = document.getElementById('title-animation-select');
+        const titleAnimationAlwaysToggle = document.getElementById('title-animation-always-toggle');
+        const titleAnimationDesyncToggle = document.getElementById('title-animation-desync-toggle');
+        const titleAnimationSection = document.getElementById('title-animation-section');
+        const titleAnimationDisabledMessage = document.getElementById('title-animation-disabled-message');
         const colorSection = document.getElementById('color-scheme-section');
         const colorGroup = document.getElementById('color-scheme-group');
         const colorResetBtn = document.getElementById('color-reset');
@@ -903,6 +1261,8 @@ function initSettingsPage() {
         const isToastSession = !!(toastSettingsSection && toastSettingsSection.dataset.toastSession === '1');
         let currentTheme = loadLocalThemePref();
         let lastSavedTheme = currentTheme;
+        let renderedTheme = currentTheme;
+        let themeChangedByUser = false;
         let themeOptions = [];
         let themePicker = null;
         let themePickerButton = null;
@@ -910,6 +1270,56 @@ function initSettingsPage() {
         let themePickerTitle = null;
         let themePickerDescription = null;
         let themePickerThumb = null;
+        let titleAnimationPicker = null;
+        let titleAnimationPickerButton = null;
+        let titleAnimationPickerMenu = null;
+        let titleAnimationPickerPreview = null;
+        let titleAnimationPickerTitle = null;
+        let settingsDirty = false;
+        let settingsNavigationPromptOpen = false;
+        let pendingSettingsDestination = '';
+        const settingsSaveButtonText = saveBtn.textContent;
+
+        const finishSettingsSave = async (reloadPage = false) => {
+            saveBtn.textContent = 'saved!';
+            saveBtn.disabled = true;
+            await new Promise(resolve => window.setTimeout(resolve, 500));
+            if (pendingSettingsDestination) {
+                const destination = pendingSettingsDestination;
+                pendingSettingsDestination = '';
+                window.location.href = destination;
+                return;
+            }
+            if (reloadPage) {
+                window.location.reload();
+                return;
+            }
+            saveBtn.textContent = settingsSaveButtonText;
+            saveBtn.disabled = false;
+        };
+
+        const markSettingsDirty = () => {
+            settingsDirty = true;
+        };
+
+        const confirmSettingsNavigation = async (destination) => {
+            if (!settingsDirty || settingsNavigationPromptOpen) return false;
+            settingsNavigationPromptOpen = true;
+            try {
+                const confirmed = await showSitePopup({
+                    title: 'unsaved settings',
+                    detail: 'you have unsaved changes. save them before leaving /settings?',
+                    okText: 'save changes',
+                    cancelText: 'stay here',
+                });
+                if (!confirmed) return false;
+                pendingSettingsDestination = destination;
+                saveBtn.click();
+                return true;
+            } finally {
+                settingsNavigationPromptOpen = false;
+            }
+        };
 
         const selectMaintenance = (state) => {
             if (!maintenanceRadios.length) return;
@@ -938,6 +1348,163 @@ function initSettingsPage() {
             journalNotificationsToggle.checked = enabled === true;
         };
 
+        const setTitleAnimationControls = (prefs) => {
+            const normalized = applyTitleAnimationPrefs(prefs);
+            if (titleAnimationSelect) titleAnimationSelect.value = normalized.animation;
+            if (titleAnimationAlwaysToggle) titleAnimationAlwaysToggle.checked = normalized.always;
+            if (titleAnimationDesyncToggle) titleAnimationDesyncToggle.checked = normalized.desync;
+            updateTitleAnimationPicker();
+            return normalized;
+        };
+
+        const getTitleAnimationValues = () => ({
+            animation: normalizeTitleAnimation(titleAnimationSelect ? titleAnimationSelect.value : TITLE_ANIMATION_DEFAULT),
+            always: !!(titleAnimationAlwaysToggle && titleAnimationAlwaysToggle.checked),
+            desync: !titleAnimationDesyncToggle || titleAnimationDesyncToggle.checked,
+        });
+
+        const createTitleAnimationMiniPreview = (animation) => {
+            const preview = document.createElement('span');
+            preview.className = 'title-animation-preview title-animation-picker-preview title-animation-desync';
+            preview.dataset.titleAnimation = normalizeTitleAnimation(animation);
+            preview.setAttribute('aria-hidden', 'true');
+            'fridge'.split('').forEach(character => {
+                const letter = document.createElement('span');
+                letter.className = 'title-letter';
+                letter.setAttribute('aria-hidden', 'true');
+                letter.textContent = character;
+                preview.appendChild(letter);
+            });
+            return preview;
+        };
+
+        const closeTitleAnimationPicker = () => {
+            if (!titleAnimationPicker) return;
+            titleAnimationPicker.classList.remove('open');
+            if (titleAnimationPickerButton) titleAnimationPickerButton.setAttribute('aria-expanded', 'false');
+        };
+
+        const updateTitleAnimationPicker = () => {
+            if (!titleAnimationPicker || !titleAnimationPickerTitle || !titleAnimationPickerPreview) return;
+            const selected = normalizeTitleAnimation(titleAnimationSelect ? titleAnimationSelect.value : TITLE_ANIMATION_DEFAULT);
+            titleAnimationPickerTitle.textContent = [...titleAnimationSelect.options].find(option => option.value === selected)?.textContent || selected;
+            const desync = !titleAnimationDesyncToggle || titleAnimationDesyncToggle.checked;
+            titleAnimationPicker.querySelectorAll('.title-animation-picker-preview').forEach(preview => {
+                preview.classList.toggle('title-animation-desync', desync);
+            });
+            const previousPreviewAnimation = titleAnimationPickerPreview.dataset.titleAnimation;
+            if (previousPreviewAnimation === 'slot-machine' && selected !== 'slot-machine') {
+                stopSlotMachineRoll(titleAnimationPickerPreview);
+            }
+            if (titleAnimationPickerPreview._titleAnimationSwitchTimeout) {
+                window.clearTimeout(titleAnimationPickerPreview._titleAnimationSwitchTimeout);
+            }
+            if (previousPreviewAnimation && previousPreviewAnimation !== selected) {
+                settleTitleLetters(titleAnimationPickerPreview, () => {
+                    titleAnimationPickerPreview.dataset.titleAnimation = '';
+                });
+                titleAnimationPickerPreview._titleAnimationSwitchTimeout = window.setTimeout(() => {
+                    titleAnimationPickerPreview.dataset.titleAnimation = selected;
+                    titleAnimationPickerPreview._titleAnimationSwitchTimeout = null;
+                    if (selected === 'slot-machine') runSlotMachineRoll(titleAnimationPickerPreview);
+                }, 440);
+            } else {
+                titleAnimationPickerPreview.dataset.titleAnimation = selected;
+                if (selected === 'slot-machine') runSlotMachineRoll(titleAnimationPickerPreview);
+            }
+            titleAnimationPickerMenu?.querySelectorAll('.theme-picker-option').forEach(option => {
+                const active = option.dataset.animationId === selected;
+                option.classList.toggle('selected', active);
+                option.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+        };
+
+        const ensureTitleAnimationPicker = () => {
+            if (!titleAnimationSelect || titleAnimationPicker) return;
+            titleAnimationSelect.classList.add('native-theme-select');
+            titleAnimationPicker = document.createElement('div');
+            titleAnimationPicker.className = 'theme-picker title-animation-picker';
+            titleAnimationPickerButton = document.createElement('button');
+            titleAnimationPickerButton.type = 'button';
+            titleAnimationPickerButton.className = 'theme-picker-button';
+            titleAnimationPickerButton.setAttribute('aria-haspopup', 'listbox');
+            titleAnimationPickerButton.setAttribute('aria-expanded', 'false');
+            titleAnimationPickerPreview = createTitleAnimationMiniPreview(titleAnimationSelect.value);
+            const copy = document.createElement('span');
+            copy.className = 'theme-picker-copy';
+            titleAnimationPickerTitle = document.createElement('span');
+            titleAnimationPickerTitle.className = 'theme-picker-title';
+            copy.append(titleAnimationPickerTitle);
+            const chevron = document.createElement('span');
+            chevron.className = 'theme-picker-chevron';
+            chevron.setAttribute('aria-hidden', 'true');
+            chevron.textContent = '▾';
+            titleAnimationPickerButton.append(titleAnimationPickerPreview, copy, chevron);
+
+            titleAnimationPickerMenu = document.createElement('div');
+            titleAnimationPickerMenu.className = 'theme-picker-menu';
+            titleAnimationPickerMenu.setAttribute('role', 'listbox');
+            [...titleAnimationSelect.options].forEach(selectOption => {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'theme-picker-option';
+                option.dataset.animationId = selectOption.value;
+                option.setAttribute('role', 'option');
+                const preview = createTitleAnimationMiniPreview(selectOption.value);
+                const label = document.createElement('span');
+                label.className = 'theme-picker-option-title';
+                label.textContent = selectOption.textContent;
+                option.append(preview, label);
+                option.addEventListener('click', () => {
+                    if (titleAnimationSelect.disabled) return;
+                    titleAnimationSelect.value = selectOption.value;
+                    titleAnimationSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    closeTitleAnimationPicker();
+                });
+                titleAnimationPickerMenu.appendChild(option);
+                if (selectOption.value === 'slot-machine') runSlotMachineRoll(preview);
+            });
+            titleAnimationPicker.append(titleAnimationPickerButton, titleAnimationPickerMenu);
+            titleAnimationSelect.insertAdjacentElement('afterend', titleAnimationPicker);
+            titleAnimationPickerButton.addEventListener('click', () => {
+                if (titleAnimationSelect.disabled) return;
+                const open = titleAnimationPicker.classList.toggle('open');
+                titleAnimationPickerButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            document.addEventListener('click', event => {
+                if (!titleAnimationPicker.contains(event.target)) closeTitleAnimationPicker();
+            });
+            updateTitleAnimationPicker();
+        };
+
+        const syncTitleAnimationAvailability = (reduceMotion) => {
+            const mobileView = document.body.classList.contains('mobile-template');
+            const disabled = reduceMotion === true || mobileView;
+            if (titleAnimationSection) {
+                titleAnimationSection.classList.toggle('is-disabled', disabled);
+                titleAnimationSection.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+            }
+            if (titleAnimationDisabledMessage) {
+                titleAnimationDisabledMessage.textContent = mobileView
+                    ? 'you cannot configure this feature while using mobile view.'
+                    : 'you cannot configure this feature while reduce motion is enabled.';
+                titleAnimationDisabledMessage.hidden = !disabled;
+            }
+            [titleAnimationSelect, titleAnimationAlwaysToggle, titleAnimationDesyncToggle].forEach(control => {
+                if (control) control.disabled = disabled;
+            });
+            if (titleAnimationPicker) titleAnimationPicker.classList.toggle('is-disabled', disabled);
+            if (titleAnimationPickerButton) titleAnimationPickerButton.disabled = disabled;
+            if (disabled) {
+                closeTitleAnimationPicker();
+                stopSlotMachineRoll(document.getElementById('title'));
+                titleAnimationPicker?.querySelectorAll('.title-animation-picker-preview').forEach(preview => stopSlotMachineRoll(preview));
+            } else {
+                setTitleAnimationControls(getTitleAnimationValues());
+                titleAnimationPicker?.querySelectorAll('.title-animation-picker-preview[data-title-animation="slot-machine"]').forEach(preview => runSlotMachineRoll(preview));
+            }
+        };
+
         const getAccessibilityValues = () => {
             return normalizeAccessibilityPrefs({
                 reduceMotion: !!(reduceMotionToggle && reduceMotionToggle.checked),
@@ -947,6 +1514,7 @@ function initSettingsPage() {
         const setAccessibilityToggles = (prefs) => {
             const normalized = normalizeAccessibilityPrefs(prefs);
             if (reduceMotionToggle) reduceMotionToggle.checked = normalized.reduceMotion;
+            syncTitleAnimationAvailability(normalized.reduceMotion);
         };
 
         const loadMaintenanceState = async () => {
@@ -1518,6 +2086,7 @@ function initSettingsPage() {
         const initialColors = Object.assign({}, getThemeColorDefaults(initialTheme), loadLocalColorPrefs() || {});
         setColorInputs(initialColors);
         applyThemeSelection(initialTheme);
+        ensureTitleAnimationPicker();
         syncMobileViewCookieWithCurrentHost();
         setMobileViewToggle(readMobileViewCookie());
         let lastSavedMobileViewEnabled = readMobileViewCookie();
@@ -1525,6 +2094,7 @@ function initSettingsPage() {
         setOnekoToggle(readLocalOnekoEnabled());
         setFeedNotificationsToggle(readLocalBrowserNotificationsEnabled());
         setJournalNotificationsToggle(readLocalJournalBrowserNotificationsEnabled());
+        setTitleAnimationControls(readLocalTitleAnimationPrefs());
 
         if (window.fetch) {
             fetch('/api/themes', {
@@ -1539,6 +2109,7 @@ function initSettingsPage() {
                     saveLocalThemePref(currentTheme);
                     applyThemeSelection(currentTheme);
                     lastSavedTheme = currentTheme;
+                    renderedTheme = currentTheme;
                 } else {
                     setThemeSelection(currentTheme);
                 }
@@ -1557,6 +2128,7 @@ function initSettingsPage() {
                 saveLocalThemePref(currentTheme);
                 setThemeCookie(currentTheme);
                 lastSavedTheme = currentTheme;
+                renderedTheme = currentTheme;
 
                 if (data.settings.colors) {
                     const serverColors = {};
@@ -1606,6 +2178,13 @@ function initSettingsPage() {
                     } catch (_) { /* ignore */ }
                     applyGlowIntensity(serverGlowIntensity);
                 }
+                if (typeof data.settings.titleAnimation === 'string' || typeof data.settings.titleAnimationAlways === 'boolean' || typeof data.settings.titleAnimationDesync === 'boolean') {
+                    setTitleAnimationControls({
+                        animation: data.settings.titleAnimation,
+                        always: data.settings.titleAnimationAlways === true,
+                        desync: data.settings.titleAnimationDesync !== false,
+                    });
+                }
                 if (toastPersonalityTextarea && typeof data.settings.toastPersonalityJson === 'string') {
                     bindToastPersonalityButton();
                     setToastPersonalityValue(data.settings.toastPersonalityJson);
@@ -1625,6 +2204,7 @@ function initSettingsPage() {
 
         if (themeSelect) {
             themeSelect.addEventListener('change', () => {
+                themeChangedByUser = true;
                 currentTheme = getThemeSelection();
                 saveLocalThemePref(currentTheme);
                 setThemeCookie(currentTheme);
@@ -1632,13 +2212,65 @@ function initSettingsPage() {
             });
         }
 
+        if (titleAnimationSelect) {
+            titleAnimationSelect.addEventListener('change', () => {
+                setTitleAnimationControls(getTitleAnimationValues());
+            });
+        }
+
+        if (titleAnimationAlwaysToggle) {
+            titleAnimationAlwaysToggle.addEventListener('change', () => {
+                setTitleAnimationControls(getTitleAnimationValues());
+            });
+        }
+
+        if (titleAnimationDesyncToggle) {
+            titleAnimationDesyncToggle.addEventListener('change', () => {
+                setTitleAnimationControls(getTitleAnimationValues());
+            });
+        }
+
+        if (reduceMotionToggle) {
+            reduceMotionToggle.addEventListener('change', () => {
+                const prefs = applyAccessibilityPrefs(getAccessibilityValues());
+                syncTitleAnimationAvailability(prefs.reduceMotion);
+            });
+        }
+
+        document.addEventListener('change', event => {
+            const control = event.target;
+            if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)) return;
+            if (!control.closest('#appearance-settings, #accessibility-settings, #notification-settings, #admin-settings')) return;
+            markSettingsDirty();
+        });
+
+        document.addEventListener('input', event => {
+            const control = event.target;
+            if (!(control instanceof HTMLInputElement) || control.type !== 'color') return;
+            if (control.closest('#appearance-settings')) markSettingsDirty();
+        });
+
+        document.addEventListener('click', event => {
+            if (!settingsDirty || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            const link = event.target.closest('a[href]');
+            if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+            const destination = new URL(link.href, window.location.href);
+            if (destination.href === window.location.href || (destination.pathname === window.location.pathname && destination.search === window.location.search && destination.hash)) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            confirmSettingsNavigation(destination.href);
+        }, true);
+
         saveBtn.addEventListener('click', async function() {
+            settingsDirty = false;
+            saveBtn.disabled = true;
             const selected = glowToggle.checked ? 'medium' : 'none';
 
             const mobileViewEnabled = !!(mobileViewToggle && mobileViewToggle.checked);
             setMobileViewCookie(mobileViewEnabled);
             const shouldReloadForMobileView = mobileViewEnabled !== lastSavedMobileViewEnabled;
             const accessibilityPrefs = applyAccessibilityPrefs(getAccessibilityValues());
+            const titleAnimationPrefs = setTitleAnimationControls(getTitleAnimationValues());
 
             if (isToastSession) {
                 if (isLoggedIn && window.fetch) {
@@ -1651,11 +2283,9 @@ function initSettingsPage() {
                             'X-Requested-With': 'XMLHttpRequest',
                         },
                         body: params.toString(),
-                    }).catch(() => {}).finally(() => {
-                        window.location.reload();
-                    });
+                    }).catch(() => {}).finally(() => finishSettingsSave(true));
                 } else {
-                    window.location.reload();
+                    finishSettingsSave(true);
                 }
                 return;
             }
@@ -1669,7 +2299,7 @@ function initSettingsPage() {
             applyGlowIntensity(selected);
 
             const selectedTheme = getThemeSelection();
-            const themeChanged = selectedTheme !== lastSavedTheme;
+            const themeChanged = themeChangedByUser || selectedTheme !== renderedTheme;
             saveLocalThemePref(selectedTheme);
             setThemeCookie(selectedTheme);
 
@@ -1704,6 +2334,9 @@ function initSettingsPage() {
                 params.append('onekoEnabled', onekoEnabled ? 'on' : 'off');
                 params.append('browserNotificationsEnabled', savedFeedNotificationsEnabled ? 'on' : 'off');
                 params.append('journalBrowserNotificationsEnabled', savedJournalNotificationsEnabled ? 'on' : 'off');
+                params.append('titleAnimation', titleAnimationPrefs.animation);
+                params.append('titleAnimationAlways', titleAnimationPrefs.always ? 'on' : 'off');
+                params.append('titleAnimationDesync', titleAnimationPrefs.desync ? 'on' : 'off');
 
                 if (themeSupportsColorPrefs(selectedTheme) && Object.keys(mergedColors).length) {
                     // flatten colors into separate fields (merged so defaults persist server-side)
@@ -1738,9 +2371,7 @@ function initSettingsPage() {
             }
 
             lastSavedMobileViewEnabled = mobileViewEnabled;
-            if (shouldReloadForMobileView || themeChanged) {
-                window.location.reload();
-            }
+            await finishSettingsSave(shouldReloadForMobileView || themeChanged);
         });
 
         if (colorResetBtn) {

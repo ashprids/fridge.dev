@@ -15,7 +15,7 @@ all API routes live under `/api/*` and are handled by PHP.
 
 - requires logged-in user
 - returns current settings from `data/accounts/accounts.json`
-- currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `reduceMotion`, `browserNotificationsEnabled`, and `journalBrowserNotificationsEnabled`; `colors` is honored by `classic` for the full palette and by `ambercrt`/`CRT` for the single `links` phosphor color
+- currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `reduceMotion`, `titleAnimation`, `titleAnimationAlways`, `titleAnimationDesync`, `browserNotificationsEnabled`, and `journalBrowserNotificationsEnabled`; `colors` is honored by `classic` for the full palette and by `ambercrt`/`CRT` for the single `links` phosphor color
 - for the hardcoded `toast` session, also returns `toastPersonalityJson`
 
 `POST`
@@ -24,6 +24,7 @@ all API routes live under `/api/*` and are handled by PHP.
 - updates user settings in `accounts.json`
 - can set `theme` to `default`, `classic`, or a valid `/themes/*.json` theme id
 - can set the reduced-motion accessibility boolean
+- can set the validated title animation id plus the always-playing and character-desync booleans
 - can set `onekoEnabled` for the optional cursor-following cat
 - can set `browserNotificationsEnabled` for account-backed browser feed notification polling
 - can set `journalBrowserNotificationsEnabled` for account-backed new journal post browser notifications

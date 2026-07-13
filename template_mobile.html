@@ -9,8 +9,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preload" href="/resources/IBM_VGA.woff" as="font" type="font/woff" crossorigin>
     <link rel="preload" href="/resources/IosevkaFixedSS03-Regular.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/resources/IosevkaFixedSS03-BoldItalic.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="/style.css?v=mobile-20260408-3">
+    <link rel="stylesheet" href="/style.css?v=mobile-20260713-5">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
 
@@ -67,6 +66,7 @@
             display: flex;
             flex-direction: column;
             min-width: 0;
+            height: 34px;
         }
 
         .mobile-collapsed-brand .mobile-collapsed-subtitle {
@@ -78,7 +78,11 @@
 
         .mobile-collapsed-brand .mobile-collapsed-title {
             font-family: "MainBoldItalic", monospace;
-            line-height: 1.1;
+            display: block;
+            height: 34px;
+            font-size: 32px !important;
+            line-height: 34px !important;
+            text-transform: lowercase !important;
             background-image: linear-gradient(0deg, #977eb6, #86d3cf);
             background-clip: text;
             -webkit-background-clip: text;
@@ -323,8 +327,7 @@
 <div class="mobile-collapsed-header" id="mobile-collapsed-header" style="display:none">
     <span id="show-sidebar" data-tooltip="show menu" style="display:none"><i class="fa-solid fa-bars"></i></span>
     <span class="mobile-collapsed-brand">
-        <span class="mobile-collapsed-subtitle">grab a snack from the</span>
-        <span class="mobile-collapsed-title">fridge.dev</span>
+        <span class="mobile-collapsed-title">fridge<span style="font-family: 'IBM_VGA'; font-size: 14px">.dev</span></span>
     </span>
 </div>
 
@@ -333,8 +336,7 @@
 <div id="sidebar">
 
     <div id="header">
-        <span id="subtitle">grab a snack from the</span><br>
-        <span id="title">fridge.dev</span>
+        <span id="title">fridge</span>
         <span id="hide-sidebar" data-tooltip="hide menu"><i class="fa-solid fa-xmark"></i></span>
         <br><span id="maintenance-banner" style="color: #c88420; display: none;"><i class="fa-solid fa-hand"></i> <b>maintenance mode</b></span>
     </div>
@@ -418,7 +420,7 @@
 </div>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script defer src="/main.js?v=mobile-20260408-3"></script>
-<script defer src="/js/settings.js?v=mobile-20260408-3"></script>
+<script defer src="/js/settings.js?v=mobile-20260713-8"></script>
 <script defer src="/js/sidebar-player.js?v=mobile-20260408-3"></script>
 <script defer src="/js/bookmarks.js?v=mobile-20260408-3"></script>
 <script defer src="/js/bbcode.js?v=mobile-20260408-3"></script>

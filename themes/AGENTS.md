@@ -215,20 +215,6 @@ common components:
 - `.mini-track`, `.mini-track:hover`, `.mini-track.active`
 - form inputs, buttons, `.dropdown`, `.radio`, `.checkbox`
 
-## frdgBeats Theming
-
-frdgBeats lives at `/tools/frdgbeats/` and must be treated as part of every theme. the default frdgBeats stylesheet intentionally keeps the original default DAW look. each selected theme stylesheet should override frdgBeats through `.frdgbeats-daw` variables, usually derived from the normal theme variables (`--bg`, `--fg`, `--border`, `--subtle`, `--links`):
-
-- `--fdgb-panel`, `--fdgb-panel-soft`, `--fdgb-panel-strong`
-- `--fdgb-popover`, `--fdgb-canvas`, `--fdgb-hover`, `--fdgb-overlay`
-- `--fdgb-line`, `--fdgb-border-strong`, `--fdgb-border-medium`, `--fdgb-border-soft`, `--fdgb-border-faint`
-- `--fdgb-hot`, `--fdgb-warm`, `--fdgb-muted`, `--fdgb-danger-base`, `--fdgb-danger`
-- `--fdgb-hot-soft`, `--fdgb-hot-mid`, `--fdgb-hot-strong`, `--fdgb-warm-soft`, `--fdgb-warm-mid`, `--fdgb-focus`
-- `--fdgb-note-fill`, `--fdgb-note-fill-slide`, `--fdgb-note-fg`
-- `--fdgb-piano-white`, `--fdgb-piano-black`, `--fdgb-swatch-border`, `--fdgb-code-bg`
-
-when creating or updating a theme, preview `/tools/frdgbeats/` and make sure the toolbar, channel rack, menus, credits modal, piano roll, playlist, mixer, automation grid, sample editor, meters, sliders, toggles, buttons, and popovers are readable and feel like the theme. synth and effect custom editors keep their own unique styling across every theme, so do not hardcode theme overrides into their internal panel/control classes. if the default derived variables are not enough, override the `--fdgb-*` variables inside the theme CSS rather than hardcoding frdgBeats component selectors everywhere.
-
 when styling menus, do not only set the background on hover/active states. set the foreground color too. this includes `#tab:hover`, `#tab.active`, `#footer-button:hover`, `#footer-button.active`, mobile nav buttons, mobile footer buttons, and pseudo-elements like `#tab::before` if the theme uses them. invisible active menu text is a tiny little css jump scare and it is your job to prevent it.
 
 ## Content Spacing

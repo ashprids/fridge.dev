@@ -70,6 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'reduceMotion' => null,
             'browserNotificationsEnabled' => null,
             'journalBrowserNotificationsEnabled' => null,
+            'titleAnimation' => 'wobble',
+            'titleAnimationAlways' => false,
+            'titleAnimationDesync' => true,
         ],
     ];
     if ($isToast) {
@@ -100,6 +103,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             if (array_key_exists('journalBrowserNotificationsEnabled', $account)) {
                 $result['settings']['journalBrowserNotificationsEnabled'] = is_truthy_setting($account['journalBrowserNotificationsEnabled']);
+            }
+            if (isset($account['titleAnimation'])) {
+                $animation = strtolower(trim((string)$account['titleAnimation']));
+                if ($animation === 'orbit' || $animation === 'domino' || $animation === 'lava-lamp') {
+                    $animation = 'bubble';
+                }
+                $animationMigrations = [
+                    'tidal-wave' => 'slot-machine',
+                    'accordion' => 'slot-machine',
+                    'typewriter' => 'slot-machine',
+                    'helicopter' => 'moonwalk',
+                    'haunted' => 'moonwalk',
+                    'juggle' => 'moonwalk',
+                ];
+                $animation = $animationMigrations[$animation] ?? $animation;
+                if (in_array($animation, ['wobble', 'bounce', 'pinball', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'], true)) {
+                    $result['settings']['titleAnimation'] = $animation;
+                }
+            }
+            if (array_key_exists('titleAnimationAlways', $account)) {
+                $result['settings']['titleAnimationAlways'] = is_truthy_setting($account['titleAnimationAlways']);
+            }
+            if (array_key_exists('titleAnimationDesync', $account)) {
+                $result['settings']['titleAnimationDesync'] = is_truthy_setting($account['titleAnimationDesync']);
             }
             break;
         }
@@ -147,6 +174,15 @@ $browserNotificationsRaw = $browserNotificationsProvided ? (string)$_POST['brows
 
 $journalBrowserNotificationsProvided = array_key_exists('journalBrowserNotificationsEnabled', $_POST);
 $journalBrowserNotificationsRaw = $journalBrowserNotificationsProvided ? (string)$_POST['journalBrowserNotificationsEnabled'] : null;
+
+$titleAnimationProvided = array_key_exists('titleAnimation', $_POST);
+$titleAnimationRaw = $titleAnimationProvided ? strtolower(trim((string)$_POST['titleAnimation'])) : null;
+
+$titleAnimationAlwaysProvided = array_key_exists('titleAnimationAlways', $_POST);
+$titleAnimationAlwaysRaw = $titleAnimationAlwaysProvided ? (string)$_POST['titleAnimationAlways'] : null;
+
+$titleAnimationDesyncProvided = array_key_exists('titleAnimationDesync', $_POST);
+$titleAnimationDesyncRaw = $titleAnimationDesyncProvided ? (string)$_POST['titleAnimationDesync'] : null;
 
 $toastPersonalityProvided = array_key_exists('toastPersonalityJson', $_POST);
 $toastPersonalityRaw = $toastPersonalityProvided ? (string)$_POST['toastPersonalityJson'] : null;
@@ -341,6 +377,70 @@ if ($reduceMotionProvided) {
             foreach ($accessibilityValues as $key => $value) {
                 $account[$key] = $value;
             }
+            $updated = true;
+            break;
+        }
+    }
+    unset($account);
+
+    if ($updated) {
+        if (!save_accounts_data($accountsPath, $data)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'write_failed']);
+            exit;
+        }
+        $didWork = true;
+    }
+}
+
+if ($titleAnimationProvided || $titleAnimationAlwaysProvided || $titleAnimationDesyncProvided) {
+    $allowedTitleAnimations = ['wobble', 'bounce', 'pinball', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'];
+    if ($titleAnimationProvided && !in_array($titleAnimationRaw, $allowedTitleAnimations, true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_title_animation']);
+        exit;
+    }
+
+    $titleAnimationAlways = null;
+    if ($titleAnimationAlwaysProvided) {
+        $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+        $falsy = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+        $lower = strtolower(trim((string)$titleAnimationAlwaysRaw));
+        if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'invalid_title_animation_always_value']);
+            exit;
+        }
+        $titleAnimationAlways = in_array($lower, $truthy, true);
+    }
+
+    $titleAnimationDesync = null;
+    if ($titleAnimationDesyncProvided) {
+        $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+        $falsy = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+        $lower = strtolower(trim((string)$titleAnimationDesyncRaw));
+        if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'invalid_title_animation_desync_value']);
+            exit;
+        }
+        $titleAnimationDesync = in_array($lower, $truthy, true);
+    }
+
+    $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+    $data = load_accounts_data($accountsPath);
+    if ($data === null) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
+        exit;
+    }
+
+    $updated = false;
+    foreach ($data['accounts'] as &$account) {
+        if (isset($account['username']) && (string)$account['username'] === $username) {
+            if ($titleAnimationProvided) $account['titleAnimation'] = $titleAnimationRaw;
+            if ($titleAnimationAlwaysProvided) $account['titleAnimationAlways'] = $titleAnimationAlways;
+            if ($titleAnimationDesyncProvided) $account['titleAnimationDesync'] = $titleAnimationDesync;
             $updated = true;
             break;
         }

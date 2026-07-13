@@ -72,7 +72,7 @@ WIKI_CONTEXT_TRIGGER_TERMS = {
     'fridg3', 'site', 'website', 'page', 'pages', 'feature', 'features', 'account', 'accounts',
     'login', 'password', 'settings', 'feed', 'post', 'posts', 'reply', 'journal', 'guestbook',
     'music', 'gallery', 'bookmark', 'bookmarks', 'chat', 'contact', 'discord', 'toast',
-    'bot', 'tool', 'tools', 'mdpaste', 'paste', 'frdgbeats', 'beats', 'wiki', 'merch',
+    'bot', 'tool', 'tools', 'mdpaste', 'paste', 'wiki', 'merch',
     'mobile', 'theme', 'profile',
 }
 
@@ -1552,7 +1552,7 @@ def build_patch_notice_embed(payload: dict) -> discord.Embed:
     embed = discord.Embed(
         title='patch notice // fridge.dev',
         description=(
-            f'new build landed on `{branch}`. '
+            f'new build landed on `{branch}`.\n'
             'here’s the patch log from the latest rollout.'
         ),
         color=PATCH_NOTICE_EMBED_COLOR,
