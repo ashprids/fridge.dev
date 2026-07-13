@@ -100,6 +100,14 @@ server {
         return 403;
     }
 
+    location = /data/etc/banlists {
+        return 403;
+    }
+
+    location ^~ /data/etc/banlists/ {
+        return 403;
+    }
+
     # Feed clean URLs
     location ~ ^/feed/posts/[^/]+$ {
         rewrite ^/feed/posts/(.+)$ /feed/posts/index.php?post=$1 last;

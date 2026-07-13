@@ -232,6 +232,7 @@ if (file_put_contents($hardBanPath, '', LOCK_EX) === false) {
     throw new RuntimeException('failed to clear the hard-ban IP list');
 }
 writeJson($root, 'etc/hard-ban-identities.json', ['identities' => new stdClass()]);
+clearDirectory($root, 'etc/banlists');
 
 $toast = readJsonObject($root, 'etc/toast.json');
 $toast['bot'] = is_array($toast['bot'] ?? null) ? $toast['bot'] : [];

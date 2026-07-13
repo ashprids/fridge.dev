@@ -10,6 +10,13 @@ if (!function_exists('fridg3_hard_ban_path')) {
     }
 }
 
+if (!function_exists('fridg3_hard_ban_source_directory')) {
+    function fridg3_hard_ban_source_directory(): string
+    {
+        return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'banlists';
+    }
+}
+
 if (!function_exists('fridg3_hard_ban_parse')) {
     function fridg3_hard_ban_parse(string $raw): array
     {
@@ -52,6 +59,45 @@ if (!function_exists('fridg3_hard_ban_load')) {
         }
 
         return fridg3_hard_ban_parse($raw)['ips'];
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_load_source_ips')) {
+    function fridg3_hard_ban_load_source_ips(): array
+    {
+        $directory = fridg3_hard_ban_source_directory();
+        if (!is_dir($directory)) {
+            return [];
+        }
+
+        $ips = [];
+        foreach (glob($directory . DIRECTORY_SEPARATOR . '*.txt') ?: [] as $path) {
+            if (!is_file($path) || !is_readable($path)) {
+                continue;
+            }
+            $parsed = fridg3_hard_ban_parse((string)@file_get_contents($path));
+            foreach ($parsed['ips'] as $ip) {
+                $packed = @inet_pton((string)$ip);
+                $key = $packed === false ? strtolower((string)$ip) : bin2hex($packed);
+                $ips[$key] = (string)$ip;
+            }
+        }
+
+        return array_values($ips);
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_load_effective')) {
+    function fridg3_hard_ban_load_effective(): array
+    {
+        $ips = [];
+        foreach (array_merge(fridg3_hard_ban_load(), fridg3_hard_ban_load_source_ips()) as $ip) {
+            $packed = @inet_pton((string)$ip);
+            if ($packed !== false) {
+                $ips[bin2hex($packed)] = (string)$ip;
+            }
+        }
+        return array_values($ips);
     }
 }
 
@@ -111,7 +157,7 @@ if (!function_exists('fridg3_hard_ban_contains')) {
             return false;
         }
 
-        foreach (fridg3_hard_ban_load() as $ip) {
+        foreach (fridg3_hard_ban_load_effective() as $ip) {
             $packedIp = @inet_pton((string)$ip);
             if ($packedIp !== false && hash_equals($packedIp, $packedCandidate)) {
                 return true;
@@ -206,10 +252,11 @@ if (!function_exists('fridg3_hard_ban_admin_save')) {
     function fridg3_hard_ban_admin_save(array $requestedIps): bool
     {
         $data = fridg3_hard_ban_load_identities();
+        $effectiveRequestedIps = array_merge($requestedIps, fridg3_hard_ban_load_source_ips());
         $releasedPrimaries = [];
         foreach ($data['identities'] as $record) {
             $primaryIp = is_array($record) ? (string)($record['primaryIp'] ?? '') : '';
-            if ($primaryIp !== '' && !fridg3_hard_ban_list_contains($requestedIps, $primaryIp)) {
+            if ($primaryIp !== '' && !fridg3_hard_ban_list_contains($effectiveRequestedIps, $primaryIp)) {
                 $releasedPrimaries[$primaryIp] = true;
             }
         }
@@ -279,7 +326,8 @@ if (!function_exists('fridg3_hard_ban_check_client')) {
             return fridg3_hard_ban_contains($ip);
         }
 
-        $hardBans = fridg3_hard_ban_load();
+        $manualHardBans = fridg3_hard_ban_load();
+        $hardBans = fridg3_hard_ban_load_effective();
         $data = fridg3_hard_ban_load_identities();
         $record = $data['identities'][$identifier] ?? null;
         if (!is_array($record)) {
@@ -288,13 +336,13 @@ if (!function_exists('fridg3_hard_ban_check_client')) {
 
         $primaryIp = (string)($record['primaryIp'] ?? '');
         if ($primaryIp === '' || !fridg3_hard_ban_list_contains($hardBans, $primaryIp)) {
-            fridg3_hard_ban_admin_save($hardBans);
+            fridg3_hard_ban_admin_save($manualHardBans);
             return fridg3_hard_ban_contains($ip);
         }
 
         if (!fridg3_hard_ban_list_contains($hardBans, $ip)) {
-            $hardBans[] = $ip;
-            if (!fridg3_hard_ban_write($hardBans)) {
+            $manualHardBans[] = $ip;
+            if (!fridg3_hard_ban_write($manualHardBans)) {
                 return true;
             }
         }

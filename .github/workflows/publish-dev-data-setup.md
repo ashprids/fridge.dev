@@ -85,6 +85,7 @@ The archive command excludes these operational identity files entirely, after sa
 
 - `data/etc/hard-banned-ips.txt`
 - `data/etc/hard-ban-identities.json`
+- `data/etc/banlists/*`
 
 To add more privacy rules, edit the marked block in:
 

@@ -213,6 +213,15 @@ Private browser-to-IP associations used to carry an active hard ban across IP ch
 - removing the original IP through `/settings/banned-ips` removes every automatically associated IP and the corresponding identifier records
 - direct client access is blocked; the developer-data sanitizer replaces the file with an empty `identities` object and the publishing archive excludes it entirely
 
+### `data/etc/banlists/*.txt`
+
+Read-only hard-ban source lists. Every valid whitespace-separated IPv4 or IPv6 address from every `.txt` file directly inside this directory is merged with the manual hard-ban list at request time.
+
+- source IPs are enforced without appearing in the `/settings/banned-ips` textarea or being copied to `hard-banned-ips.txt`
+- unreadable files and invalid tokens are ignored without disabling the other source lists
+- nginx blocks the entire directory from client access
+- the developer-data sanitizer clears the directory and the publishing archive excludes its contents
+
 ## `data/journal/`
 
 published journal post:

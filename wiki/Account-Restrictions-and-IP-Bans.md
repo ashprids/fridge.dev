@@ -45,6 +45,8 @@ User-facing blocked notices use `your IP address has been restricted.` Account-b
 
 Hard bans are exact IPv4 or IPv6 addresses stored in `data/etc/hard-banned-ips.txt`. Admins edit the list at `/settings/banned-ips`; spaces and newlines are accepted, saves validate every token, remove duplicates, and normalize the file to one address per line.
 
+Additional read-only sources may be placed in `data/etc/banlists/*.txt`. Every valid whitespace-separated IP in every text file in that directory is included in the effective hard-ban set. Source-list IPs are deliberately not copied into `hard-banned-ips.txt` and do not appear in the `/settings/banned-ips` textarea.
+
 Unlike posting bans, hard bans are enforced before normal page or static-file handling. Nginx calls the internal `/_hard-ban-check` authorization endpoint for requests. A denied check becomes a server-side `302` redirect to `/error/blacklisted`, whose final response is `403`.
 
 Hard-banned clients may access only:
@@ -92,12 +94,14 @@ The following files contain operational IP or browser identity information and m
 
 - `data/etc/hard-banned-ips.txt`
 - `data/etc/hard-ban-identities.json`
+- `data/etc/banlists/*.txt`
 - `data/feed/banned_ips.json`
 
 Nginx explicitly blocks the two hard-ban files, and the general private-data rules protect the posting-ban JSON. The developer-data sanitizer empties the hard-ban list and identity records as defense in depth. The development archive command then excludes both hard-ban files entirely:
 
 - `data/etc/hard-banned-ips.txt`
 - `data/etc/hard-ban-identities.json`
+- `data/etc/banlists/*`
 
 ## Implementation Checklist
 
