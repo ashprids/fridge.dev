@@ -516,6 +516,42 @@ config = load_config()
 signal_file_path = CONFIG_PATH.parent / '.stream-update-signal'
 feed_notify_state_path = CONFIG_PATH.parent / 'toast-feed-notify-state.json'
 dm_history_path = CONFIG_PATH.parent / 'toast-dm-history.json'
+patch_notice_approval_state_path = CONFIG_PATH.parent / 'toast-patch-approvals.json'
+
+def load_patch_notice_approval_state():
+    fallback = {'pending': {}, 'approved': []}
+    try:
+        if not patch_notice_approval_state_path.exists():
+            return fallback
+        decoded = json.loads(patch_notice_approval_state_path.read_text(encoding='utf-8'))
+        if not isinstance(decoded, dict):
+            return fallback
+        pending = decoded.get('pending', {})
+        approved = decoded.get('approved', [])
+        return {
+            'pending': pending if isinstance(pending, dict) else {},
+            'approved': approved if isinstance(approved, list) else [],
+        }
+    except Exception as e:
+        logger.warning(f"Failed to load patch notice approval state: {e}")
+        return fallback
+
+def save_patch_notice_approval_state():
+    state = {
+        'pending': pending_patch_notice_approvals,
+        'approved': sorted(processed_patch_notice_approvals, key=int)[-5000:],
+    }
+    temp_path = patch_notice_approval_state_path.with_suffix('.json.tmp')
+    try:
+        patch_notice_approval_state_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path.write_text(json.dumps(state, indent=2) + '\n', encoding='utf-8')
+        temp_path.replace(patch_notice_approval_state_path)
+    except Exception as e:
+        logger.error(f"Failed to save patch notice approval state: {e}")
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 # Initialize bot with intents
 intents = discord.Intents.default()
@@ -527,7 +563,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 bot_online = False
 ai_dm_reply_tasks = {}
 ai_dm_pending_batches = {}
-pending_patch_notice_approvals = {}
+patch_notice_approval_state = load_patch_notice_approval_state()
+pending_patch_notice_approvals = patch_notice_approval_state['pending']
+processed_patch_notice_approvals = {
+    str(message_id)
+    for message_id in patch_notice_approval_state['approved']
+    if str(message_id).isdigit()
+}
+processing_patch_notice_approvals = set()
 
 MENTION_PATTERN = re.compile(r'@([A-Za-z0-9_-]{1,50})')
 
@@ -1667,6 +1710,7 @@ async def request_patch_notice_approval(payload: dict, target_channel_id: str = 
         'payload': payload,
         'target_channel_id': target_channel_id,
     }
+    save_patch_notice_approval_state()
 
     try:
         await sent_message.add_reaction(PATCH_NOTICE_APPROVAL_EMOJI)
@@ -1689,6 +1733,61 @@ def member_can_approve_patch_notice(member) -> bool:
             return True
 
     return False
+
+async def recover_patch_notice_approval(message_id: int):
+    channel = await resolve_sendable_channel(PATCH_NOTICE_APPROVAL_CHANNEL_ID)
+    if channel is None or not hasattr(channel, 'fetch_message'):
+        return None
+
+    try:
+        message = await channel.fetch_message(message_id)
+    except Exception as e:
+        logger.warning(f"Failed to fetch older patch approval message {message_id}: {e}")
+        return None
+
+    if getattr(getattr(message, 'author', None), 'id', None) != getattr(bot.user, 'id', None):
+        return None
+    embeds = getattr(message, 'embeds', None) or []
+    if not embeds or str(getattr(embeds[0], 'title', '')).strip() != 'patch notice // fridge.dev':
+        return None
+
+    embed = embeds[0]
+    commit_url = str(getattr(embed, 'url', '') or '').strip()
+    sha_match = re.search(r'/commit/([0-9a-fA-F]{7,40})(?:[/?#]|$)', commit_url)
+    if not sha_match:
+        return None
+    commit_sha = sha_match.group(1)
+
+    try:
+        payload = build_manual_patch_notice_payload(commit_sha)
+    except Exception as e:
+        logger.warning(f"Could not rebuild older patch approval {message_id} from git: {e}")
+        patch_notes = []
+        for field in getattr(embed, 'fields', []) or []:
+            if str(getattr(field, 'name', '')).lower().startswith('patch notes'):
+                patch_notes.append(str(getattr(field, 'value', '')).strip())
+        payload = {
+            'branch': 'main',
+            'commit_sha': commit_sha,
+            'commit_url': commit_url,
+            'commits': [{
+                'sha': commit_sha,
+                'subject': '\n\n'.join(note for note in patch_notes if note) or commit_sha[:7],
+                'body': '',
+                'url': commit_url,
+            }],
+            'pr_url': '',
+            'pr_number': '',
+        }
+
+    recovered = {
+        'payload': payload,
+        'target_channel_id': PATCH_NOTICE_CHANNEL_ID,
+    }
+    pending_patch_notice_approvals[str(message_id)] = recovered
+    save_patch_notice_approval_state()
+    logger.info(f"Recovered older patch notice approval {message_id} from its Discord embed")
+    return recovered
 
 def save_notify_state(state: dict):
     try:
@@ -1915,8 +2014,8 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     if str(payload.channel_id) != PATCH_NOTICE_APPROVAL_CHANNEL_ID:
         return
 
-    pending = pending_patch_notice_approvals.get(str(payload.message_id))
-    if not pending:
+    message_id = str(payload.message_id)
+    if message_id in processed_patch_notice_approvals or message_id in processing_patch_notice_approvals:
         return
 
     guild = bot.get_guild(payload.guild_id) if payload.guild_id else None
@@ -1934,21 +2033,32 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         logger.info(f"Ignoring patch notice approval reaction from non-admin user {payload.user_id}")
         return
 
-    pending = pending_patch_notice_approvals.pop(str(payload.message_id), None)
-    if not pending:
-        return
-
+    processing_patch_notice_approvals.add(message_id)
     try:
-        sent_message = await send_patch_notice_payload(
-            pending['payload'],
-            channel_id=str(pending.get('target_channel_id') or PATCH_NOTICE_CHANNEL_ID),
-        )
-        logger.info(
-            f"Approved patch notice {payload.message_id}; posted update message {sent_message.id}"
-        )
-    except Exception as e:
-        pending_patch_notice_approvals[str(payload.message_id)] = pending
-        logger.warning(f"Failed to post approved patch notice {payload.message_id}: {e}")
+        pending = pending_patch_notice_approvals.get(message_id)
+        if not pending:
+            pending = await recover_patch_notice_approval(payload.message_id)
+        if not pending:
+            return
+
+        pending_patch_notice_approvals.pop(message_id, None)
+
+        try:
+            sent_message = await send_patch_notice_payload(
+                pending['payload'],
+                channel_id=str(pending.get('target_channel_id') or PATCH_NOTICE_CHANNEL_ID),
+            )
+            logger.info(
+                f"Approved patch notice {payload.message_id}; posted update message {sent_message.id}"
+            )
+            processed_patch_notice_approvals.add(message_id)
+            save_patch_notice_approval_state()
+        except Exception as e:
+            pending_patch_notice_approvals[message_id] = pending
+            save_patch_notice_approval_state()
+            logger.warning(f"Failed to post approved patch notice {payload.message_id}: {e}")
+    finally:
+        processing_patch_notice_approvals.discard(message_id)
 
 @tasks.loop(seconds=1)  # Check every second for immediate stream restart signal
 async def config_monitor():

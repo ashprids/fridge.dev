@@ -28,12 +28,14 @@ main details:
 - deploy target is `deploy@45.76.134.105:/var/www/fridge.dev`
 - the workflow verifies `/var/www/fridge.dev` exists and is writable before rsync, and refuses any unexpected target path
 - after rsync, ssh stops any `toast` GNU screen session owned by `deploy`, stops any `toast` session owned by `http`, prepares `others/toast-discord-bot/bot/toast-bot.log` for `http`, then runs `/var/www/fridge.dev/others/toast-discord-bot/bot/start.sh` as `http`
-- the restart step needs passwordless sudo for `deploy` to run the Toast bot as `http`; Toast writes DM history and feed notification state under `/data`, which is owned by `http:http`
+- the restart step needs passwordless sudo for `deploy` to run the Toast bot as `http`; Toast writes DM history, feed notification state, and patch approval state under `/data`, which is owned by `http:http`
 - because the `http` user home is not a normal login home, the workflow sets `SCREENDIR=/tmp/toast-screen-http` for `http`-owned screen commands and creates that socket directory as `http` with mode `700` before start
 
 ## Toast Patch Notice Commit Format
 
 after a successful `main` deploy, the workflow sends Toast a list of non-merge commits using each commit's subject (`git log %s`) and full body (`git log %b`). Toast turns each commit into Discord patch-note bullets and posts the fully formatted patch notice preview in approval channel `1526075637096255548`. Toast reacts to that preview with `✅`; when an admin approves with `✅`, Toast posts the update to channel `1455194403642802309` and pings role `1408064850688475197`.
+
+Pending approval message IDs and payloads are persisted in `/data/etc/toast-patch-approvals.json`, so older messages remain actionable after a bot restart. The raw reaction handler also fetches uncached approval messages from Discord. For a legacy Toast-authored approval embed created before persistence was added, Toast reconstructs the notice from the embed's commit URL and patch-note fields and sends it to the standard update channel.
 
 ```text
 • commit subject

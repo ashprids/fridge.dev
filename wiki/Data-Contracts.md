@@ -414,6 +414,13 @@ legacy Discord bot fallback. The bot now prefers `data/etc/toast-personality.jso
 - internal bot dedupe state for sent feed mention/reply notifications
 - stores which feed post mentions, feed reply mentions, and replies to a user's own posts have already triggered DMs
 
+### `toast-patch-approvals.json`
+
+- persists pending Discord update approvals across bot restarts by mapping approval message IDs to their patch payload and destination channel
+- retains recently approved message IDs so later reactions cannot publish the same update twice
+- older Toast-authored approval embeds that predate this state file can be recovered from their commit URL and patch-note fields; legacy recoveries use the standard update channel
+- sanitized developer data clears both pending and approved message IDs
+
 ### `feed-browser-notify-state.json`
 
 - internal browser-notification dedupe state for logged-in users
@@ -437,7 +444,8 @@ legacy Discord bot fallback. The bot now prefers `data/etc/toast-personality.jso
 - the toast bot exposes localhost-only `POST /patch-notice` on `127.0.0.1:8765`
 - the deploy workflow calls it after a successful deploy to `main`
 - toast sends the fully formatted patch notice preview to approval channel `1526075637096255548` and reacts to its own message with `✅`
-- when an admin approves with `✅`, toast posts the Discord embed patch note to channel `1455194403642802309`
+- when an admin approves with `✅`, including on an older uncached approval message, toast posts the Discord embed patch note to channel `1455194403642802309`
+- pending approvals persist across bot restarts; Toast can also reconstruct legacy approval messages from their stored Discord embed
 - approved patch notices ping role `1408064850688475197` in the update channel so the update gets the right attention
 - the payload includes the shipped commit range plus a PR link when the update came from a merged pull request
 

@@ -261,6 +261,10 @@ writeJson($root, 'etc/toast-feed-notify-state.json', [
     'replies' => new stdClass(),
     'reply_mentions_initialized' => false,
 ]);
+writeJson($root, 'etc/toast-patch-approvals.json', [
+    'pending' => new stdClass(),
+    'approved' => [],
+]);
 writeJson($root, 'etc/feed-browser-notify-state.json', [
     'users' => new stdClass(),
 ]);

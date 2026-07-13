@@ -69,6 +69,7 @@ The sanitizer currently changes:
 - `data/etc/toast-personality.json`: clears `private_lore`
 - `data/etc/toast-dm-history.json`: clears Discord DM history
 - `data/etc/toast-feed-notify-state.json`: clears Discord notification state
+- `data/etc/toast-patch-approvals.json`: clears pending and completed Discord update approvals
 - `data/etc/off-topic-archive.json`: replaces exported Discord archive contents with an empty placeholder
 - `data/etc/webhooks.json`: clears all scalar values
 - `data/guestbook/ip_index.json`: clears contents
