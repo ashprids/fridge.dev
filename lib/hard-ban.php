@@ -45,6 +45,77 @@ if (!function_exists('fridg3_hard_ban_parse')) {
     }
 }
 
+if (!function_exists('fridg3_hard_ban_normalize_cidr')) {
+    function fridg3_hard_ban_normalize_cidr(string $candidate): ?string
+    {
+        $parts = explode('/', trim($candidate));
+        if (count($parts) !== 2 || filter_var($parts[0], FILTER_VALIDATE_IP) === false || !ctype_digit($parts[1])) {
+            return null;
+        }
+
+        $packed = @inet_pton($parts[0]);
+        if ($packed === false) {
+            return null;
+        }
+
+        $prefix = (int)$parts[1];
+        $maximumPrefix = strlen($packed) * 8;
+        if ($prefix < 0 || $prefix > $maximumPrefix) {
+            return null;
+        }
+
+        $wholeBytes = intdiv($prefix, 8);
+        $remainingBits = $prefix % 8;
+        $length = strlen($packed);
+        for ($index = $wholeBytes; $index < $length; $index++) {
+            if ($index === $wholeBytes && $remainingBits !== 0) {
+                $packed[$index] = chr(ord($packed[$index]) & (0xff << (8 - $remainingBits)));
+                continue;
+            }
+            $packed[$index] = "\0";
+        }
+
+        $network = @inet_ntop($packed);
+        return $network === false ? null : $network . '/' . $prefix;
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_parse_source')) {
+    function fridg3_hard_ban_parse_source(string $raw): array
+    {
+        $tokens = preg_split('/\s+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $entries = [];
+        $invalid = [];
+
+        foreach ($tokens as $token) {
+            $candidate = trim((string)$token);
+            if (str_contains($candidate, '/')) {
+                $normalized = fridg3_hard_ban_normalize_cidr($candidate);
+                if ($normalized === null) {
+                    $invalid[$candidate] = true;
+                    continue;
+                }
+                $entries[strtolower($normalized)] = $normalized;
+                continue;
+            }
+
+            if (filter_var($candidate, FILTER_VALIDATE_IP) === false) {
+                $invalid[$candidate] = true;
+                continue;
+            }
+
+            $packed = @inet_pton($candidate);
+            $key = $packed === false ? strtolower($candidate) : bin2hex($packed);
+            $entries[$key] = $candidate;
+        }
+
+        return [
+            'ips' => array_values($entries),
+            'invalid' => array_keys($invalid),
+        ];
+    }
+}
+
 if (!function_exists('fridg3_hard_ban_load')) {
     function fridg3_hard_ban_load(): array
     {
@@ -70,12 +141,29 @@ if (!function_exists('fridg3_hard_ban_load_source_ips')) {
             return [];
         }
 
-        $ips = [];
-        foreach (glob($directory . DIRECTORY_SEPARATOR . '*.txt') ?: [] as $path) {
-            if (!is_file($path) || !is_readable($path)) {
+        try {
+            $directoryIterator = new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS);
+            $iterator = new RecursiveIteratorIterator(
+                $directoryIterator,
+                RecursiveIteratorIterator::LEAVES_ONLY,
+                RecursiveIteratorIterator::CATCH_GET_CHILD
+            );
+        } catch (UnexpectedValueException) {
+            return [];
+        }
+
+        $paths = [];
+        foreach ($iterator as $file) {
+            if (!$file->isFile() || !$file->isReadable() || strtolower($file->getExtension()) !== 'txt') {
                 continue;
             }
-            $parsed = fridg3_hard_ban_parse((string)@file_get_contents($path));
+            $paths[] = $file->getPathname();
+        }
+        sort($paths, SORT_STRING);
+
+        $ips = [];
+        foreach ($paths as $path) {
+            $parsed = fridg3_hard_ban_parse_source((string)@file_get_contents($path));
             foreach ($parsed['ips'] as $ip) {
                 $packed = @inet_pton((string)$ip);
                 $key = $packed === false ? strtolower((string)$ip) : bin2hex($packed);
@@ -95,6 +183,11 @@ if (!function_exists('fridg3_hard_ban_load_effective')) {
             $packed = @inet_pton((string)$ip);
             if ($packed !== false) {
                 $ips[bin2hex($packed)] = (string)$ip;
+                continue;
+            }
+            $cidr = fridg3_hard_ban_normalize_cidr((string)$ip);
+            if ($cidr !== null) {
+                $ips[strtolower($cidr)] = $cidr;
             }
         }
         return array_values($ips);
@@ -157,14 +250,7 @@ if (!function_exists('fridg3_hard_ban_contains')) {
             return false;
         }
 
-        foreach (fridg3_hard_ban_load_effective() as $ip) {
-            $packedIp = @inet_pton((string)$ip);
-            if ($packedIp !== false && hash_equals($packedIp, $packedCandidate)) {
-                return true;
-            }
-        }
-
-        return false;
+        return fridg3_hard_ban_list_contains(fridg3_hard_ban_load_effective(), $candidate);
     }
 }
 
@@ -194,8 +280,36 @@ if (!function_exists('fridg3_hard_ban_ips_equal')) {
 if (!function_exists('fridg3_hard_ban_list_contains')) {
     function fridg3_hard_ban_list_contains(array $ips, string $candidate): bool
     {
+        $packedCandidate = @inet_pton(trim($candidate));
+        if ($packedCandidate === false) {
+            return false;
+        }
+
         foreach ($ips as $ip) {
             if (fridg3_hard_ban_ips_equal((string)$ip, $candidate)) {
+                return true;
+            }
+
+            $cidr = fridg3_hard_ban_normalize_cidr((string)$ip);
+            if ($cidr === null) {
+                continue;
+            }
+            [$network, $prefix] = explode('/', $cidr, 2);
+            $packedNetwork = @inet_pton($network);
+            if ($packedNetwork === false || strlen($packedNetwork) !== strlen($packedCandidate)) {
+                continue;
+            }
+
+            $wholeBytes = intdiv((int)$prefix, 8);
+            $remainingBits = (int)$prefix % 8;
+            if ($wholeBytes > 0 && !hash_equals(substr($packedNetwork, 0, $wholeBytes), substr($packedCandidate, 0, $wholeBytes))) {
+                continue;
+            }
+            if ($remainingBits === 0) {
+                return true;
+            }
+            $mask = 0xff << (8 - $remainingBits);
+            if ((ord($packedNetwork[$wholeBytes]) & $mask) === (ord($packedCandidate[$wholeBytes]) & $mask)) {
                 return true;
             }
         }

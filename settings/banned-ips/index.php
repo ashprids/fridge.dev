@@ -45,7 +45,7 @@ $content = '<style>'
     . '<h2>site-wide network access restrictions</h2>'
     . $notice
     . '<p class="hard-ban-note">one IP per space or line. hard-banned IPs are redirected by nginx before website pages or files are served. only <code>/error/blacklisted</code>, files inside that directory, and shared font files remain accessible.</p>'
-    . '<p class="hard-ban-note">additional IPs from <code>/data/etc/banlists/*.txt</code> are enforced separately and are intentionally not shown in this editor.</p>'
+    . '<p class="hard-ban-note">additional IPs and CIDR subnets from text files anywhere beneath <code>/data/etc/banlists/</code> are enforced separately and are intentionally not shown in this editor.</p>'
     . '<p class="hard-ban-note">a first-party browser identifier associates later IPs with the original manually banned IP. removing that original IP also removes its automatically associated IPs and browser records.</p>'
     . '<p class="hard-ban-note"><strong>warning:</strong> adding your current IP will lock this browser out after the save completes.</p>'
     . '<form method="post" action="/settings/banned-ips/" data-no-spa="1">'
