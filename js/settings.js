@@ -633,9 +633,12 @@ function saveFeedNotificationSeenKeys(keys) {
     } catch (_) { /* ignore */ }
 }
 
-async function fetchFeedNotificationEvents() {
+async function fetchFeedNotificationEvents(options = {}) {
     if (!window.fetch) return [];
     const params = new URLSearchParams();
+    if (options.baseline === true) {
+        params.append('baseline', '1');
+    }
     if (!document.getElementById('user-greeting')) {
         const guestBrowserId = getFeedGuestBrowserId();
         if (guestBrowserId) params.append('guestBrowserId', guestBrowserId);
@@ -652,7 +655,7 @@ async function fetchFeedNotificationEvents() {
 }
 
 async function baselineFeedNotifications() {
-    const events = await fetchFeedNotificationEvents();
+    const events = await fetchFeedNotificationEvents({ baseline: true });
     const seen = readFeedNotificationSeenKeys();
     events.forEach(event => {
         if (event && event.key) seen.add(String(event.key));

@@ -62,7 +62,7 @@ notes:
 - text glow is stored in `glowIntensity`; the settings UI writes `none` for off and `medium` for on, while legacy `low`/`high` values are treated as enabled medium glow when saved again
 - title motion is stored in `titleAnimation` (`wobble`, `bounce`, `pinball`, `rubberhose`, `bubble`, `slot-machine`, `moonwalk`, or `heartbeat`), `titleAnimationAlways` (boolean), and `titleAnimationDesync` (boolean, default `true`); legacy `orbit`, `domino`, and `lava-lamp` values migrate to `bubble`; removed `tidal-wave`, `accordion`, and `typewriter` values migrate to `slot-machine`, while `helicopter`, `haunted`, and `juggle` migrate to `moonwalk`; guests keep the same values in local storage
 - accessibility toggles are stored as account booleans such as `reduceMotion`; logged-out browsers keep the same preferences in localStorage
-- `browserNotificationsEnabled` stores the account-backed preference for browser feed notifications; `journalBrowserNotificationsEnabled` stores the account-backed preference for new journal post browser notifications; logged-out browsers keep the same preferences and dedupe state in localStorage
+- `browserNotificationsEnabled` stores the account-backed preference for browser feed notifications; `journalBrowserNotificationsEnabled` stores the account-backed preference for new journal post browser notifications; logged-in notification dedupe state is stored in `data/etc/feed-browser-notify-state.json`, while logged-out browsers keep the same preferences and dedupe state in localStorage
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes
 - `discordUserId` links a site account to a Discord member for bot DMs and notifications
 - `emailAddress` marks accounts with a fridge.dev email mailbox; when present and valid, shared chrome swaps the footer Discord button to `/account/email`, and `/account/email` shows the assigned address
@@ -378,6 +378,12 @@ legacy Discord bot fallback. The bot now prefers `data/etc/toast-personality.jso
 - internal bot dedupe state for sent feed mention/reply notifications
 - stores which feed post mentions, feed reply mentions, and replies to a user's own posts have already triggered DMs
 
+### `feed-browser-notify-state.json`
+
+- internal browser-notification dedupe state for logged-in users
+- stores per-account `seenKeys` for feed mention/reply and journal notification events so a fresh browser login does not replay all historical matching events
+- sanitized developer data replaces it with an empty `users` object
+
 ### `toast-dm-history.json`
 
 - tracked inbound/outbound DM threads used by `/others/toast-discord-bot/messages`
@@ -394,8 +400,9 @@ legacy Discord bot fallback. The bot now prefers `data/etc/toast-personality.jso
 
 - the toast bot exposes localhost-only `POST /patch-notice` on `127.0.0.1:8765`
 - the deploy workflow calls it after a successful deploy to `main`
-- toast sends a Discord embed patch note to channel `1455194403642802309`
-- each patch notice pings role `1408064850688475197` so the update gets the right attention
+- toast sends the fully formatted patch notice preview to approval channel `1526075637096255548` and reacts to its own message with `✅`
+- when an admin approves with `✅`, toast posts the Discord embed patch note to channel `1455194403642802309`
+- approved patch notices ping role `1408064850688475197` in the update channel so the update gets the right attention
 - the payload includes the shipped commit range plus a PR link when the update came from a merged pull request
 
 ### `off-topic-archive.json`

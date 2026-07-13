@@ -109,7 +109,7 @@ Related:
 - successful saves briefly change the main button label to `saved!`; theme or mobile-view changes then reload automatically using the newly persisted preference
 - includes accessibility toggles for mobile view and reduced motion, notification toggles for feed events and new journal posts, plus theme selection, a text glow toggle, optional cursor cat, and an in-site title-animation picker with live previews, always-playing mode, and default-on character desync
 - title animation controls and previews are disabled with an explanatory message whenever reduced motion or mobile view is active; mobile view also disables the title gradient
-- browser notifications use the Notification API while the site is open; logged-in users can receive feed mention/reply events matching Toast Discord feed DMs, guests can receive replies to comments made from the same browser, and both can receive new journal post alerts
+- browser notifications use the Notification API while the site is open; logged-in users can receive feed mention/reply events matching Toast Discord feed DMs, guests can receive replies to comments made from the same browser, and both can receive new journal post alerts; logged-in notification events are deduped server-side so a fresh browser login does not replay old matching events
 - developer mode can bootstrap a blank-password `admin` / `Administrator` account when no admin accounts exist, and can download the latest sanitized developer data zip, delete local `data/`, and install the new copy
 - shows a Discord linking action for logged-in users and disables it once `discordUserId` is already linked
 - when logged in as hardcoded `toast`, shows a JSON editor for shared Toast personalities stored in `data/etc/toast-personality.json`
@@ -318,7 +318,7 @@ UI shell for toast bot status, controls, and stream playback.
 
 The bot also exposes localhost-only service endpoints on `127.0.0.1:8765`, including contact submission notifications to Discord channel `1503931489560301609`.
 It also scans `/feed` activity for linked Discord accounts and sends DMs for post mentions, reply mentions, and replies to a user's own feed posts.
-It also receives deploy-time patch notices and posts them as Discord embed patch notes to channel `1455194403642802309`, pinging role `1408064850688475197` on each update.
+It also receives deploy-time patch notices, posts the fully formatted patch notice preview to approval channel `1526075637096255548`, and posts to update channel `1455194403642802309` with role `1408064850688475197` only after an admin approves with `✅`.
 Admins can also use `/shareupdate latest` or `/shareupdate <commit ID>` in Discord to manually post a patch notice for the deployed `HEAD` commit or a specific commit SHA.
 
 ### `/others/toast-discord-bot/messages`

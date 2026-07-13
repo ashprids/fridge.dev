@@ -227,6 +227,9 @@ writeJson($root, 'etc/toast-feed-notify-state.json', [
     'replies' => new stdClass(),
     'reply_mentions_initialized' => false,
 ]);
+writeJson($root, 'etc/feed-browser-notify-state.json', [
+    'users' => new stdClass(),
+]);
 writeJson($root, 'etc/off-topic-archive.json', [
     'channels' => [],
     'exported_at' => null,

@@ -141,9 +141,84 @@ function feed_notifications_event(string $key, string $type, string $title, stri
     ];
 }
 
+function feed_notifications_seen_state_path(): string {
+    return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'feed-browser-notify-state.json';
+}
+
+function feed_notifications_normalize_seen_state($decoded): array {
+    if (!is_array($decoded)) {
+        return ['users' => []];
+    }
+    if (!isset($decoded['users']) || !is_array($decoded['users'])) {
+        $decoded['users'] = [];
+    }
+    return $decoded;
+}
+
+function feed_notifications_load_seen_state(string $path): array {
+    if (!is_file($path)) {
+        return ['users' => []];
+    }
+    $decoded = json_decode((string)@file_get_contents($path), true);
+    return feed_notifications_normalize_seen_state($decoded);
+}
+
+function feed_notifications_save_seen_state(string $path, array $state): bool {
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    return $encoded !== false && @file_put_contents($path, $encoded, LOCK_EX) !== false;
+}
+
+function feed_notifications_filter_seen_for_user(string $usernameKey, array $events, bool $baselineOnly = false): array {
+    if ($usernameKey === '') {
+        return $events;
+    }
+
+    $statePath = feed_notifications_seen_state_path();
+    $state = feed_notifications_load_seen_state($statePath);
+    $users = is_array($state['users'] ?? null) ? $state['users'] : [];
+    $userState = is_array($users[$usernameKey] ?? null) ? $users[$usernameKey] : [];
+    $seenKeys = is_array($userState['seenKeys'] ?? null)
+        ? array_values(array_filter(array_map('strval', $userState['seenKeys'])))
+        : [];
+    $seen = array_fill_keys($seenKeys, true);
+    $hadUserState = isset($users[$usernameKey]) && is_array($users[$usernameKey]);
+    $currentKeys = [];
+    $unseenEvents = [];
+
+    foreach ($events as $event) {
+        $key = isset($event['key']) ? (string)$event['key'] : '';
+        if ($key === '') {
+            continue;
+        }
+        $currentKeys[] = $key;
+        if (!$hadUserState || $baselineOnly || isset($seen[$key])) {
+            continue;
+        }
+        $unseenEvents[] = $event;
+    }
+
+    foreach ($currentKeys as $key) {
+        $seen[$key] = true;
+    }
+
+    $users[$usernameKey] = [
+        'seenKeys' => array_slice(array_keys($seen), -2000),
+        'updatedAt' => gmdate('c'),
+    ];
+    $state['users'] = $users;
+    feed_notifications_save_seen_state($statePath, $state);
+
+    return $baselineOnly || !$hadUserState ? [] : $unseenEvents;
+}
+
 $currentUsername = isset($_SESSION['user']['username']) ? ltrim((string)$_SESSION['user']['username'], '@') : '';
 $currentUsernameKey = strtolower($currentUsername);
 $guestBrowserId = fridg3_feed_normalize_guest_browser_id((string)($_GET['guestBrowserId'] ?? ''));
+$baselineOnly = isset($_GET['baseline']) && in_array(strtolower((string)$_GET['baseline']), ['1', 'true', 'yes'], true);
 
 $posts = feed_notifications_load_posts();
 $accountsIndex = feed_notifications_accounts_index();
@@ -249,6 +324,10 @@ foreach (feed_notifications_load_journal_posts() as $postId => $post) {
 usort($events, static function (array $a, array $b): int {
     return strcmp((string)($a['date'] ?? ''), (string)($b['date'] ?? ''));
 });
+
+if ($currentUsernameKey !== '') {
+    $events = feed_notifications_filter_seen_for_user($currentUsernameKey, $events, $baselineOnly);
+}
 
 echo json_encode(['ok' => true, 'events' => $events], JSON_UNESCAPED_SLASHES);
 exit;

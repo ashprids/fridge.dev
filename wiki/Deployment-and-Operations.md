@@ -11,7 +11,7 @@ current chain:
 3. if lint passes, `deploy to fridge.dev` runs from the successful workflow event
 4. repo is rsynced to `/var/www/fridge.dev`
 5. the Toast Discord bot is gracefully restarted from the deployed copy
-6. the deploy workflow sends a patch notice embed to Discord channel `1455194403642802309` with the shipped commit list and a PR link when applicable, and pings role `1408064850688475197`
+6. the deploy workflow asks Toast to post a patch notice approval preview in Discord channel `1526075637096255548`; an admin `✅` reaction posts it to update channel `1455194403642802309` and pings role `1408064850688475197`
 
 ## Deploy Workflow
 
@@ -31,7 +31,7 @@ main details:
 
 ## Toast Patch Notice Commit Format
 
-after a successful `main` deploy, the workflow sends Toast a list of non-merge commits using each commit's subject (`git log %s`) and full body (`git log %b`). Toast turns each commit into Discord patch-note bullets:
+after a successful `main` deploy, the workflow sends Toast a list of non-merge commits using each commit's subject (`git log %s`) and full body (`git log %b`). Toast turns each commit into Discord patch-note bullets and posts the fully formatted patch notice preview in approval channel `1526075637096255548`. Toast reacts to that preview with `✅`; when an admin approves with `✅`, Toast posts the update to channel `1455194403642802309` and pings role `1408064850688475197`.
 
 ```text
 • commit subject
@@ -80,12 +80,12 @@ Load shared runtime scripts through rendered pages so settings controls keep wor
 
 that appears in Toast's Discord embed as three patch-note bullets: one for the subject and one for each body note.
 
-admins can manually post the same style of update from Discord with Toast's `/shareupdate` command:
+admins can manually post the same style of update directly from Discord with Toast's `/shareupdate` command:
 
 - `/shareupdate latest` posts the currently deployed `HEAD` commit from the bot's local repo
 - `/shareupdate <commit ID>` posts a specific 7-40 character commit SHA
 
-the command uses the same embed formatter and update channel as deploy notices, so it also pings role `1408064850688475197`.
+the command uses the same embed formatter and update channel as approved deploy notices, so it also pings role `1408064850688475197`.
 
 ## What Does Not Deploy
 
@@ -200,7 +200,7 @@ on the same daily schedule as the private backup workflow, this workflow:
 5. keeps only the 10 newest zip files in that folder
 6. removes temporary server and runner files
 
-the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership, feed guest reply IPs/browser tokens, feed IP ban lists, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft.
+the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership, feed guest reply IPs/browser tokens, feed IP ban lists, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state and browser notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft.
 
 setup notes live in `/.github/workflows/publish-dev-data-setup.md`.
 

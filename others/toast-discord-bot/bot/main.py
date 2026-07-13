@@ -65,8 +65,10 @@ LINKED_FEED_CONTEXT_SNIPPET_CHARS = 420
 WIKI_CONTEXT_FILES = ('Home.md', 'Routes-and-Features.md')
 WIKI_CONTEXT_MAX_CHARS = 5200
 PATCH_NOTICE_CHANNEL_ID = '1455194403642802309'
+PATCH_NOTICE_APPROVAL_CHANNEL_ID = '1526075637096255548'
 PATCH_NOTICE_ROLE_ID = '1408064850688475197'
 PATCH_NOTICE_EMBED_COLOR = 0x3C7895
+PATCH_NOTICE_APPROVAL_EMOJI = '✅'
 DEFAULT_REPOSITORY_URL = 'https://github.com/ashprids/fridge.dev'
 WIKI_CONTEXT_TRIGGER_TERMS = {
     'fridg3', 'site', 'website', 'page', 'pages', 'feature', 'features', 'account', 'accounts',
@@ -525,6 +527,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 bot_online = False
 ai_dm_reply_tasks = {}
 ai_dm_pending_batches = {}
+pending_patch_notice_approvals = {}
 
 MENTION_PATTERN = re.compile(r'@([A-Za-z0-9_-]{1,50})')
 
@@ -1660,6 +1663,44 @@ async def send_patch_notice_payload(payload: dict, channel_id: str = PATCH_NOTIC
         allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=True, replied_user=False),
     )
 
+async def request_patch_notice_approval(payload: dict, target_channel_id: str = PATCH_NOTICE_CHANNEL_ID):
+    channel = await resolve_sendable_channel(PATCH_NOTICE_APPROVAL_CHANNEL_ID)
+    if channel is None:
+        raise RuntimeError('could not resolve the patch notice approval channel.')
+
+    embed = build_patch_notice_embed(payload)
+    sent_message = await channel.send(
+        content=f'<@&{PATCH_NOTICE_ROLE_ID}>',
+        embed=embed,
+        allowed_mentions=discord.AllowedMentions.none(),
+    )
+    pending_patch_notice_approvals[str(sent_message.id)] = {
+        'payload': payload,
+        'target_channel_id': target_channel_id,
+    }
+
+    try:
+        await sent_message.add_reaction(PATCH_NOTICE_APPROVAL_EMOJI)
+    except Exception as e:
+        logger.warning(f"Failed to add patch notice approval reaction to {sent_message.id}: {e}")
+
+    return sent_message
+
+def member_can_approve_patch_notice(member) -> bool:
+    if member is None or getattr(member, 'bot', False):
+        return False
+
+    guild_permissions = getattr(member, 'guild_permissions', None)
+    if guild_permissions and getattr(guild_permissions, 'administrator', False):
+        return True
+
+    for role in getattr(member, 'roles', []) or []:
+        role_name = str(getattr(role, 'name', '')).strip().lower()
+        if role_name in ('admin', 'administrator'):
+            return True
+
+    return False
+
 def save_notify_state(state: dict):
     try:
         with open(feed_notify_state_path, 'w', encoding='utf-8') as f:
@@ -1875,6 +1916,50 @@ async def on_message(message: discord.Message):
         await respond_to_dm_with_groq(message)
 
     await bot.process_commands(message)
+
+@bot.event
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    if str(payload.emoji) != PATCH_NOTICE_APPROVAL_EMOJI:
+        return
+    if payload.user_id == getattr(bot.user, 'id', None):
+        return
+    if str(payload.channel_id) != PATCH_NOTICE_APPROVAL_CHANNEL_ID:
+        return
+
+    pending = pending_patch_notice_approvals.get(str(payload.message_id))
+    if not pending:
+        return
+
+    guild = bot.get_guild(payload.guild_id) if payload.guild_id else None
+    member = getattr(payload, 'member', None)
+    if member is None and guild is not None:
+        member = guild.get_member(payload.user_id)
+        if member is None:
+            try:
+                member = await guild.fetch_member(payload.user_id)
+            except Exception as e:
+                logger.warning(f"Failed to fetch patch notice approver {payload.user_id}: {e}")
+                return
+
+    if not member_can_approve_patch_notice(member):
+        logger.info(f"Ignoring patch notice approval reaction from non-admin user {payload.user_id}")
+        return
+
+    pending = pending_patch_notice_approvals.pop(str(payload.message_id), None)
+    if not pending:
+        return
+
+    try:
+        sent_message = await send_patch_notice_payload(
+            pending['payload'],
+            channel_id=str(pending.get('target_channel_id') or PATCH_NOTICE_CHANNEL_ID),
+        )
+        logger.info(
+            f"Approved patch notice {payload.message_id}; posted update message {sent_message.id}"
+        )
+    except Exception as e:
+        pending_patch_notice_approvals[str(payload.message_id)] = pending
+        logger.warning(f"Failed to post approved patch notice {payload.message_id}: {e}")
 
 @tasks.loop(seconds=1)  # Check every second for immediate stream restart signal
 async def config_monitor():
@@ -2357,20 +2442,21 @@ async def patch_notice_handler(request):
     }
 
     try:
-        sent_message = await send_patch_notice_payload(notice_payload, channel_id=channel_id)
+        sent_message = await request_patch_notice_approval(notice_payload, target_channel_id=channel_id)
     except RuntimeError as e:
         return web.json_response({'ok': False, 'error': str(e)}, status=404)
     except Exception as e:
-        logger.warning(f"Failed to send patch notice to {channel_id}: {e}")
-        return web.json_response({'ok': False, 'error': 'failed to send channel message'}, status=500)
+        logger.warning(f"Failed to request patch notice approval for {channel_id}: {e}")
+        return web.json_response({'ok': False, 'error': 'failed to send approval message'}, status=500)
 
     logger.info(
-        f"Sent patch notice to {channel_id} for {commit_sha or 'unknown commit'}"
+        f"Requested patch notice approval in {PATCH_NOTICE_APPROVAL_CHANNEL_ID} for {commit_sha or 'unknown commit'}"
         + (f" with PR {notice_payload.get('pr_number')}" if notice_payload.get('pr_url') else "")
     )
     return web.json_response({
         'ok': True,
-        'channel_id': str(channel_id),
+        'approval_channel_id': str(PATCH_NOTICE_APPROVAL_CHANNEL_ID),
+        'target_channel_id': str(channel_id),
         'message_id': str(sent_message.id),
     })
 
