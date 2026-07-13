@@ -107,8 +107,15 @@ if (!function_exists('fridg3_hard_ban_source_paths')) {
 
         try {
             $directoryIterator = new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS);
-            $iterator = new RecursiveIteratorIterator(
+            $indexDirectory = rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'index';
+            $filteredIterator = new RecursiveCallbackFilterIterator(
                 $directoryIterator,
+                static function (SplFileInfo $item) use ($indexDirectory): bool {
+                    return !($item->isDir() && $item->getPathname() === $indexDirectory);
+                }
+            );
+            $iterator = new RecursiveIteratorIterator(
+                $filteredIterator,
                 RecursiveIteratorIterator::LEAVES_ONLY,
                 RecursiveIteratorIterator::CATCH_GET_CHILD
             );
@@ -253,7 +260,7 @@ if (!function_exists('fridg3_hard_ban_source_signature')) {
         }
 
         return hash('sha256', (string)json_encode([
-            'format' => 1,
+            'format' => 2,
             'sources' => $sources,
         ], JSON_UNESCAPED_SLASHES));
     }
@@ -361,6 +368,202 @@ if (!function_exists('fridg3_hard_ban_entry_range')) {
     }
 }
 
+if (!function_exists('fridg3_hard_ban_write_merged_records')) {
+    function fridg3_hard_ban_write_merged_records(array $records, int $recordLength, $handle): bool
+    {
+        if ($records === []) {
+            return true;
+        }
+
+        $remainderLength = intdiv($recordLength, 2);
+        usort($records, static function (string $left, string $right) use ($remainderLength): int {
+            $startComparison = strcmp(substr($left, 0, $remainderLength), substr($right, 0, $remainderLength));
+            return $startComparison !== 0
+                ? $startComparison
+                : strcmp(substr($left, $remainderLength), substr($right, $remainderLength));
+        });
+
+        $currentStart = substr($records[0], 0, $remainderLength);
+        $currentEnd = substr($records[0], $remainderLength);
+        $count = count($records);
+        for ($index = 1; $index < $count; $index++) {
+            $nextStart = substr($records[$index], 0, $remainderLength);
+            $nextEnd = substr($records[$index], $remainderLength);
+            if (strcmp($nextStart, $currentEnd) <= 0) {
+                if (strcmp($nextEnd, $currentEnd) > 0) {
+                    $currentEnd = $nextEnd;
+                }
+                continue;
+            }
+
+            if (fwrite($handle, $currentStart . $currentEnd) !== $recordLength) {
+                return false;
+            }
+            $currentStart = $nextStart;
+            $currentEnd = $nextEnd;
+        }
+
+        return fwrite($handle, $currentStart . $currentEnd) === $recordLength;
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_sort_and_merge_bucket')) {
+    function fridg3_hard_ban_sort_and_merge_bucket(string $path, int $recordLength): bool
+    {
+        $sourceHandle = @fopen($path, 'rb');
+        if ($sourceHandle === false) {
+            return false;
+        }
+
+        $runPaths = [];
+        $runNumber = 0;
+        $succeeded = true;
+        try {
+            while (!feof($sourceHandle)) {
+                $records = [];
+                while (count($records) < 50000 && !feof($sourceHandle)) {
+                    $record = fread($sourceHandle, $recordLength);
+                    if ($record === false || $record === '') {
+                        break;
+                    }
+                    if (strlen($record) !== $recordLength) {
+                        $succeeded = false;
+                        break 2;
+                    }
+                    $records[] = $record;
+                }
+
+                if ($records === []) {
+                    break;
+                }
+
+                $runPath = $path . '.run-' . $runNumber++;
+                $runHandle = @fopen($runPath, 'wb');
+                if ($runHandle === false) {
+                    $succeeded = false;
+                    break;
+                }
+                $runSucceeded = fridg3_hard_ban_write_merged_records($records, $recordLength, $runHandle);
+                fclose($runHandle);
+                if (!$runSucceeded) {
+                    @unlink($runPath);
+                    $succeeded = false;
+                    break;
+                }
+                $runPaths[] = $runPath;
+            }
+        } finally {
+            fclose($sourceHandle);
+        }
+
+        if (!$succeeded || $runPaths === []) {
+            foreach ($runPaths as $runPath) {
+                @unlink($runPath);
+            }
+            return false;
+        }
+
+        $outputPath = $path . '.sorted';
+        $outputHandle = @fopen($outputPath, 'wb');
+        if ($outputHandle === false) {
+            foreach ($runPaths as $runPath) {
+                @unlink($runPath);
+            }
+            return false;
+        }
+
+        $runHandles = [];
+        $currentRecords = [];
+        $remainderLength = intdiv($recordLength, 2);
+        $currentStart = null;
+        $currentEnd = null;
+        try {
+            foreach ($runPaths as $runIndex => $runPath) {
+                $runHandles[$runIndex] = @fopen($runPath, 'rb');
+                if ($runHandles[$runIndex] === false) {
+                    $succeeded = false;
+                    break;
+                }
+                $record = fread($runHandles[$runIndex], $recordLength);
+                if ($record !== false && strlen($record) === $recordLength) {
+                    $currentRecords[$runIndex] = $record;
+                }
+            }
+
+            while ($succeeded && $currentRecords !== []) {
+                $selectedRun = null;
+                $selectedRecord = null;
+                foreach ($currentRecords as $runIndex => $record) {
+                    if ($selectedRecord === null) {
+                        $selectedRun = $runIndex;
+                        $selectedRecord = $record;
+                        continue;
+                    }
+                    $startComparison = strcmp(
+                        substr($record, 0, $remainderLength),
+                        substr($selectedRecord, 0, $remainderLength)
+                    );
+                    if (
+                        $startComparison < 0
+                        || ($startComparison === 0 && strcmp(substr($record, $remainderLength), substr($selectedRecord, $remainderLength)) < 0)
+                    ) {
+                        $selectedRun = $runIndex;
+                        $selectedRecord = $record;
+                    }
+                }
+
+                $nextStart = substr((string)$selectedRecord, 0, $remainderLength);
+                $nextEnd = substr((string)$selectedRecord, $remainderLength);
+                if ($currentStart === null) {
+                    $currentStart = $nextStart;
+                    $currentEnd = $nextEnd;
+                } elseif (strcmp($nextStart, (string)$currentEnd) <= 0) {
+                    if (strcmp($nextEnd, (string)$currentEnd) > 0) {
+                        $currentEnd = $nextEnd;
+                    }
+                } else {
+                    if (fwrite($outputHandle, $currentStart . $currentEnd) !== $recordLength) {
+                        $succeeded = false;
+                        break;
+                    }
+                    $currentStart = $nextStart;
+                    $currentEnd = $nextEnd;
+                }
+
+                $nextRecord = fread($runHandles[$selectedRun], $recordLength);
+                if ($nextRecord === false || $nextRecord === '') {
+                    unset($currentRecords[$selectedRun]);
+                } elseif (strlen($nextRecord) !== $recordLength) {
+                    $succeeded = false;
+                } else {
+                    $currentRecords[$selectedRun] = $nextRecord;
+                }
+            }
+
+            if ($succeeded && $currentStart !== null && fwrite($outputHandle, $currentStart . $currentEnd) !== $recordLength) {
+                $succeeded = false;
+            }
+        } finally {
+            fclose($outputHandle);
+            foreach ($runHandles as $runHandle) {
+                if (is_resource($runHandle)) {
+                    fclose($runHandle);
+                }
+            }
+            foreach ($runPaths as $runPath) {
+                @unlink($runPath);
+            }
+        }
+
+        if (!$succeeded || !@rename($outputPath, $path)) {
+            @unlink($outputPath);
+            return false;
+        }
+
+        return true;
+    }
+}
+
 if (!function_exists('fridg3_hard_ban_build_source_index')) {
     function fridg3_hard_ban_build_source_index(array $paths, string $buildDirectory): bool
     {
@@ -369,6 +572,7 @@ if (!function_exists('fridg3_hard_ban_build_source_index')) {
         }
 
         $handles = [];
+        $bucketPaths = [];
         $succeeded = true;
         try {
             foreach ($paths as $path) {
@@ -395,6 +599,7 @@ if (!function_exists('fridg3_hard_ban_build_source_index')) {
                                 $succeeded = false;
                                 break 3;
                             }
+                            $bucketPaths[$bucketKey] = $bucketPath;
                         }
 
                         $rangeStart = $bucket === $startBucket ? substr($start, 1) : $minimumRemainder;
@@ -415,6 +620,16 @@ if (!function_exists('fridg3_hard_ban_build_source_index')) {
             }
         }
 
+        if ($succeeded) {
+            foreach ($bucketPaths as $bucketKey => $bucketPath) {
+                $recordLength = str_starts_with($bucketKey, '4-') ? 6 : 30;
+                if (!fridg3_hard_ban_sort_and_merge_bucket($bucketPath, $recordLength)) {
+                    $succeeded = false;
+                    break;
+                }
+            }
+        }
+
         if (!$succeeded || @file_put_contents($buildDirectory . DIRECTORY_SEPARATOR . '.ready', "1\n", LOCK_EX) === false) {
             fridg3_hard_ban_remove_directory($buildDirectory);
             return false;
@@ -430,6 +645,13 @@ if (!function_exists('fridg3_hard_ban_source_index')) {
         $cacheDirectory = fridg3_hard_ban_index_cache_directory();
         if (!is_dir($cacheDirectory) && !@mkdir($cacheDirectory, 0700, true)) {
             return null;
+        }
+
+        $paths = fridg3_hard_ban_source_paths();
+        $signature = fridg3_hard_ban_source_signature($paths);
+        $indexDirectory = $cacheDirectory . DIRECTORY_SEPARATOR . $signature;
+        if (is_file($indexDirectory . DIRECTORY_SEPARATOR . '.ready')) {
+            return $indexDirectory;
         }
 
         $lockHandle = @fopen($cacheDirectory . DIRECTORY_SEPARATOR . '.lock', 'c');
@@ -494,18 +716,30 @@ if (!function_exists('fridg3_hard_ban_source_index_contains')) {
         $remainderLength = strlen($candidateRemainder);
         $recordLength = $remainderLength * 2;
         try {
-            while (!feof($handle)) {
-                $record = fread($handle, $recordLength);
-                if ($record === false || $record === '') {
-                    break;
+            $size = @filesize($path);
+            if ($size === false || $size % $recordLength !== 0) {
+                return false;
+            }
+
+            $low = 0;
+            $high = intdiv($size, $recordLength) - 1;
+            while ($low <= $high) {
+                $middle = intdiv($low + $high, 2);
+                if (fseek($handle, $middle * $recordLength) !== 0) {
+                    return false;
                 }
-                if (strlen($record) !== $recordLength) {
-                    break;
+                $record = fread($handle, $recordLength);
+                if ($record === false || strlen($record) !== $recordLength) {
+                    return false;
                 }
 
                 $start = substr($record, 0, $remainderLength);
                 $end = substr($record, $remainderLength);
-                if (strcmp($candidateRemainder, $start) >= 0 && strcmp($candidateRemainder, $end) <= 0) {
+                if (strcmp($candidateRemainder, $start) < 0) {
+                    $high = $middle - 1;
+                } elseif (strcmp($candidateRemainder, $end) > 0) {
+                    $low = $middle + 1;
+                } else {
                     return true;
                 }
             }

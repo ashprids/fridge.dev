@@ -221,6 +221,7 @@ Read-only hard-ban source lists. Every valid whitespace-separated IPv4 or IPv6 a
 - unreadable files and subdirectories, non-text files, and invalid tokens are ignored without disabling the other source lists
 - PHP-FPM builds a stat-signature-keyed binary range index beneath `data/etc/banlists/index/` and reuses it until a source path, inode, size, modification time, or change time differs
 - `data/etc/banlists/index/` must be writable by the PHP-FPM user; its binary files are not treated as source lists because discovery accepts only `.txt` files
+- fixed-width bucket records are externally sorted in bounded-memory runs, merged into non-overlapping ranges, and queried with binary search; ready-index lookups do not acquire the build lock
 - the next locked index access removes interrupted `.build-*` directories, while completed superseded signature versions are retained for one hour before pruning so in-flight requests can finish safely
 - index construction is streaming and bounded-memory; if index creation fails, checks fall back to scanning the source files in fixed-size chunks
 - nginx blocks the entire directory from client access
