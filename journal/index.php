@@ -20,6 +20,7 @@ if (isset($_SESSION['user']) && isset($_SESSION['user']['username'])) {
             foreach ($accountsData['accounts'] as $account) {
                 if (isset($account['username']) && $account['username'] === $_SESSION['user']['username']) {
                     $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+                    $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
                     $_SESSION['user']['allowedPages'] = (array)($account['allowedPages'] ?? []);
                     break;
                 }

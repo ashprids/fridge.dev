@@ -7,6 +7,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+fridg3_feed_refresh_session_user();
 
 // Require logged-in user
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -51,6 +52,7 @@ if (count($lines) > 2) {
 $currentUser = $_SESSION['user']['username'] ?? '';
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 $canEdit = ($currentUser === $postUsername) || $isAdmin;
+$postingRestricted = fridg3_current_user_posting_restricted();
 
 if (!$canEdit) {
     header('Location: /feed');
@@ -58,6 +60,11 @@ if (!$canEdit) {
 }
 
 // Handle POST submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted && !isset($_POST['delete'])) {
+    header('Location: /feed/edit?post=' . rawurlencode((string)$postId) . '&posting_restricted=1');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Check if delete action
     if (isset($_POST['delete'])) {
@@ -183,6 +190,16 @@ $escapedBody = htmlspecialchars($postBody, ENT_QUOTES, 'UTF-8');
 $content = str_replace('<textarea id="bbcode-textbox" name="content"></textarea>', 
                        '<textarea id="bbcode-textbox" name="content">' . $escapedBody . '</textarea>', 
                        $content);
+if ($postingRestricted) {
+    $deleteButton = '<button id="two-buttons" type="submit" form="delete-feed-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>';
+    $content = fridg3_disable_composer_controls($content);
+    $content = str_replace(
+        '<button disabled id="two-buttons" type="submit" form="delete-feed-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>',
+        $deleteButton,
+        $content
+    );
+    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
+}
 
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

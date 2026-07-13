@@ -34,7 +34,8 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <h4>account management</h4>
 <button id="form-button" type="button" data-tooltip="(admin-only) generate a new account with a random password" onclick="window.location='/account/create'">create new account</button>
 <button id="form-button" type="button" data-tooltip="(admin-only) configure all made accounts" onclick="window.location='/account/admin'">manage accounts</button>
-<button id="form-button" type="button" data-tooltip="review guest replies and manage guest IP moderation" onclick="window.location='/settings/guests'">manage guests</button>
+<button id="form-button" type="button" data-tooltip="review feed and guestbook posts and manage guest IP moderation" onclick="window.location='/settings/guests'">manage guests</button>
+<button id="form-button" type="button" data-tooltip="manage IPs blocked from the entire website" onclick="window.location='/settings/banned-ips'">manage hard-banned IPs</button>
 <br><br><hr><br>
 </span>
 <span id="toast-settings">
@@ -102,7 +103,6 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
     <select class="dropdown" id="title-animation-select">
         <option value="wobble">wobble</option>
         <option value="bounce">bounce</option>
-        <option value="pinball">pinball</option>
         <option value="rubberhose">rubberhose</option>
         <option value="bubble">bubble</option>
         <option value="slot-machine">slot machine</option>

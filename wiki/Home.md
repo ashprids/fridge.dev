@@ -41,3 +41,5 @@ If you need to change:
 - one page’s server behavior: edit that route’s `index.php`
 - shared UI: edit `template.html`, `template_mobile.html`, `style.css`, or `main.js`
 - persistence or auth: edit the relevant PHP writer/reader and update the data contract
+
+For moderation terminology and enforcement boundaries, see [Account Restrictions and IP Bans](Account-Restrictions-and-IP-Bans).

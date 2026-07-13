@@ -586,15 +586,40 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
 if (!function_exists('fridg3_inject_dev_mode_banner')) {
     function fridg3_inject_dev_mode_banner($template) {
-        if (!fridg3_is_local_dev_server() || strpos($template, 'id="dev-mode-banner"') !== false) {
+        if (!fridg3_is_local_dev_server()) {
             return $template;
         }
 
-        $banner = '<span id="dev-mode-banner" style="color: #9fd6a3; display: block; line-height: 1.15;"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
-        if (strpos($template, 'id="maintenance-banner"') !== false) {
-            return preg_replace('/(<br><span id="maintenance-banner"[^>]*>.*?<\/span>)/is', '$1' . $banner, $template, 1);
+        if (strpos($template, 'id="dev-mode-banner"') === false) {
+            $banner = '<span id="dev-mode-banner" style="color: #9fd6a3; display: block; line-height: 1.15;"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
+            if (strpos($template, 'id="maintenance-banner"') !== false) {
+                $template = preg_replace('/(<br><span id="maintenance-banner"[^>]*>.*?<\/span>)/is', '$1' . $banner, $template, 1) ?: $template;
+            } else {
+                $template = preg_replace('/(<span id="title">.*?<\/span>)/is', '$1<br>' . $banner, $template, 1) ?: $template;
+            }
         }
 
-        return preg_replace('/(<span id="title">.*?<\/span>)/is', '$1<br>' . $banner, $template, 1);
+        if (strpos($template, 'id="hard-ban-dev-banner"') !== false) {
+            return $template;
+        }
+
+        $hardBanHelper = __DIR__ . DIRECTORY_SEPARATOR . 'hard-ban.php';
+        if (!is_file($hardBanHelper)) {
+            return $template;
+        }
+        require_once $hardBanHelper;
+
+        $clientIp = fridg3_hard_ban_client_ip();
+        $identifier = (string)($_COOKIE[FRIDG3_HARD_BAN_COOKIE] ?? '');
+        if (!fridg3_hard_ban_check_client($clientIp, $identifier)) {
+            return $template;
+        }
+
+        $hardBanBanner = '<span id="hard-ban-dev-banner"><i class="fa-solid fa-skull-crossbones"></i> <b>hard-banned client</b><small>access termination active</small></span>';
+        if (strpos($template, 'id="dev-mode-banner"') !== false) {
+            return preg_replace('/(<span id="dev-mode-banner"[^>]*>.*?<\/span>)/is', '$1' . $hardBanBanner, $template, 1) ?: $template;
+        }
+
+        return $template;
     }
 }

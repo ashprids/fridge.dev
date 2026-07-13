@@ -103,6 +103,70 @@ if (!function_exists('fridg3_session_truthy_value')) {
     }
 }
 
+if (!function_exists('fridg3_current_user_posting_restricted')) {
+    function fridg3_current_user_posting_restricted(): bool
+    {
+        return isset($_SESSION['user']) && !empty($_SESSION['user']['postingRestricted']);
+    }
+}
+
+if (!function_exists('fridg3_refresh_current_user_posting_restriction')) {
+    function fridg3_refresh_current_user_posting_restriction(): void
+    {
+        if (!isset($_SESSION['user']['username'])) {
+            return;
+        }
+
+        $startDir = $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__);
+        $accountsPath = fridg3_session_find_relative_upward((string)$startDir, 'data/accounts/accounts.json');
+        if ($accountsPath === null || !is_file($accountsPath)) {
+            return;
+        }
+
+        $data = json_decode((string)@file_get_contents($accountsPath), true);
+        if (!is_array($data) || !isset($data['accounts']) || !is_array($data['accounts'])) {
+            return;
+        }
+
+        $username = (string)$_SESSION['user']['username'];
+        foreach ($data['accounts'] as $account) {
+            if ((string)($account['username'] ?? '') !== $username) {
+                continue;
+            }
+
+            $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
+            return;
+        }
+    }
+}
+
+if (!function_exists('fridg3_posting_restriction_notice')) {
+    function fridg3_posting_restriction_notice(): string
+    {
+        return '<p class="posting-restriction-message">your account has been restricted.</p>';
+    }
+}
+
+if (!function_exists('fridg3_disable_composer_controls')) {
+    function fridg3_disable_composer_controls(string $html): string
+    {
+        return (string)preg_replace_callback(
+            '/<(button|input|select|textarea)\b([^>]*)>/i',
+            static function (array $matches): string {
+                if (
+                    preg_match('/\bdisabled\b/i', $matches[2])
+                    || (strcasecmp($matches[1], 'input') === 0 && preg_match('/\btype\s*=\s*(["\'])hidden\1/i', $matches[2]))
+                ) {
+                    return $matches[0];
+                }
+
+                return '<' . $matches[1] . ' disabled' . $matches[2] . '>';
+            },
+            $html
+        );
+    }
+}
+
 if (!function_exists('fridg3_session_extract_save_path_dir')) {
     function fridg3_session_extract_save_path_dir(string $savePath): ?string
     {

@@ -21,6 +21,7 @@ if ($currentUsername !== null) {
             foreach ($accountsData['accounts'] as $account) {
                 if (isset($account['username']) && $account['username'] === $currentUsername) {
                     $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+                    $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
                     $_SESSION['user']['allowedPages'] = (array)($account['allowedPages'] ?? []);
                     break;
                 }
@@ -61,6 +62,12 @@ $postDate = (string)($lines[0] ?? date('Y-m-d'));
 $postTitle = (string)($lines[1] ?? '');
 $postSubtitle = (string)($lines[2] ?? '');
 $postHtml = implode("\n", array_slice($lines, 3));
+$postingRestricted = fridg3_current_user_posting_restricted();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted && !isset($_POST['delete'])) {
+    header('Location: /journal/edit?post=' . rawurlencode($postId) . '&posting_restricted=1');
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete'])) {
@@ -159,6 +166,16 @@ $content = str_replace('{post_id}', htmlspecialchars($postId, ENT_QUOTES, 'UTF-8
 $content = str_replace('{title_value}', htmlspecialchars($postTitle, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{description_value}', htmlspecialchars($postSubtitle, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{content_value}', htmlspecialchars($postHtml, ENT_QUOTES, 'UTF-8'), $content);
+if ($postingRestricted) {
+    $deleteButton = '<button id="two-buttons" type="submit" form="delete-journal-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>';
+    $content = fridg3_disable_composer_controls($content);
+    $content = str_replace(
+        '<button disabled id="two-buttons" type="submit" form="delete-journal-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>',
+        $deleteButton,
+        $content
+    );
+    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
+}
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

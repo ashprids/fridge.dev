@@ -8,6 +8,7 @@ require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
+fridg3_feed_refresh_session_user();
 
 // Require logged-in user with permission to create posts
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -20,6 +21,7 @@ $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 $allowedPages = $_SESSION['user']['allowedPages'] ?? [];
 $canCreatePost = $isAdmin || in_array('feed', $allowedPages);
 $isToast = fridg3_toast_is_current_user();
+$postingRestricted = fridg3_current_user_posting_restricted();
 
 if (!$canCreatePost) {
     header('Location: /feed');
@@ -91,6 +93,11 @@ function save_jpeg_under_limit(string $srcPath, string $mime, string $destPath, 
 }
 
 // Handle create-post submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted) {
+    header('Location: /feed/create?posting_restricted=1');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Require logged-in user
     if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -275,6 +282,10 @@ if ($isToast) {
         $content
     );
     $content = str_replace('<div class="bbcode-editor">', $toastGeneratorControls . '<div class="bbcode-editor">', $content);
+}
+if ($postingRestricted) {
+    $content = fridg3_disable_composer_controls($content);
+    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
 }
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

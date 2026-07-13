@@ -2,6 +2,26 @@
    Shared dialogs and notices
    ========================================================================== */
 
+(() => {
+    try {
+        const identifier = localStorage.getItem('fridg3_hard_ban_id') || '';
+        if (!/^[a-f0-9]{64}$/.test(identifier)) return;
+        const cookieMatch = document.cookie.match(/(?:^|;\s*)fridg3_hard_ban_id=([a-f0-9]{64})(?:;|$)/);
+        if (cookieMatch && cookieMatch[1] === identifier) return;
+
+        const domain = location.hostname === 'fridge.dev' || location.hostname.endsWith('.fridge.dev')
+            ? '; Domain=.fridge.dev'
+            : '';
+        document.cookie = `fridg3_hard_ban_id=${identifier}; Path=/; Max-Age=157680000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}${domain}`;
+        if (sessionStorage.getItem('fridg3_hard_ban_cookie_synced') !== identifier) {
+            sessionStorage.setItem('fridg3_hard_ban_cookie_synced', identifier);
+            location.reload();
+        }
+    } catch (_error) {
+        // Storage may be unavailable in privacy-restricted browser contexts.
+    }
+})();
+
 let hostRedirectInProgress = false;
 
 function siteEscapeHtml(value) {

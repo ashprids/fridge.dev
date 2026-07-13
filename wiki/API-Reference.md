@@ -66,7 +66,7 @@ all API routes live under `/api/*` and are handled by PHP.
 
 ### `/tools/upload/?api=*`
 
-route-local JSON endpoints for the `/tools/upload` peer-to-peer transfer page.
+route-local JSON endpoints for the `/tools/upload` peer-to-peer transfer page, displayed as `serverless upload`.
 
 - `POST ?api=create` with `role=sender|receiver` creates a short-lived room and returns `/tools/upload/?r={token}`
 - `GET ?api=room&r={token}` claims/loads a room for the creator browser or first guest browser

@@ -756,7 +756,7 @@ function initBBCodeEditor() {
         });
     }
 
-    if (bbcodeVoiceBtn && bbcodeVoiceInput && bbcodeVoiceRecorder) {
+    if (bbcodeVoiceBtn && bbcodeVoiceInput && bbcodeVoiceRecorder && !bbcodeTextbox.disabled) {
         fridg3CreateVoiceRecorder(bbcodeVoiceRecorder, function(file) {
             const fileIndex = voiceFileStore.files.length;
             voiceFileStore.items.add(file);

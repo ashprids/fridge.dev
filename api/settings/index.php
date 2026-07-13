@@ -110,6 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     $animation = 'bubble';
                 }
                 $animationMigrations = [
+                    'pinball' => 'wobble',
                     'tidal-wave' => 'slot-machine',
                     'accordion' => 'slot-machine',
                     'typewriter' => 'slot-machine',
@@ -118,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'juggle' => 'moonwalk',
                 ];
                 $animation = $animationMigrations[$animation] ?? $animation;
-                if (in_array($animation, ['wobble', 'bounce', 'pinball', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'], true)) {
+                if (in_array($animation, ['wobble', 'bounce', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'], true)) {
                     $result['settings']['titleAnimation'] = $animation;
                 }
             }
@@ -394,7 +395,7 @@ if ($reduceMotionProvided) {
 }
 
 if ($titleAnimationProvided || $titleAnimationAlwaysProvided || $titleAnimationDesyncProvided) {
-    $allowedTitleAnimations = ['wobble', 'bounce', 'pinball', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'];
+    $allowedTitleAnimations = ['wobble', 'bounce', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'];
     if ($titleAnimationProvided && !in_array($titleAnimationRaw, $allowedTitleAnimations, true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'invalid_title_animation']);

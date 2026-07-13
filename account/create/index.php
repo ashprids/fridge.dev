@@ -47,6 +47,7 @@ $formName = '';
 $formDiscordUserId = '';
 $formEmailAddress = '';
 $formIsAdmin = false;
+$formPostingRestricted = false;
 $formAllowFeed = false;
 $formAllowJournal = false;
 $formAllowComments = false;
@@ -89,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formDiscordUserId = trim($_POST['discordUserId'] ?? '');
     $formEmailAddress = strtolower(trim((string)($_POST['emailAddress'] ?? '')));
     $formIsAdmin = isset($_POST['isAdmin']);
+    $formPostingRestricted = isset($_POST['postingRestricted']);
     $formAllowFeed = isset($_POST['allowFeed']);
     $formAllowJournal = isset($_POST['allowJournal']);
     $formAllowComments = isset($_POST['allowComments']);
@@ -110,6 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $formDiscordUserId = '';
         $formEmailAddress = '';
         $formIsAdmin = false;
+        $formPostingRestricted = false;
         $formAllowFeed = true;
         $formAllowJournal = false;
         $formAllowComments = true;
@@ -171,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'name' => $formName,
                 'password' => $passwordHash,
                 'isAdmin' => $formIsAdmin,
+                'postingRestricted' => $formPostingRestricted,
                 'mustResetPassword' => $createdAccountMustResetPassword,
                 'allowedPages' => $allowedPages,
             ];
@@ -260,6 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $formDiscordUserId = '';
                 $formEmailAddress = '';
                 $formIsAdmin = false;
+                $formPostingRestricted = false;
                 $formAllowFeed = false;
                 $formAllowJournal = false;
                 $formAllowComments = false;
@@ -322,6 +327,7 @@ $content = str_replace([
     '{form_discord_user_id}',
     '{form_email_address}',
     '{is_admin_checked}',
+    '{posting_restricted_checked}',
     '{allow_feed_checked}',
     '{allow_journal_checked}',
     '{allow_comments_checked}',
@@ -338,6 +344,7 @@ $content = str_replace([
     htmlspecialchars($formDiscordUserId, ENT_QUOTES, 'UTF-8'),
     htmlspecialchars($formEmailAddress, ENT_QUOTES, 'UTF-8'),
     $formIsAdmin ? 'checked' : '',
+    $formPostingRestricted ? 'checked' : '',
     $formAllowFeed ? 'checked' : '',
     $formAllowJournal ? 'checked' : '',
     $formAllowComments ? 'checked' : '',

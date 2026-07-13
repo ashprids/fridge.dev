@@ -6,6 +6,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 fridg3_feed_refresh_session_user();
 
@@ -96,6 +97,7 @@ if (!isset($_SESSION['csrf_token'])) {
 
 $clientIp = fridg3_feed_client_ip();
 $isLoggedIn = isset($_SESSION['user']) && isset($_SESSION['user']['username']);
+$postingRestricted = $isLoggedIn && fridg3_current_user_posting_restricted();
 $isClientIpBanned = fridg3_feed_is_ip_banned($clientIp);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -110,11 +112,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $replyBodyForSave = $replyBody;
     $imageMap = [];
     $voiceMap = [];
-    if ($isLoggedIn && isset($_FILES['images']) && is_array($_FILES['images'])) {
+    if ($isLoggedIn && !$postingRestricted && isset($_FILES['images']) && is_array($_FILES['images'])) {
         $imageMap = fridg3_feed_process_uploaded_images($_FILES['images']);
         $replyBody = fridg3_feed_replace_image_placeholders($replyBody, $imageMap);
     }
-    if ($isLoggedIn && $replyAction === 'create' && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])) {
+    if ($isLoggedIn && !$postingRestricted && $replyAction === 'create' && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])) {
         $voiceMap = fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes']);
         $replyBody = fridg3_feed_replace_voice_placeholders($replyBody, $voiceMap);
         if (preg_match('/\[voice:\d+\]/i', $replyBody) === 1) {
@@ -151,8 +153,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $replyError = 'invalid request. try again.';
     } elseif (!$isLoggedIn && $replyAction !== 'create' && !$canManageTargetReply) {
         $replyEditError = 'You do not have permission to manage replies.';
+    } elseif ($postingRestricted && in_array($replyAction, ['create', 'update'], true)) {
+        if ($replyAction === 'update') {
+            $replyEditError = 'your account has been restricted.';
+        } else {
+            $replyError = 'your account has been restricted.';
+        }
     } elseif (!$isLoggedIn && $isClientIpBanned) {
-        $replyError = 'Your IP address has been blacklisted from posting replies to the feed. To appeal this, <a href="/contact">send a message here</a> or log into your account.';
+        $replyError = 'your IP address has been restricted.';
     } elseif (!$isLoggedIn && $replyAction === 'create' && $guestDisplayName !== '' && fridg3_feed_registered_username_exists($guestDisplayName)) {
         $replyError = 'that username belongs to a registered account. please choose another name or log in.';
     } elseif (!$isLoggedIn && $replyAction === 'create' && fridg3_feed_guest_filter_is_mostly_filtered($replyBody)) {
@@ -175,15 +183,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($replyAction === 'purge_ip_replies') {
         if (empty($_SESSION['user']['isAdmin'])) {
-            $replyEditError = 'you do not have permission to purge IP replies.';
+            $replyEditError = 'you do not have permission to purge guest content.';
         } elseif (!fridg3_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
             $replyEditError = 'admin password did not match. purge cancelled.';
         } elseif ($targetReply === null || ($targetReply['isGuest'] ?? false) !== true || !filter_var((string)($targetReply['ip'] ?? ''), FILTER_VALIDATE_IP)) {
             $replyEditError = 'could not find a guest IP to purge.';
         } else {
             $purgeResult = fridg3_feed_purge_guest_replies_by_ip((string)$targetReply['ip']);
+            $guestbookPurgeResult = fridg3_guestbook_purge_entries_by_ip((string)$targetReply['ip']);
+            $purgedCount = (int)$purgeResult['deleted'] + (int)$guestbookPurgeResult['deleted'];
+            $failedCount = (int)$purgeResult['failed'] + (int)$guestbookPurgeResult['failed'];
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-            header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_purged=' . rawurlencode((string)$purgeResult['deleted']) . '&ip_purge_failed=' . rawurlencode((string)$purgeResult['failed']));
+            header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_purged=' . rawurlencode((string)$purgedCount) . '&ip_purge_failed=' . rawurlencode((string)$failedCount));
             exit;
         }
     } elseif ($replyAction === 'delete') {
@@ -408,14 +419,14 @@ if ($replySuccess) {
 } elseif ($replyDeleted) {
     $replyNotice = '<div class="feed-reply-notice success">reply deleted.</div>';
 } elseif ($ipBanned) {
-    $replyNotice = '<div class="feed-reply-notice success">IP banned.</div>';
+    $replyNotice = '<div class="feed-reply-notice success">IP banned from feed and guestbook posting.</div>';
 } elseif ($ipPurged !== null) {
     if ($ipPurgeFailed > 0) {
-        $replyNotice = '<div class="feed-reply-notice error">purged ' . $ipPurged . ' guest repl' . ($ipPurged === 1 ? 'y' : 'ies') . ', but ' . $ipPurgeFailed . ' file' . ($ipPurgeFailed === 1 ? '' : 's') . ' failed.</div>';
+        $replyNotice = '<div class="feed-reply-notice error">purged ' . $ipPurged . ' guest item(s), but ' . $ipPurgeFailed . ' data file(s) failed.</div>';
     } elseif ($ipPurged === 0) {
-        $replyNotice = '<div class="feed-reply-notice success">no guest feed replies found for this IP.</div>';
+        $replyNotice = '<div class="feed-reply-notice success">no guest content found for this IP.</div>';
     } else {
-        $replyNotice = '<div class="feed-reply-notice success">purged ' . $ipPurged . ' guest repl' . ($ipPurged === 1 ? 'y' : 'ies') . '.</div>';
+        $replyNotice = '<div class="feed-reply-notice success">purged ' . $ipPurged . ' guest item(s).</div>';
     }
 } elseif ($replyError !== '') {
     $replyNotice = '<div class="feed-reply-notice error">' . htmlspecialchars($replyError, ENT_QUOTES, 'UTF-8') . '</div>';
@@ -489,8 +500,11 @@ if (!$isClientIpBanned || $isLoggedIn) {
         . '</div>'
         . '<button id="form-button" type="submit">reply</button>'
         . '</form>';
+    if ($postingRestricted) {
+        $replyFormHtml = fridg3_posting_restriction_notice() . fridg3_disable_composer_controls($replyFormHtml);
+    }
 } elseif (!$isLoggedIn && $isClientIpBanned) {
-    $replyNotice = '<div class="feed-reply-notice error">guest replies from your IP address are banned.</div>';
+    $replyNotice = '<div class="feed-reply-notice error">your IP address has been restricted.</div>';
 }
 
 $canCreateReply = !$isClientIpBanned || $isLoggedIn;
@@ -538,6 +552,7 @@ $renderReply = function (array $reply, int $depth = 0) use (
     $replyEditTargetId,
     $editReplyBodyValue,
     $replyEditNotice,
+    $postingRestricted,
     $postIdNoExt
 ): string {
     $replyUser = htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8');
@@ -560,17 +575,17 @@ $renderReply = function (array $reply, int $depth = 0) use (
             $replyActionsHtml .= '<a class="feed-reply-action-link" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?edit_reply=' . rawurlencode($replyId) . '" data-tooltip="edit reply"><i class="fa-solid fa-pencil"></i></a>';
         }
         if (!empty($_SESSION['user']['isAdmin']) && $isGuestReply && $replyIp !== '') {
-            $replyActionsHtml .= '<form class="feed-reply-delete-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks new guest replies from this IP." data-confirm-text="ban IP" data-cancel-text="cancel">'
+            $replyActionsHtml .= '<form class="feed-reply-delete-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks new feed replies and guestbook posts from this IP." data-confirm-text="ban IP" data-cancel-text="cancel">'
                 . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
                 . '<input type="hidden" name="reply_action" value="ban_ip">'
                 . '<input type="hidden" name="reply_id" value="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '">'
                 . '<button type="submit" class="feed-reply-action-button" data-tooltip="ban IP"><i class="fa-solid fa-ban"></i></button>'
                 . '</form>'
-                . '<form class="feed-reply-delete-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-admin-password-confirm="1" data-confirm-title="purge replies from this IP?" data-confirm-detail="this deletes guest feed replies from this IP. it does not ban or unban the IP." data-confirm-text="purge replies" data-cancel-text="cancel" data-password-title="confirm reply purge" data-password-detail="enter your admin password to purge guest feed replies from this IP.">'
+                . '<form class="feed-reply-delete-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-admin-password-confirm="1" data-confirm-title="purge guest content from this IP?" data-confirm-detail="this deletes feed replies and guestbook posts from this IP. it does not ban or unban the IP." data-confirm-text="purge content" data-cancel-text="cancel" data-password-title="confirm guest purge" data-password-detail="enter your admin password to purge all guest content from this IP.">'
                 . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
                 . '<input type="hidden" name="reply_action" value="purge_ip_replies">'
                 . '<input type="hidden" name="reply_id" value="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '">'
-                . '<button type="submit" class="feed-reply-action-button" data-tooltip="purge IP replies"><i class="fa-solid fa-broom"></i></button>'
+                . '<button type="submit" class="feed-reply-action-button" data-tooltip="purge IP content"><i class="fa-solid fa-broom"></i></button>'
                 . '</form>';
         }
         if ($canManageThisReply) {
@@ -630,6 +645,11 @@ $renderReply = function (array $reply, int $depth = 0) use (
             . '<button id="form-button" type="submit">save reply</button>'
             . '</form>'
             . '</div>';
+        if ($postingRestricted) {
+            $replyEditFormHtml = '<div class="feed-reply-box feed-reply-edit-box">'
+                . fridg3_posting_restriction_notice()
+                . fridg3_disable_composer_controls(substr($replyEditFormHtml, strlen('<div class="feed-reply-box feed-reply-edit-box">')));
+        }
     }
     $replyUserHtml = $isGuestReply
         ? '<em>' . $replyUser . '</em>'

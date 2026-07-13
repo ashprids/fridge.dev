@@ -1,5 +1,7 @@
 # Data Contracts
 
+For how account restrictions, posting IP bans, hard bans, and browser/IP propagation interact, see [Account Restrictions and IP Bans](Account-Restrictions-and-IP-Bans).
+
 ## Big Rule
 
 runtime data lives under `/data`.
@@ -26,6 +28,7 @@ expected top-level shape:
       "name": "string",
       "password": "bcrypt-hash or empty",
       "isAdmin": true,
+      "postingRestricted": false,
       "mustResetPassword": false,
       "discordUserId": "optional discord snowflake string",
       "emailAddress": "optional @fridge.dev email address",
@@ -60,10 +63,11 @@ notes:
 - `theme: default` is blackprint and uses the base template plus `/style.css`; `theme: classic` enables saved `colors` for `bg`/`fg`/`border`/`subtle`/`links`; `theme: ambercrt` is shown as `CRT` and uses only saved `colors.links` as its main phosphor color; any other valid value refers to a `/themes/{theme-id}.json` file with `name`, `description`, `thumbnail`, `html`, and `css`
 - legacy `blackprint` normalizes to `default`, `custom` normalizes to `classic`, `newsprint` normalizes to `whiteprint`, `crt` normalizes to `ambercrt`, and removed `liminal`/`syswave` preferences normalize to `default`
 - text glow is stored in `glowIntensity`; the settings UI writes `none` for off and `medium` for on, while legacy `low`/`high` values are treated as enabled medium glow when saved again
-- title motion is stored in `titleAnimation` (`wobble`, `bounce`, `pinball`, `rubberhose`, `bubble`, `slot-machine`, `moonwalk`, or `heartbeat`), `titleAnimationAlways` (boolean), and `titleAnimationDesync` (boolean, default `true`); legacy `orbit`, `domino`, and `lava-lamp` values migrate to `bubble`; removed `tidal-wave`, `accordion`, and `typewriter` values migrate to `slot-machine`, while `helicopter`, `haunted`, and `juggle` migrate to `moonwalk`; guests keep the same values in local storage
+- title motion is stored in `titleAnimation` (`wobble`, `bounce`, `rubberhose`, `bubble`, `slot-machine`, `moonwalk`, or `heartbeat`), `titleAnimationAlways` (boolean), and `titleAnimationDesync` (boolean, default `true`); removed `pinball` values migrate to `wobble`; legacy `orbit`, `domino`, and `lava-lamp` values migrate to `bubble`; removed `tidal-wave`, `accordion`, and `typewriter` values migrate to `slot-machine`, while `helicopter`, `haunted`, and `juggle` migrate to `moonwalk`; guests keep the same values in local storage
 - accessibility toggles are stored as account booleans such as `reduceMotion`; logged-out browsers keep the same preferences in localStorage
 - `browserNotificationsEnabled` stores the account-backed preference for browser feed notifications; `journalBrowserNotificationsEnabled` stores the account-backed preference for new journal post browser notifications; logged-in notification dedupe state is stored in `data/etc/feed-browser-notify-state.json`, while logged-out browsers keep the same preferences and dedupe state in localStorage
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes
+- `postingRestricted` is an admin-managed account boolean; when enabled, server handlers reject new or edited feed posts, journal posts/drafts, feed replies, chat conversations/messages, guestbook entries, contact submissions, mdpaste creation, and upload room/signaling use, while matching composer notices keep text fields, BBCode controls, uploads, and submit controls disabled
 - `discordUserId` links a site account to a Discord member for bot DMs and notifications
 - `emailAddress` marks accounts with a fridge.dev email mailbox; when present and valid, shared chrome swaps the footer Discord button to `/account/email`, and `/account/email` shows the assigned address
 - `allowedPages` currently includes functional grants like `feed`, `journal`, `comments`, and `chat`
@@ -178,16 +182,36 @@ notes:
 - reply bodies can contain image BBCode that points at `/data/images/*`
 - new reply bodies can also contain voice note audio BBCode that points at `/data/audio/voice/*`
 - guest replies include `isGuest: true` plus a plaintext `ip`; guest display names are stored in `username`, default to `Anonymous`, cannot match a registered account username case-insensitively, and are filtered with guest reply bodies through `/feed/filters/*.txt` before storage; matching body text becomes tooltip-wrapped `★` text explaining `this phrase was automatically filtered.`; guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text are locked from later guest edits; admin moderation can purge all guest replies with a matching IP without changing the IP ban list
-- sanitized developer data copies blank guest reply `ip` values, remove guest reply browser notification tokens, and clear the feed IP ban list before the copy is zipped
+- sanitized developer data copies blank guest reply `ip` values, remove guest reply browser notification tokens, remove `IP:` metadata from guestbook entry files, clear guestbook ownership mappings, and clear the shared feed/guestbook IP ban list before the copy is zipped
 - automatic Toast replies are stored as normal `username: "toast"` replies when a user replies to Toast's post or mentions `@toast`; generated Toast replies begin by mentioning the triggering user and are delayed by 1 minute before posting
 
 ### `data/feed/banned_ips.json`
 
-IP-keyed guest reply ban list used by the `/settings/guests` manage guests page; `/settings/banned-ips` is a compatibility alias.
+IP-keyed posting ban list shared by feed replies, guestbook submissions, the contact form, mdpaste creation, and upload room/signaling use, and managed through `/settings/guests`.
 
 - entries can record ban metadata and usernames seen for that IP
-- purging an IP's guest feed replies is a separate action and does not add, remove, or mutate ban entries
+- purging an IP's feed replies and guestbook posts is a separate action and does not add, remove, or mutate ban entries
 - the manage guests page also scans `data/feed/replies/*.json` for `isGuest: true` replies and groups them by plaintext `ip`
+
+### `data/etc/hard-banned-ips.txt`
+
+Site-wide hard-ban list managed by the admin-only `/settings/banned-ips` editor.
+
+- contains exact IPv4 or IPv6 addresses separated by whitespace; saves normalize the list to one address per line and reject invalid tokens
+- this list is separate from posting bans in `data/feed/banned_ips.json`
+- nginx checks it through the internal hard-ban authorization endpoint before serving pages or static files and redirects matches to `/error/blacklisted`
+- direct web access to the list and to the checker is blocked; `/error/blacklisted` uses self-contained local templates because hard-banned clients cannot load global website assets
+- hard-banned clients may additionally load font files beneath `/resources`; all other shared assets remain unavailable
+- the developer-data sanitizer empties this file and the publishing archive excludes it entirely
+
+### `data/etc/hard-ban-identities.json`
+
+Private browser-to-IP associations used to carry an active hard ban across IP changes.
+
+- a random first-party identifier is mirrored in a five-year cookie and browser local storage; the server stores its original manually banned IP, observed IPs, timestamps, and a hash of the user agent
+- when an identifier tied to an active original IP appears from a new IP, the new IP is appended to `hard-banned-ips.txt`
+- removing the original IP through `/settings/banned-ips` removes every automatically associated IP and the corresponding identifier records
+- direct client access is blocked; the developer-data sanitizer replaces the file with an empty `identities` object and the publishing archive excludes it entirely
 
 ## `data/journal/`
 
@@ -215,11 +239,14 @@ entry format:
 
 1. timestamp
 2. display name
-3. message body
+3. optional `IP:<address>` metadata for new entries
+4. message body (line 3 for legacy or sanitized entries without IP metadata)
 
 plus:
 
 - `ip_index.json` for one-post-per-IP ownership tracking
+- nginx blocks direct client access to `/data/guestbook` and its descendants; entries are exposed only through the PHP guestbook and admin moderation views
+- the sanitizer removes entry `IP:` metadata and clears `ip_index.json` while retaining the public guestbook messages
 
 ## `data/images/`
 

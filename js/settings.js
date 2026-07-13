@@ -41,7 +41,7 @@ const ACCESSIBILITY_DEFAULTS = {
 const TITLE_ANIMATION_KEY = 'titleAnimation';
 const TITLE_ANIMATION_ALWAYS_KEY = 'titleAnimationAlways';
 const TITLE_ANIMATION_DESYNC_KEY = 'titleAnimationDesync';
-const TITLE_ANIMATIONS = ['wobble', 'bounce', 'pinball', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'];
+const TITLE_ANIMATIONS = ['wobble', 'bounce', 'rubberhose', 'bubble', 'slot-machine', 'moonwalk', 'heartbeat'];
 const TITLE_ANIMATION_DEFAULT = 'wobble';
 const ONEKO_ASSET_URL = '/resources/oneko.gif';
 const ONEKO_SIZE = 32;
@@ -53,6 +53,7 @@ let onekoController = null;
 let feedNotificationPollTimer = null;
 
 function normalizeTitleAnimation(value) {
+    if (value === 'pinball') return TITLE_ANIMATION_DEFAULT;
     if (value === 'orbit' || value === 'domino' || value === 'lava-lamp') return 'bubble';
     if (value === 'tidal-wave' || value === 'accordion' || value === 'typewriter') return 'slot-machine';
     if (value === 'helicopter' || value === 'haunted' || value === 'juggle') return 'moonwalk';

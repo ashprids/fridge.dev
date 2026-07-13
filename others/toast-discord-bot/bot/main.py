@@ -1540,9 +1540,6 @@ def format_patch_notice_commit_line(commit: dict) -> str:
 def build_patch_notice_embed(payload: dict) -> discord.Embed:
     commit_sha = str(payload.get('commit_sha', '')).strip()
     commit_url = str(payload.get('commit_url') or '').strip()
-    branch = str(payload.get('branch', 'main')).strip() or 'main'
-    pr_url = str(payload.get('pr_url') or '').strip()
-    pr_number = str(payload.get('pr_number', '')).strip()
     commits = normalize_patch_notice_commits(payload.get('commits', []))
     if not commits and commit_sha:
         commits = [{
@@ -1554,10 +1551,6 @@ def build_patch_notice_embed(payload: dict) -> discord.Embed:
 
     embed = discord.Embed(
         title='patch notice // fridge.dev',
-        description=(
-            f'new build landed on `{branch}`.\n'
-            'here’s the patch log from the latest rollout.'
-        ),
         color=PATCH_NOTICE_EMBED_COLOR,
         url=commit_url or None,
     )
@@ -1567,16 +1560,12 @@ def build_patch_notice_embed(payload: dict) -> discord.Embed:
         build_line = f"[`{commit_sha[:7]}`]({commit_url})" if commit_url else f"`{commit_sha[:7]}`"
         embed.add_field(name='build', value=build_line, inline=True)
 
-    if pr_url:
-        pr_label = f'pull request #{pr_number}' if pr_number else 'pull request'
-        embed.add_field(name='source', value=f'[{pr_label}]({pr_url})', inline=True)
-
     commit_lines = [format_patch_notice_commit_line(commit) for commit in commits]
     for index, chunk in enumerate(split_text_by_lines(commit_lines, 1024), start=1):
         field_name = 'patch notes' if len(commit_lines) <= 1 and index == 1 else f'patch notes ({index})'
         embed.add_field(name=field_name, value=chunk, inline=False)
 
-    embed.set_footer(text='main branch update // fridge.dev')
+    embed.set_footer(text='Main branch • fridge.dev')
     return embed
 
 def run_git_command(args: list, timeout: int = 8) -> str:

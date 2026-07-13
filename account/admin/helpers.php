@@ -156,6 +156,7 @@ function account_admin_require_admin(): void {
         $foundCurrentUser = true;
         $_SESSION['user']['name'] = htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8');
         $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+        $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
         $_SESSION['user']['emailAddress'] = htmlspecialchars((string)($account['emailAddress'] ?? ''), ENT_QUOTES, 'UTF-8');
         $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
             return htmlspecialchars((string)$page, ENT_QUOTES, 'UTF-8');

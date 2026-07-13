@@ -6,6 +6,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
 
 $title = 'guestbook';
 $description = 'messages left by visitors.';
@@ -13,6 +15,9 @@ $postsDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATO
 $isAdmin = isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']);
 $pageSize = 10;
 $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 // Best-effort client IP detection (single IP only)
 function guestbook_client_ip(): string {
@@ -45,35 +50,45 @@ if (is_file($ip_index_path)) {
     }
 }
 
-// Handle admin delete requests
+// Handle owner deletion and admin IP moderation requests.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $submittedToken = (string)($_POST['csrf_token'] ?? '');
+    if (!hash_equals((string)$_SESSION['csrf_token'], $submittedToken)) {
+        $_SESSION['guestbook_status'] = 'invalid request.';
+        header('Location: /guestbook');
+        exit;
+    }
+
+    $moderationAction = (string)($_POST['moderation_action'] ?? '');
+    $moderationIp = trim((string)($_POST['ip'] ?? ''));
+    if ($isAdmin && $moderationAction === 'ban_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
+        $guestName = trim((string)($_POST['guest_name'] ?? 'Anonymous'));
+        $_SESSION['guestbook_status'] = fridg3_feed_ban_guest_ip($moderationIp, (string)$_SESSION['user']['username'], $guestName)
+            ? 'IP banned from feed and guestbook posting.'
+            : 'unable to ban that IP.';
+        header('Location: /guestbook');
+        exit;
+    }
+    if ($isAdmin && $moderationAction === 'purge_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
+        if (!fridg3_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
+            $_SESSION['guestbook_status'] = 'admin password did not match. purge cancelled.';
+        } else {
+            $feedResult = fridg3_feed_purge_guest_replies_by_ip($moderationIp);
+            $guestbookResult = fridg3_guestbook_purge_entries_by_ip($moderationIp);
+            $_SESSION['guestbook_status'] = 'purged '
+                . ((int)$feedResult['deleted'] + (int)$guestbookResult['deleted'])
+                . ' guest item(s) for this IP.';
+        }
+        header('Location: /guestbook');
+        exit;
+    }
+
     $deleteFile = basename($_POST['delete_file'] ?? '');
-    $target = $postsDir . DIRECTORY_SEPARATOR . $deleteFile;
-
-    $valid = $deleteFile !== '' && preg_match('/\.txt$/i', $deleteFile);
-    $targetReal = $valid ? realpath($target) : false;
-    $postsReal = realpath($postsDir);
-
     $isOwner = isset($ip_index[$clientIp]) && $ip_index[$clientIp] === $deleteFile;
     $canDelete = $isAdmin || $isOwner;
 
-    if ($valid && $canDelete && $targetReal && $postsReal && strpos($targetReal, $postsReal) === 0 && is_file($targetReal)) {
-        if (@unlink($targetReal)) {
-            if ($isOwner) {
-                unset($ip_index[$clientIp]);
-            } else {
-                // Clean any mapping that points to the deleted file
-                foreach ($ip_index as $ipKey => $mappedFile) {
-                    if ($mappedFile === $deleteFile) {
-                        unset($ip_index[$ipKey]);
-                    }
-                }
-            }
-            @file_put_contents($ip_index_path, json_encode($ip_index, JSON_PRETTY_PRINT), LOCK_EX);
-            $_SESSION['guestbook_status'] = 'post deleted.';
-        } else {
-            $_SESSION['guestbook_status'] = 'unable to delete that post.';
-        }
+    if ($canDelete && fridg3_guestbook_delete_entry($deleteFile)) {
+        $_SESSION['guestbook_status'] = 'post deleted.';
     } else {
         $_SESSION['guestbook_status'] = 'invalid delete request.';
     }
@@ -144,7 +159,7 @@ function guestbook_get_files(string $postsDir): array {
 }
 
 // Build HTML for a provided list of guestbook files
-function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, array $ipIndex): string {
+function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, array $ipIndex, string $csrfToken): string {
     if (empty($files)) {
         return '<div id="post"><div id="post-header"><span id="post-username">no messages yet</span><span id="post-date-feed"></span></div><span id="post-content">be the first to leave one!</span></div>';
     }
@@ -156,10 +171,22 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
             continue;
         }
 
-        $lines = preg_split("/\r\n|\n|\r/", $raw);
-        $timestampLine = trim($lines[0] ?? '');
-        $nameLine = trim($lines[1] ?? '');
-        $message = trim(implode("\n", array_slice($lines, 2)));
+        $entry = fridg3_guestbook_parse_entry($raw, basename($file));
+        if ($entry === null) {
+            continue;
+        }
+        $timestampLine = (string)$entry['timestamp'];
+        $nameLine = (string)$entry['name'];
+        $entryIp = (string)$entry['ip'];
+        if ($entryIp === '') {
+            foreach ($ipIndex as $indexedIp => $indexedFile) {
+                if ((string)$indexedFile === basename($file) && filter_var((string)$indexedIp, FILTER_VALIDATE_IP)) {
+                    $entryIp = (string)$indexedIp;
+                    break;
+                }
+            }
+        }
+        $message = (string)$entry['message'];
 
         if ($message === '') {
             continue;
@@ -181,12 +208,33 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
             $editUrl = '/guestbook/edit?file=' . rawurlencode($safeFile);
             $editButton = '<a class="guestbook-edit-btn" href="' . $editUrl . '" data-tooltip="edit post"><i class="fa-solid fa-pen"></i></a>';
             $deleteButton = '<form class="guestbook-delete-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-confirm-title="delete guestbook entry?" data-confirm-detail="this removes the guestbook entry from the site." data-confirm-text="delete" data-cancel-text="cancel">'
+                . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
                 . '<input type="hidden" name="delete_file" value="' . $safeFile . '">'
                 . '<button type="submit" id="post-edit-feed" class="guestbook-delete-btn" data-tooltip="delete post"><i class="fa-solid fa-trash"></i></button>'
                 . '</form>';
         }
 
-        $rightSide = '<div class="guestbook-post-actions">' . $timeHtml . $editButton . $deleteButton . '</div>';
+        $ipModerationButtons = '';
+        if ($isAdmin && $entryIp !== '') {
+            $safeIp = htmlspecialchars($entryIp, ENT_QUOTES, 'UTF-8');
+            if (!fridg3_feed_is_ip_banned($entryIp)) {
+                $ipModerationButtons .= '<form class="guestbook-delete-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks feed replies and guestbook posts from this IP." data-confirm-text="ban IP" data-cancel-text="cancel">'
+                    . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
+                    . '<input type="hidden" name="moderation_action" value="ban_ip">'
+                    . '<input type="hidden" name="ip" value="' . $safeIp . '">'
+                    . '<input type="hidden" name="guest_name" value="' . $safeName . '">'
+                    . '<button type="submit" id="post-edit-feed" class="guestbook-delete-btn" data-tooltip="ban IP"><i class="fa-solid fa-ban"></i></button>'
+                    . '</form>';
+            }
+            $ipModerationButtons .= '<form class="guestbook-delete-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-admin-password-confirm="1" data-confirm-title="purge guest content from this IP?" data-confirm-detail="this deletes feed replies and guestbook posts from this IP." data-confirm-text="purge content" data-cancel-text="cancel" data-password-title="confirm guest purge" data-password-detail="enter your admin password to purge this IP&apos;s guest content.">'
+                . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
+                . '<input type="hidden" name="moderation_action" value="purge_ip">'
+                . '<input type="hidden" name="ip" value="' . $safeIp . '">'
+                . '<button type="submit" id="post-edit-feed" class="guestbook-delete-btn" data-tooltip="purge IP content"><i class="fa-solid fa-broom"></i></button>'
+                . '</form>';
+        }
+
+        $rightSide = '<div class="guestbook-post-actions">' . $timeHtml . $editButton . $ipModerationButtons . $deleteButton . '</div>';
 
         $html .= '<div id="post">'
             . '<div id="post-header">'
@@ -288,12 +336,21 @@ $totalPages = $totalPosts > 0 ? (int)ceil($totalPosts / $pageSize) : 1;
 $currentPage = min($currentPage, max(1, $totalPages));
 $offset = ($currentPage - 1) * $pageSize;
 $pageFiles = array_slice($allFiles, $offset, $pageSize);
-$posts_html = render_guestbook_posts($pageFiles, $isAdmin, $clientIp, $ip_index);
+$posts_html = render_guestbook_posts(
+    $pageFiles,
+    $isAdmin,
+    $clientIp,
+    $ip_index,
+    htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8')
+);
 $pagination_html = render_guestbook_pagination($currentPage, $totalPages);
 
 $leave_button_attrs = 'data-tooltip="post to the guestbook"';
-if (isset($ip_index[$clientIp])) {
-    $leave_button_attrs = 'disabled aria-disabled="true" class="form-button-disabled" data-tooltip="you can only post here once!"';
+$isClientIpBanned = fridg3_feed_is_ip_banned($clientIp);
+if (isset($ip_index[$clientIp]) || $isClientIpBanned) {
+    $leave_button_attrs = 'disabled aria-disabled="true" class="form-button-disabled" data-tooltip="'
+        . ($isClientIpBanned ? 'your IP address has been restricted.' : 'you can only post here once!')
+        . '"';
 }
 
 $status_message = $_SESSION['guestbook_status'] ?? '';

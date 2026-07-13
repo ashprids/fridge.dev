@@ -6,6 +6,12 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+fridg3_refresh_current_user_posting_restriction();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+
+$uploadPostingRestricted = fridg3_current_user_posting_restricted();
+$uploadIpBanned = fridg3_feed_is_ip_banned(fridg3_feed_client_ip());
+$uploadAccessBlocked = $uploadPostingRestricted || $uploadIpBanned;
 
 const UPLOAD_ROOM_TTL_SECONDS = 86400;
 const UPLOAD_HEARTBEAT_TIMEOUT_SECONDS = 15;
@@ -195,6 +201,15 @@ function upload_claim_room(&$store, $token, $peerId) {
     return 'room_full';
 }
 
+if (isset($_GET['api']) && $uploadAccessBlocked) {
+    upload_json_response([
+        'ok' => false,
+        'error' => $uploadPostingRestricted
+            ? 'your account has been restricted.'
+            : 'your IP address has been restricted.',
+    ], 403);
+}
+
 if (isset($_GET['api'])) {
     $peerId = upload_peer_id();
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -371,7 +386,7 @@ if (isset($_GET['api'])) {
     upload_json_response(['ok' => false, 'error' => 'not_found'], 404);
 }
 
-$title = 'upload';
+$title = 'serverless upload';
 $description = 'peer-to-peer encrypted file transfer.';
 
 $render_helper_path = upload_find_template_file('lib/render.php');
@@ -401,6 +416,14 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+if ($uploadAccessBlocked) {
+    $restrictionNotice = $uploadPostingRestricted
+        ? fridg3_posting_restriction_notice()
+        : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
+    $content = fridg3_disable_composer_controls($content);
+    $content = str_replace('<div class="upload-app" data-upload-app>', $restrictionNotice . '<div class="upload-app" data-upload-app data-access-blocked>', $content);
+    $content = preg_replace('/<script>.*?<\/script>/s', '', $content) ?? $content;
+}
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

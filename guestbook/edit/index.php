@@ -6,11 +6,15 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+fridg3_refresh_current_user_posting_restriction();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
 
 $title = 'edit guestbook entry';
 $description = 'edit a guestbook message (admin or owner).';
 
 $isAdmin = isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']);
+$postingRestricted = fridg3_current_user_posting_restricted();
 
 // Best-effort client IP detection (single IP only)
 function guestbook_client_ip(): string {
@@ -32,6 +36,8 @@ function guestbook_client_ip(): string {
 }
 
 $clientIp = guestbook_client_ip();
+$isClientIpBanned = !$isAdmin && fridg3_feed_is_ip_banned($clientIp);
+$postingBlocked = $postingRestricted || $isClientIpBanned;
 
 $status_message = '';
 $status_class = 'success';
@@ -66,30 +72,12 @@ $current_name = '';
 $current_message = '';
 
 function load_guestbook_entry(string $posts_dir, string $filename): ?array {
-    if ($filename === '' || !preg_match('/\.txt$/i', $filename)) {
-        return null;
-    }
-    $target = $posts_dir . DIRECTORY_SEPARATOR . basename($filename);
-    $real = realpath($target);
-    $posts_real = realpath($posts_dir);
-    if (!$real || !$posts_real || strpos($real, $posts_real) !== 0 || !is_file($real)) {
-        return null;
-    }
-    $raw = @file_get_contents($real);
-    if ($raw === false) {
-        return null;
-    }
-    $lines = preg_split("/\r\n|\n|\r/", $raw);
-    $timestamp = trim($lines[0] ?? '');
-    $name = trim($lines[1] ?? '');
-    $message = trim(implode("\n", array_slice($lines, 2)));
-    return [
-        'path' => $real,
-        'timestamp' => $timestamp,
-        'name' => $name,
-        'message' => $message,
-        'file' => basename($filename),
-    ];
+    return fridg3_guestbook_load_entry($filename);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingBlocked) {
+    header('Location: /guestbook/edit?file=' . rawurlencode(basename((string)($_POST['file'] ?? ''))) . '&posting_restricted=1');
+    exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -118,8 +106,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $status_message = 'message cannot be empty.';
             $status_class = 'error';
         } else {
-            $payload = $timestamp_line . PHP_EOL . $name . PHP_EOL . $message . PHP_EOL;
-            $written = @file_put_contents($entry['path'], $payload, LOCK_EX);
+            $written = fridg3_guestbook_write_entry(
+                (string)$entry['path'],
+                $timestamp_line,
+                $name,
+                $message,
+                (string)($entry['ip'] ?? '')
+            );
             if ($written === false) {
                 $status_message = 'could not save your changes. please try again later.';
                 $status_class = 'error';
@@ -195,6 +188,13 @@ $content = str_replace('{status}', $status_html, $content);
 $content = str_replace('{file}', htmlspecialchars($target_file, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{name}', htmlspecialchars($current_name, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{message}', htmlspecialchars($current_message, ENT_QUOTES, 'UTF-8'), $content);
+if ($postingBlocked) {
+    $content = fridg3_disable_composer_controls($content);
+    $blockedNotice = $postingRestricted
+        ? fridg3_posting_restriction_notice()
+        : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
+    $content = str_replace('<form id="guestbook-edit-form"', $blockedNotice . '<form id="guestbook-edit-form"', $content);
+}
 
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

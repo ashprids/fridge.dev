@@ -1,5 +1,7 @@
 # Deployment and Operations
 
+For the complete moderation-layer model behind account restrictions, posting bans, and nginx hard bans, see [Account Restrictions and IP Bans](Account-Restrictions-and-IP-Bans).
+
 ## Deployment Flow
 
 deployment is GitHub Actions driven.
@@ -53,6 +55,7 @@ Second useful detail, if needed
 
 rules to keep in mind:
 
+- the Discord embed shows the deployed build ID followed by the patch-note fields, without introductory or pull-request source text
 - the first bullet is the commit subject and does not include the commit ID
 - body notes are separated by blank lines in the commit body
 - every body note starts with its own bullet
@@ -140,7 +143,9 @@ the generic `location /` fallback should route missing paths to `/error/404`, no
 
 POST-only API directory routes also need POST-safe rewrites when called without `index.php`; otherwise nginx can normalize the directory URL with a redirect and the browser may retry as `GET`. `/api/dev-bootstrap` and `/api/toast-feed-generate` are included in that rewrite list.
 
-the contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access. account form routes such as `/account/login`, `/account/change-password`, and `/account/admin/edit` are also rewritten directly to their PHP handlers so POST bodies are not lost to trailing-slash redirects.
+the contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access. `/data/guestbook` and `/data/guestbook/` are also blocked because entry files contain moderation-only IP metadata; the public guestbook remains available through its PHP routes. account form routes such as `/account/login`, `/account/change-password`, and `/account/admin/edit` are also rewritten directly to their PHP handlers so POST bodies are not lost to trailing-slash redirects.
+
+site-wide hard bans are stored in `data/etc/hard-banned-ips.txt` and enforced by nginx `auth_request` through the internal `/_hard-ban-check` location. a denied subrequest returns `401`, which nginx converts into a `302` redirect to `/error/blacklisted`; that route, files beneath its directory, and font files beneath `/resources` explicitly disable the authorization check so the redirect cannot loop and the stripped Blackprint page can render. browser/IP associations live in `data/etc/hard-ban-identities.json`. the physical checker route and both hard-ban data files must remain blocked from direct requests. this requires nginx's standard `ngx_http_auth_request_module`.
 
 the upload API posts to `/tools/upload/?api=*`; keep the exact `/tools/upload` nginx rewrite so stale no-slash requests hit PHP directly instead of losing their POST body to a trailing-slash redirect. cursed but real.
 
@@ -200,7 +205,7 @@ on the same daily schedule as the private backup workflow, this workflow:
 5. keeps only the 10 newest zip files in that folder
 6. removes temporary server and runner files
 
-the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership, feed guest reply IPs/browser tokens, feed IP ban lists, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state and browser notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft.
+the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership and entry IP metadata, feed guest reply IPs/browser tokens, shared posting ban lists, the site-wide hard-ban list and browser/IP associations, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state and browser notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft. the development archive additionally excludes `data/etc/hard-banned-ips.txt` and `data/etc/hard-ban-identities.json` entirely.
 
 setup notes live in `/.github/workflows/publish-dev-data-setup.md`.
 

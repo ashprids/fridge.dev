@@ -90,6 +90,15 @@ h1 {
 	color: var(--muted);
 }
 
+.posting-restriction-message {
+	margin: 0 0 16px;
+	padding: 10px 12px;
+	border: 1px solid var(--border);
+	color: var(--subtle);
+	font-size: 12px;
+	line-height: 1.35;
+}
+
 .workspace {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

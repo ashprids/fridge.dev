@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="WEB_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/data/accounts" />
+      <excludeFolder url="file://$MODULE_DIR$/data/audio" />
+      <excludeFolder url="file://$MODULE_DIR$/data/chat" />
+      <excludeFolder url="file://$MODULE_DIR$/data/contact" />
+      <excludeFolder url="file://$MODULE_DIR$/data/downloads" />
+      <excludeFolder url="file://$MODULE_DIR$/data/etc" />
+      <excludeFolder url="file://$MODULE_DIR$/data/feed" />
+      <excludeFolder url="file://$MODULE_DIR$/data/guestbook" />
+      <excludeFolder url="file://$MODULE_DIR$/data/images" />
+      <excludeFolder url="file://$MODULE_DIR$/data/journal" />
+      <excludeFolder url="file://$MODULE_DIR$/data/mdpaste" />
+      <excludeFolder url="file://$MODULE_DIR$/data/music" />
+      <excludeFolder url="file://$MODULE_DIR$/data/newsletter" />
+      <excludeFolder url="file://$MODULE_DIR$/data/upload" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

@@ -335,6 +335,7 @@ if (!function_exists('fridg3_feed_refresh_session_user')) {
 
             $_SESSION['user']['name'] = htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8');
             $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+            $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
             $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
                 return htmlspecialchars((string)$page, ENT_QUOTES, 'UTF-8');
             }, (array)($account['allowedPages'] ?? []));

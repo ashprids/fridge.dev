@@ -189,6 +189,32 @@ function sanitizeFeedReplies(string $root): void
     }
 }
 
+function sanitizeGuestbookEntries(string $root): void
+{
+    $guestbookDir = pathFor($root, 'guestbook');
+    ensureDirectory($guestbookDir);
+
+    foreach (glob($guestbookDir . '/*.txt') ?: [] as $path) {
+        $raw = file_get_contents($path);
+        if ($raw === false) {
+            throw new RuntimeException("failed to read guestbook entry for sanitizing: {$path}");
+        }
+        $lines = preg_split("/\r\n|\n|\r/", $raw);
+        if (!is_array($lines)) {
+            continue;
+        }
+        if (isset($lines[2]) && str_starts_with(trim((string) $lines[2]), 'IP:')) {
+            $candidateIp = trim(substr(trim((string) $lines[2]), 3));
+            if ($candidateIp === '' || filter_var($candidateIp, FILTER_VALIDATE_IP) !== false) {
+                array_splice($lines, 2, 1);
+            }
+        }
+        if (file_put_contents($path, implode(PHP_EOL, $lines), LOCK_EX) === false) {
+            throw new RuntimeException("failed to sanitize guestbook entry: {$path}");
+        }
+    }
+}
+
 /*
  * Edit this block when new sensitive /data paths need scrubbing.
  * Keep the output useful for local dev, but never ship secrets,
@@ -200,6 +226,12 @@ writeJson($root, 'accounts/accounts.json', [
 
 writeJson($root, 'accounts/login_attempts.json', new stdClass());
 writeJson($root, 'etc/page_views.json', ['pages' => new stdClass(), 'updated_at' => null]);
+$hardBanPath = pathFor($root, 'etc/hard-banned-ips.txt');
+ensureDirectory(dirname($hardBanPath));
+if (file_put_contents($hardBanPath, '', LOCK_EX) === false) {
+    throw new RuntimeException('failed to clear the hard-ban IP list');
+}
+writeJson($root, 'etc/hard-ban-identities.json', ['identities' => new stdClass()]);
 
 $toast = readJsonObject($root, 'etc/toast.json');
 $toast['bot'] = is_array($toast['bot'] ?? null) ? $toast['bot'] : [];
@@ -218,6 +250,7 @@ $webhooks = readJsonObject($root, 'etc/webhooks.json');
 writeJson($root, 'etc/webhooks.json', blankScalarValues($webhooks));
 
 writeJson($root, 'guestbook/ip_index.json', new stdClass());
+sanitizeGuestbookEntries($root);
 writeJson($root, 'feed/banned_ips.json', []);
 sanitizeFeedReplies($root);
 writeJson($root, 'contact/rate_limits.json', new stdClass());

@@ -72,11 +72,19 @@ The sanitizer currently changes:
 - `data/etc/off-topic-archive.json`: replaces exported Discord archive contents with an empty placeholder
 - `data/etc/webhooks.json`: clears all scalar values
 - `data/guestbook/ip_index.json`: clears contents
+- `data/guestbook/*.txt`: removes `IP:` metadata while retaining public messages
+- `data/feed/replies/*.json`: blanks guest IPs and removes guest browser notification tokens
+- `data/feed/banned_ips.json`: clears the shared posting IP ban list
 - `data/contact/rate_limits.json`: clears IP rate-limit state
 - `data/upload/rooms.json`: clears temporary room tokens and public keys
 - `data/mdpaste/`: clears encrypted paste records
 - `data/chat/`: clears encrypted chat conversations, attachments, presence state, and local chat keys
 - `data/journal/drafts`: removes drafts and adds a harmless placeholder draft
+
+The archive command excludes these operational identity files entirely, after sanitization as defense in depth:
+
+- `data/etc/hard-banned-ips.txt`
+- `data/etc/hard-ban-identities.json`
 
 To add more privacy rules, edit the marked block in:
 

@@ -45,7 +45,7 @@ if ($selectedUsername === '' || $accountIndex === null) {
 }
 
 $account = $accountsData['accounts'][$accountIndex];
-$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages', 'emailAddress'];
+$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages', 'emailAddress', 'postingRestricted'];
 $extraData = $account;
 foreach ($managedKeys as $managedKey) {
     unset($extraData[$managedKey]);
@@ -58,6 +58,7 @@ $formUsername = (string)($account['username'] ?? '');
 $formName = (string)($account['name'] ?? '');
 $formEmailAddress = (string)($account['emailAddress'] ?? '');
 $formIsAdmin = !empty($account['isAdmin']);
+$formPostingRestricted = !empty($account['postingRestricted']);
 $allowedPages = array_values(array_map('strval', (array)($account['allowedPages'] ?? [])));
 $formAllowFeed = in_array('feed', $allowedPages, true);
 $formAllowJournal = in_array('journal', $allowedPages, true);
@@ -219,6 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $formName = trim((string)($_POST['name'] ?? ''));
             $formEmailAddress = strtolower(trim((string)($_POST['emailAddress'] ?? '')));
             $formIsAdmin = isset($_POST['isAdmin']);
+            $formPostingRestricted = isset($_POST['postingRestricted']);
             $formAllowFeed = isset($_POST['allowFeed']);
             $formAllowJournal = isset($_POST['allowJournal']);
             $formAllowComments = isset($_POST['allowComments']);
@@ -292,6 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $updatedAccount['username'] = $formUsername;
                         $updatedAccount['name'] = $formName;
                         $updatedAccount['isAdmin'] = $formIsAdmin;
+                        $updatedAccount['postingRestricted'] = $formPostingRestricted;
                         $updatedAccount['mustResetPassword'] = !empty($account['mustResetPassword']);
                         $updatedAccount['allowedPages'] = $newAllowedPages;
                         $updatedAccount['password'] = (string)($account['password'] ?? '');
@@ -317,6 +320,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $_SESSION['user']['username'] = htmlspecialchars($formUsername, ENT_QUOTES, 'UTF-8');
                                 $_SESSION['user']['name'] = htmlspecialchars($formName, ENT_QUOTES, 'UTF-8');
                                 $_SESSION['user']['isAdmin'] = $formIsAdmin;
+                                $_SESSION['user']['postingRestricted'] = $formPostingRestricted;
                                 $_SESSION['user']['mustResetPassword'] = !empty($updatedAccount['mustResetPassword']);
                                 $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
                                     return htmlspecialchars((string)$page, ENT_QUOTES, 'UTF-8');
@@ -337,7 +341,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages', 'emailAddress'];
+$managedKeys = ['username', 'name', 'password', 'isAdmin', 'mustResetPassword', 'allowedPages', 'emailAddress', 'postingRestricted'];
 $extraData = $account;
 foreach ($managedKeys as $managedKey) {
     unset($extraData[$managedKey]);
@@ -355,6 +359,7 @@ $formAllowJournal = in_array('journal', $allowedPages, true);
 $formAllowComments = in_array('comments', $allowedPages, true);
 $formAllowChat = in_array('chat', $allowedPages, true);
 $formIsAdmin = !empty($account['isAdmin']);
+$formPostingRestricted = !empty($account['postingRestricted']);
 $formUsername = (string)($account['username'] ?? $formUsername);
 $formName = (string)($account['name'] ?? $formName);
 $formEmailAddress = (string)($account['emailAddress'] ?? $formEmailAddress);
@@ -375,6 +380,7 @@ $content = str_replace(
         '{form_name}',
         '{form_email_address}',
         '{is_admin_checked}',
+        '{posting_restricted_checked}',
         '{allow_feed_checked}',
         '{allow_journal_checked}',
         '{allow_comments_checked}',
@@ -399,6 +405,7 @@ $content = str_replace(
         htmlspecialchars($formName, ENT_QUOTES, 'UTF-8'),
         htmlspecialchars($formEmailAddress, ENT_QUOTES, 'UTF-8'),
         $formIsAdmin ? 'checked' : '',
+        $formPostingRestricted ? 'checked' : '',
         $formAllowFeed ? 'checked' : '',
         $formAllowJournal ? 'checked' : '',
         $formAllowComments ? 'checked' : '',

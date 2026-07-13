@@ -21,6 +21,7 @@ if ($currentUsername !== null) {
             foreach ($accountsData['accounts'] as $account) {
                 if (isset($account['username']) && $account['username'] === $currentUsername) {
                     $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+                    $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
                     $_SESSION['user']['allowedPages'] = (array)($account['allowedPages'] ?? []);
                     break;
                 }

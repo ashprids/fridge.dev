@@ -8,9 +8,11 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 
+$rootDir = dirname(__DIR__);
+require_once $rootDir . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+
 $title = 'contact';
 $description = 'send a message to fridge.dev.';
-$rootDir = dirname(__DIR__);
 $contactDataDir = $rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'contact';
 $rateLimitPath = $contactDataDir . DIRECTORY_SEPARATOR . 'rate_limits.json';
 const CONTACT_REPLY_EMAIL = 'me@fridge.dev';
@@ -294,7 +296,11 @@ function contact_notify_toast(array $submission): ?string {
 }
 
 contact_refresh_current_user_permissions();
+fridg3_refresh_current_user_posting_restriction();
 $csrfToken = contact_create_csrf_token();
+$contactPostingRestricted = fridg3_current_user_posting_restricted();
+$contactIpBanned = fridg3_feed_is_ip_banned(fridg3_feed_client_ip());
+$contactSubmissionBlocked = $contactPostingRestricted || $contactIpBanned;
 
 if (isset($_GET['dashboard'])) {
     if (!contact_user_is_admin()) {
@@ -372,6 +378,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedToken = (string)($_POST['csrf'] ?? '');
     $startedAt = (int)($_POST['started_at'] ?? 0);
     $challengeAnswer = trim((string)($_POST['security_answer'] ?? ''));
+
+    if ($contactSubmissionBlocked) {
+        $errors[] = $contactPostingRestricted
+            ? 'your account has been restricted.'
+            : 'your IP address has been restricted.';
+    }
 
     if (!hash_equals($csrfToken, $postedToken)) {
         $errors[] = 'invalid request token. refresh and try again.';
@@ -481,5 +493,13 @@ $content = str_replace(
     ],
     $content
 );
+
+if ($contactSubmissionBlocked) {
+    $restrictionNotice = $contactPostingRestricted
+        ? fridg3_posting_restriction_notice()
+        : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
+    $content = fridg3_disable_composer_controls($content);
+    $content = $restrictionNotice . $content;
+}
 
 contact_render_page($title, $description, $content);

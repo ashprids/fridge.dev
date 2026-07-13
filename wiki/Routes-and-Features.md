@@ -62,7 +62,9 @@ Related:
 
 - list entries from `data/guestbook/*.txt`
 - one-post-per-IP gate via `data/guestbook/ip_index.json`
+- new entries store an `IP:` metadata line; IPs in the shared feed ban list cannot submit guestbook posts
 - owner/admin edit and delete flow
+- admins can ban an entry IP or password-confirm a purge of both feed replies and guestbook posts associated with that IP
 
 Related:
 
@@ -90,7 +92,9 @@ Related:
 
 ### `/tools/upload`
 
+- displayed as `serverless upload`; the route remains stable for existing transfer links
 - browser-to-browser encrypted file transfer using WebRTC data channels
+- accounts with `postingRestricted` and clients on the shared banned-IP list cannot create, join, or signal upload rooms; the page disables its controls and every API action independently enforces the restriction
 - PHP stores only short-lived room/signaling metadata under `data/upload/rooms.json`; uploaded file bytes are never stored server-side
 - creating a room chooses whether the creator is the sender or receiver, then produces a `/tools/upload/?r={token}` share link
 - access is limited to the creator browser plus the first guest browser through the HttpOnly `fridg3_upload_peer` cookie; later browsers receive `room_full`
@@ -114,7 +118,9 @@ Related:
 - shows a Discord linking action for logged-in users and disables it once `discordUserId` is already linked
 - when logged in as hardcoded `toast`, shows a JSON editor for shared Toast personalities stored in `data/etc/toast-personality.json`
 - admins can open a dedicated system diagnostics subsection in `/settings` to jump into `/settings/sysinfo`
-- admins can open `/settings/guests`, labeled as manage guests, to review all guest feed replies grouped by IP, search by IP or username, see ban state, unban IPs, or purge guest feed replies from an IP after password confirmation; `/settings/banned-ips` is kept as a compatibility alias
+- admins can open `/settings/guests`, labeled as manage guests, to review guest feed replies and IP-backed guestbook posts grouped by IP, search by IP or username, individually delete either content type, ban or unban IPs across both posting surfaces, or purge all guest content from an IP after password confirmation
+- admins can open `/settings/banned-ips` to edit the separate hard-ban IP list; valid IPv4 and IPv6 addresses may be separated by spaces or newlines, and nginx redirects matching clients away from all pages and static files to `/error/blacklisted`; a durable first-party browser identifier carries an active ban to later IPs, while removing the original manually banned IP releases its associated IPs
+- `/error/blacklisted` returns the stripped Blackprint denial page only to an actively hard-banned IP or associated browser identity; other direct visitors receive a server-side redirect to `/`
 - admins can open `/settings/sysinfo` to see live system diagnostics, PHP/runtime details, storage usage, website state, and key content counts in a dashboard-style view
 
 ## Account Routes
@@ -149,6 +155,7 @@ admin-only account creation flow that writes to `data/accounts/accounts.json`.
 - can seed `discordUserId`
 - can seed an optional `emailAddress` for fridge.dev mailboxes
 - can grant `comments` and `chat` permissions
+- can create the account with `postingRestricted` already enabled
 - newly created accounts are flagged with `mustResetPassword`
 - username `toast` is reserved and cannot be created as a normal account
 - if a Discord id is provided, it asks the local toast bot to DM the invite credentials
@@ -184,6 +191,7 @@ not covered in the older references, but very real.
 - preserves unknown extra account fields through an editable JSON object field
 - blocks deleting the currently logged-in account
 - includes `comments` and `chat` as grantable `allowedPages` permissions
+- includes a `restricted from posting` checkbox backed by `postingRestricted`; restricted accounts retain their page permissions and deletion/moderation access, but cannot create or edit posts, replies, chat messages, or guestbook entries
 - password resets now preserve the account and flip `mustResetPassword` back on
 
 Helpers live in `account/admin/helpers.php`.
@@ -232,6 +240,7 @@ one-to-one conversation view.
 
 ### `/contact`
 
+- accounts with `postingRestricted` and clients on the shared banned-IP list cannot submit the public form; the server enforces the restriction and the form renders with its controls disabled
 - public contact form with name, email, message, and server-side anti-spam checks
 - replies are sent manually from `me@fridge.dev`
 - accepted submissions are stored under `data/contact/*.json`
@@ -295,6 +304,8 @@ Subroutes:
 
 - `/tools/mdpaste`
 
+Any current or future tool that creates, uploads, or shares user content must enforce both the account `postingRestricted` flag and the shared `data/feed/banned_ips.json` list in every write/API handler. Disabled controls and notices are only the UI layer and must not be the sole enforcement. Read-only tool pages may remain available.
+
 ### `/tools/mdpaste`
 
 standalone markdown paste service for sharing notes without exposing a whole vault.
@@ -304,6 +315,7 @@ standalone markdown paste service for sharing notes without exposing a whole vau
 - supports normal markdown images plus Obsidian-style `![[image.png]]` embeds that point at `/data/images`
 - optional hard-break mode keeps single line breaks in formatted paragraphs
 - `POST /tools/mdpaste/` writes temporary paste JSON under `data/mdpaste`
+- accounts with `postingRestricted` and clients on the shared banned-IP list cannot create pastes; the editor controls are disabled and the JSON endpoint independently returns `403`
 - optional password mode encrypts the markdown with AES-256-GCM before storage
 - shared links render from `/tools/mdpaste/s/{pasteId}`
 - pastes expire after 30 days

@@ -11,6 +11,56 @@ server {
     index index.html index.php;
     client_max_body_size 20M;
 
+    # Check the editable hard-ban list before serving website pages or files.
+    # A 401 from the internal checker becomes a server-side redirect to the
+    # only public route exempted from this access check.
+    auth_request /_hard-ban-check;
+    error_page 401 = @hard-ban-redirect;
+
+    location @hard-ban-redirect {
+        auth_request off;
+        return 302 /error/blacklisted;
+    }
+
+    location = /_hard-ban-check {
+        internal;
+        auth_request off;
+        fastcgi_pass unix:/run/php-fpm/php-fpm.sock;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root/api/hard-ban-check/index.php;
+    }
+
+    # The checker is callable only through nginx's internal subrequest.
+    location ^~ /api/hard-ban-check/ {
+        return 404;
+    }
+
+    # Hard-banned clients may access this page and its local, self-contained
+    # templates, but nothing else on the website.
+    location = /error/blacklisted {
+        auth_request off;
+        rewrite ^ /error/blacklisted/index.php last;
+    }
+
+    location = /error/blacklisted/index.php {
+        auth_request off;
+        fastcgi_pass unix:/run/php-fpm/php-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root/error/blacklisted/index.php;
+        include fastcgi_params;
+    }
+
+    location /error/blacklisted/ {
+        auth_request off;
+        try_files $uri $uri/ =404;
+    }
+
+    # The blacklist response may load only font assets from the shared resource directory.
+    location ~* ^/resources/.*\.(?:woff2?|ttf|otf)$ {
+        auth_request off;
+        try_files $uri =404;
+    }
+
     location ~ \.php$ {
         root /var/www/fridge.dev;
         fastcgi_pass unix:/run/php-fpm/php-fpm.sock;  # adjust if your PHP-FPM socket differs
@@ -24,11 +74,29 @@ server {
         try_files $uri =404;
     }
 
+    # Guestbook entries contain IP metadata and must only be read through PHP
+    location = /data/guestbook {
+        return 403;
+    }
+
+    location ^~ /data/guestbook/ {
+        return 403;
+    }
+
     # Only block other JSON files in /data/
     location ~* ^/data/.*\.json$ { return 403; }
 
     # Never serve contact submissions or rate-limit data directly
     location ^~ /data/contact/ {
+        return 403;
+    }
+
+    # Operational IP denylist; never expose it as a data file.
+    location = /data/etc/hard-banned-ips.txt {
+        return 403;
+    }
+
+    location = /data/etc/hard-ban-identities.json {
         return 403;
     }
 
@@ -67,6 +135,11 @@ server {
 
     location /contact/ {
         try_files $uri $uri/ /contact/index.php?$args;
+    }
+
+    # Admin hard-ban editor: preserve POST bodies on the no-slash route.
+    location = /settings/banned-ips {
+        rewrite ^ /settings/banned-ips/index.php?$args last;
     }
 
     # Account routes: avoid trailing-slash redirects on POST

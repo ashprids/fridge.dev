@@ -1,3 +1,12 @@
+# Directories/files listed in this file will be ignored by rsync.
+
+# --------------------------------------------------------------------------------------------------
+# Add a file/directory here if you don't want it to be:
+# - Uploaded to the web server
+# - Overwritten on the server
+# - Deleted from /var/www/fridge.dev/ when the server is updated
+# --------------------------------------------------------------------------------------------------
+
 - /data/**
 - /formatting/example_page/**
 - sitemap.xml
@@ -11,3 +20,4 @@
 - /others/toast-discord-bot/bot/venv/**
 - /scripts/**
 - qodana.yaml
+- /.idea/**

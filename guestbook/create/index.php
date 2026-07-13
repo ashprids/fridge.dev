@@ -6,6 +6,9 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+fridg3_refresh_current_user_posting_restriction();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
 
 $title = 'post to guestbook';
 $description = 'send a message to the guestbook.';
@@ -13,8 +16,14 @@ $description = 'send a message to the guestbook.';
 $status_message = '';
 $status_class = 'success';
 $hasPosted = false;
+$postingRestricted = fridg3_current_user_posting_restricted();
 
 $client_ip = guestbook_client_ip();
+$isClientIpBanned = fridg3_feed_is_ip_banned($client_ip);
+if ($isClientIpBanned) {
+    $status_message = 'your IP address has been restricted.';
+    $status_class = 'error';
+}
 
 $posts_dir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'guestbook';
 if (!is_dir($posts_dir)) {
@@ -56,6 +65,11 @@ function guestbook_client_ip(): string {
 }
 
 // Handle guestbook submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted) {
+    header('Location: /guestbook/create?posting_restricted=1');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $message = $_POST['message'] ?? '';
@@ -71,7 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = (function_exists('mb_substr') ? mb_substr($name, 0, 80) : substr($name, 0, 80));
     $message = trim(function_exists('mb_substr') ? mb_substr($message, 0, 4000) : substr($message, 0, 4000));
 
-    if ($message === '') {
+    if ($isClientIpBanned) {
+        $status_message = 'your IP address has been restricted.';
+        $status_class = 'error';
+    } elseif ($message === '') {
         $status_message = 'message cannot be empty.';
         $status_class = 'error';
     } else {
@@ -91,9 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $filename = date('Y-m-d_H-i-s') . '_' . $suffix . '.txt';
             $filepath = $posts_dir . DIRECTORY_SEPARATOR . $filename;
 
-            $payload = $timestamp_line . PHP_EOL . $name . PHP_EOL . $message . PHP_EOL;
-
-            $written = @file_put_contents($filepath, $payload, LOCK_EX);
+            $written = fridg3_guestbook_write_entry($filepath, $timestamp_line, $name, $message, $client_ip);
             if ($written === false) {
                 $status_message = 'could not save your message. please try again later.';
                 $status_class = 'error';
@@ -172,11 +187,15 @@ if ($status_message !== '') {
     $status_html = '<div class="' . $status_classname . '">' . htmlspecialchars($status_message, ENT_QUOTES, 'UTF-8') . '</div>';
 }
 
-$button_state = $hasPosted
-    ? 'disabled aria-disabled="true" class="form-button-disabled" data-tooltip="you can only post here once!"'
+$button_state = $hasPosted || $isClientIpBanned
+    ? 'disabled aria-disabled="true" class="form-button-disabled" data-tooltip="' . ($isClientIpBanned ? 'your IP address has been restricted.' : 'you can only post here once!') . '"'
     : 'data-tooltip="please note: you can only post one message here!"';
 $content = str_replace('{status}', $status_html, $content);
 $content = str_replace('{post_button_attrs}', $button_state, $content);
+if ($postingRestricted) {
+    $content = fridg3_disable_composer_controls($content);
+    $content = str_replace('<form id="guestbook-form"', fridg3_posting_restriction_notice() . '<form id="guestbook-form"', $content);
+}
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

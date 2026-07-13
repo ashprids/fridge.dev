@@ -147,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     'username' => htmlspecialchars($account['username'], ENT_QUOTES, 'UTF-8'),
                                     'name' => htmlspecialchars($account['name'], ENT_QUOTES, 'UTF-8'),
                                     'isAdmin' => (bool)($account['isAdmin'] ?? false),
+                                    'postingRestricted' => (bool)($account['postingRestricted'] ?? false),
                                     'mustResetPassword' => !empty($account['mustResetPassword']),
                                     'emailAddress' => htmlspecialchars((string)($account['emailAddress'] ?? ''), ENT_QUOTES, 'UTF-8'),
                                     'allowedPages' => array_map(function ($page) {

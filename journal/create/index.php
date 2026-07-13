@@ -23,6 +23,7 @@ if ($currentUsername !== null) {
             foreach ($accountsData['accounts'] as $account) {
                 if (isset($account['username']) && $account['username'] === $currentUsername) {
                     $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+                    $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
                     $_SESSION['user']['allowedPages'] = (array)($account['allowedPages'] ?? []);
                     break;
                 }
@@ -35,6 +36,7 @@ if ($currentUsername !== null) {
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 $allowedPages = $_SESSION['user']['allowedPages'] ?? [];
 $canCreatePost = $isAdmin || in_array('journal', $allowedPages);
+$postingRestricted = fridg3_current_user_posting_restricted();
 
 if (!$canCreatePost) {
     header('Location: /journal');
@@ -212,6 +214,15 @@ function bbcode_to_html(string $text): string {
 }
 
 // Handle create-post submission
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    && $postingRestricted
+    && trim((string)($_POST['delete_draft'] ?? '')) === ''
+) {
+    header('Location: /journal/create?posting_restricted=1');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Require logged-in user
     if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -541,6 +552,10 @@ if (is_dir($draftsDir)) {
 $content = file_get_contents($content_path);
 // Replace {drafts} placeholder with rendered draft list
 $content = str_replace('{drafts}', $draftItems, $content);
+if ($postingRestricted) {
+    $content = fridg3_disable_composer_controls($content);
+    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
+}
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);
