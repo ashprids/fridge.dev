@@ -12,8 +12,9 @@ current chain:
 2. `code lint` workflow runs
 3. if lint passes, `deploy to fridge.dev` runs from the successful workflow event
 4. repo is rsynced to `/var/www/fridge.dev`
-5. the Toast Discord bot is gracefully restarted from the deployed copy
-6. the deploy workflow asks Toast to post a patch notice approval preview in Discord channel `1526075637096255548`; an admin `✅` reaction posts it to update channel `1455194403642802309` and pings role `1408064850688475197`
+5. the hard-ban source index is built or reused as the PHP-FPM `http` user
+6. the Toast Discord bot is gracefully restarted from the deployed copy
+7. the deploy workflow asks Toast to post a patch notice approval preview in Discord channel `1526075637096255548`; an admin `✅` reaction posts it to update channel `1455194403642802309` and pings role `1408064850688475197`
 
 ## Deploy Workflow
 
@@ -27,6 +28,7 @@ main details:
 - uses `DEPLOY_KEY`
 - deploy target is `deploy@45.76.134.105:/var/www/fridge.dev`
 - the workflow verifies `/var/www/fridge.dev` exists and is writable before rsync, and refuses any unexpected target path
+- after rsync, the workflow asks PHP running as `http` to build or reuse the hard-ban source index so a public request does not pay the one-time rebuild cost
 - after rsync, ssh stops any `toast` GNU screen session owned by `deploy`, stops any `toast` session owned by `http`, prepares `others/toast-discord-bot/bot/toast-bot.log` for `http`, then runs `/var/www/fridge.dev/others/toast-discord-bot/bot/start.sh` as `http`
 - the restart step needs passwordless sudo for `deploy` to run the Toast bot as `http`; Toast writes DM history, feed notification state, and patch approval state under `/data`, which is owned by `http:http`
 - because the `http` user home is not a normal login home, the workflow sets `SCREENDIR=/tmp/toast-screen-http` for `http`-owned screen commands and creates that socket directory as `http` with mode `700` before start
@@ -147,7 +149,7 @@ POST-only API directory routes also need POST-safe rewrites when called without 
 
 the contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access. `/data/guestbook` and `/data/guestbook/` are also blocked because entry files contain moderation-only IP metadata; the public guestbook remains available through its PHP routes. account form routes such as `/account/login`, `/account/change-password`, and `/account/admin/edit` are also rewritten directly to their PHP handlers so POST bodies are not lost to trailing-slash redirects.
 
-site-wide hard bans are stored in `data/etc/hard-banned-ips.txt`, augmented by read-only `.txt` source files recursively discovered beneath `data/etc/banlists/` and containing exact IPs or IPv4/IPv6 CIDR subnets, and enforced by nginx `auth_request` through the internal `/_hard-ban-check` location. a denied subrequest returns `401`, which nginx converts into a `302` redirect to `/error/blacklisted`; that route, files beneath its directory, and font files beneath `/resources` explicitly disable the authorization check so the redirect cannot loop and the stripped Blackprint page can render. browser/IP associations live in `data/etc/hard-ban-identities.json`. the physical checker route, hard-ban data files, and source-list directory must remain blocked from direct requests. this requires nginx's standard `ngx_http_auth_request_module`.
+site-wide hard bans are stored in `data/etc/hard-banned-ips.txt`, augmented by read-only `.txt` source files recursively discovered beneath `data/etc/banlists/` and containing exact IPs or IPv4/IPv6 CIDR subnets, and enforced by nginx `auth_request` through the internal `/_hard-ban-check` location. PHP-FPM compiles source lists into a fixed-width binary range index beneath `data/etc/banlists/index/`; its source-stat signature automatically invalidates it when a list changes, and a lock prevents concurrent rebuilds. index construction and its streaming fallback use fixed-size token chunks, keeping memory bounded even for large files or lines. the index directory must be writable by `http`; deleting it or updating a source makes the next deployment prewarm or request rebuild it. a denied subrequest returns `401`, which nginx converts into a `302` redirect to `/error/blacklisted`; that route, files beneath its directory, and font files beneath `/resources` explicitly disable the authorization check so the redirect cannot loop and the stripped Blackprint page can render. browser/IP associations live in `data/etc/hard-ban-identities.json`. the physical checker route, hard-ban data files, source-list directory, and binary index must remain inaccessible to clients. this requires nginx's standard `ngx_http_auth_request_module`.
 
 the upload API posts to `/tools/upload/?api=*`; keep the exact `/tools/upload` nginx rewrite so stale no-slash requests hit PHP directly instead of losing their POST body to a trailing-slash redirect. cursed but real.
 

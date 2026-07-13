@@ -215,10 +215,14 @@ Private browser-to-IP associations used to carry an active hard ban across IP ch
 
 ### `data/etc/banlists/**/*.txt`
 
-Read-only hard-ban source lists. Every valid whitespace-separated IPv4 or IPv6 address or CIDR subnet from every `.txt` file anywhere beneath this directory is merged with the manual hard-ban list at request time. Subdirectories are scanned recursively. IPv4 prefixes from `/0` through `/32` and IPv6 prefixes from `/0` through `/128` are supported.
+Read-only hard-ban source lists. Every valid whitespace-separated IPv4 or IPv6 address or CIDR subnet from every `.txt` file anywhere beneath this directory is merged with the manual hard-ban set. Subdirectories are scanned recursively. IPv4 prefixes from `/0` through `/32` and IPv6 prefixes from `/0` through `/128` are supported.
 
 - source entries are enforced without appearing in the `/settings/banned-ips` textarea or being copied to `hard-banned-ips.txt`
 - unreadable files and subdirectories, non-text files, and invalid tokens are ignored without disabling the other source lists
+- PHP-FPM builds a stat-signature-keyed binary range index beneath `data/etc/banlists/index/` and reuses it until a source path, inode, size, modification time, or change time differs
+- `data/etc/banlists/index/` must be writable by the PHP-FPM user; its binary files are not treated as source lists because discovery accepts only `.txt` files
+- the next locked index access removes interrupted `.build-*` directories, while completed superseded signature versions are retained for one hour before pruning so in-flight requests can finish safely
+- index construction is streaming and bounded-memory; if index creation fails, checks fall back to scanning the source files in fixed-size chunks
 - nginx blocks the entire directory from client access
 - the developer-data sanitizer clears the directory and the publishing archive excludes its contents
 
