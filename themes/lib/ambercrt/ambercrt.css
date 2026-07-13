@@ -16,6 +16,11 @@
     --hero-ascii-opacity: 0.95;
 }
 
+body.ambercrt-theme,
+body.ambercrt-theme *:not(#title):not(#title *):not(.mobile-collapsed-title):not(.mobile-collapsed-title *):not(.fa):not(.fa-solid):not(.fa-regular):not(.fa-brands):not([class^="fa-"]):not([class*=" fa-"]) {
+    font-family: 'IBM_VGA', var(--emoji-font), monospace !important;
+}
+
 body {
     background:
         radial-gradient(ellipse at 50% 45%, rgba(255, 137, 20, 0.12), transparent 62%),
@@ -54,7 +59,6 @@ body {
 #title,
 .mobile-collapsed-title {
     color: var(--fg);
-    font-family: "MainBold", var(--emoji-font), monospace;
     text-shadow:
         0 0 8px rgba(255, 184, 77, 0.72),
         0 0 22px rgba(255, 111, 0, 0.42);
@@ -229,7 +233,6 @@ button:hover,
     max-width: 100%;
     overflow: hidden;
     color: var(--links);
-    font-family: "MainItalic", var(--emoji-font), monospace;
     font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;

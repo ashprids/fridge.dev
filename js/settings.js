@@ -130,9 +130,9 @@ function stopSlotMachineRoll(container, restore = true) {
     container.classList.remove('slot-machine-rolling');
     container.style.removeProperty('--slot-machine-inline-size');
     container.style.removeProperty('--slot-machine-block-size');
-    container.querySelectorAll('.slot-machine-word-incoming, .slot-machine-extra-reel').forEach(letter => letter.remove());
-    container.querySelectorAll('.slot-machine-freezer-ejected, .slot-machine-reroll').forEach(letter => {
-        letter.classList.remove('slot-machine-freezer-ejected', 'slot-machine-reroll', 'slot-machine-reel');
+    container.querySelectorAll('.slot-machine-extra-reel').forEach(letter => letter.remove());
+    container.querySelectorAll('.slot-machine-reroll').forEach(letter => {
+        letter.classList.remove('slot-machine-reroll', 'slot-machine-reel');
     });
     if (restore) {
         container.querySelectorAll('.title-letter:not(.slot-machine-extra-reel)').forEach(letter => {
@@ -214,28 +214,33 @@ function runSlotMachineRoll(container) {
         }
 
         if (rareFreezer) {
-            const incomingWord = document.createElement('span');
-            incomingWord.className = 'slot-machine-word-incoming';
-            incomingWord.setAttribute('aria-hidden', 'true');
-            incomingWord.textContent = 'fridge';
-            const containerBox = container.getBoundingClientRect();
-            const firstReelBox = reels[0].getBoundingClientRect();
-            incomingWord.style.left = `${firstReelBox.left - containerBox.left}px`;
-            incomingWord.style.top = `${firstReelBox.top - containerBox.top + firstReelBox.height / 2}px`;
-            container.appendChild(incomingWord);
-            reels.forEach(reel => reel.classList.add('slot-machine-freezer-ejected'));
-            const freezerReplaceTimer = window.setTimeout(() => {
-                baseReels.forEach((reel, index) => {
-                    reel.textContent = ['f', 'r', 'i', 'd', 'g', 'e'][index];
-                    reel.classList.remove('slot-machine-freezer-ejected', 'slot-machine-reel');
+            const fridgeTargets = ['f', 'r', 'i', 'd', 'g', 'e'];
+            reels.forEach(reel => {
+                reel.dataset.reelLocked = '0';
+                reel.classList.add('slot-machine-reroll');
+            });
+            container._slotMachineInterval = window.setInterval(() => {
+                reels.forEach(reel => {
+                    if (reel.dataset.reelLocked !== '1') {
+                        reel.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+                    }
                 });
-                reels[6].remove();
-                incomingWord.remove();
-                container.classList.remove('slot-machine-rolling');
-                container._slotMachineRunning = false;
-                scheduleSlotMachineReplay(container);
-            }, 740);
-            container._slotMachineTimers.push(freezerReplaceTimer);
+            }, 55);
+            baseReels.forEach((reel, index) => {
+                const timer = window.setTimeout(() => {
+                    reel.textContent = fridgeTargets[index];
+                    reel.dataset.reelLocked = '1';
+                    if (index !== baseReels.length - 1) return;
+                    if (container._slotMachineInterval) window.clearInterval(container._slotMachineInterval);
+                    container._slotMachineInterval = null;
+                    reels.forEach(item => item.classList.remove('slot-machine-reroll', 'slot-machine-reel'));
+                    reels[6].remove();
+                    container.classList.remove('slot-machine-rolling');
+                    container._slotMachineRunning = false;
+                    scheduleSlotMachineReplay(container);
+                }, 520 + index * 120);
+                container._slotMachineTimers.push(timer);
+            });
             return;
         }
 

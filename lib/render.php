@@ -149,15 +149,15 @@ if (!function_exists('fridg3_apply_work_in_progress_banner')) {
                 $quote = $styleMatches[1];
                 $style = $styleMatches[2];
                 if (preg_match('/display\s*:\s*none\s*;?/i', $style)) {
-                    $style = preg_replace('/display\s*:\s*none\s*;?/i', 'display: inline;', $style, 1);
+                    $style = preg_replace('/display\s*:\s*none\s*;?/i', 'display: block;', $style, 1);
                 } else {
                     $style = rtrim($style);
-                    $style .= ($style !== '' && substr($style, -1) !== ';' ? ';' : '') . ' display: inline;';
+                    $style .= ($style !== '' && substr($style, -1) !== ';' ? ';' : '') . ' display: block;';
                 }
                 return preg_replace('/\sstyle=(["\'])(.*?)\1/i', ' ' . 'style' . '=' . $quote . $style . $quote, $tag, 1);
             }
 
-            return rtrim($tag, '>') . ' style="display: inline;">';
+            return rtrim($tag, '>') . ' style="display: block;">';
         }, $template, 1) ?: $template;
     }
 }
@@ -590,7 +590,7 @@ if (!function_exists('fridg3_inject_dev_mode_banner')) {
             return $template;
         }
 
-        $banner = '<span id="dev-mode-banner" style="color: #9fd6a3; line-height: 1.15;"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
+        $banner = '<span id="dev-mode-banner" style="color: #9fd6a3; display: block; line-height: 1.15;"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
         if (strpos($template, 'id="maintenance-banner"') !== false) {
             return preg_replace('/(<br><span id="maintenance-banner"[^>]*>.*?<\/span>)/is', '$1' . $banner, $template, 1);
         }

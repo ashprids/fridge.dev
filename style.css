@@ -681,39 +681,8 @@ body.sidebar-is-hidden #sidebar {
 }
 
 .slot-machine-reroll {
-    animation: title-letter-slot-machine 520ms linear both !important;
+    animation: title-letter-slot-machine 1.2s linear both !important;
 }
-
-.slot-machine-word-incoming {
-    position: absolute;
-    background-image: linear-gradient(0deg, #776490, #748f9c, #6caaa7, #748f9c, #776490);
-    background-size: 100% 300%;
-    background-position: 50% 100%;
-    background-clip: text;
-    -webkit-background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-    white-space: nowrap;
-    animation:
-        slot-machine-word-incoming 720ms cubic-bezier(0.22, 1, 0.36, 1) both,
-        title-gradient-shift 1.8s ease-in-out infinite alternate;
-    filter: drop-shadow(0 0 7px rgba(116, 143, 156, 0.75));
-}
-
-.slot-machine-freezer-ejected {
-    --freezer-shatter-x: 0px;
-    --freezer-shatter-y: -20px;
-    --freezer-shatter-rotate: 25deg;
-    animation: slot-machine-freezer-ejected 620ms cubic-bezier(0.55, 0, 1, 0.45) both !important;
-}
-
-.slot-machine-freezer-ejected:nth-child(1) { --freezer-shatter-x: -48px; --freezer-shatter-y: -24px; --freezer-shatter-rotate: -95deg; }
-.slot-machine-freezer-ejected:nth-child(2) { --freezer-shatter-x: -34px; --freezer-shatter-y: 28px; --freezer-shatter-rotate: 70deg; }
-.slot-machine-freezer-ejected:nth-child(3) { --freezer-shatter-x: -18px; --freezer-shatter-y: -38px; --freezer-shatter-rotate: -55deg; }
-.slot-machine-freezer-ejected:nth-child(4) { --freezer-shatter-x: 18px; --freezer-shatter-y: 34px; --freezer-shatter-rotate: 60deg; }
-.slot-machine-freezer-ejected:nth-child(5) { --freezer-shatter-x: 30px; --freezer-shatter-y: -34px; --freezer-shatter-rotate: 82deg; }
-.slot-machine-freezer-ejected:nth-child(6) { --freezer-shatter-x: 42px; --freezer-shatter-y: 22px; --freezer-shatter-rotate: -72deg; }
-.slot-machine-freezer-ejected:nth-child(7) { --freezer-shatter-x: 54px; --freezer-shatter-y: -18px; --freezer-shatter-rotate: 110deg; }
 
 #title[data-title-animation="moonwalk"]:is(:hover, .title-animation-always) .title-letter,
 .title-animation-preview[data-title-animation="moonwalk"] .title-letter {
@@ -951,26 +920,6 @@ body.sidebar-is-hidden #sidebar {
     90% { transform: translateY(-2px) scale(0.98, 1.04); opacity: 1; filter: blur(0); }
 }
 
-@keyframes slot-machine-word-incoming {
-    0% { transform: translateY(-140%) rotate(-12deg) scale(0.45); opacity: 0; }
-    32% { transform: translateY(-140%) rotate(-12deg) scale(0.45); opacity: 0; }
-    58% { transform: translateY(-38%) rotate(4deg) scale(1.24, 0.82); opacity: 1; }
-    70% { transform: translateY(-52%) rotate(-2deg) scale(0.9, 1.14); opacity: 1; }
-    82% { transform: translateY(-46%) rotate(1deg) scale(1.07, 0.94); opacity: 1; }
-    92% { transform: translateY(-51%) rotate(0deg) scale(0.98, 1.03); opacity: 1; }
-    100% { transform: translateY(-50%) rotate(0deg) scale(1); opacity: 1; }
-}
-
-@keyframes slot-machine-freezer-ejected {
-    0%, 18% { transform: translate(0) rotate(0deg) scale(1); opacity: 1; filter: blur(0); }
-    25% { transform: translate(-1px, 1px) rotate(-3deg) scale(1.08); opacity: 1; filter: brightness(1.7); }
-    100% {
-        transform: translate(var(--freezer-shatter-x), var(--freezer-shatter-y)) rotate(var(--freezer-shatter-rotate)) scale(0.18);
-        opacity: 0;
-        filter: blur(1.5px) brightness(1.8);
-    }
-}
-
 @keyframes title-letter-moonwalk {
     0%, 100% { transform: translateX(0) skewX(0deg) rotate(0deg) scale(1); }
     18% { transform: translateX(6px) skewX(-14deg) rotate(2deg) scale(0.96, 1.04); }
@@ -1042,6 +991,11 @@ body.mobile-template #title .title-letter {
 :where(body:not(.classic-theme)) #maintenance-banner {
     display: block;
     margin-top: 12px;
+}
+
+#dev-mode-banner {
+    display: block;
+    margin-top: 4px;
 }
 
 #hide-sidebar {
