@@ -219,7 +219,7 @@ Global hard-ban enforcement settings managed by admins through `/settings`.
 
 - `strictIdentityEnforcement` defaults to `true` when the file or key is absent
 - when `true`, recognized banned identities propagate the ban to later IPs
-- when `false`, previously propagated associated IPs are removed from the manual list, while identity-group primary IPs remain; only the current IP can trigger a hard ban, and recognizable identity information and newly observed IPs are still recorded without denying access or modifying the hard-ban list
+- when switching to `false`, previously propagated associated IPs are removed from the manual list while identity-group primary IPs remain; after the switch, the identity JSON is entirely ignored and is neither read nor updated until strict enforcement is enabled again
 
 ### `data/etc/banlists/**/*.txt`
 

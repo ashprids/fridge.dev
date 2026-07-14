@@ -121,9 +121,10 @@ try {
     assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.45'), 'relaxed mode added a future IP to the hard-ban list');
     $identityData = fridg3_hard_ban_load_identities();
     assertHardBanResult(
-        fridg3_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.45'),
-        'relaxed mode did not retain the observed future IP'
+        !fridg3_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.45'),
+        'relaxed mode wrote a future IP to the ignored identity store'
     );
+    assertHardBanResult(!fridg3_hard_ban_register_identifier('198.51.100.8', str_repeat('b', 64)), 'relaxed mode registered a new identity');
     assertHardBanResult(fridg3_hard_ban_check_client('198.51.100.8', $identifier), 'relaxed mode did not enforce the specifically banned IP');
     assertHardBanResult(fridg3_hard_ban_set_strict_enabled(true), 'could not re-enable strict hard bans');
     $initialIndex = fridg3_hard_ban_source_index();

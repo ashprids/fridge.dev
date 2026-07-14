@@ -27,7 +27,7 @@ if (!function_exists('fridg3_hard_ban_strict_enabled')) {
 if (!function_exists('fridg3_hard_ban_set_strict_enabled')) {
     function fridg3_hard_ban_set_strict_enabled(bool $enabled): bool
     {
-        if (!$enabled && !fridg3_hard_ban_release_associated_ips()) {
+        if (!$enabled && fridg3_hard_ban_strict_enabled() && !fridg3_hard_ban_release_associated_ips()) {
             return false;
         }
         $path = fridg3_hard_ban_settings_path();
@@ -1023,6 +1023,9 @@ if (!function_exists('fridg3_hard_ban_release_associated_ips')) {
 if (!function_exists('fridg3_hard_ban_admin_save')) {
     function fridg3_hard_ban_admin_save(array $requestedIps): bool
     {
+        if (!fridg3_hard_ban_strict_enabled()) {
+            return fridg3_hard_ban_write($requestedIps);
+        }
         $data = fridg3_hard_ban_load_identities();
         $releasedPrimaries = [];
         foreach ($data['identities'] as $record) {
@@ -1058,7 +1061,7 @@ if (!function_exists('fridg3_hard_ban_admin_save')) {
 if (!function_exists('fridg3_hard_ban_register_identifier')) {
     function fridg3_hard_ban_register_identifier(string $ip, string $identifier): bool
     {
-        if (!fridg3_hard_ban_valid_identifier($identifier) || !fridg3_hard_ban_contains($ip)) {
+        if (!fridg3_hard_ban_strict_enabled() || !fridg3_hard_ban_valid_identifier($identifier) || !fridg3_hard_ban_contains($ip)) {
             return false;
         }
 
@@ -1097,7 +1100,7 @@ if (!function_exists('fridg3_hard_ban_register_identifier')) {
 if (!function_exists('fridg3_hard_ban_observe_identifier')) {
     function fridg3_hard_ban_observe_identifier(string $ip, string $identifier): bool
     {
-        if (!fridg3_hard_ban_valid_identifier($identifier) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+        if (!fridg3_hard_ban_strict_enabled() || !fridg3_hard_ban_valid_identifier($identifier) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
             return false;
         }
         $data = fridg3_hard_ban_load_identities();
@@ -1121,12 +1124,7 @@ if (!function_exists('fridg3_hard_ban_check_client')) {
     function fridg3_hard_ban_check_client(string $ip, string $identifier): bool
     {
         if (!fridg3_hard_ban_strict_enabled()) {
-            // Release IPs propagated before relaxed mode was enabled while
-            // retaining their identity records for recognition and auditing.
-            fridg3_hard_ban_release_associated_ips();
-            if (fridg3_hard_ban_valid_identifier($identifier)) {
-                fridg3_hard_ban_observe_identifier($ip, $identifier);
-            }
+            // Relaxed mode deliberately ignores the complete identity store.
             return fridg3_hard_ban_contains($ip);
         }
         if (!fridg3_hard_ban_valid_identifier($identifier)) {

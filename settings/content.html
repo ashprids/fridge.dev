@@ -26,7 +26,7 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <div class="checkbox-group">
     <label class="checkbox-label">
         <input type="checkbox" class="checkbox" id="strict-hard-bans-toggle">
-        <span data-tooltip="<b>when enabled:</b>\na browser identifier associated with a\nhard-banned IP causes later IPs used by\nthat browser to be added to the hard-ban\nlist and blocked.\n\n<b>when disabled:</b>\npreviously associated IPs are unbanned.\nonly the original and currently listed IPs\nare checked and blocked. recognized browser\nidentifiers, observed IPs, timestamps, and\nuser-agent hashes are still recorded, but\nthey do not cause future IPs to be banned\nor denied access.">punish associated identities and future IPs</span>
+        <span data-tooltip="<b>when enabled:</b>\na browser identifier associated with a\nhard-banned IP causes later IPs used by\nthat browser to be added to the hard-ban\nlist and blocked. identity details are\nrecorded in hard-ban-identities.json.\n\n<b>when disabled:</b>\npreviously associated IPs are unbanned.\nonly the original and currently listed IPs\nare checked and blocked. the entire\nhard-ban-identities.json file is ignored:\nit is not read, enforced, or updated.">punish associated identities and future IPs</span>
     </label>
 </div>
 <br>
