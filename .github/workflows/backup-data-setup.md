@@ -111,7 +111,7 @@ The backup archive is created in:
 /home/deploy
 ```
 
-During archive creation, the workflow checks that the `deploy` user can read every file and read/traverse every directory under `data`, then prints the target archive path, backup filesystem disk usage, and the zip error log if compression fails.
+During archive creation, the workflow checks that the `deploy` user can read every file and read/traverse every directory under `data`, excluding the rebuildable `data/etc/banlists/index/` cache, then prints the target archive path, backup filesystem disk usage, and the zip error log if compression fails. The generated hard-ban index is also excluded from the archive and is rebuilt automatically from the backed-up source lists after restoration.
 Before creating a new archive, the workflow removes stale `DD-MM-YY_hh-mm-ss.zip` files from `/home/deploy`; the server copy is temporary, while Google Drive is the retained backup store.
 
 The archive contains the `data` directory from:
@@ -144,7 +144,9 @@ If the workflow fails on archive creation:
 `zip` exit code `18` means at least one file was unreadable and skipped. To diagnose it on the server, run:
 
 ```sh
-sudo -u deploy find /var/www/fridge.dev/data \( -type f ! -readable -o -type d \( ! -readable -o ! -executable \) \) -print
+sudo -u deploy find /var/www/fridge.dev/data \
+  -path /var/www/fridge.dev/data/etc/banlists/index -prune -o \
+  \( -type f ! -readable -o -type d \( ! -readable -o ! -executable \) \) -print
 ```
 
 The usual repair is to keep `/data` owned by the runtime user/group and make it group-readable to `deploy`:

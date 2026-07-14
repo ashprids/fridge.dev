@@ -56,6 +56,7 @@ jobs:
               [ -d "$TARGET" ] || { echo "site directory not found: $TARGET" >&2; exit 1; }
               cd "$TARGET"
               command -v php >/dev/null 2>&1 || { echo "php is not installed on the server" >&2; exit 1; }
+              command -v rsync >/dev/null 2>&1 || { echo "rsync is not installed on the server" >&2; exit 1; }
               [ -d data ] || { echo "data directory not found at $TARGET/data" >&2; exit 1; }
               [ -w "$REMOTE_WORK_DIR" ] || { echo "remote work directory is not writable: $REMOTE_WORK_DIR" >&2; exit 1; }
 
@@ -64,7 +65,7 @@ jobs:
 
               echo "Copying production data to temporary workspace: $work_dir" >&2
               mkdir -p "$sanitized_data"
-              cp -a data/. "$sanitized_data/"
+              rsync -a --exclude '/etc/banlists/index/' data/ "$sanitized_data/"
               printf "%s" "$work_dir"
           EOF
           )"

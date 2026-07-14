@@ -51,7 +51,10 @@ jobs:
               [ -w "$REMOTE_BACKUP_DIR" ] || { echo "remote backup directory is not writable: $REMOTE_BACKUP_DIR" >&2; exit 1; }
 
               unreadable_paths="$(
-                find data \( -type f ! -readable -o -type d \( ! -readable -o ! -executable \) \) -print 2>&1 | head -50 || true
+                find data \
+                  -path 'data/etc/banlists/index' -prune -o \
+                  \( -type f ! -readable -o -type d \( ! -readable -o ! -executable \) \) -print 2>&1 \
+                  | head -50 || true
               )"
               if [ -n "$unreadable_paths" ]; then
                 echo "data contains paths the deploy user cannot archive:" >&2
@@ -75,7 +78,7 @@ jobs:
               df -h "$REMOTE_BACKUP_DIR" >&2
               rm -f "$archive_path"
 
-              if zip -r "$archive_path" data >"$zip_log" 2>&1; then
+              if zip -r "$archive_path" data -x 'data/etc/banlists/index/*' >"$zip_log" 2>&1; then
                 :
               else
                 status=$?

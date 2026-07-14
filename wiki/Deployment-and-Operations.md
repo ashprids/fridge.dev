@@ -176,8 +176,8 @@ what it does:
 
 1. ssh to the server
 2. remove stale temporary backup zips from `/home/deploy`
-3. verify `deploy` can read/traverse `/var/www/fridge.dev/data`
-4. zip `/var/www/fridge.dev/data` into a temporary archive under `/home/deploy`
+3. verify `deploy` can read/traverse `/var/www/fridge.dev/data`, excluding the rebuildable hard-ban index cache
+4. zip `/var/www/fridge.dev/data` into a temporary archive under `/home/deploy`, excluding that generated cache
 5. download the archive to the runner
 6. upload it to Google Drive using `rclone`
 7. keep only the 10 newest backups
@@ -196,7 +196,7 @@ required secrets:
 
 setup notes live in `/.github/workflows/backup-data-setup.md`.
 
-if archive creation fails with `zip` exit code `18`, at least one path under `/data` was unreadable to `deploy`. run the unreadable-path check from `/.github/workflows/backup-data-setup.md`, then fix ownership/permissions before rerunning the workflow.
+if archive creation fails with `zip` exit code `18`, at least one non-cache path under `/data` was unreadable to `deploy`. run the unreadable-path check from `/.github/workflows/backup-data-setup.md`, then fix ownership/permissions before rerunning the workflow. `data/etc/banlists/index/` is deliberately omitted because its restrictive runtime permissions must not break backups and it can be rebuilt from the backed-up banlist sources.
 
 the backup and developer-data workflows also refuse to run if `TARGET` is anything other than `/var/www/fridge.dev`, so a stale workflow variable cannot accidentally back up or publish the wrong site tree.
 

@@ -9,7 +9,7 @@ The workflow runs daily at `00:00 UTC`, matching the private `/data` backup work
 Each run:
 
 1. Connects to `deploy@45.76.134.105` over SSH
-2. Copies `/var/www/fridge.dev/data` into a temporary server workspace
+2. Copies `/var/www/fridge.dev/data` into a temporary server workspace while excluding the rebuildable hard-ban binary index
 3. Runs `.github/scripts/sanitize-dev-data.php` against that copy
 4. Compresses the sanitized `data` directory into a zip file named `DD-MM-YY_hh-mm-ss.zip`
 5. Uploads the zip file into the public Google Drive developer data folder
