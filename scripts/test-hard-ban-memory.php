@@ -114,8 +114,9 @@ try {
     assertHardBanResult(fridg3_hard_ban_check_client('192.0.2.44', $identifier), 'strict mode did not propagate the identity ban');
     assertHardBanResult(fridg3_hard_ban_contains('192.0.2.44'), 'strict mode did not add the future IP');
 
-    file_put_contents(fridg3_hard_ban_path(), "198.51.100.8\n");
     assertHardBanResult(fridg3_hard_ban_set_strict_enabled(false), 'could not disable strict hard bans');
+    assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.44'), 'disabling strict mode did not release a previously propagated IP');
+    assertHardBanResult(fridg3_hard_ban_contains('198.51.100.8'), 'disabling strict mode released the original banned IP');
     assertHardBanResult(!fridg3_hard_ban_check_client('192.0.2.45', $identifier), 'relaxed mode punished a future IP');
     assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.45'), 'relaxed mode added a future IP to the hard-ban list');
     $identityData = fridg3_hard_ban_load_identities();
