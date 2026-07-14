@@ -265,6 +265,9 @@ function initAsciiTime() {
             return;
         }
         el.dataset.asciiTimeBound = '1';
+        el.style.width = 'max-content';
+        el.style.marginInline = 'auto';
+        el.style.alignSelf = 'center';
 
         let fontMap = {};
         let maxLines = 0;
@@ -278,17 +281,16 @@ function initAsciiTime() {
             return glyph.reduce((m, l) => Math.max(m, l.length), 0);
         };
 
-        const buildMap = (entries) => {
+        const buildMap = (rawFont) => {
+            const characters = '0123456789:?'.split('');
+            const normalized = typeof rawFont === 'string' ? rawFont.replace(/\r\n?/g, '\n').replace(/\n$/, '') : '';
+            const glyphs = normalized.split('\n----------------\n');
+            if (glyphs.length !== characters.length) {
+                throw new Error(`Expected ${characters.length} ASCII time glyphs, received ${glyphs.length}`);
+            }
             const map = {};
-            if (!Array.isArray(entries)) return map;
-            entries.forEach((item) => {
-                if (item && typeof item === 'object') {
-                    if (typeof item.number === 'string' && typeof item.font === 'string') {
-                        map[item.number] = item.font.split(/\r?\n/);
-                    } else if (Object.prototype.hasOwnProperty.call(item, 'colon') && typeof item.colon === 'string') {
-                        map[':'] = item.colon.split(/\r?\n/);
-                    }
-                }
+            characters.forEach((character, index) => {
+                map[character] = glyphs[index].split('\n');
             });
             const lineHeights = Object.values(map).map((lines) => lines.length || 0);
             const widths = Object.values(map).map((lines) => lines.reduce((m, l) => Math.max(m, l.length), 0));
@@ -312,10 +314,14 @@ function initAsciiTime() {
 
         const renderAsciiRows = (timeStr) => {
             const rows = Array.from({ length: maxLines }, () => '');
-            timeStr.split('').forEach((ch) => {
+            const characters = timeStr.split('');
+            characters.forEach((ch, characterIndex) => {
                 const glyph = fontMap[ch] || [];
                 const width = ch === ':' ? glyphWidthFor(glyph) : glyphWidth;
-                const gap = ch === ':' ? 0 : charGap;
+                // The clock font's colon block contains its own horizontal
+                // padding, matching the legacy embedded glyph exactly.
+                const isLastCharacter = characterIndex === characters.length - 1;
+                const gap = isLastCharacter || ch === ':' ? 0 : charGap;
                 for (let i = 0; i < maxLines; i += 1) {
                     rows[i] += pad(glyph[i] || '', width + gap);
                 }
@@ -357,22 +363,10 @@ function initAsciiTime() {
         };
 
         const loadFonts = async () => {
-            const timeGlyphs = [
-                { number: '1', font: "SsSSs.     \n  SSSSs    \n  S SSS    \n  S  SS    \n  S..SS    \n  S:::S    \n  S;;;S    \n  S%%%S    \nSsSSSSSsS  " },
-                { number: '2', font: ".sSSSSs.   \n`SSSS SSSs.\n      SSSSS\n.sSSSsSSSS'\nS..SS      \nS:::S SSSs.\nS;;;S SSSSS\nS%%%S SSSSS\nSSSSSsSSSSS" },
-                { number: '3', font: ".sSSSSSSs. \n`SSSS SSSSs\n      S SSS\n  .sS S  SS\n SSSSsS..SS\n  `:; S:::S\n      S;;;S\n.SSSS S%%%S\n`:;SSsSSSSS" },
-                { number: '4', font: ".sSSS s.   \nSSSSS SSSs.\nS SSS SSSSS\nS  SS SSSSS\nS..SSsSSSSS\n      SSSSS\n      SSSSS\n      SSSSS\n      SSSSS" },
-                { number: '5', font: "SSSSSSSSSs.\nSSSSS SSSS'\nS SSS      \nSSSSSsSSSs.\n      SSSSS\n.sSSS SSSSS\nS;;;S SSSSS\nS%%%S SSSSS\n`:;SSsSS;:'" },
-                { number: '6', font: ".sSSSSs.   \nSSSSSSSSSs.\nS SSS SSSS'\nS  SS      \nS...SsSSSa.\nS:::S SSSSS\nS;;;S SSSSS\nS%%%S SSSSS\n`:;SSsSS;:'" },
-                { number: '7', font: "SSSSSSSSSs.\nSSSSSSSSSSS\n     S SSS \n    S  SS  \n   S..SS   \n  S:::S    \n S;;;S     \nS%%%S      \nSSSSS      " },
-                { number: '8', font: ".sSSSSs.   \nSSSSS SSSs.\nS SSS SSSSS\nS  SS SSSSS\n`..SSsSSSs'\ns:::S SSSSs\nS;;;S SSSSS\nS%%%S SSSSS\n`:;SSsSS;:'" },
-                { number: '9', font: ".sSSSSs.   \nSSSSS SSSs.\nS SSS SSSSS\nS  SS SSSSS\n`..SSsSSSSS\n      SSSSS\n.sSSS SSSSS\nS%%%S SSSSS\n`:;SSsSS;:'" },
-                { number: '0', font: ".sSSSSs.   \nSSSSSSSSSs.\nS SSS SSSSS\nS  SS SSSSS\nS..SS\\SSSSS\nS:::S SSSSS\nS;;;S SSSSS\nS%%%S SSSSS\n`:;SSsSS;:'" },
-                { colon: " \n.sSs. \nS%%%S \n`:;:' \n      \n.sSs. \nS%%%S \n`:;:' " }
-            ];
-
             try {
-                fontMap = buildMap(timeGlyphs);
+                const response = await fetch('/resources/ascii-time.txt', { cache: 'no-cache' });
+                if (!response.ok) throw new Error(`ASCII time font request failed with ${response.status}`);
+                fontMap = buildMap(await response.text());
                 if (!maxLines) throw new Error('No glyphs loaded');
                 render();
                 el._asciiTimeRender = render;
@@ -453,6 +447,11 @@ function initAsciiUsage() {
         let maxLines = 0;
         let glyphWidth = 8;
         const charGap = 1;
+        let scrambleInterval = null;
+        let scrambleTimeout = null;
+        let previousReadings = null;
+        const scrambleDurationMs = 420;
+        const scrambleFrameMs = 60;
 
         const percentageGlyphs = [
             { number: '1', font: " d888      \nd8888      \n  888      \n  888      \n  888      \n  888      \n  888      \n8888888    " },
@@ -492,10 +491,12 @@ function initAsciiUsage() {
             return map;
         };
 
-        const renderValue = (value) => {
+        const renderValue = (value, digitOverride = null) => {
             if (!maxLines || !Object.keys(fontMap).length) return null;
             const safeVal = Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : null;
-            const numStr = safeVal === null ? '??' : String(safeVal).padStart(2, '0');
+            const numStr = typeof digitOverride === 'string'
+                ? digitOverride
+                : (safeVal === null ? '??' : String(safeVal).padStart(2, '0'));
             const str = `${numStr}%`;
             const rows = Array.from({ length: maxLines }, () => '');
             str.split('').forEach((ch) => {
@@ -508,16 +509,57 @@ function initAsciiUsage() {
             return rows.join('\n');
         };
 
-        const applyReadings = (data) => {
-            const cpu = renderValue(data.cpu);
-            const mem = renderValue(data.memory);
-            const disk = renderValue(data.disk);
-            const diskAvail = renderValue(data.diskAvailable);
+        const normalizeUsageValue = (value) => Number.isFinite(value)
+            ? Math.max(0, Math.min(100, Math.round(value)))
+            : null;
+
+        const renderReadings = (data, scrambledMetrics = new Set()) => {
+            const randomDigits = (value) => {
+                const safeVal = normalizeUsageValue(value);
+                const digitCount = safeVal === 100 ? 3 : 2;
+                return Array.from({ length: digitCount }, () => Math.floor(Math.random() * 10)).join('');
+            };
+            const cpu = renderValue(data.cpu, scrambledMetrics.has('cpu') ? randomDigits(data.cpu) : null);
+            const mem = renderValue(data.memory, scrambledMetrics.has('memory') ? randomDigits(data.memory) : null);
+            const disk = renderValue(data.disk, scrambledMetrics.has('disk') ? randomDigits(data.disk) : null);
+            const diskAvail = renderValue(data.diskAvailable, scrambledMetrics.has('diskAvailable') ? randomDigits(data.diskAvailable) : null);
             if (cpuEl) cpuEl.textContent = cpu || '??%';
             if (memEl) memEl.textContent = mem || '??%';
             if (diskEl) diskEl.textContent = disk || '??%';
             if (diskAvailEl) diskAvailEl.textContent = diskAvail || '??%';
             fitMobileAsciiLayout();
+        };
+
+        const applyReadings = (data) => {
+            if (scrambleInterval) window.clearInterval(scrambleInterval);
+            if (scrambleTimeout) window.clearTimeout(scrambleTimeout);
+
+            const currentReadings = {
+                cpu: normalizeUsageValue(data.cpu),
+                memory: normalizeUsageValue(data.memory),
+                disk: normalizeUsageValue(data.disk),
+                diskAvailable: normalizeUsageValue(data.diskAvailable),
+            };
+            const changedMetrics = new Set(previousReadings === null
+                ? []
+                : Object.keys(currentReadings).filter((key) => previousReadings[key] !== currentReadings[key]));
+            previousReadings = currentReadings;
+
+            if (changedMetrics.size === 0) {
+                scrambleInterval = null;
+                scrambleTimeout = null;
+                renderReadings(data);
+                return;
+            }
+
+            renderReadings(data, changedMetrics);
+            scrambleInterval = window.setInterval(() => renderReadings(data, changedMetrics), scrambleFrameMs);
+            scrambleTimeout = window.setTimeout(() => {
+                window.clearInterval(scrambleInterval);
+                scrambleInterval = null;
+                scrambleTimeout = null;
+                renderReadings(data);
+            }, scrambleDurationMs);
         };
 
         const loadFonts = async () => {

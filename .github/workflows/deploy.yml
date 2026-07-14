@@ -62,6 +62,20 @@ jobs:
             --exclude ".gitignore" \
             "$DEPLOY_DIR"/ "$REMOTE":"$TARGET"/
 
+      - name: validate and reload nginx
+        run: |
+          ssh "$REMOTE" TARGET="$TARGET" bash -s <<'EOF'
+          set -euo pipefail
+
+          [ "$TARGET" = "/var/www/fridge.dev" ] || { echo "refusing to reload nginx for unexpected target: $TARGET" >&2; exit 1; }
+
+          echo "Validating deployed nginx configuration..."
+          sudo -n /usr/bin/nginx -t
+
+          echo "Gracefully reloading nginx..."
+          sudo -n /usr/bin/systemctl reload nginx
+          EOF
+
       - name: warm hard-ban index
         run: |
           ssh "$REMOTE" TARGET="$TARGET" bash -s <<'EOF'

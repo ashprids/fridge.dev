@@ -25,8 +25,14 @@ server {
     location = /_hard-ban-check {
         internal;
         auth_request off;
+        # auth_request does not forward the parent request body. Clear its
+        # body metadata as well so PHP-FPM does not wait for a POST body that
+        # can never arrive.
+        fastcgi_pass_request_body off;
         fastcgi_pass unix:/run/php-fpm/php-fpm.sock;
         include fastcgi_params;
+        fastcgi_param CONTENT_LENGTH "";
+        fastcgi_param REQUEST_METHOD GET;
         fastcgi_param SCRIPT_FILENAME $document_root/api/hard-ban-check/index.php;
     }
 
