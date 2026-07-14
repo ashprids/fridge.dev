@@ -286,7 +286,7 @@ if (!function_exists('fridg3_session_enforce_work_in_progress')) {
 }
 
 if (!function_exists('fridg3_start_session')) {
-    function fridg3_start_session(): void
+    function fridg3_start_session(bool $enforceAccessRules = true): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
             return;
@@ -315,6 +315,10 @@ if (!function_exists('fridg3_start_session')) {
         ));
 
         session_start();
+
+        if (!$enforceAccessRules) {
+            return;
+        }
 
         if (
             PHP_SAPI !== 'cli'

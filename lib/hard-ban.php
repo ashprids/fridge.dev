@@ -1187,3 +1187,25 @@ if (!function_exists('fridg3_hard_ban_check_client')) {
         return true;
     }
 }
+
+if (!function_exists('fridg3_hard_ban_would_block_client')) {
+    function fridg3_hard_ban_would_block_client(string $ip, string $identifier): bool
+    {
+        if (!fridg3_hard_ban_enforcement_enabled()) {
+            return false;
+        }
+        if (fridg3_hard_ban_contains($ip)) {
+            return true;
+        }
+        if (!fridg3_hard_ban_strict_enabled() || !fridg3_hard_ban_valid_identifier($identifier)) {
+            return false;
+        }
+        $data = fridg3_hard_ban_load_identities();
+        $record = $data['identities'][$identifier] ?? null;
+        if (!is_array($record)) {
+            return false;
+        }
+        $primaryIp = (string)($record['primaryIp'] ?? '');
+        return $primaryIp !== '' && fridg3_hard_ban_contains($primaryIp);
+    }
+}

@@ -77,6 +77,8 @@ Admins can disable **strict hard bans** in the admin-only section of `/settings`
 
 Admins can separately disable **hard-ban enforcement** above the strict-mode checkbox. This global setting also defaults to enabled. When disabled, the nginx authorization subrequest returns allowed immediately, before client-IP resolution and without reading the manual list, source lists, or identity data. Hard-ban data remains stored unchanged so enforcement can be restored later.
 
+Authenticated admin sessions always bypass hard-ban enforcement. The internal authorization endpoint loads the session without applying unrelated page redirects and returns allowed before performing the client hard-ban check. Shared rendering uses a read-only evaluation of the current settings for admins; when those rules would otherwise block the admin's IP or identity, it shows the same `hard-banned client` banner used in development mode with an `admin bypass active` status. This preview never propagates an IP or updates identity data.
+
 This mechanism follows the same browser profile while either first-party storage value remains. It intentionally does not use probabilistic canvas, hardware, or font fingerprinting because collisions could hard-ban unrelated visitors.
 
 ## Unbanning a Hard-Ban Group

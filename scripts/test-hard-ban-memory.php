@@ -131,6 +131,9 @@ try {
     assertHardBanResult(!fridg3_hard_ban_check_client('198.51.100.8', $identifier), 'disabled enforcement still blocked a banned IP');
     assertHardBanResult(fridg3_hard_ban_set_enforcement_enabled(true), 'could not re-enable hard-ban enforcement');
     assertHardBanResult(fridg3_hard_ban_check_client('198.51.100.8', $identifier), 're-enabled enforcement did not block a banned IP');
+    $hardBansBeforePreview = file_get_contents(fridg3_hard_ban_path());
+    assertHardBanResult(fridg3_hard_ban_would_block_client('192.0.2.46', $identifier), 'read-only preview missed a strict identity ban');
+    assertHardBanResult(file_get_contents(fridg3_hard_ban_path()) === $hardBansBeforePreview, 'read-only preview modified the hard-ban list');
     $initialIndex = fridg3_hard_ban_source_index();
     assertHardBanResult($initialIndex !== null, 'source index was not created');
     assertHardBanResult(fridg3_hard_ban_source_index() === $initialIndex, 'unchanged source index was not reused');

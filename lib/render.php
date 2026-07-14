@@ -586,11 +586,13 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
 if (!function_exists('fridg3_inject_dev_mode_banner')) {
     function fridg3_inject_dev_mode_banner($template) {
-        if (!fridg3_is_local_dev_server()) {
+        $isLocalDevServer = fridg3_is_local_dev_server();
+        $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
+        if (!$isLocalDevServer && !$isAdmin) {
             return $template;
         }
 
-        if (strpos($template, 'id="dev-mode-banner"') === false) {
+        if ($isLocalDevServer && strpos($template, 'id="dev-mode-banner"') === false) {
             $banner = '<span id="dev-mode-banner" style="color: #9fd6a3; display: block; line-height: 1.15;"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
             if (strpos($template, 'id="maintenance-banner"') !== false) {
                 $template = preg_replace('/(<br><span id="maintenance-banner"[^>]*>.*?<\/span>)/is', '$1' . $banner, $template, 1) ?: $template;
@@ -611,13 +613,21 @@ if (!function_exists('fridg3_inject_dev_mode_banner')) {
 
         $clientIp = fridg3_hard_ban_client_ip();
         $identifier = (string)($_COOKIE[FRIDG3_HARD_BAN_COOKIE] ?? '');
-        if (!fridg3_hard_ban_check_client($clientIp, $identifier)) {
+        $isHardBanned = $isAdmin
+            ? fridg3_hard_ban_would_block_client($clientIp, $identifier)
+            : fridg3_hard_ban_check_client($clientIp, $identifier);
+        if (!$isHardBanned) {
             return $template;
         }
 
-        $hardBanBanner = '<span id="hard-ban-dev-banner"><i class="fa-solid fa-skull-crossbones"></i> <b>hard-banned client</b><small>access termination active</small></span>';
+        $hardBanStatus = $isAdmin ? 'admin bypass active' : 'access termination active';
+        $hardBanBanner = '<span id="hard-ban-dev-banner"><i class="fa-solid fa-skull-crossbones"></i> <b>hard-banned client</b><small>' . $hardBanStatus . '</small></span>';
         if (strpos($template, 'id="dev-mode-banner"') !== false) {
             return preg_replace('/(<span id="dev-mode-banner"[^>]*>.*?<\/span>)/is', '$1' . $hardBanBanner, $template, 1) ?: $template;
+        }
+
+        if ($isAdmin && strpos($template, 'id="title"') !== false) {
+            return preg_replace('/(<span id="title">.*?<\/span>)/is', '$1<br>' . $hardBanBanner, $template, 1) ?: $template;
         }
 
         return $template;

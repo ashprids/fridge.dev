@@ -2,8 +2,14 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
 
 if (!fridg3_hard_ban_enforcement_enabled()) {
+    header('Location: /', true, 302);
+    exit;
+}
+fridg3_start_session(false);
+if (isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true) {
     header('Location: /', true, 302);
     exit;
 }
