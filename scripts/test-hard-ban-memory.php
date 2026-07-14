@@ -112,7 +112,29 @@ try {
     $_SERVER['HTTP_USER_AGENT'] = 'hard-ban-test-agent';
     assertHardBanResult(fridg3_hard_ban_register_identifier('198.51.100.8', $identifier), 'banned identity was not registered');
     assertHardBanResult(fridg3_hard_ban_check_client('192.0.2.44', $identifier), 'strict mode did not propagate the identity ban');
-    assertHardBanResult(fridg3_hard_ban_contains('192.0.2.44'), 'strict mode did not add the future IP');
+    assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.44'), 'strict mode copied an associated IP into the effective IP ban set');
+    assertHardBanResult(!fridg3_hard_ban_source_contains('198.51.100.8'), 'manual hard ban leaked into the source-list index');
+    $identityData = fridg3_hard_ban_load_identities();
+    assertHardBanResult(
+        fridg3_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.44'),
+        'strict mode did not retain the associated IP in its identity record'
+    );
+    assertHardBanResult(
+        fridg3_hard_ban_ips_equal((string)$identityData['identities'][$identifier]['primaryIp'], '198.51.100.8'),
+        'strict mode replaced the original primary IP with an associated IP'
+    );
+
+    // A legacy propagated IP can still be present in the manual list. A new
+    // identifier seen there must inherit the existing root instead of making
+    // that associated IP a second primary.
+    file_put_contents(fridg3_hard_ban_path(), "198.51.100.8\n192.0.2.44\n");
+    $associatedIdentifier = str_repeat('b', 64);
+    assertHardBanResult(fridg3_hard_ban_register_identifier('192.0.2.44', $associatedIdentifier), 'associated identity was not registered');
+    $identityData = fridg3_hard_ban_load_identities();
+    assertHardBanResult(
+        fridg3_hard_ban_ips_equal((string)$identityData['identities'][$associatedIdentifier]['primaryIp'], '198.51.100.8'),
+        'associated identity created a new primary IP'
+    );
 
     assertHardBanResult(fridg3_hard_ban_set_strict_enabled(false), 'could not disable strict hard bans');
     assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.44'), 'disabling strict mode did not release a previously propagated IP');

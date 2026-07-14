@@ -209,7 +209,7 @@ Site-wide hard-ban list managed by the admin-only `/settings/banned-ips` editor.
 Private browser-to-IP associations used to carry an active hard ban across IP changes.
 
 - a random first-party identifier is mirrored in a five-year cookie and browser local storage; the server stores its original manually banned IP, observed IPs, timestamps, and a hash of the user agent
-- when an identifier tied to an active original IP appears from a new IP, the new IP is appended to `hard-banned-ips.txt`
+- when strict enforcement recognizes an identifier tied to an active original IP on a new IP, the request is denied through that identity record and the IP is added only to its `ips` array; it is not copied to the manual hard-ban file, made a primary IP, or added to the source index
 - removing the original IP through `/settings/banned-ips` removes every automatically associated IP and the corresponding identifier records
 - direct client access is blocked; the developer-data sanitizer replaces the file with an empty `identities` object and the publishing archive excludes it entirely
 
@@ -219,7 +219,7 @@ Global hard-ban enforcement settings managed by admins through `/settings`.
 
 - `strictIdentityEnforcement` defaults to `true` when the file or key is absent
 - `enforcementEnabled` defaults to `true` when the file or key is absent; when `false`, the authorization endpoint allows requests before resolving the client IP or reading ban and identity data
-- when `true`, recognized banned identities propagate the ban to later IPs
+- when `true`, recognized banned identities enforce the ban on later IPs directly without modifying the manual hard-ban list or source index
 - when switching to `false`, previously propagated associated IPs are removed from the manual list while identity-group primary IPs remain; after the switch, the identity JSON is entirely ignored and is neither read nor updated until strict enforcement is enabled again
 
 ### `data/etc/banlists/**/*.txt`
@@ -227,6 +227,7 @@ Global hard-ban enforcement settings managed by admins through `/settings`.
 Read-only hard-ban source lists. Every valid whitespace-separated IPv4 or IPv6 address or CIDR subnet from every `.txt` file anywhere beneath this directory is merged with the manual hard-ban set. Subdirectories are scanned recursively. IPv4 prefixes from `/0` through `/32` and IPv6 prefixes from `/0` through `/128` are supported.
 
 - source entries are enforced without appearing in the `/settings/banned-ips` textarea or being copied to `hard-banned-ips.txt`
+- only valid entries read from `.txt` files beneath this directory are compiled into the binary index; manual hard bans and identity IPs are checked separately and never inserted into it
 - unreadable files and subdirectories, non-text files, and invalid tokens are ignored without disabling the other source lists
 - PHP-FPM builds a stat-signature-keyed binary range index beneath `data/etc/banlists/index/` and reuses it until a source path, inode, size, modification time, or change time differs
 - `data/etc/banlists/index/` must be writable by the PHP-FPM user; its binary files are not treated as source lists because discovery accepts only `.txt` files

@@ -1177,13 +1177,10 @@ if (!function_exists('fridg3_hard_ban_check_client')) {
             return fridg3_hard_ban_contains($ip);
         }
 
-        if (!fridg3_hard_ban_contains($ip)) {
-            $manualHardBans[] = $ip;
-            if (!fridg3_hard_ban_write($manualHardBans)) {
-                return true;
-            }
-        }
-        fridg3_hard_ban_register_identifier($ip, $identifier);
+        // Enforce the association directly. Associated IPs belong only in the
+        // identity record; they must never become manual bans or source-index
+        // entries merely because this browser used them.
+        fridg3_hard_ban_observe_identifier($ip, $identifier);
         return true;
     }
 }
