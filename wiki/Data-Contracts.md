@@ -218,6 +218,7 @@ Private browser-to-IP associations used to carry an active hard ban across IP ch
 Global hard-ban enforcement settings managed by admins through `/settings`.
 
 - `strictIdentityEnforcement` defaults to `true` when the file or key is absent
+- `enforcementEnabled` defaults to `true` when the file or key is absent; when `false`, the authorization endpoint allows requests before resolving the client IP or reading ban and identity data
 - when `true`, recognized banned identities propagate the ban to later IPs
 - when switching to `false`, previously propagated associated IPs are removed from the manual list while identity-group primary IPs remain; after the switch, the identity JSON is entirely ignored and is neither read nor updated until strict enforcement is enabled again
 

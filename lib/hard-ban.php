@@ -24,18 +24,31 @@ if (!function_exists('fridg3_hard_ban_strict_enabled')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_set_strict_enabled')) {
-    function fridg3_hard_ban_set_strict_enabled(bool $enabled): bool
+if (!function_exists('fridg3_hard_ban_enforcement_enabled')) {
+    function fridg3_hard_ban_enforcement_enabled(): bool
     {
-        if (!$enabled && fridg3_hard_ban_strict_enabled() && !fridg3_hard_ban_release_associated_ips()) {
-            return false;
-        }
         $path = fridg3_hard_ban_settings_path();
+        if (!is_file($path)) {
+            return true;
+        }
+        $decoded = json_decode((string)@file_get_contents($path), true);
+        return !is_array($decoded) || !array_key_exists('enforcementEnabled', $decoded)
+            ? true
+            : $decoded['enforcementEnabled'] === true;
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_write_settings')) {
+    function fridg3_hard_ban_write_settings(array $updates): bool
+    {
+        $path = fridg3_hard_ban_settings_path();
+        $existing = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
+        $settings = is_array($existing) ? array_merge($existing, $updates) : $updates;
         $directory = dirname($path);
         if (!is_dir($directory) && !@mkdir($directory, 0750, true)) {
             return false;
         }
-        $encoded = json_encode(['strictIdentityEnforcement' => $enabled], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $encoded = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($encoded === false) {
             return false;
         }
@@ -48,6 +61,23 @@ if (!function_exists('fridg3_hard_ban_set_strict_enabled')) {
             @unlink($tempPath);
         }
         return $saved;
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_set_enforcement_enabled')) {
+    function fridg3_hard_ban_set_enforcement_enabled(bool $enabled): bool
+    {
+        return fridg3_hard_ban_write_settings(['enforcementEnabled' => $enabled]);
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_set_strict_enabled')) {
+    function fridg3_hard_ban_set_strict_enabled(bool $enabled): bool
+    {
+        if (!$enabled && fridg3_hard_ban_strict_enabled() && !fridg3_hard_ban_release_associated_ips()) {
+            return false;
+        }
+        return fridg3_hard_ban_write_settings(['strictIdentityEnforcement' => $enabled]);
     }
 }
 
@@ -1123,6 +1153,9 @@ if (!function_exists('fridg3_hard_ban_observe_identifier')) {
 if (!function_exists('fridg3_hard_ban_check_client')) {
     function fridg3_hard_ban_check_client(string $ip, string $identifier): bool
     {
+        if (!fridg3_hard_ban_enforcement_enabled()) {
+            return false;
+        }
         if (!fridg3_hard_ban_strict_enabled()) {
             // Relaxed mode deliberately ignores the complete identity store.
             return fridg3_hard_ban_contains($ip);

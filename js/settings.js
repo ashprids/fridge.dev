@@ -1261,6 +1261,7 @@ function initSettingsPage() {
         glowGroup.dataset.bound = '1';
 
         const maintenanceRadios = maintenanceGroup ? maintenanceGroup.querySelectorAll('input[type="radio"][name="maintenance-mode"]') : [];
+        const enforceHardBansToggle = document.getElementById('enforce-hard-bans-toggle');
         const strictHardBansToggle = document.getElementById('strict-hard-bans-toggle');
         const colorInputs = colorGroup ? colorGroup.querySelectorAll('input.color-input[data-color-key]') : [];
         const host = getCurrentHostName();
@@ -2195,6 +2196,9 @@ function initSettingsPage() {
                         desync: data.settings.titleAnimationDesync !== false,
                     });
                 }
+                if (enforceHardBansToggle && typeof data.settings.enforceHardBans === 'boolean') {
+                    enforceHardBansToggle.checked = data.settings.enforceHardBans;
+                }
                 if (strictHardBansToggle && typeof data.settings.strictHardBans === 'boolean') {
                     strictHardBansToggle.checked = data.settings.strictHardBans;
                 }
@@ -2362,6 +2366,9 @@ function initSettingsPage() {
                     const maintenanceSelection = getMaintenanceSelection();
                     if (maintenanceSelection !== null) {
                         params.append('maintenanceMode', maintenanceSelection);
+                    }
+                    if (enforceHardBansToggle) {
+                        params.append('enforceHardBans', enforceHardBansToggle.checked ? 'on' : 'off');
                     }
                     if (strictHardBansToggle) {
                         params.append('strictHardBans', strictHardBansToggle.checked ? 'on' : 'off');

@@ -75,6 +75,8 @@ If the identifier later arrives from a different IP while its original `primaryI
 
 Admins can disable **strict hard bans** in the admin-only section of `/settings`. The setting defaults to enabled and is stored globally in `data/etc/hard-ban-settings.json`. During the switch, previously propagated associated IPs are removed from the manual hard-ban list while each identity group's original banned IP remains. Once disabled, `hard-ban-identities.json` is entirely ignored: it is not consulted for authorization or admin saves and no identifiers, observed IPs, timestamps, or user-agent hashes are written to it. Only the client's current IP is checked against the manual and source hard-ban lists. The blacklist page then advises clients to disable VPNs, proxies, or other IP-masking tools.
 
+Admins can separately disable **hard-ban enforcement** above the strict-mode checkbox. This global setting also defaults to enabled. When disabled, the nginx authorization subrequest returns allowed immediately, before client-IP resolution and without reading the manual list, source lists, or identity data. Hard-ban data remains stored unchanged so enforcement can be restored later.
+
 This mechanism follows the same browser profile while either first-party storage value remains. It intentionally does not use probabilistic canvas, hardware, or font fingerprinting because collisions could hard-ban unrelated visitors.
 
 ## Unbanning a Hard-Ban Group

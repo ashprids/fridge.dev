@@ -77,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         ],
     ];
     if (isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true) {
+        $result['settings']['enforceHardBans'] = fridg3_hard_ban_enforcement_enabled();
         $result['settings']['strictHardBans'] = fridg3_hard_ban_strict_enabled();
     }
     if ($isToast) {
@@ -167,6 +168,9 @@ $theme = $themeProvided ? (string)$_POST['theme'] : null;
 
 $maintenanceProvided = array_key_exists('maintenanceMode', $_POST);
 $maintenanceRaw = $maintenanceProvided ? (string)$_POST['maintenanceMode'] : null;
+
+$enforceHardBansProvided = array_key_exists('enforceHardBans', $_POST);
+$enforceHardBansRaw = $enforceHardBansProvided ? (string)$_POST['enforceHardBans'] : null;
 
 $strictHardBansProvided = array_key_exists('strictHardBans', $_POST);
 $strictHardBansRaw = $strictHardBansProvided ? (string)$_POST['strictHardBans'] : null;
@@ -655,6 +659,29 @@ if ($maintenanceProvided) {
     $didWork = true;
 }
 
+// Handle the global hard-ban authorization gate (admin only).
+if ($enforceHardBansProvided) {
+    if (!$isAdmin) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'forbidden']);
+        exit;
+    }
+    $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+    $falsy = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+    $lower = strtolower(trim((string)$enforceHardBansRaw));
+    if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_enforce_hard_bans_value']);
+        exit;
+    }
+    if (!fridg3_hard_ban_set_enforcement_enabled(in_array($lower, $truthy, true))) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'hard_ban_settings_write_failed']);
+        exit;
+    }
+    $didWork = true;
+}
+
 // Handle identity-based hard-ban propagation (admin only).
 if ($strictHardBansProvided) {
     if (!$isAdmin) {
@@ -678,7 +705,7 @@ if ($strictHardBansProvided) {
     $didWork = true;
 }
 
-if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $strictHardBansProvided || $reduceMotionProvided || $onekoProvided || $browserNotificationsProvided || $journalBrowserNotificationsProvided || $toastPersonalityProvided) {
+if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $enforceHardBansProvided || $strictHardBansProvided || $reduceMotionProvided || $onekoProvided || $browserNotificationsProvided || $journalBrowserNotificationsProvided || $toastPersonalityProvided) {
     echo json_encode(['ok' => true]);
     exit;
 }

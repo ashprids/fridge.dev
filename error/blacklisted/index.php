@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
 
+if (!fridg3_hard_ban_enforcement_enabled()) {
+    header('Location: /', true, 302);
+    exit;
+}
+
 $clientIp = fridg3_hard_ban_client_ip();
 $identifier = (string)($_COOKIE[FRIDG3_HARD_BAN_COOKIE] ?? '');
 if (!fridg3_hard_ban_check_client($clientIp, $identifier)) {

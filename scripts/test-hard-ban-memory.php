@@ -127,6 +127,10 @@ try {
     assertHardBanResult(!fridg3_hard_ban_register_identifier('198.51.100.8', str_repeat('b', 64)), 'relaxed mode registered a new identity');
     assertHardBanResult(fridg3_hard_ban_check_client('198.51.100.8', $identifier), 'relaxed mode did not enforce the specifically banned IP');
     assertHardBanResult(fridg3_hard_ban_set_strict_enabled(true), 'could not re-enable strict hard bans');
+    assertHardBanResult(fridg3_hard_ban_set_enforcement_enabled(false), 'could not disable hard-ban enforcement');
+    assertHardBanResult(!fridg3_hard_ban_check_client('198.51.100.8', $identifier), 'disabled enforcement still blocked a banned IP');
+    assertHardBanResult(fridg3_hard_ban_set_enforcement_enabled(true), 'could not re-enable hard-ban enforcement');
+    assertHardBanResult(fridg3_hard_ban_check_client('198.51.100.8', $identifier), 're-enabled enforcement did not block a banned IP');
     $initialIndex = fridg3_hard_ban_source_index();
     assertHardBanResult($initialIndex !== null, 'source index was not created');
     assertHardBanResult(fridg3_hard_ban_source_index() === $initialIndex, 'unchanged source index was not reused');
