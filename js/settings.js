@@ -1261,6 +1261,7 @@ function initSettingsPage() {
         glowGroup.dataset.bound = '1';
 
         const maintenanceRadios = maintenanceGroup ? maintenanceGroup.querySelectorAll('input[type="radio"][name="maintenance-mode"]') : [];
+        const strictHardBansToggle = document.getElementById('strict-hard-bans-toggle');
         const colorInputs = colorGroup ? colorGroup.querySelectorAll('input.color-input[data-color-key]') : [];
         const host = getCurrentHostName();
         if (!glowToggle) return;
@@ -2194,6 +2195,9 @@ function initSettingsPage() {
                         desync: data.settings.titleAnimationDesync !== false,
                     });
                 }
+                if (strictHardBansToggle && typeof data.settings.strictHardBans === 'boolean') {
+                    strictHardBansToggle.checked = data.settings.strictHardBans;
+                }
                 if (toastPersonalityTextarea && typeof data.settings.toastPersonalityJson === 'string') {
                     bindToastPersonalityButton();
                     setToastPersonalityValue(data.settings.toastPersonalityJson);
@@ -2358,6 +2362,9 @@ function initSettingsPage() {
                     const maintenanceSelection = getMaintenanceSelection();
                     if (maintenanceSelection !== null) {
                         params.append('maintenanceMode', maintenanceSelection);
+                    }
+                    if (strictHardBansToggle) {
+                        params.append('strictHardBans', strictHardBansToggle.checked ? 'on' : 'off');
                     }
                 }
 

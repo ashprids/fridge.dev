@@ -3,6 +3,51 @@ declare(strict_types=1);
 
 const FRIDG3_HARD_BAN_COOKIE = 'fridg3_hard_ban_id';
 
+if (!function_exists('fridg3_hard_ban_settings_path')) {
+    function fridg3_hard_ban_settings_path(): string
+    {
+        return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-ban-settings.json';
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_strict_enabled')) {
+    function fridg3_hard_ban_strict_enabled(): bool
+    {
+        $path = fridg3_hard_ban_settings_path();
+        if (!is_file($path)) {
+            return true;
+        }
+        $decoded = json_decode((string)@file_get_contents($path), true);
+        return !is_array($decoded) || !array_key_exists('strictIdentityEnforcement', $decoded)
+            ? true
+            : $decoded['strictIdentityEnforcement'] === true;
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_set_strict_enabled')) {
+    function fridg3_hard_ban_set_strict_enabled(bool $enabled): bool
+    {
+        $path = fridg3_hard_ban_settings_path();
+        $directory = dirname($path);
+        if (!is_dir($directory) && !@mkdir($directory, 0750, true)) {
+            return false;
+        }
+        $encoded = json_encode(['strictIdentityEnforcement' => $enabled], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($encoded === false) {
+            return false;
+        }
+        $tempPath = tempnam($directory, 'hard_ban_settings_');
+        if ($tempPath === false) {
+            return false;
+        }
+        $saved = @file_put_contents($tempPath, $encoded . PHP_EOL, LOCK_EX) !== false && @rename($tempPath, $path);
+        if (!$saved && is_file($tempPath)) {
+            @unlink($tempPath);
+        }
+        return $saved;
+    }
+}
+
 if (!function_exists('fridg3_hard_ban_path')) {
     function fridg3_hard_ban_path(): string
     {
@@ -1006,9 +1051,38 @@ if (!function_exists('fridg3_hard_ban_register_identifier')) {
     }
 }
 
+if (!function_exists('fridg3_hard_ban_observe_identifier')) {
+    function fridg3_hard_ban_observe_identifier(string $ip, string $identifier): bool
+    {
+        if (!fridg3_hard_ban_valid_identifier($identifier) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
+        $data = fridg3_hard_ban_load_identities();
+        $record = $data['identities'][$identifier] ?? null;
+        if (!is_array($record)) {
+            return false;
+        }
+        $knownIps = array_values(array_filter(array_map('strval', (array)($record['ips'] ?? [])), static fn(string $knownIp): bool => filter_var($knownIp, FILTER_VALIDATE_IP) !== false));
+        if (!fridg3_hard_ban_list_contains($knownIps, $ip)) {
+            $knownIps[] = $ip;
+        }
+        $record['ips'] = $knownIps;
+        $record['lastSeen'] = gmdate(DATE_ATOM);
+        $record['userAgentHash'] = hash('sha256', (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+        $data['identities'][$identifier] = $record;
+        return fridg3_hard_ban_write_identities($data);
+    }
+}
+
 if (!function_exists('fridg3_hard_ban_check_client')) {
     function fridg3_hard_ban_check_client(string $ip, string $identifier): bool
     {
+        if (!fridg3_hard_ban_strict_enabled()) {
+            if (fridg3_hard_ban_valid_identifier($identifier)) {
+                fridg3_hard_ban_observe_identifier($ip, $identifier);
+            }
+            return fridg3_hard_ban_contains($ip);
+        }
         if (!fridg3_hard_ban_valid_identifier($identifier)) {
             return fridg3_hard_ban_contains($ip);
         }

@@ -16,6 +16,11 @@ function fridg3_hard_ban_identity_path(): string
     return $GLOBALS['testRoot'] . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-ban-identities.json';
 }
 
+function fridg3_hard_ban_settings_path(): string
+{
+    return $GLOBALS['testRoot'] . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-ban-settings.json';
+}
+
 function fridg3_hard_ban_source_directory(): string
 {
     return $GLOBALS['sourceRoot'];
@@ -102,6 +107,24 @@ try {
     assertHardBanResult(!fridg3_hard_ban_contains('2200::1'), 'address above cross-bucket IPv6 CIDR was matched');
     assertHardBanResult(fridg3_hard_ban_contains('2001:db8:abcd::42'), 'source IPv6 CIDR was not matched');
     assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.1'), 'unlisted IP was matched');
+
+    $identifier = str_repeat('a', 64);
+    $_SERVER['HTTP_USER_AGENT'] = 'hard-ban-test-agent';
+    assertHardBanResult(fridg3_hard_ban_register_identifier('198.51.100.8', $identifier), 'banned identity was not registered');
+    assertHardBanResult(fridg3_hard_ban_check_client('192.0.2.44', $identifier), 'strict mode did not propagate the identity ban');
+    assertHardBanResult(fridg3_hard_ban_contains('192.0.2.44'), 'strict mode did not add the future IP');
+
+    file_put_contents(fridg3_hard_ban_path(), "198.51.100.8\n");
+    assertHardBanResult(fridg3_hard_ban_set_strict_enabled(false), 'could not disable strict hard bans');
+    assertHardBanResult(!fridg3_hard_ban_check_client('192.0.2.45', $identifier), 'relaxed mode punished a future IP');
+    assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.45'), 'relaxed mode added a future IP to the hard-ban list');
+    $identityData = fridg3_hard_ban_load_identities();
+    assertHardBanResult(
+        fridg3_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.45'),
+        'relaxed mode did not retain the observed future IP'
+    );
+    assertHardBanResult(fridg3_hard_ban_check_client('198.51.100.8', $identifier), 'relaxed mode did not enforce the specifically banned IP');
+    assertHardBanResult(fridg3_hard_ban_set_strict_enabled(true), 'could not re-enable strict hard bans');
     $initialIndex = fridg3_hard_ban_source_index();
     assertHardBanResult($initialIndex !== null, 'source index was not created');
     assertHardBanResult(fridg3_hard_ban_source_index() === $initialIndex, 'unchanged source index was not reused');

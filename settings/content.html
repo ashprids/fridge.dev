@@ -22,6 +22,14 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
     </label>
 </div>
 <br>
+<h4 data-tooltip="when disabled, only the currently listed IP is blocked; browser identity information is still recorded">strict hard bans</h4>
+<div class="checkbox-group">
+    <label class="checkbox-label">
+        <input type="checkbox" class="checkbox" id="strict-hard-bans-toggle">
+        <span data-tooltip="<b>when enabled:</b>\na browser identifier associated with a\nhard-banned IP causes later IPs used by\nthat browser to be added to the hard-ban\nlist and blocked.\n\n<b>when disabled:</b>\nonly the client's current IP is checked\nand blocked. recognized browser identifiers,\nobserved IPs, timestamps, and user-agent\nhashes are still recorded, but they do not\ncause future IPs to be banned or denied access.">punish associated identities and future IPs</span>
+    </label>
+</div>
+<br>
 <h4>sitemap.xml</h4>
 <button id="form-button" type="button" data-tooltip="regenerate the sitemap.xml file" data-action="generate-sitemap">regenerate sitemap</button>
 <br>

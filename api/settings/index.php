@@ -7,6 +7,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
 
 $renderHelperPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'render.php';
 if (is_file($renderHelperPath)) {
@@ -75,6 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'titleAnimationDesync' => true,
         ],
     ];
+    if (isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true) {
+        $result['settings']['strictHardBans'] = fridg3_hard_ban_strict_enabled();
+    }
     if ($isToast) {
         $personality = fridg3_toast_load_personality_config();
         $result['settings']['toastPersonalityJson'] = json_encode($personality, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -163,6 +167,9 @@ $theme = $themeProvided ? (string)$_POST['theme'] : null;
 
 $maintenanceProvided = array_key_exists('maintenanceMode', $_POST);
 $maintenanceRaw = $maintenanceProvided ? (string)$_POST['maintenanceMode'] : null;
+
+$strictHardBansProvided = array_key_exists('strictHardBans', $_POST);
+$strictHardBansRaw = $strictHardBansProvided ? (string)$_POST['strictHardBans'] : null;
 
 $reduceMotionProvided = array_key_exists('reduceMotion', $_POST);
 $reduceMotionRaw = $reduceMotionProvided ? (string)$_POST['reduceMotion'] : null;
@@ -648,7 +655,30 @@ if ($maintenanceProvided) {
     $didWork = true;
 }
 
-if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $reduceMotionProvided || $onekoProvided || $browserNotificationsProvided || $journalBrowserNotificationsProvided || $toastPersonalityProvided) {
+// Handle identity-based hard-ban propagation (admin only).
+if ($strictHardBansProvided) {
+    if (!$isAdmin) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'forbidden']);
+        exit;
+    }
+    $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+    $falsy = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+    $lower = strtolower(trim((string)$strictHardBansRaw));
+    if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_strict_hard_bans_value']);
+        exit;
+    }
+    if (!fridg3_hard_ban_set_strict_enabled(in_array($lower, $truthy, true))) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'hard_ban_settings_write_failed']);
+        exit;
+    }
+    $didWork = true;
+}
+
+if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $strictHardBansProvided || $reduceMotionProvided || $onekoProvided || $browserNotificationsProvided || $journalBrowserNotificationsProvided || $toastPersonalityProvided) {
     echo json_encode(['ok' => true]);
     exit;
 }

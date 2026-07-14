@@ -47,7 +47,12 @@ if (!is_file($templatePath) || !is_file($contentPath)) {
 }
 
 $html = (string)file_get_contents($templatePath);
-$html = str_replace('{content}', (string)file_get_contents($contentPath), $html);
+$content = (string)file_get_contents($contentPath);
+$explanation = fridg3_hard_ban_strict_enabled()
+    ? 'your IP address has been blacklisted from this website, and as a result, any identifiable information has also been flagged.'
+    : 'your current IP address has been blacklisted. disable your VPN, proxy, or anything else masking your IP address, then try again.';
+$content = str_replace('{hard_ban_explanation}', htmlspecialchars($explanation, ENT_QUOTES, 'UTF-8'), $content);
+$html = str_replace('{content}', $content, $html);
 $html = str_replace('{title}', 'access denied', $html);
 $html = str_replace('{description}', 'this client is not permitted to access fridge.dev.', $html);
 $html = str_replace('{hard_ban_identifier}', json_encode($identifier, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), $html);

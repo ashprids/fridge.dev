@@ -213,6 +213,14 @@ Private browser-to-IP associations used to carry an active hard ban across IP ch
 - removing the original IP through `/settings/banned-ips` removes every automatically associated IP and the corresponding identifier records
 - direct client access is blocked; the developer-data sanitizer replaces the file with an empty `identities` object and the publishing archive excludes it entirely
 
+### `data/etc/hard-ban-settings.json`
+
+Global hard-ban enforcement settings managed by admins through `/settings`.
+
+- `strictIdentityEnforcement` defaults to `true` when the file or key is absent
+- when `true`, recognized banned identities propagate the ban to later IPs
+- when `false`, only the current IP can trigger a hard ban; recognizable identity information and newly observed IPs are still recorded without denying access or modifying the hard-ban list
+
 ### `data/etc/banlists/**/*.txt`
 
 Read-only hard-ban source lists. Every valid whitespace-separated IPv4 or IPv6 address or CIDR subnet from every `.txt` file anywhere beneath this directory is merged with the manual hard-ban set. Subdirectories are scanned recursively. IPv4 prefixes from `/0` through `/32` and IPv6 prefixes from `/0` through `/128` are supported.
