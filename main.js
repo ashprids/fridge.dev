@@ -318,10 +318,11 @@ function initAsciiTime() {
             characters.forEach((ch, characterIndex) => {
                 const glyph = fontMap[ch] || [];
                 const width = ch === ':' ? glyphWidthFor(glyph) : glyphWidth;
-                // The clock font's colon block contains its own horizontal
-                // padding, matching the legacy embedded glyph exactly.
                 const isLastCharacter = characterIndex === characters.length - 1;
-                const gap = isLastCharacter || ch === ':' ? 0 : charGap;
+                // Keep one explicit cell between every clock glyph, including
+                // immediately after a colon. Spacing inside the colon glyph is
+                // still preserved as part of the external font.
+                const gap = isLastCharacter ? 0 : charGap;
                 for (let i = 0; i < maxLines; i += 1) {
                     rows[i] += pad(glyph[i] || '', width + gap);
                 }
