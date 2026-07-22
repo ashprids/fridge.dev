@@ -606,6 +606,17 @@ if (!function_exists('fridg3_feed_delete_voice_files_from_content')) {
     }
 }
 
+if (!function_exists('fridg3_feed_delete_media_files_from_content')) {
+    /**
+     * Remove any successfully stored media referenced by a submission that is
+     * being rejected because one or more attachment placeholders were unresolved.
+     */
+    function fridg3_feed_delete_media_files_from_content(string $content): void
+    {
+        fridg3_feed_delete_voice_files_from_content($content);
+    }
+}
+
 if (!function_exists('fridg3_feed_delete_post_voice_files')) {
     function fridg3_feed_delete_post_voice_files(string $postId, string $postBody): void
     {

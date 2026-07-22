@@ -143,6 +143,8 @@ when adding routes, APIs, uploads, redirects, or private data folders, check `.n
 
 nginx uses `client_max_body_size 0` and the repo-root `.user.ini` disables PHP's aggregate request/upload limits. Individual application handlers remain responsible for validating MIME types and enforcing per-file limits; feed and journal media attachments are capped at 8 MB per file.
 
+Production must provision `data/audio/uploads/` and `data/video/` as writable by the PHP-FPM `http` user. Failed mixed-media submissions call the shared media cleanup helper so successfully moved files are removed before the request redirects with an upload error.
+
 legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled in Cloudflare, not nginx. the redirect must append `legacy_domain=fridg3.org`; the frontend consumes that marker for the one-time rebrand popup and then removes it from the URL.
 
 ## Nginx Clean URLs
