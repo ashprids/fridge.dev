@@ -964,3 +964,4 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
     border-left-color: #d6b36a !important;
     transform: translateY(-1px) !important;
 }
+body.gothic-theme .content-pagination .guestbook-page-btn { border-radius: 0; }

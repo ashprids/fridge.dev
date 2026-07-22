@@ -66,6 +66,23 @@ function initSidebarAndBBCode() {
 
     // Apply BBCode formatting to any post-content elements on the page
     try {
+        document.querySelectorAll('.feed-post-link[data-post-href]').forEach(card => {
+            if (card.dataset.postNavigationBound === '1') return;
+            card.dataset.postNavigationBound = '1';
+            const openPost = () => {
+                const href = card.dataset.postHref || '';
+                if (!href) return;
+                if (typeof loadPageIntoContent === 'function') loadPageIntoContent(href);
+                else window.location.href = href;
+            };
+            card.addEventListener('click', openPost);
+            card.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                openPost();
+            });
+        });
+
         const targets = document.querySelectorAll('#post-content, .post-content');
         targets.forEach(el => {
             const raw = el.textContent || '';
@@ -115,6 +132,10 @@ function initSidebarAndBBCode() {
             });
         });
     } catch (_) { /* no-op */ }
+
+    if (typeof initInlineMediaPlayers === 'function') {
+        initInlineMediaPlayers(document);
+    }
 }
 
 // Run once on initial load

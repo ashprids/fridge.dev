@@ -521,3 +521,4 @@ body.mobile-template .color-input {
     color: var(--fg) !important;
     border-color: rgba(163, 239, 255, 0.44) !important;
 }
+body.aero-theme .content-pagination .guestbook-page-btn { border-radius: 7px; }

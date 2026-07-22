@@ -79,6 +79,16 @@ function showSitePopup(options) {
             actions.append(cancel);
         }
 
+        const customText = config.customText || '';
+        let custom = null;
+        if (customText) {
+            custom = document.createElement('button');
+            custom.className = 'site-popup-button site-popup-custom';
+            custom.type = 'button';
+            custom.textContent = customText;
+            actions.append(custom);
+        }
+
         const ok = document.createElement('button');
         ok.className = 'site-popup-button site-popup-ok';
         ok.type = 'button';
@@ -103,6 +113,7 @@ function showSitePopup(options) {
         };
 
         if (cancel) cancel.addEventListener('click', () => close(input ? null : false));
+        if (custom) custom.addEventListener('click', () => close('custom'));
         ok.addEventListener('click', () => close(input ? input.value : true));
         overlay.addEventListener('click', event => {
             if (event.target === overlay) close(input ? null : false);
@@ -137,6 +148,90 @@ function showSitePrompt(title, detail, value) {
 
 window.showSiteNotice = showSiteNotice;
 window.showSitePrompt = showSitePrompt;
+
+let activeSiteNoticePopupId = '';
+
+function siteNoticeStorageKey(type, id) {
+    return `fridg3_site_notice_${type}_${id}`;
+}
+
+function siteNoticeWasSeen(type, id) {
+    try {
+        return localStorage.getItem(siteNoticeStorageKey(type, id)) === '1';
+    } catch (_) {
+        return false;
+    }
+}
+
+function markSiteNoticeSeen(type, id) {
+    try {
+        localStorage.setItem(siteNoticeStorageKey(type, id), '1');
+    } catch (_) { /* Storage can be unavailable. */ }
+}
+
+function readSiteNoticePopup(sourceDocument) {
+    const runtime = (sourceDocument || document).getElementById('site-notice-runtime');
+    if (!runtime) return null;
+    try {
+        const value = JSON.parse(runtime.textContent || 'null');
+        return value && typeof value === 'object' ? value : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function initSiteNotices(sourceDocument) {
+    const source = sourceDocument || document;
+    if (source !== document) {
+        const incomingBanner = source.getElementById('site-notice-banner-region');
+        const currentBanner = document.getElementById('site-notice-banner-region');
+        if (incomingBanner && currentBanner) {
+            currentBanner.replaceWith(incomingBanner.cloneNode(true));
+        }
+    }
+
+    const banner = document.querySelector('.site-notice-banner[data-site-notice-id]');
+    if (banner) {
+        const id = banner.dataset.siteNoticeId || '';
+        const dismissible = banner.dataset.dismissible === '1';
+        if (dismissible && id && siteNoticeWasSeen('banner', id)) {
+            banner.remove();
+        } else if (dismissible && id) {
+            const dismissButton = banner.querySelector('[data-site-notice-dismiss]');
+            if (dismissButton) {
+                dismissButton.addEventListener('click', () => {
+                    markSiteNoticeSeen('banner', id);
+                    banner.remove();
+                }, { once: true });
+            }
+        }
+    }
+
+    const popup = readSiteNoticePopup(source);
+    if (!popup || typeof popup.id !== 'string' || !/^[a-f0-9]{32}$/.test(popup.id) || typeof popup.message !== 'string') {
+        return;
+    }
+    if (activeSiteNoticePopupId === popup.id || siteNoticeWasSeen('popup', popup.id)) {
+        return;
+    }
+
+    activeSiteNoticePopupId = popup.id;
+    showSitePopup({
+        title: typeof popup.title === 'string' && popup.title ? popup.title : 'notice',
+        detail: popup.message,
+        okText: 'ok',
+        customText: typeof popup.buttonLabel === 'string' ? popup.buttonLabel : ''
+    }).then(result => {
+        markSiteNoticeSeen('popup', popup.id);
+        activeSiteNoticePopupId = '';
+        if (result === 'custom' && typeof popup.buttonUrl === 'string' && /^\/(?!\/)/.test(popup.buttonUrl)) {
+            window.location.assign(popup.buttonUrl);
+        }
+    });
+}
+
+window.fridg3InitSiteNotices = initSiteNotices;
+window.addEventListener('DOMContentLoaded', () => initSiteNotices());
 
 function consumeLegacyDomainRedirectNotice() {
     try {
@@ -1020,6 +1115,119 @@ function updateContentFooterSpacing() {
 
 let lastPageViewPathRequested = null;
 
+function initContentPagination(root = document) {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('.content-pagination[data-pagination-total]').forEach(nav => {
+        const current = Number(nav.dataset.paginationCurrent || 1);
+        const total = Number(nav.dataset.paginationTotal || 1);
+        const route = nav.dataset.paginationRoute || '';
+        const search = nav.dataset.paginationSearch || '';
+        if (!route || !Number.isInteger(current) || !Number.isInteger(total) || total < 2) return;
+
+        const pageUrl = page => {
+            const params = new URLSearchParams({ page: String(page) });
+            if (search) params.set('q', search);
+            return route + '?' + params.toString() + '#content-footer';
+        };
+        const tokenCount = pages => {
+            let count = pages.length;
+            for (let index = 1; index < pages.length; index++) {
+                if (pages[index] - pages[index - 1] > 1) count++;
+            }
+            return count;
+        };
+        const render = () => {
+            const width = nav.parentElement?.clientWidth || nav.clientWidth || 320;
+            const capacity = Math.max(5, Math.floor((width + 4) / 34));
+            nav.classList.toggle('is-filled', total + 2 >= capacity);
+            const pageCapacity = Math.max(3, capacity - 2); // previous + next
+            const selected = new Set([1, current, total]);
+            const candidates = [];
+            for (let page = 2; page < total; page++) {
+                if (page !== current) candidates.push(page);
+            }
+            candidates.sort((a, b) => Math.abs(a - current) - Math.abs(b - current) || a - b);
+            for (const page of candidates) {
+                const trial = Array.from(new Set([...selected, page])).sort((a, b) => a - b);
+                if (tokenCount(trial) > pageCapacity) continue;
+                selected.add(page);
+            }
+            const pages = Array.from(selected).sort((a, b) => a - b);
+            const parts = [];
+            const arrow = (direction, page, disabled, label) => disabled
+                ? `<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">${direction}</span>`
+                : `<a class="guestbook-page-btn pagination-arrow" href="${pageUrl(page)}" aria-label="${label}">${direction}</a>`;
+            parts.push(arrow('&lsaquo;', current - 1, current <= 1, 'previous page'));
+            pages.forEach((page, index) => {
+                if (index > 0 && page - pages[index - 1] > 1) parts.push('<span class="pagination-ellipsis" aria-hidden="true">&hellip;</span>');
+                parts.push(page === current
+                    ? `<span class="guestbook-page-btn current" aria-current="page">${page}</span>`
+                    : `<a class="guestbook-page-btn" href="${pageUrl(page)}" aria-label="page ${page}">${page}</a>`);
+            });
+            parts.push(arrow('&rsaquo;', current + 1, current >= total, 'next page'));
+            nav.innerHTML = parts.join('');
+        };
+        render();
+        if (nav.dataset.paginationResizeBound !== '1' && typeof ResizeObserver === 'function') {
+            nav.dataset.paginationResizeBound = '1';
+            const resizeTarget = nav.parentElement || nav;
+            let lastWidth = resizeTarget.clientWidth;
+            new ResizeObserver(entries => {
+                const width = Math.round(entries[0]?.contentRect?.width || resizeTarget.clientWidth);
+                if (width === lastWidth) return;
+                lastWidth = width;
+                render();
+            }).observe(resizeTarget);
+        }
+    });
+}
+
+function pinContentToBottomWhileMediaLoads() {
+    const container = document.getElementById('container');
+    const content = document.getElementById('content');
+    if (!container || !content) return;
+    let active = true;
+    let pendingImages = 0;
+    let finishTimer = 0;
+    const pin = () => {
+        if (!active) return;
+        container.scrollTop = container.scrollHeight;
+    };
+    const finish = () => {
+        window.clearTimeout(finishTimer);
+        finishTimer = window.setTimeout(() => {
+            if (pendingImages > 0) return;
+            pin();
+            active = false;
+            observer?.disconnect();
+        }, 500);
+    };
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(pin) : null;
+    if (observer) observer.observe(content);
+    content.querySelectorAll('img').forEach(image => {
+        if (!image.complete) {
+            pendingImages++;
+            const settled = () => {
+                pendingImages = Math.max(0, pendingImages - 1);
+                pin();
+                if (pendingImages === 0) finish();
+            };
+            image.addEventListener('load', settled, { once: true });
+            image.addEventListener('error', settled, { once: true });
+        }
+    });
+    pin();
+    window.setTimeout(pin, 50);
+    window.setTimeout(pin, 250);
+    if (pendingImages === 0) finish();
+    window.setTimeout(() => {
+        if (!active) return;
+        pin();
+        active = false;
+        observer?.disconnect();
+    }, 15000);
+}
+
 function normalizePageViewPath(rawUrl) {
     try {
         const base = window.location && window.location.origin ? window.location.origin : undefined;
@@ -1140,6 +1348,7 @@ function loadPageIntoContent(url, addToHistory = true) {
 
                 syncAccountFooterButton();
                 syncActiveChatSidebarButton();
+                initSiteNotices(doc);
 
                 if (addToHistory && window.history && window.history.pushState) {
                     window.history.pushState({ spa: true, url: url }, '', url);
@@ -1171,8 +1380,17 @@ function loadPageIntoContent(url, addToHistory = true) {
                 refreshAsciiLayoutAfterFontLoad();
                 initTooltips();
                 updateContentFooterSpacing();
+                initContentPagination(contentEl);
                 fitMobileAsciiLayout();
                 updatePageViewFooter(url);
+
+                // Pagination is used from the bottom of feed/journal listings.
+                // Keep that reading position after the SPA swaps in the next page.
+                let requestedHash = '';
+                try { requestedHash = new URL(url, window.location.href).hash; } catch (_) { /* no-op */ }
+                if (requestedHash === '#content-footer') {
+                    window.requestAnimationFrame(() => window.requestAnimationFrame(pinContentToBottomWhileMediaLoads));
+                }
 
                 // Re-run syntax highlighting on newly loaded content
                 if (typeof hljs !== 'undefined') {
@@ -1236,6 +1454,7 @@ function setupSpaNavigation() {
 }
 
 window.addEventListener('DOMContentLoaded', setupSpaNavigation);
+window.addEventListener('DOMContentLoaded', () => initContentPagination(document));
 window.addEventListener('DOMContentLoaded', updateContentFooterSpacing);
 window.addEventListener('DOMContentLoaded', function() { updatePageViewFooter(window.location.href); });
 window.addEventListener('load', updateContentFooterSpacing);
@@ -1477,6 +1696,9 @@ function bindSpaForm(form) {
         }
 
         const formData = new FormData(form);
+        if (typeof window.fridg3AppendBBCodeUploadFiles === 'function') {
+            window.fridg3AppendBBCodeUploadFiles(formData, form);
+        }
 
         // Ensure the clicked submit button's name/value (e.g., delete=1)
         // are included in the payload so multi-action forms work.
@@ -1550,6 +1772,7 @@ function bindSpaForm(form) {
 
                 syncAccountFooterButton();
                 syncActiveChatSidebarButton();
+                initSiteNotices(doc);
 
                 if (window.history && window.history.pushState) {
                     window.history.pushState({ spa: true, url: finalUrl }, '', finalUrl);

@@ -1031,3 +1031,4 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
         inset 0 0 22px rgba(248, 207, 116, 0.2),
         0 0 16px rgba(200, 132, 32, 0.24) !important;
 }
+body.occult-theme .content-pagination .guestbook-page-btn { border-radius: 0; }

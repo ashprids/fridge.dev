@@ -1,11 +1,26 @@
-// BBCode formatting state (images + file list) is global so that
+// BBCode formatting state (media + file list) is global so that
 // it can be reused when the editor is loaded via SPA navigation.
 const bbcodeImages = new Map();
+const bbcodeMedia = new Map();
 const bbcodeVoiceNotes = new Map();
-const imageFileStore = new DataTransfer();
+const mediaFileStore = new DataTransfer();
 const voiceFileStore = new DataTransfer();
 let isPreviewMode = false;
+let activeBBCodeEditor = null;
 const VOICE_NOTE_MAX_MS = 120000;
+const MEDIA_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+
+window.fridg3AppendBBCodeUploadFiles = function(formData, form) {
+    if (!formData || !form || !form.querySelector('#bbcode-textbox')) return;
+    if (mediaFileStore.files.length > 0) {
+        formData.delete('images[]');
+        Array.from(mediaFileStore.files).forEach(file => formData.append('images[]', file, file.name));
+    }
+    if (voiceFileStore.files.length > 0) {
+        formData.delete('voice_notes[]');
+        Array.from(voiceFileStore.files).forEach(file => formData.append('voice_notes[]', file, file.name));
+    }
+};
 const VOICE_NOTE_AUDIO_CONSTRAINTS = {
     echoCancellation: { ideal: true },
     noiseSuppression: { ideal: true },
@@ -263,9 +278,10 @@ function renderChatStyleAudio(url, fileName, mode = 'feed') {
     const safeUrl = escapeAttr(url);
     const safeName = escapeText(fileName || 'voice note');
     const isChat = mode === 'chat';
+    const isVoiceNote = /\/data\/audio\/voice\//i.test(String(url || ''));
     const classes = isChat
         ? 'chat-attachment chat-attachment-media chat-attachment-audio voice-preview-chat-note'
-        : 'feed-audio-note feed-voice-note chat-attachment chat-attachment-media chat-attachment-audio';
+        : `feed-audio-note feed-voice-note${isVoiceNote ? '' : ' feed-uploaded-audio'} chat-attachment chat-attachment-media chat-attachment-audio`;
     const label = isChat
         ? `<a class="chat-attachment-download" href="${safeUrl}"><i class="fa-solid fa-microphone"></i><span>${safeName}</span></a>`
         : '';
@@ -277,7 +293,7 @@ function renderChatStyleAudio(url, fileName, mode = 'feed') {
         '<button class="chat-media-play" type="button" aria-label="play audio"><i class="fa-solid fa-play"></i></button>',
         '<input class="chat-media-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="seek audio">',
         '<span class="chat-media-time">0:00 / 0:00</span>',
-        '<button class="chat-media-speed" type="button" aria-label="playback speed"><span class="chat-media-speed-label">1x</span></button>',
+        isChat || isVoiceNote ? '<button class="chat-media-speed" type="button" aria-label="playback speed"><span class="chat-media-speed-label">1x</span></button>' : '',
         '</div>',
         '</div>'
     ].join('');
@@ -285,6 +301,128 @@ function renderChatStyleAudio(url, fileName, mode = 'feed') {
 
 function initInlineMediaPlayers(root = document) {
     const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('.feed-video-attachment').forEach(function(videoWrap) {
+        if (videoWrap.dataset.videoBound === '1') return;
+        const video = videoWrap.querySelector('.feed-video-element');
+        const play = videoWrap.querySelector('.feed-video-play');
+        const playIcon = play ? play.querySelector('i') : null;
+        const seek = videoWrap.querySelector('.feed-video-seek');
+        const time = videoWrap.querySelector('.feed-video-time');
+        const mute = videoWrap.querySelector('.feed-video-mute');
+        const muteIcon = mute ? mute.querySelector('i') : null;
+        const volume = videoWrap.querySelector('.feed-video-volume');
+        const fullscreen = videoWrap.querySelector('.feed-video-fullscreen');
+        const fullscreenIcon = fullscreen ? fullscreen.querySelector('i') : null;
+        if (!video) return;
+        videoWrap.dataset.videoBound = '1';
+        videoWrap.addEventListener('click', function(event) {
+            event.stopPropagation();
+        });
+        const updateCompactControls = () => {
+            videoWrap.classList.toggle('is-thin', videoWrap.clientWidth < 360);
+        };
+        if (typeof ResizeObserver === 'function') {
+            new ResizeObserver(updateCompactControls).observe(videoWrap);
+        }
+
+        const format = (seconds) => {
+            seconds = Number(seconds || 0);
+            if (!isFinite(seconds) || seconds < 0) seconds = 0;
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return mins + ':' + (secs < 10 ? '0' : '') + secs;
+        };
+        const updatePlay = () => {
+            if (!playIcon) return;
+            playIcon.classList.toggle('fa-play', video.paused);
+            playIcon.classList.toggle('fa-pause', !video.paused);
+            if (play) play.setAttribute('aria-label', video.paused ? 'play video' : 'pause video');
+        };
+        const updateTime = () => {
+            const duration = isFinite(video.duration) ? video.duration : 0;
+            if (seek && !seek.matches(':active')) {
+                seek.value = duration > 0 ? String(Math.round((video.currentTime / duration) * 1000)) : '0';
+            }
+            if (time) time.textContent = format(video.currentTime) + ' / ' + format(duration);
+        };
+        const updateVolume = () => {
+            if (volume) volume.value = String(video.muted ? 0 : video.volume);
+            if (!muteIcon) return;
+            muteIcon.classList.toggle('fa-volume-high', !video.muted && video.volume > 0.5);
+            muteIcon.classList.toggle('fa-volume-low', !video.muted && video.volume > 0 && video.volume <= 0.5);
+            muteIcon.classList.toggle('fa-volume-xmark', video.muted || video.volume === 0);
+        };
+        const togglePlayback = () => {
+            if (video.paused) {
+                document.querySelectorAll('audio, video').forEach(function(other) {
+                    if (other !== video) other.pause();
+                });
+                video.play().catch(function() {});
+            } else {
+                video.pause();
+            }
+        };
+
+        if (play) play.addEventListener('click', togglePlayback);
+        video.addEventListener('click', togglePlayback);
+        if (seek) {
+            seek.addEventListener('input', function() {
+                if (!isFinite(video.duration) || video.duration <= 0) return;
+                video.currentTime = (Number(seek.value || 0) / 1000) * video.duration;
+                updateTime();
+            });
+        }
+        if (mute) {
+            mute.addEventListener('click', function() {
+                video.muted = !video.muted;
+                updateVolume();
+            });
+        }
+        if (volume) {
+            volume.addEventListener('input', function() {
+                video.volume = Number(volume.value || 0);
+                video.muted = video.volume === 0;
+                updateVolume();
+            });
+        }
+        if (fullscreen) {
+            fullscreen.addEventListener('click', function() {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(function() {});
+                } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (videoWrap.requestFullscreen) {
+                    videoWrap.requestFullscreen().catch(function() {});
+                } else if (videoWrap.webkitRequestFullscreen) {
+                    videoWrap.webkitRequestFullscreen();
+                } else if (video.webkitEnterFullscreen) {
+                    video.webkitEnterFullscreen();
+                }
+            });
+        }
+        const updateFullscreen = () => {
+            const active = document.fullscreenElement === videoWrap || document.webkitFullscreenElement === videoWrap;
+            if (fullscreenIcon) {
+                fullscreenIcon.classList.toggle('fa-expand', !active);
+                fullscreenIcon.classList.toggle('fa-compress', active);
+            }
+            if (fullscreen) fullscreen.setAttribute('aria-label', active ? 'exit fullscreen video' : 'fullscreen video');
+        };
+        document.addEventListener('fullscreenchange', updateFullscreen);
+        document.addEventListener('webkitfullscreenchange', updateFullscreen);
+        video.addEventListener('loadedmetadata', updateTime);
+        video.addEventListener('loadedmetadata', updateCompactControls);
+        video.addEventListener('timeupdate', updateTime);
+        video.addEventListener('play', updatePlay);
+        video.addEventListener('pause', updatePlay);
+        video.addEventListener('ended', updatePlay);
+        video.addEventListener('volumechange', updateVolume);
+        updatePlay();
+        updateTime();
+        updateVolume();
+        updateCompactControls();
+        updateFullscreen();
+    });
     const wraps = [];
     if (scope.matches && scope.matches('.chat-attachment-media')) {
         wraps.push(scope);
@@ -389,6 +527,29 @@ function initInlineMediaPlayers(root = document) {
     });
 }
 
+function renderFeedVideo(url, fileName) {
+    const escapeAttr = (value) => String(value || '')
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const safeUrl = escapeAttr(url);
+    const safeName = escapeAttr(fileName || 'video');
+    return [
+        '<div class="feed-video-attachment">',
+        `<video class="feed-video-element" playsinline preload="metadata" src="${safeUrl}" aria-label="${safeName}"></video>`,
+        '<div class="feed-video-controls">',
+        '<button class="feed-video-control feed-video-play" type="button" aria-label="play video"><i class="fa-solid fa-play"></i></button>',
+        '<input class="feed-video-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="seek video">',
+        '<span class="feed-video-time">0:00 / 0:00</span>',
+        '<button class="feed-video-control feed-video-mute" type="button" aria-label="mute video"><i class="fa-solid fa-volume-high"></i></button>',
+        '<input class="feed-video-volume" type="range" min="0" max="1" value="1" step="0.05" aria-label="video volume">',
+        '<button class="feed-video-control feed-video-fullscreen" type="button" aria-label="fullscreen video"><i class="fa-solid fa-expand"></i></button>',
+        '</div></div>'
+    ].join('');
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+    initInlineMediaPlayers(document);
+});
+
 // Compress images client-side to JPEG under 1MB (also converts PNG/GIF/WEBP to JPEG)
 async function compressImageToJpegUnder1MB(file, maxBytes = 1000000) {
     return new Promise((resolve, reject) => {
@@ -465,6 +626,130 @@ async function compressImageToJpegUnder1MB(file, maxBytes = 1000000) {
     });
 }
 
+function replaceQueuedMediaFile(index, replacement) {
+    const files = Array.from(mediaFileStore.files);
+    if (!files[index]) return false;
+    files[index] = replacement;
+    while (mediaFileStore.items.length) mediaFileStore.items.remove(0);
+    files.forEach(file => mediaFileStore.items.add(file));
+    return true;
+}
+
+function openBBCodeCropper(index, onComplete) {
+    const media = bbcodeMedia.get(index);
+    const sourceFile = mediaFileStore.files[index];
+    if (!media || media.kind !== 'image' || !sourceFile) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'site-popup-overlay bbcode-crop-overlay';
+    const dialog = document.createElement('div');
+    dialog.className = 'site-popup-dialog bbcode-crop-dialog';
+    dialog.innerHTML = '<div class="site-popup-title">crop image</div><div class="site-popup-detail">drag across the image to choose the area to keep.</div>';
+    const stage = document.createElement('div');
+    stage.className = 'bbcode-crop-stage';
+    const canvas = document.createElement('canvas');
+    const selection = document.createElement('div');
+    selection.className = 'bbcode-crop-selection';
+    stage.append(canvas, selection);
+    const actions = document.createElement('div');
+    actions.className = 'site-popup-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'site-popup-button site-popup-cancel';
+    cancel.textContent = 'cancel';
+    const apply = document.createElement('button');
+    apply.type = 'button';
+    apply.className = 'site-popup-button site-popup-ok';
+    apply.textContent = 'crop';
+    apply.disabled = true;
+    actions.append(cancel, apply);
+    dialog.append(stage, actions);
+    overlay.append(dialog);
+    document.body.append(overlay);
+
+    const image = new Image();
+    const sourceUrl = URL.createObjectURL(sourceFile);
+    let crop = null;
+    let start = null;
+    const close = () => {
+        URL.revokeObjectURL(sourceUrl);
+        overlay.remove();
+    };
+    const point = event => {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
+            y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)),
+        };
+    };
+    const drawSelection = () => {
+        if (!crop) return;
+        selection.style.left = crop.x + 'px';
+        selection.style.top = crop.y + 'px';
+        selection.style.width = crop.width + 'px';
+        selection.style.height = crop.height + 'px';
+        selection.hidden = false;
+        apply.disabled = crop.width < 4 || crop.height < 4;
+    };
+    stage.addEventListener('pointerdown', event => {
+        if (!image.complete) return;
+        event.preventDefault();
+        start = point(event);
+        crop = { x: start.x, y: start.y, width: 0, height: 0 };
+        stage.setPointerCapture(event.pointerId);
+        drawSelection();
+    });
+    stage.addEventListener('pointermove', event => {
+        if (!start) return;
+        const current = point(event);
+        crop = {
+            x: Math.min(start.x, current.x),
+            y: Math.min(start.y, current.y),
+            width: Math.abs(current.x - start.x),
+            height: Math.abs(current.y - start.y),
+        };
+        drawSelection();
+    });
+    const endDrag = () => { start = null; };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+    cancel.addEventListener('click', close);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    image.onload = () => {
+        const maxWidth = Math.min(760, window.innerWidth - 72);
+        const maxHeight = Math.min(560, window.innerHeight - 190);
+        const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+    };
+    image.onerror = close;
+    image.src = sourceUrl;
+    apply.addEventListener('click', () => {
+        if (!crop || apply.disabled) return;
+        const scaleX = image.naturalWidth / canvas.width;
+        const scaleY = image.naturalHeight / canvas.height;
+        const output = document.createElement('canvas');
+        output.width = Math.max(1, Math.round(crop.width * scaleX));
+        output.height = Math.max(1, Math.round(crop.height * scaleY));
+        const ctx = output.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, output.width, output.height);
+        ctx.drawImage(image, crop.x * scaleX, crop.y * scaleY, crop.width * scaleX, crop.height * scaleY, 0, 0, output.width, output.height);
+        output.toBlob(blob => {
+            if (!blob) return;
+            const baseName = (sourceFile.name || 'image').replace(/\.[^.]+$/, '') || 'image';
+            const croppedFile = new File([blob], baseName + '-cropped.jpg', { type: 'image/jpeg' });
+            if (!replaceQueuedMediaFile(index, croppedFile)) return;
+            const dataUrl = output.toDataURL('image/jpeg', 0.9);
+            bbcodeImages.set(index, { data: dataUrl, name: croppedFile.name });
+            bbcodeMedia.set(index, { url: dataUrl, name: croppedFile.name, kind: 'image' });
+            close();
+            if (typeof onComplete === 'function') onComplete();
+        }, 'image/jpeg', 0.9);
+    });
+}
+
 function initBBCodeEditor() {
     const bbcodeTextbox = document.getElementById('bbcode-textbox');
     const bbcodeEditor = bbcodeTextbox ? bbcodeTextbox.closest('.bbcode-editor') : null;
@@ -474,9 +759,62 @@ function initBBCodeEditor() {
     const bbcodeHeaderDropdown = bbcodeScope.querySelector('#bbcode-header-dropdown');
     const bbcodeButtons = bbcodeScope.querySelectorAll('.bbcode-btn');
 
+    const refreshPreview = () => {
+        if (!bbcodePreview || !isPreviewMode) return;
+        bbcodePreview.innerHTML = parseBBCode(applyGuestPreviewFilter(bbcodeTextbox.value));
+        initInlineMediaPlayers(bbcodePreview);
+    };
+
+    if (bbcodePreview && bbcodePreview.dataset.cropMenuBound !== '1') {
+        bbcodePreview.dataset.cropMenuBound = '1';
+        bbcodePreview.addEventListener('contextmenu', event => {
+            const image = event.target.closest('img[data-bbcode-media-index]');
+            if (!image || !bbcodePreview.contains(image)) return;
+            const index = Number(image.dataset.bbcodeMediaIndex);
+            if (!Number.isInteger(index) || !bbcodeImages.has(index)) return;
+            event.preventDefault();
+            document.querySelectorAll('.bbcode-image-context-menu').forEach(menu => menu.remove());
+            const menu = document.createElement('div');
+            menu.className = 'bbcode-image-context-menu';
+            const cropButton = document.createElement('button');
+            cropButton.type = 'button';
+            cropButton.innerHTML = '<i class="fa-solid fa-crop-simple"></i><span>crop image</span>';
+            menu.append(cropButton);
+            document.body.append(menu);
+            const rect = menu.getBoundingClientRect();
+            menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - 8)) + 'px';
+            menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8)) + 'px';
+            const dismiss = dismissEvent => {
+                if (!menu.contains(dismissEvent.target)) menu.remove();
+            };
+            window.setTimeout(() => document.addEventListener('pointerdown', dismiss, { once: true }), 0);
+            cropButton.addEventListener('click', () => {
+                menu.remove();
+                openBBCodeCropper(index, refreshPreview);
+            });
+        });
+    }
+
     // Avoid rebinding if this editor instance is already initialized
     if (!bbcodeTextbox || bbcodeTextbox.dataset.bbcodeInitialized === '1') return;
     bbcodeTextbox.dataset.bbcodeInitialized = '1';
+
+    // SPA navigation replaces the editor DOM without reloading this script. Do not
+    // let files or temporary placeholder indexes leak into the next post editor.
+    if (activeBBCodeEditor !== bbcodeTextbox) {
+        bbcodeMedia.forEach(media => {
+            if (media && typeof media.url === 'string' && media.url.startsWith('blob:')) URL.revokeObjectURL(media.url);
+        });
+        bbcodeVoiceNotes.forEach(note => {
+            if (note && typeof note.url === 'string' && note.url.startsWith('blob:')) URL.revokeObjectURL(note.url);
+        });
+        bbcodeImages.clear();
+        bbcodeMedia.clear();
+        bbcodeVoiceNotes.clear();
+        while (mediaFileStore.items.length) mediaFileStore.items.remove(0);
+        while (voiceFileStore.items.length) voiceFileStore.items.remove(0);
+        activeBBCodeEditor = bbcodeTextbox;
+    }
 
     const guestFilterTermsScript = bbcodeScope.querySelector('[data-feed-guest-filter-terms]');
     let guestFilterTerms = [];
@@ -664,57 +1002,97 @@ function initBBCodeEditor() {
         });
     }
     
-    // Image attachment
+    // Media attachment
     const bbcodeImageBtn = bbcodeScope.querySelector('#bbcode-image-btn');
     const bbcodeImageInput = bbcodeScope.querySelector('#bbcode-image-input');
     const bbcodeVoiceBtn = bbcodeScope.querySelector('.bbcode-voice-btn, #bbcode-voice-btn');
     const bbcodeVoiceInput = bbcodeScope.querySelector('#bbcode-voice-input');
     const bbcodeVoiceRecorder = bbcodeScope.querySelector('.bbcode-voice-recorder');
 
-    const queueImageFile = async (file) => {
+    const mediaKindForFile = (file) => {
+        const type = String(file && file.type || '').toLowerCase();
+        if (type.startsWith('image/')) return 'image';
+        if (type.startsWith('audio/')) return 'audio';
+        if (type.startsWith('video/')) return 'video';
+        // Safari/iOS and some Android file providers leave File.type blank for
+        // otherwise valid media. The accept filter still selected the file, so
+        // use its extension to decide which placeholder/player it needs.
+        const name = String(file && file.name || '').toLowerCase().split(/[?#]/, 1)[0];
+        if (/\.(?:png|jpe?g|gif|webp)$/.test(name)) return 'image';
+        if (/\.(?:mp3|m4a|aac|wav|ogg|oga|flac)$/.test(name)) return 'audio';
+        if (/\.(?:mp4|m4v|mov|webm|ogv)$/.test(name)) return 'video';
+        return '';
+    };
+
+    const mediaKindForUrl = (url) => {
+        let path = String(url || '').toLowerCase();
+        try { path = new URL(url, window.location.href).pathname.toLowerCase(); } catch (_) { /* use raw value */ }
+        if (/\.(?:mp3|m4a|aac|wav|ogg|oga|flac)$/.test(path)) return 'audio';
+        if (/\.(?:mp4|m4v|mov|webm|ogv)$/.test(path)) return 'video';
+        return 'image';
+    };
+
+    const queueMediaFile = async (file) => {
+        const kind = mediaKindForFile(file);
+        if (!kind) return;
+        if (file.size > MEDIA_UPLOAD_MAX_BYTES) {
+            if (typeof showSiteNotice === 'function') {
+                showSiteNotice('media too large', `${file.name || 'this file'} is larger than the 8 MB upload limit.`);
+            }
+            return;
+        }
         let processedFile = file;
-        try {
-            processedFile = await compressImageToJpegUnder1MB(file, 1000000);
-        } catch (_) {
-            processedFile = file;
+        if (kind === 'image') {
+            try {
+                processedFile = await compressImageToJpegUnder1MB(file, 1000000);
+            } catch (_) {
+                processedFile = file;
+            }
         }
 
-        const fileIndex = imageFileStore.files.length;
-        imageFileStore.items.add(processedFile);
+        const fileIndex = mediaFileStore.files.length;
+        mediaFileStore.items.add(processedFile);
+        const addPlaceholder = (previewUrl) => {
+            bbcodeMedia.set(fileIndex, { url: previewUrl, name: processedFile.name, kind });
+            if (kind === 'image') bbcodeImages.set(fileIndex, { data: previewUrl, name: processedFile.name });
+            const start = bbcodeTextbox.selectionStart;
+            const end = bbcodeTextbox.selectionEnd;
+            const beforeText = bbcodeTextbox.value.substring(0, start);
+            const afterText = bbcodeTextbox.value.substring(end);
+            const placeholderTag = kind === 'image' ? 'img' : kind;
+            const newText = `[${placeholderTag}:${fileIndex}][name:${processedFile.name}]`;
+            bbcodeTextbox.value = beforeText + newText + afterText;
+            const newCursorPos = start + newText.length;
+            bbcodeTextbox.focus();
+            bbcodeTextbox.setSelectionRange(newCursorPos, newCursorPos);
+        };
 
-        return new Promise((resolve) => {
+        if (kind !== 'image') {
+            addPlaceholder(URL.createObjectURL(processedFile));
+            return;
+        }
+
+        await new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = function(event) {
-                const imageData = event.target.result;
-                bbcodeImages.set(fileIndex, { data: imageData, name: processedFile.name });
-
-                const start = bbcodeTextbox.selectionStart;
-                const end = bbcodeTextbox.selectionEnd;
-                const beforeText = bbcodeTextbox.value.substring(0, start);
-                const afterText = bbcodeTextbox.value.substring(end);
-
-                const newText = `[img:${fileIndex}][name:${processedFile.name}]`;
-                bbcodeTextbox.value = beforeText + newText + afterText;
-                const newCursorPos = start + newText.length;
-                bbcodeTextbox.focus();
-                bbcodeTextbox.setSelectionRange(newCursorPos, newCursorPos);
+                addPlaceholder(event.target.result);
                 resolve();
             };
             reader.readAsDataURL(processedFile);
         });
     };
 
-    const handleImageFiles = async (incomingFiles) => {
-        const files = (incomingFiles || []).filter(f => f && typeof f.type === 'string' && f.type.startsWith('image/'));
+    const handleMediaFiles = async (incomingFiles) => {
+        const files = (incomingFiles || []).filter(file => mediaKindForFile(file));
         if (!files.length) return false;
 
         // Process sequentially to keep placeholder order predictable
         for (const file of files) {
-            await queueImageFile(file);
+            await queueMediaFile(file);
         }
 
         if (bbcodeImageInput) {
-            bbcodeImageInput.files = imageFileStore.files;
+            bbcodeImageInput.files = mediaFileStore.files;
         }
         return true;
     };
@@ -723,21 +1101,22 @@ function initBBCodeEditor() {
         bbcodeImageBtn.addEventListener('click', function() {
             const canSelectFile = !bbcodeImageInput.disabled;
             const promptDetail = canSelectFile
-                ? 'enter an image URL, or leave blank to select a file.'
-                : 'enter an image URL.';
-            showSitePrompt('add image', promptDetail, '').then(function(imageUrl) {
-                if (imageUrl === null) return;
+                ? 'enter a direct image, audio, or video URL, or leave blank to select files.'
+                : 'enter a direct image, audio, or video URL.';
+            showSitePrompt('add media', promptDetail, '').then(function(mediaUrl) {
+                if (mediaUrl === null) return;
 
-                if (imageUrl.trim()) {
-                    // URL provided - use [img=URL][name:filename] format
+                if (mediaUrl.trim()) {
                     const start = bbcodeTextbox.selectionStart;
                     const end = bbcodeTextbox.selectionEnd;
                     const beforeText = bbcodeTextbox.value.substring(0, start);
                     const afterText = bbcodeTextbox.value.substring(end);
 
-                    const url = imageUrl.trim();
-                    const fileName = url.split('/').pop() || 'image';
-                    const newText = `[img=${url}][name:${fileName}]`;
+                    const url = mediaUrl.trim();
+                    const kind = mediaKindForUrl(url);
+                    const fileName = url.split('/').pop().split('?')[0] || kind;
+                    const tag = kind === 'audio' ? 'audio' : (kind === 'video' ? 'video' : 'img');
+                    const newText = `[${tag}=${url}][name:${fileName}]`;
                     bbcodeTextbox.value = beforeText + newText + afterText;
                     bbcodeTextbox.focus();
                     bbcodeTextbox.setSelectionRange(start + newText.length, start + newText.length);
@@ -749,9 +1128,9 @@ function initBBCodeEditor() {
         });
         
         bbcodeImageInput.addEventListener('change', async function(e) {
-            const used = await handleImageFiles(Array.from(e.target.files || []));
+            const used = await handleMediaFiles(Array.from(e.target.files || []));
             if (used) {
-                bbcodeImageInput.files = imageFileStore.files;
+                bbcodeImageInput.files = mediaFileStore.files;
             }
         });
     }
@@ -798,7 +1177,7 @@ function initBBCodeEditor() {
                 files.push(...Array.from(e.clipboardData.files).filter(f => f && f.type && f.type.startsWith('image/')));
             }
 
-            const used = await handleImageFiles(files);
+            const used = await handleMediaFiles(files);
             if (used) {
                 e.preventDefault();
             }
@@ -858,39 +1237,11 @@ function initBBCodeEditor() {
     // Preview toggle
     if (bbcodePreviewToggle && bbcodePreview) {
         bbcodePreviewToggle.addEventListener('click', function(e) {
-            const createForm = document.getElementById('create-post-form');
-            const isJournalCreateForm = !!(createForm && createForm.querySelector('button[name="save_draft"]'));
-            if (isJournalCreateForm) {
-                e.preventDefault();
-                const addOrUpdateHidden = (name, value) => {
-                    let input = createForm.querySelector('input[name="' + name + '"]');
-                    if (!input) {
-                        input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = name;
-                        createForm.appendChild(input);
-                    }
-                    input.value = value;
-                };
-
-                addOrUpdateHidden('save_draft', '1');
-                addOrUpdateHidden('open_preview', '1');
-                if (typeof createForm.requestSubmit === 'function') {
-                    createForm.requestSubmit();
-                } else {
-                    createForm.submit();
-                }
-                return;
-            }
-
             isPreviewMode = !isPreviewMode;
             
             if (isPreviewMode) {
                 // Show preview
-                const bbcodeText = bbcodeTextbox.value;
-                const htmlText = parseBBCode(applyGuestPreviewFilter(bbcodeText));
-                bbcodePreview.innerHTML = htmlText;
-                initInlineMediaPlayers(bbcodePreview);
+                refreshPreview();
                 bbcodeTextbox.style.display = 'none';
                 bbcodePreview.style.display = 'block';
                 
@@ -1128,6 +1479,112 @@ function initToastFeedGenerator() {
 
 window.addEventListener('DOMContentLoaded', initToastFeedGenerator);
 
+function externalVideoEmbedData(rawUrl) {
+    let parsed;
+    try {
+        parsed = new URL(rawUrl);
+    } catch (_) {
+        return null;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+
+    const host = parsed.hostname.toLowerCase().replace(/^(?:www\.|m\.|music\.)/, '');
+    const pathParts = parsed.pathname.split('/').filter(Boolean);
+    let provider = '';
+    let id = '';
+    if (host === 'youtu.be') {
+        provider = 'youtube';
+        id = pathParts[0] || '';
+    } else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+        provider = 'youtube';
+        if (parsed.pathname === '/watch') {
+            id = parsed.searchParams.get('v') || '';
+        } else if (['shorts', 'live', 'embed'].includes(pathParts[0])) {
+            id = pathParts[1] || '';
+        }
+    } else if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+        provider = 'vimeo';
+        const numericPart = pathParts.find(part => /^[0-9]+$/.test(part));
+        id = numericPart || '';
+    } else if (host === 'dai.ly') {
+        provider = 'dailymotion';
+        id = pathParts[0] || '';
+    } else if (host === 'dailymotion.com') {
+        provider = 'dailymotion';
+        const videoIndex = pathParts[0] === 'embed' && pathParts[1] === 'video' ? 2 : (pathParts[0] === 'video' ? 1 : -1);
+        id = videoIndex >= 0 ? (pathParts[videoIndex] || '') : '';
+    }
+
+    if (provider === 'youtube' && /^[a-zA-Z0-9_-]{6,20}$/.test(id)) {
+        return { provider, title: 'YouTube video', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}` };
+    }
+    if (provider === 'vimeo' && /^[0-9]{5,15}$/.test(id)) {
+        return { provider, title: 'Vimeo video', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}` };
+    }
+    if (provider === 'dailymotion' && /^[a-zA-Z0-9]{5,20}$/.test(id)) {
+        return { provider, title: 'Dailymotion video', url: `https://www.dailymotion.com/embed/video/${encodeURIComponent(id)}` };
+    }
+    return null;
+}
+
+function createExternalVideoEmbed(video) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'external-video-embed';
+    wrapper.dataset.videoProvider = video.provider;
+
+    const iframe = document.createElement('iframe');
+    iframe.src = video.url;
+    iframe.title = video.title;
+    iframe.loading = 'lazy';
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    iframe.allowFullscreen = true;
+    wrapper.append(iframe);
+    return wrapper;
+}
+
+function embedPlainVideoLinks(html) {
+    if (typeof document === 'undefined' || !html) return html;
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const urlPattern = /https?:\/\/[^\s<]+/giu;
+
+    Array.from(template.content.childNodes).forEach(node => {
+        if (node.nodeType !== Node.TEXT_NODE || !node.nodeValue) return;
+        const text = node.nodeValue;
+        const fragment = document.createDocumentFragment();
+        let cursor = 0;
+        let replaced = false;
+
+        for (const match of text.matchAll(urlPattern)) {
+            const candidate = match[0];
+            const url = candidate.replace(/[.,!?;:)]*$/, '');
+            const suffix = candidate.slice(url.length);
+            const video = externalVideoEmbedData(url);
+            if (!video) continue;
+
+            fragment.append(document.createTextNode(text.slice(cursor, match.index)));
+            fragment.append(createExternalVideoEmbed(video));
+            if (suffix) fragment.append(document.createTextNode(suffix));
+            cursor = match.index + candidate.length;
+            replaced = true;
+        }
+
+        if (!replaced) return;
+        fragment.append(document.createTextNode(text.slice(cursor)));
+        node.replaceWith(fragment);
+    });
+
+    template.content.querySelectorAll('.external-video-embed').forEach(embed => {
+        const next = embed.nextSibling;
+        if (next && next.nodeType === Node.ELEMENT_NODE && next.tagName === 'BR') {
+            next.remove();
+        }
+    });
+
+    return template.innerHTML;
+}
+
 // BBCode parser
 function parseBBCode(text) {
     // Extract and temporarily store URLs from [img=URL] and [link=URL] before HTML sanitization
@@ -1163,11 +1620,18 @@ function parseBBCode(text) {
     });
 
     const audioUrlMap = new Map();
+    const videoUrlMap = new Map();
     let audioCounter = 0;
+    let videoCounter = 0;
     text = text.replace(/\[audio=([^\]\s]+)\](?:\[name:(.*?)\])?/gi, function(match, url, customName) {
         const id = audioCounter++;
         audioUrlMap.set(id, { url, name: customName });
         return `[audio-placeholder:${id}]`;
+    });
+    text = text.replace(/\[video=([^\]\s]+)\](?:\[name:(.*?)\])?/gi, function(match, url, customName) {
+        const id = videoCounter++;
+        videoUrlMap.set(id, { url, name: customName });
+        return `[video-placeholder:${id}]`;
     });
     
     // Replace [link=URL]text[/link] with placeholder
@@ -1248,7 +1712,7 @@ function parseBBCode(text) {
         const imageObj = bbcodeImages.get(parseInt(id));
         if (imageObj) {
             const fileName = customName || imageObj.name || 'image';
-            return `<img id="post-image" src="${imageObj.data}" alt="${fileName}" style="max-width: 100%; height: auto;">`;
+            return `<img id="post-image" data-bbcode-media-index="${parseInt(id)}" src="${imageObj.data}" alt="${fileName}" style="max-width: 100%; height: auto;">`;
         }
         return match;
     });
@@ -1263,6 +1727,32 @@ function parseBBCode(text) {
         if (!voiceObj) return match;
         const fileName = customName || voiceObj.name || 'voice-note.m4a';
         return renderChatStyleAudio(voiceObj.url, fileName);
+    });
+    html = html.replace(/\[audio:(\d+)\](?:\[name:(.*?)\])?/gi, function(match, id, customName) {
+        const media = bbcodeMedia.get(parseInt(id));
+        if (!media || media.kind !== 'audio') return match;
+        return renderChatStyleAudio(media.url, customName || media.name || 'audio');
+    });
+    html = html.replace(/\[video:(\d+)\](?:\[name:(.*?)\])?/gi, function(match, id, customName) {
+        const media = bbcodeMedia.get(parseInt(id));
+        if (!media || media.kind !== 'video') return match;
+        return renderFeedVideo(media.url, customName || media.name || 'video');
+    });
+    html = html.replace(/\[video-placeholder:(\d+)\]/gi, function(match, id) {
+        const videoData = videoUrlMap.get(parseInt(id));
+        if (!videoData) return match;
+        const fileName = videoData.name || videoData.url.split('/').pop() || 'video';
+        return renderFeedVideo(videoData.url, fileName);
+    });
+    html = html.replace(/\[media:(\d+)\](?:\[name:(.*?)\])?/gi, function(match, id, customName) {
+        const media = bbcodeMedia.get(parseInt(id));
+        if (!media) return match;
+        const fileName = customName || media.name || media.kind;
+        if (media.kind === 'audio') return renderChatStyleAudio(media.url, fileName);
+        if (media.kind === 'video') return renderFeedVideo(media.url, fileName);
+        const safeUrl = String(media.url || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeName = String(fileName || 'image').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<img id="post-image" src="${safeUrl}" alt="${safeName}" style="max-width: 100%; height: auto;">`;
     });
     html = html.replace(/(<div class="[^"]*\bfeed-audio-note\b[\s\S]*?<\/div>\s*<\/div>)\n+/gi, '$1');
     // Convert newlines to <br> for regular content
@@ -1288,5 +1778,5 @@ function parseBBCode(text) {
 
     // Remove a single <br> immediately before any h3 heading (collapse extra blank line)
     html = html.replace(/<br\s*\/?\s*>\s*(<h3[^>]*>)/gi, '$1');
-    return html;
+    return embedPlainVideoLinks(html);
 }

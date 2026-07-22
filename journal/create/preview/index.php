@@ -6,6 +6,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'video-embeds.php';
+require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
     header('Location: /account/login');
@@ -83,6 +85,13 @@ function bbcode_to_html(string $text): string {
         $altSource = isset($m[2]) && strlen(trim($m[2])) > 0 ? trim($m[2]) : basename($rawUrl);
         $alt = htmlspecialchars($altSource, ENT_QUOTES, 'UTF-8');
         return '<img id="post-image" src="' . $url . '" alt="' . $alt . '">';
+    }, $html);
+
+    $html = preg_replace_callback('/\[audio=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
+        return fridg3_feed_render_audio_attachment($m[1], trim((string)($m[2] ?? 'audio')));
+    }, $html);
+    $html = preg_replace_callback('/\[video=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
+        return fridg3_feed_render_video_attachment($m[1], trim((string)($m[2] ?? 'video')));
     }, $html);
 
     $html = preg_replace_callback('/\[spoiler\](.*?)\[\/spoiler\]/is', function($m) {
@@ -259,6 +268,7 @@ if ($hasDraft) {
     } else {
         $contentHtml = bbcode_to_html($draftBody);
     }
+    $contentHtml = fridg3_embed_plain_video_links_in_html($contentHtml);
 }
 
 $content = file_get_contents($content_path);

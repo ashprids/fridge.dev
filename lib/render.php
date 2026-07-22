@@ -354,6 +354,36 @@ if (!function_exists('fridg3_get_account_theme_preference')) {
     }
 }
 
+if (!function_exists('fridg3_paginate_static_post_list')) {
+    function fridg3_paginate_static_post_list(string $content, string $route, int $currentPage, int $perPage = 10): string {
+        if ($perPage < 1 || preg_match('#(<div\b[^>]*\bid=([' . "\"'" . '])posts\2[^>]*>)([\s\S]*)(</div>)#i', $content, $wrapper) !== 1) {
+            return $content;
+        }
+        $inner = (string)$wrapper[3];
+        if (preg_match_all('#<a\b[^>]*>\s*<div\b[^>]*\bid=([' . "\"'" . '])post\1[^>]*>[\s\S]*?</div>\s*</a>#i', $inner, $matches) === false) {
+            return $content;
+        }
+        $cards = $matches[0] ?? [];
+        $total = count($cards);
+        if ($total === 0) return $content;
+        $totalPages = max(1, (int)ceil($total / $perPage));
+        $currentPage = min(max(1, $currentPage), $totalPages);
+        $visibleCards = array_slice($cards, ($currentPage - 1) * $perPage, $perPage);
+        $replacement = (string)$wrapper[1] . PHP_EOL . implode(PHP_EOL, $visibleCards) . PHP_EOL . (string)$wrapper[4];
+        if ($totalPages > 1) {
+            $previous = $currentPage > 1
+                ? '<a class="guestbook-page-btn pagination-arrow" href="' . htmlspecialchars($route, ENT_QUOTES, 'UTF-8') . '?page=' . ($currentPage - 1) . '#content-footer" aria-label="previous page">&lsaquo;</a>'
+                : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';
+            $next = $currentPage < $totalPages
+                ? '<a class="guestbook-page-btn pagination-arrow" href="' . htmlspecialchars($route, ENT_QUOTES, 'UTF-8') . '?page=' . ($currentPage + 1) . '#content-footer" aria-label="next page">&rsaquo;</a>'
+                : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&rsaquo;</span>';
+            $replacement .= '<nav class="guestbook-pagination content-pagination" aria-label="pages" data-pagination-route="' . htmlspecialchars($route, ENT_QUOTES, 'UTF-8') . '" data-pagination-current="' . $currentPage . '" data-pagination-total="' . $totalPages . '" data-pagination-search="">'
+                . $previous . '<span class="guestbook-page-btn current" aria-current="page">' . $currentPage . '</span>' . $next . '</nav>';
+        }
+        return str_replace((string)$wrapper[0], $replacement, $content);
+    }
+}
+
 if (!function_exists('fridg3_get_theme_cookie_options')) {
     function fridg3_get_theme_cookie_options() {
         $options = [
@@ -487,7 +517,49 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
             && str_ends_with(strtolower($emailAddress), '@fridge.dev');
     }
 
+    function fridg3_inject_site_notices($template, $startDir) {
+        $noticesHelper = __DIR__ . DIRECTORY_SEPARATOR . 'site-notices.php';
+        if (!is_file($noticesHelper)) {
+            return $template;
+        }
+        require_once $noticesHelper;
+
+        $allNotices = fridg3_site_notices_load($startDir);
+        $audience = isset($_SESSION['user']['username']) ? 'users' : 'guests';
+        $requestUri = (string)($_SERVER['REQUEST_URI'] ?? '/');
+        $notices = fridg3_site_notices_for_request($allNotices, $audience, $requestUri);
+        $banner = is_array($notices['banner'] ?? null) ? $notices['banner'] : null;
+        $popup = is_array($notices['popup'] ?? null) ? $notices['popup'] : null;
+        $bannerHtml = '<div id="site-notice-banner-region"></div>';
+        if ($banner !== null) {
+            $message = nl2br(htmlspecialchars((string)$banner['message'], ENT_QUOTES, 'UTF-8'));
+            $dismiss = !empty($banner['dismissible'])
+                ? '<button type="button" class="site-notice-banner-close" aria-label="dismiss notice" data-site-notice-dismiss="' . htmlspecialchars((string)$banner['id'], ENT_QUOTES, 'UTF-8') . '">&times;</button>'
+                : '';
+            $bannerHtml = '<div id="site-notice-banner-region"><div class="site-notice-banner" data-site-notice-id="' . htmlspecialchars((string)$banner['id'], ENT_QUOTES, 'UTF-8') . '" data-dismissible="' . (!empty($banner['dismissible']) ? '1' : '0') . '" role="status"><div class="site-notice-banner-message">' . $message . '</div>' . $dismiss . '</div></div>';
+        }
+
+        $popupJson = json_encode($popup, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES);
+        $runtime = '<script id="site-notice-runtime" type="application/json">' . ($popupJson === false ? 'null' : $popupJson) . '</script>';
+        $injection = $bannerHtml . $runtime;
+
+        if (stripos($template, 'id="content-layout"') !== false) {
+            return preg_replace('/(<div\b[^>]*\bid=("|\')content-layout\2[^>]*>)/i', '$1' . $injection, $template, 1) ?: $template;
+        }
+
+        if (stripos($template, 'id="content"') !== false) {
+            return preg_replace('/(<div\b[^>]*\bid=("|\')content\2[^>]*>)/i', '$1' . $injection, $template, 1) ?: $template;
+        }
+
+        if (stripos($template, '<body') !== false) {
+            return preg_replace('/(<body\b[^>]*>)/i', '$1' . $injection, $template, 1) ?: $template;
+        }
+
+        return $injection . $template;
+    }
+
     function fridg3_replace_logged_in_discord_footer_button($template, $startDir) {
+        $template = fridg3_inject_site_notices($template, $startDir);
         if (!fridg3_user_has_email_account($startDir)) {
             return $template;
         }
@@ -510,15 +582,15 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/js/settings.js',
-            '/js/sidebar-player.js',
-            '/js/bookmarks.js',
-            '/js/bbcode.js',
+            '/js/settings.js' => '/js/settings.js',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260721-media-2',
+            '/js/bookmarks.js' => '/js/bookmarks.js?v=20260722-gallery-thumbs-1',
+            '/js/bbcode.js' => '/js/bbcode.js?v=20260722-media-13',
         ];
 
         $missing = [];
-        foreach ($scripts as $src) {
-            if (stripos($template, $src) === false) {
+        foreach ($scripts as $detectPath => $src) {
+            if (stripos($template, $detectPath) === false) {
                 $missing[] = '    <script src="' . $src . '"></script>';
             }
         }

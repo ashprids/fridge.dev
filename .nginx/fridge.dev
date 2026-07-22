@@ -9,7 +9,8 @@ server {
 
     root /var/www/fridge.dev;
     index index.html index.php;
-    client_max_body_size 20M;
+    # Application handlers enforce per-file limits where appropriate.
+    client_max_body_size 0;
 
     # Check the editable hard-ban list before serving website pages or files.
     # A 401 from the internal checker becomes a server-side redirect to the

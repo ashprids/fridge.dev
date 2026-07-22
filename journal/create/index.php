@@ -6,6 +6,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 
 // Require logged-in user with permission to create posts
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -165,6 +166,13 @@ function bbcode_to_html(string $text): string {
         return '<img id="post-image" src="' . $url . '" alt="' . $alt . '">';
     }, $html);
 
+    $html = preg_replace_callback('/\[audio=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
+        return fridg3_feed_render_audio_attachment($m[1], trim((string)($m[2] ?? 'audio')));
+    }, $html);
+    $html = preg_replace_callback('/\[video=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
+        return fridg3_feed_render_video_attachment($m[1], trim((string)($m[2] ?? 'video')));
+    }, $html);
+
     // Handle spoiler tags [spoiler]...[/spoiler]
     $html = preg_replace_callback('/\[spoiler\](.*?)\[\/spoiler\]/is', function($m) {
         return '<span class="spoiler">' . $m[1] . '</span>';
@@ -291,69 +299,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Prepare images directory and process uploads (shared by posts and drafts)
-    $imagesDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images'; // /data/images
-    if (!is_dir($imagesDir)) {
-        @mkdir($imagesDir, 0777, true);
-    }
-
-    // Save uploaded images (support multiple) with compression
-    $imageMap = [];
-    if (isset($_FILES['images']) && isset($_FILES['images']['name']) && is_array($_FILES['images']['name'])) {
-        $count = count($_FILES['images']['name']);
-        $allowed = [
-            'image/png' => 'png',
-            'image/jpeg' => 'jpg',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp'
-        ];
-
-        for ($i = 0; $i < $count; $i++) {
-            $error = $_FILES['images']['error'][$i] ?? UPLOAD_ERR_NO_FILE;
-            if ($error !== UPLOAD_ERR_OK) continue;
-
-            $tmpPath = $_FILES['images']['tmp_name'][$i];
-            if (!is_uploaded_file($tmpPath)) continue;
-
-            $origName = $_FILES['images']['name'][$i] ?? ('image_' . $i);
-            $imageInfo = @getimagesize($tmpPath);
-            $mime = is_array($imageInfo) && isset($imageInfo['mime']) ? $imageInfo['mime'] : '';
-            if (!isset($allowed[$mime])) continue;
-
-            $ext = $allowed[$mime];
-            $sizeBytes = @filesize($tmpPath) ?: 0;
-            $mustJpeg = ($mime === 'image/png');
-            $mustCompress = $mustJpeg || ($sizeBytes > 1000000);
-            $randomBase = bin2hex(random_bytes(8));
-            $destExt = $mustCompress ? 'jpg' : $ext;
-            $destName = $randomBase . '.' . $destExt;
-            $destPath = $imagesDir . DIRECTORY_SEPARATOR . $destName;
-
-            $saved = false;
-            if ($mustCompress) {
-                $saved = save_jpeg_under_limit($tmpPath, $mime, $destPath, 1000000);
-            } else {
-                $saved = @move_uploaded_file($tmpPath, $destPath);
-            }
-
-            // Fallback: try compressing to JPEG if initial move failed or size still too large
-            $finalSize = $saved ? (@filesize($destPath) ?: 0) : 0;
-            if (!$saved || $finalSize > 1000000) {
-                @unlink($destPath);
-                $destExt = 'jpg';
-                $destName = $randomBase . '.jpg';
-                $destPath = $imagesDir . DIRECTORY_SEPARATOR . $destName;
-                $saved = save_jpeg_under_limit($tmpPath, $mime, $destPath, 1000000);
-            }
-
-            if ($saved) {
-                $imageMap[$i] = [
-                    'url' => '/data/images/' . $destName,
-                    'name' => $origName ?: $destName,
-                ];
-            }
-        }
-    }
+    // Process uploaded images, audio, and video for both posts and drafts.
+    $imageMap = isset($_FILES['images']) && is_array($_FILES['images'])
+        ? fridg3_feed_process_uploaded_media($_FILES['images'])
+        : [];
 
     // Save draft: /data/journal/drafts/[title_with_underscores].txt
     if ($isDraft) {
@@ -371,17 +320,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $draftFilename = $safeBase . '.txt';
         $draftPath = $draftsDir . DIRECTORY_SEPARATOR . $draftFilename;
 
-        // For drafts, update BBCode image placeholders to point at uploaded files
+        // For drafts, update BBCode media placeholders to point at uploaded files
         $draftContent = $content;
-        if (!empty($imageMap)) {
-            $draftContent = preg_replace_callback('/\[img:(\d+)\](?:\[name:([^\]]*)\])?/i', function($m) use ($imageMap) {
-                $idx = (int)$m[1];
-                if (!isset($imageMap[$idx])) {
-                    return $m[0];
-                }
-                $name = isset($m[2]) && strlen(trim($m[2])) ? trim($m[2]) : ($imageMap[$idx]['name'] ?? 'image');
-                return '[img=' . $imageMap[$idx]['url'] . '][name:' . $name . ']';
-            }, $draftContent);
+        $draftContent = fridg3_feed_replace_media_placeholders($draftContent, $imageMap);
+        if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $draftContent) === 1) {
+            fridg3_feed_delete_media_files_from_content($draftContent);
+            header('Location: /journal/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
+            exit;
         }
 
         // Line 1: owner (USER:username), line 2: title, line 3: description, remaining: BBCode body (with image URLs)
@@ -423,16 +368,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Build post file content
     $safeContent = $content; // store raw; renderer can sanitize/format later
-    // Replace client-side image placeholders [img:index][name:...] with saved server paths
-    if (!empty($imageMap)) {
-        $safeContent = preg_replace_callback('/\[img:(\d+)\](?:\[name:([^\]]*)\])?/i', function($m) use ($imageMap) {
-            $idx = (int)$m[1];
-            if (!isset($imageMap[$idx])) {
-                return $m[0];
-            }
-            $name = isset($m[2]) && strlen(trim($m[2])) ? trim($m[2]) : ($imageMap[$idx]['name'] ?? 'image');
-            return '[img=' . $imageMap[$idx]['url'] . '][name:' . $name . '][/img]';
-        }, $safeContent);
+    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap);
+    if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $safeContent) === 1) {
+        fridg3_feed_delete_media_files_from_content($safeContent);
+        header('Location: /journal/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
+        exit;
     }
     // Convert BBCode to HTML
     $htmlContent = bbcode_to_html($safeContent);

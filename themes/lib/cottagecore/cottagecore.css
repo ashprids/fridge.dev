@@ -891,3 +891,4 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
     border-style: solid !important;
     transform: translate(-1px, -1px) !important;
 }
+body.cottagecore-theme .content-pagination .guestbook-page-btn { border-radius: 5px; }

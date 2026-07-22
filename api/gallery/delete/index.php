@@ -81,4 +81,9 @@ if (!@unlink($realFilePath)) {
     exit;
 }
 
+$thumbnailPath = $imagesDir . DIRECTORY_SEPARATOR . 'thumbnails' . DIRECTORY_SEPARATOR . hash('sha256', $filename) . '.jpg';
+if (is_file($thumbnailPath)) {
+    @unlink($thumbnailPath);
+}
+
 echo json_encode(['ok' => true]);

@@ -54,6 +54,7 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+$content = fridg3_paginate_static_post_list($content, '/tools', max(1, (int)($_GET['page'] ?? 1)), 10);
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

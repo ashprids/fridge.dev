@@ -39,19 +39,30 @@ function render_journal_pagination(int $currentPage, int $totalPages, string $se
     if ($totalPages <= 1) {
         return '';
     }
-    $items = '';
-    for ($i = 1; $i <= $totalPages; $i++) {
+    $query = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
+    $pageUrl = static fn(int $page): string => '/journal?page=' . $page . $query . '#content-footer';
+    $items = $currentPage > 1
+        ? '<a class="guestbook-page-btn pagination-arrow" href="' . $pageUrl($currentPage - 1) . '" aria-label="previous page">&lsaquo;</a>'
+        : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';
+    $pages = array_unique(array_filter([1, $currentPage - 1, $currentPage, $currentPage + 1, $totalPages], static fn(int $page): bool => $page >= 1 && $page <= $totalPages));
+    sort($pages);
+    $previous = 0;
+    foreach ($pages as $i) {
+        if ($previous > 0 && $i - $previous > 1) $items .= '<span class="pagination-ellipsis" aria-hidden="true">&hellip;</span>';
         $isCurrent = $i === $currentPage;
         $class = 'guestbook-page-btn' . ($isCurrent ? ' current' : '');
         $aria = $isCurrent ? ' aria-current="page"' : '';
-        $query = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
         if ($isCurrent) {
             $items .= '<span class="' . $class . '"' . $aria . '>' . $i . '</span>';
         } else {
-            $items .= '<a class="' . $class . '" href="/journal?page=' . $i . $query . '">' . $i . '</a>';
+            $items .= '<a class="' . $class . '" href="' . $pageUrl($i) . '" aria-label="page ' . $i . '">' . $i . '</a>';
         }
+        $previous = $i;
     }
-    return '<div class="guestbook-pagination">' . $items . '</div>';
+    $items .= $currentPage < $totalPages
+        ? '<a class="guestbook-page-btn pagination-arrow" href="' . $pageUrl($currentPage + 1) . '" aria-label="next page">&rsaquo;</a>'
+        : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&rsaquo;</span>';
+    return '<nav class="guestbook-pagination content-pagination" aria-label="journal pages" data-pagination-route="/journal" data-pagination-current="' . $currentPage . '" data-pagination-total="' . $totalPages . '" data-pagination-search="' . htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') . '">' . $items . '</nav>';
 }
 
 

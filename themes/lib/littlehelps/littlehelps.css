@@ -1596,3 +1596,4 @@ body.mobile-template #mini-player-volume::-moz-range-thumb {
         border-bottom: 1px solid var(--littlehelps-rule) !important;
     }
 }
+body.littlehelps-theme .content-pagination .guestbook-page-btn { border-radius: 3px; }

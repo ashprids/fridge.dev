@@ -141,6 +141,8 @@ the repo-tracked files in `.nginx/` are the source for the production nginx conf
 
 when adding routes, APIs, uploads, redirects, or private data folders, check `.nginx/fridge.dev` as part of the feature. a correct PHP route can still fail if nginx redirects POSTs, misses a clean-url rewrite, or accidentally exposes/blocklists the wrong `/data` path.
 
+nginx uses `client_max_body_size 0` and the repo-root `.user.ini` disables PHP's aggregate request/upload limits. Individual application handlers remain responsible for validating MIME types and enforcing per-file limits; feed and journal media attachments are capped at 8 MB per file.
+
 legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled in Cloudflare, not nginx. the redirect must append `legacy_domain=fridg3.org`; the frontend consumes that marker for the one-time rebrand popup and then removes it from the URL.
 
 ## Nginx Clean URLs
@@ -211,7 +213,7 @@ on the same daily schedule as the private backup workflow, this workflow:
 3. zips the sanitized directory as `DD-MM-YY_hh-mm-ss.zip`
 4. uploads it to the public Google Drive developer data folder
 5. keeps only the 10 newest zip files in that folder
-6. removes temporary server and runner files
+6. removes temporary server and runner files. Before each run, it removes stale `/home/deploy/dev-data.*` workspaces left by failed or cancelled runs; runs are serialized so it does not remove an active run's workspace. A workspace is also removed immediately if its initial production-data copy fails.
 
 the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership and entry IP metadata, feed guest reply IPs/browser tokens, shared posting ban lists, the site-wide hard-ban list and browser/IP associations, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state and browser notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft. the development archive additionally excludes `data/etc/hard-banned-ips.txt` and `data/etc/hard-ban-identities.json` entirely.
 

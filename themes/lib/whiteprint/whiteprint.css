@@ -804,3 +804,4 @@ body.mobile-template #usage-grid .usage-card:hover {
 #ascii-time-label {
     color: var(--time-label) !important;
 }
+body.whiteprint-theme .content-pagination .guestbook-page-btn { border-radius: 2px; }

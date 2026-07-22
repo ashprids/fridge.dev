@@ -16,6 +16,8 @@ Each run:
 6. Keeps only the 10 newest developer copies in that folder
 7. Deletes temporary files from the runner and server
 
+Before creating a workspace, the workflow removes any stale `/home/deploy/dev-data.*` workspaces left by an earlier failed or cancelled run. Runs are serialized, so this cleanup cannot remove files from another active developer-data run. If the initial production-data copy fails, that run also removes its newly-created workspace immediately.
+
 ## Required GitHub Secrets
 
 Create these repository secrets in `Settings` -> `Secrets and variables` -> `Actions`.

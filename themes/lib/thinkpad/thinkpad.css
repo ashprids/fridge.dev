@@ -396,3 +396,4 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
     color: #ffffff !important;
     border-color: #ff6259 !important;
 }
+body.thinkpad-theme .content-pagination .guestbook-page-btn { border-radius: 2px; }

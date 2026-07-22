@@ -46,8 +46,9 @@ larger shared frontend systems live in `/js/`, loaded by both desktop and mobile
 - `/js/sidebar-player.js`: sidebar visibility, mini player, footer/account state, active sidebar/footer buttons, and Toast listen-along playback support
 
 client performance notes: templates preload only the IBM VGA font and the regular Iosevka face needed by initial content; do not re-add the 400KB+ Bold Italic preload unless it becomes render-critical again. title-animation settling samples active letter transforms every 80ms rather than every animation frame and skips computed-style reads while the document is hidden, preserving smooth exits without continuous high-frequency layout/style queries.
+- feed and journal use compact windowed pagination; Blackprint keeps its frame and 30×30 controls square, while every selectable theme supplies its own pager surface, corner treatment, and shadow/glow styling without changing the single-line layout
 - `/js/bookmarks.js`: bookmark/save icons, anonymous bookmark storage, image modal behavior, and `/bookmarks` hydration
-- `/js/bbcode.js`: BBCode editor, inline media players, voice notes, feed generator, and `parseBBCode`
+- `/js/bbcode.js`: BBCode editor, attach-media URL/upload flow for images, audio, and video, inline media players, voice notes, feed generator, `parseBBCode`, and plain-link video embeds for YouTube, Vimeo, and Dailymotion; right-clicking a queued image in feed or journal preview opens a crop action with a drag-selection editor that replaces the pending upload; queued editor files are appended directly when `main.js` builds an SPA submission payload, and automatic video conversion examines only top-level text so links inside BBCode-rendered elements are not embedded
 
 page-specific behavior belongs in a route-local `{page-name}.js` file and the page's `content.html` should include that script. examples:
 
@@ -66,6 +67,8 @@ use the on-site popup helpers in `main.js`, not native browser `alert()`, `confi
 - notices: `showSiteNotice(title, detail)`
 - confirmations: `showSitePopup({ title, detail/html, okText, cancelText })`
 - text input: `showSitePrompt(title, detail, value)`
+
+The shared renderer injects the active site notice for either logged-in users or guests. Dismissible banners and popup acknowledgements are stored in browser local storage by notice revision; saving a notice from `/settings/notices` creates a new revision, so it is shown again. Popup custom buttons accept only site-relative destinations.
 - form confirmations: add `data-site-confirm="1"` plus `data-confirm-*` text attributes
 - account deletion can use `data-delete-animation="account-rip"`; other destructive forms should use plain in-site confirmations
 

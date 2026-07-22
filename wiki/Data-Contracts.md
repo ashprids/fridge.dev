@@ -151,7 +151,7 @@ feed bodies can include public voice notes as BBCode:
 [audio=/data/audio/voice/example.m4a][name:voice-note.m4a]
 ```
 
-voice notes are created from temporary `[voice:N]` editor placeholders, verified at upload time, transcoded to small mono `.m4a` files, and stored under `data/audio/voice/`.
+voice notes are created from temporary `[voice:N]` editor placeholders, verified at upload time, normally transcoded to small mono `.m4a` files, and stored under `data/audio/voice/`. If ffmpeg cannot decode a valid browser recording container, the validated original WebM, Ogg, MP4/M4A, MP3, or WAV recording is retained so posting does not fail solely because of browser codec differences.
 
 ### `data/feed/replies/`
 
@@ -222,6 +222,10 @@ Global hard-ban enforcement settings managed by admins through `/settings`.
 - when `true`, recognized banned identities enforce the ban on later IPs directly without modifying the manual hard-ban list or source index
 - when switching to `false`, previously propagated associated IPs are removed from the manual list while identity-group primary IPs remain; after the switch, the identity JSON is entirely ignored and is neither read nor updated until strict enforcement is enabled again
 
+### `data/etc/site-notices.json`
+
+Global visitor notices managed through the admin-only `/settings/notices` page. It has independent `users` and `guests` blocks, each with an optional `banner` and `popup`, plus a `pages` array for exact-path notices. Page records include `path`, an `audiences` array containing `users`, `guests`, or both, and `type` alongside the corresponding banner or popup fields; legacy page records with one string `audience` are normalized into the array. A matching page notice overrides the global notice of the same type for each selected audience on that path. Banner records contain a revision `id`, plaintext `message`, and `dismissible` flag. Popup records contain a revision `id`, plaintext `title` and `message`, plus optional `buttonLabel` and site-relative `buttonUrl`. A new save receives a new revision ID, so browser-local banner dismissal and popup acknowledgement apply only to that saved revision.
+
 ### `data/etc/banlists/**/*.txt`
 
 Read-only hard-ban source lists. Every valid whitespace-separated IPv4 or IPv6 address or CIDR subnet from every `.txt` file anywhere beneath this directory is merged with the manual hard-ban set. Subdirectories are scanned recursively. IPv4 prefixes from `/0` through `/32` and IPv6 prefixes from `/0` through `/128` are supported.
@@ -276,6 +280,9 @@ plus:
 
 - uploaded images used across feed, journal, and gallery content
 - expected web path is `/data/images/<filename>`
+- `data/images/thumbnails/` contains regenerable 500×500 JPEG gallery thumbnails keyed by a hash of the original filename; these are excluded from the top-level gallery listing and removed alongside originals by the gallery delete API
+
+Feed and journal attachment uploads use typed temporary `[img:N]`, `[audio:N]`, or `[video:N]` editor placeholders. Every source media attachment is capped at 8 MB. Images become `[img=...]` records and retain the existing 1 MB post-compression limit. Audio becomes `[audio=...]` and is stored beneath `data/audio/uploads/`; video becomes `[video=...]` and is stored beneath `data/video/`. Allowed audio formats are MP3, AAC, M4A, OGG, WAV, FLAC, and WebM; allowed video formats are MP4, WebM, Ogg video, and QuickTime. Because libmagic can report audio-only WebM, MP4/M4A, and Ogg containers as their shared video/application container types, validated shared containers declared by the browser as audio are classified as audio; MIME parameters such as WebM codecs are ignored during this comparison. Temporary media indexes are reset when SPA navigation creates a new editor, and content with an unresolved upload placeholder is rejected rather than persisted.
 
 ## `data/music/`
 
@@ -310,6 +317,11 @@ The `/music/upload` admin page writes audio files to `data/audio/`, cover art to
 - track files referenced by music metadata
 - also used by shared playback features
 - `data/audio/voice/` stores public feed voice notes as compressed `.m4a` files
+- `data/audio/uploads/` stores feed and journal audio uploads in the same square player style as voice notes, but without the voice-note playback-speed control; the legacy `data/audio/attachments/` path remains recognized for cleanup of older posts
+
+## `data/video/`
+
+- stores feed and journal video attachments for the inline, site-styled video player; its controls overlay the video and attachment filenames are not displayed
 
 ## `data/contact/`
 

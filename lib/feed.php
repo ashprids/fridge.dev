@@ -575,6 +575,34 @@ if (!function_exists('fridg3_feed_delete_voice_files_from_content')) {
                 @unlink($path);
             }
         }
+
+        if (preg_match_all('/\[(audio|video)=([^\]]+)\]/i', $content, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $type = strtolower((string)$match[1]);
+                $urlPath = (string)(parse_url(html_entity_decode((string)$match[2], ENT_QUOTES, 'UTF-8'), PHP_URL_PATH) ?? '');
+                $relativePrefixes = $type === 'video'
+                    ? ['/data/video/']
+                    : ['/data/audio/uploads/', '/data/audio/attachments/'];
+                $relativePrefix = null;
+                foreach ($relativePrefixes as $candidatePrefix) {
+                    if (str_starts_with($urlPath, $candidatePrefix)) {
+                        $relativePrefix = $candidatePrefix;
+                        break;
+                    }
+                }
+                if ($relativePrefix === null) {
+                    continue;
+                }
+                $directory = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR
+                    . ($type === 'video'
+                        ? 'video'
+                        : 'audio' . DIRECTORY_SEPARATOR . (str_contains($relativePrefix, '/attachments/') ? 'attachments' : 'uploads'));
+                $path = $directory . DIRECTORY_SEPARATOR . basename($urlPath);
+                if (is_file($path)) {
+                    @unlink($path);
+                }
+            }
+        }
     }
 }
 
@@ -1050,7 +1078,7 @@ if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
             $tmpPath = (string)($files['tmp_name'][$i] ?? '');
             $origName = (string)($files['name'][$i] ?? ('voice-note-' . $i . '.m4a'));
             $size = (int)($files['size'][$i] ?? 0);
-            if ($tmpPath === '' || $size <= 0 || $size > 12000000 || !is_uploaded_file($tmpPath)) {
+            if ($tmpPath === '' || $size <= 0 || $size > 8 * 1024 * 1024 || !is_uploaded_file($tmpPath)) {
                 continue;
             }
 
@@ -1059,16 +1087,43 @@ if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
                 continue;
             }
 
-            $destName = bin2hex(random_bytes(12)) . '.m4a';
+            $randomName = bin2hex(random_bytes(12));
+            $destName = $randomName . '.m4a';
             $destPath = $voiceDir . DIRECTORY_SEPARATOR . $destName;
             if (!fridg3_feed_transcode_voice_note($tmpPath, $destPath)) {
                 @unlink($destPath);
-                continue;
+                // MediaRecorder output varies by browser, and some valid browser
+                // containers cannot be remuxed by a particular ffmpeg build. Keep
+                // a validated original recording instead of rejecting the post.
+                $finfo = function_exists('finfo_open') ? @finfo_open(FILEINFO_MIME_TYPE) : false;
+                $mime = $finfo ? (string)@finfo_file($finfo, $tmpPath) : (string)($files['type'][$i] ?? '');
+                if ($finfo) {
+                    finfo_close($finfo);
+                }
+                $fallbackTypes = [
+                    'audio/webm' => 'webm',
+                    'video/webm' => 'webm',
+                    'audio/ogg' => 'ogg',
+                    'application/ogg' => 'ogg',
+                    'audio/mp4' => 'm4a',
+                    'video/mp4' => 'm4a',
+                    'audio/mpeg' => 'mp3',
+                    'audio/wav' => 'wav',
+                    'audio/x-wav' => 'wav',
+                ];
+                if (!isset($fallbackTypes[$mime])) {
+                    continue;
+                }
+                $destName = $randomName . '.' . $fallbackTypes[$mime];
+                $destPath = $voiceDir . DIRECTORY_SEPARATOR . $destName;
+                if (!@move_uploaded_file($tmpPath, $destPath)) {
+                    continue;
+                }
             }
 
             $voiceMap[$i] = [
                 'url' => '/data/audio/voice/' . $destName,
-                'name' => 'voice-note.m4a',
+                'name' => 'voice-note.' . pathinfo($destName, PATHINFO_EXTENSION),
                 'duration' => fridg3_feed_probe_audio_duration($destPath) ?? $sourceDuration ?? 0,
             ];
         }
@@ -1187,7 +1242,8 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
 
             $tmpPath = $files['tmp_name'][$i] ?? '';
             $origName = $files['name'][$i] ?? ('image_' . $i);
-            if ($tmpPath === '') {
+            $uploadSize = (int)($files['size'][$i] ?? 0);
+            if ($tmpPath === '' || $uploadSize <= 0 || $uploadSize > 8 * 1024 * 1024) {
                 continue;
             }
 
@@ -1248,5 +1304,156 @@ if (!function_exists('fridg3_feed_replace_image_placeholders')) {
             $name = isset($m[2]) && strlen(trim($m[2])) ? trim($m[2]) : ($imageMap[$idx]['name'] ?? 'image');
             return '[img=' . $imageMap[$idx]['url'] . '][name:' . $name . ']';
         }, $content);
+    }
+}
+
+if (!function_exists('fridg3_feed_process_uploaded_media')) {
+    function fridg3_feed_process_uploaded_media(array $files): array
+    {
+        $mediaMap = [];
+        foreach (fridg3_feed_process_uploaded_images($files) as $index => $image) {
+            $mediaMap[$index] = $image + ['type' => 'image'];
+        }
+        if (!isset($files['name']) || !is_array($files['name'])) {
+            return $mediaMap;
+        }
+
+        $allowed = [
+            'audio/mpeg' => ['audio', 'mp3'],
+            'audio/aac' => ['audio', 'aac'],
+            'audio/x-aac' => ['audio', 'aac'],
+            'audio/x-hx-aac-adts' => ['audio', 'aac'],
+            'audio/vnd.dlna.adts' => ['audio', 'aac'],
+            'audio/mp4' => ['audio', 'm4a'],
+            'audio/x-m4a' => ['audio', 'm4a'],
+            'audio/ogg' => ['audio', 'ogg'],
+            'audio/wav' => ['audio', 'wav'],
+            'audio/x-wav' => ['audio', 'wav'],
+            'audio/flac' => ['audio', 'flac'],
+            'audio/webm' => ['audio', 'webm'],
+            'video/mp4' => ['video', 'mp4'],
+            'video/webm' => ['video', 'webm'],
+            'video/ogg' => ['video', 'ogv'],
+            'video/quicktime' => ['video', 'mov'],
+        ];
+        $finfo = function_exists('finfo_open') ? @finfo_open(FILEINFO_MIME_TYPE) : false;
+        foreach ($files['name'] as $index => $originalName) {
+            if (isset($mediaMap[$index]) || ($files['error'][$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            $tmpPath = (string)($files['tmp_name'][$index] ?? '');
+            $size = (int)($files['size'][$index] ?? 0);
+            $declaredMimeParts = explode(';', strtolower((string)($files['type'][$index] ?? '')), 2);
+            $declaredMime = trim($declaredMimeParts[0]);
+            $mime = $finfo && $tmpPath !== '' ? (string)@finfo_file($finfo, $tmpPath) : $declaredMime;
+            // libmagic commonly labels audio-only WebM as video/webm because the
+            // container is shared. Once the container itself is validated as
+            // WebM, use MediaRecorder/the file input's audio kind to distinguish
+            // which player and storage directory should be used.
+            if ($mime === 'video/webm' && $declaredMime === 'audio/webm') {
+                $mime = 'audio/webm';
+            }
+            if (in_array($mime, ['video/mp4', 'video/quicktime', 'application/mp4'], true)
+                && in_array($declaredMime, ['audio/mp4', 'audio/x-m4a'], true)) {
+                $mime = $declaredMime;
+            }
+            if ($mime === 'application/ogg' && $declaredMime === 'audio/ogg') {
+                $mime = 'audio/ogg';
+            }
+            // Some upload clients omit the MIME type altogether. Only fall back
+            // to the filename when libmagic has still positively identified a
+            // compatible media container; never trust the extension by itself.
+            $extension = strtolower(pathinfo((string)$originalName, PATHINFO_EXTENSION));
+            if ($declaredMime === '' && in_array($mime, ['video/mp4', 'video/quicktime', 'application/mp4'], true)
+                && in_array($extension, ['m4a', 'aac'], true)) {
+                $mime = $extension === 'aac' ? 'audio/aac' : 'audio/mp4';
+            }
+            if ($declaredMime === '' && $mime === 'application/ogg' && in_array($extension, ['ogg', 'oga'], true)) {
+                $mime = 'audio/ogg';
+            }
+            if ($tmpPath === '' || !isset($allowed[$mime]) || !is_uploaded_file($tmpPath)) {
+                continue;
+            }
+            [$type, $extension] = $allowed[$mime];
+            if ($size <= 0 || $size > 8 * 1024 * 1024) {
+                continue;
+            }
+            $relativeDir = $type === 'video' ? 'video' : 'audio/uploads';
+            $directory = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
+            if (!is_dir($directory) && !@mkdir($directory, 0777, true)) {
+                continue;
+            }
+            $destName = bin2hex(random_bytes(12)) . '.' . $extension;
+            if (!@move_uploaded_file($tmpPath, $directory . DIRECTORY_SEPARATOR . $destName)) {
+                continue;
+            }
+            $mediaMap[$index] = [
+                'type' => $type,
+                'url' => '/data/' . $relativeDir . '/' . $destName,
+                'name' => (string)$originalName ?: $destName,
+            ];
+        }
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        ksort($mediaMap);
+        return $mediaMap;
+    }
+}
+
+if (!function_exists('fridg3_feed_replace_media_placeholders')) {
+    function fridg3_feed_replace_media_placeholders(string $content, array $mediaMap): string
+    {
+        return (string)preg_replace_callback('/\[(media|img|audio|video):(\d+)\](?:\[name:([^\]]*)\])?/i', static function (array $match) use ($mediaMap): string {
+            $index = (int)$match[2];
+            if (!isset($mediaMap[$index])) {
+                return $match[0];
+            }
+            $media = $mediaMap[$index];
+            $type = in_array(($media['type'] ?? ''), ['image', 'audio', 'video'], true) ? $media['type'] : 'image';
+            $tag = $type === 'image' ? 'img' : $type;
+            $placeholderType = strtolower((string)$match[1]);
+            if ($placeholderType !== 'media' && $placeholderType !== $tag) {
+                return $match[0];
+            }
+            $name = trim((string)($match[3] ?? '')) ?: (string)($media['name'] ?? $type);
+            $name = str_replace([']', "\r", "\n"], '', $name);
+            return '[' . $tag . '=' . $media['url'] . '][name:' . $name . ']';
+        }, $content);
+    }
+}
+
+if (!function_exists('fridg3_feed_render_audio_attachment')) {
+    function fridg3_feed_render_audio_attachment(string $url, string $name): string
+    {
+        $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        $path = (string)(parse_url($url, PHP_URL_PATH) ?? '');
+        $isVoiceNote = str_contains($path, '/data/audio/voice/');
+        return '<div class="feed-audio-note feed-voice-note' . ($isVoiceNote ? '' : ' feed-uploaded-audio') . ' chat-attachment chat-attachment-media chat-attachment-audio">'
+            . '<audio class="chat-media-element" preload="metadata" src="' . $safeUrl . '"></audio>'
+            . '<div class="chat-media-player" data-media-kind="audio">'
+            . '<button class="chat-media-play" type="button" aria-label="play audio"><i class="fa-solid fa-play"></i></button>'
+            . '<input class="chat-media-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="seek audio">'
+            . '<span class="chat-media-time">0:00 / 0:00</span>'
+            . ($isVoiceNote ? '<button class="chat-media-speed" type="button" aria-label="playback speed"><span class="chat-media-speed-label">1x</span></button>' : '')
+            . '</div></div>';
+    }
+}
+
+if (!function_exists('fridg3_feed_render_video_attachment')) {
+    function fridg3_feed_render_video_attachment(string $url, string $name): string
+    {
+        $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        $safeName = htmlspecialchars($name !== '' ? $name : 'video', ENT_QUOTES, 'UTF-8');
+        return '<div class="feed-video-attachment">'
+            . '<video class="feed-video-element" playsinline preload="metadata" src="' . $safeUrl . '" aria-label="' . $safeName . '"></video>'
+            . '<div class="feed-video-controls">'
+            . '<button class="feed-video-control feed-video-play" type="button" aria-label="play video"><i class="fa-solid fa-play"></i></button>'
+            . '<input class="feed-video-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="seek video">'
+            . '<span class="feed-video-time">0:00 / 0:00</span>'
+            . '<button class="feed-video-control feed-video-mute" type="button" aria-label="mute video"><i class="fa-solid fa-volume-high"></i></button>'
+            . '<input class="feed-video-volume" type="range" min="0" max="1" value="1" step="0.05" aria-label="video volume">'
+            . '<button class="feed-video-control feed-video-fullscreen" type="button" aria-label="fullscreen video"><i class="fa-solid fa-expand"></i></button>'
+            . '</div></div>';
     }
 }

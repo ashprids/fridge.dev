@@ -759,3 +759,4 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
     border-color: var(--links) !important;
     text-shadow: none !important;
 }
+.content-pagination .guestbook-page-btn { border-radius: 3px; }

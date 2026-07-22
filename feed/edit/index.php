@@ -92,43 +92,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $newContent = trim($_POST['content'] ?? '');
     
-    // Handle image upload (same logic as create-post)
-    $imageUrl = null;
-    $imageDisplayName = null;
-    $imagesDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images';
-    if (!is_dir($imagesDir)) {
-        @mkdir($imagesDir, 0777, true);
-    }
-
-    if (isset($_FILES['image']) && is_array($_FILES['image']) && ($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-        $tmpPath = $_FILES['image']['tmp_name'];
-        $origName = $_FILES['image']['name'] ?? '';
-        $imageInfo = @getimagesize($tmpPath);
-        $mime = is_array($imageInfo) && isset($imageInfo['mime']) ? $imageInfo['mime'] : '';
-        $allowed = [
-            'image/png' => 'png',
-            'image/jpeg' => 'jpg',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp'
-        ];
-        if (isset($allowed[$mime])) {
-            $ext = $allowed[$mime];
-            $rand = bin2hex(random_bytes(8));
-            $destName = $rand . '.' . $ext;
-            $destPath = $imagesDir . DIRECTORY_SEPARATOR . $destName;
-            @move_uploaded_file($tmpPath, $destPath);
-            $imageUrl = '/data/images/' . $destName;
-            $imageDisplayName = $origName ?: $destName;
-        }
-    }
-
-    // Replace image placeholders if image was uploaded
-    if ($imageUrl) {
-        $nameFallback = htmlspecialchars($imageDisplayName ?? basename($imageUrl), ENT_QUOTES, 'UTF-8');
-        $newContent = preg_replace_callback('/\[img:\d+\](?:\[name:([^\]]*)\])?/i', function($m) use ($imageUrl, $nameFallback) {
-            $name = isset($m[1]) && strlen(trim($m[1])) ? trim($m[1]) : $nameFallback;
-            return '[img=' . $imageUrl . '][name:' . $name . ']';
-        }, $newContent);
+    $mediaMap = isset($_FILES['images']) && is_array($_FILES['images'])
+        ? fridg3_feed_process_uploaded_media($_FILES['images'])
+        : [];
+    $newContent = fridg3_feed_replace_media_placeholders($newContent, $mediaMap);
+    if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $newContent) === 1) {
+        fridg3_feed_delete_media_files_from_content($newContent);
+        header('Location: /feed/edit?post=' . rawurlencode(pathinfo(basename($postId), PATHINFO_FILENAME)) . '&error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
+        exit;
     }
 
     // Update the post file (keep original username and date)

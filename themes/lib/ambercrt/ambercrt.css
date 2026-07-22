@@ -883,3 +883,4 @@ body.mobile-template .color-input {
     --chat-other-bg: color-mix(in srgb, var(--bg) 82%, var(--border) 18%);
     --chat-other-fg: var(--fg);
 }
+body.ambercrt-theme .content-pagination .guestbook-page-btn { border-radius: 0; }

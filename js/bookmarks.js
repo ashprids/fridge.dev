@@ -262,7 +262,7 @@ document.addEventListener('click', function(e) {
     }
 
     if (targetImg) {
-        const imageSrc = targetImg.src;
+        const imageSrc = targetImg.dataset.fullSrc || targetImg.src;
         const filename = targetImg.alt || imageSrc.split('/').pop();
         const content = document.createElement('div');
         content.className = 'image-modal-content';
@@ -466,4 +466,3 @@ function enhanceBookmarksPage() {
 }
 
 window.addEventListener('DOMContentLoaded', enhanceBookmarksPage);
-

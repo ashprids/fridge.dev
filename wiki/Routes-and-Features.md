@@ -9,12 +9,15 @@ homepage with dynamic latest feed, latest journal, and music cards.
 ### `/feed`
 
 - list/search/paginate feed posts from `data/feed/*.txt`
+- feed and journal pagination measures the available content width to show as many background-free page controls as fit on one line, expanding across the row only when enough pages exist to fill it and otherwise shrink-wrapping at the center; it retains previous/next, first/last, current-page context, and ellipses across remaining gaps, while selecting a page pins the viewport to the bottom through delayed image loading and layout changes
 - create visibility depends on admin or `allowedPages` containing `feed`
 - create composer supports recorded voice notes; accepted recordings request browser noise suppression, echo cancellation, and auto gain when available, are previewed before posting, capped at 2 minutes, transcoded to compressed `.m4a`, stored under `data/audio/voice/`, and played with inline controls that include a `1x`/`1.5x`/`2x` speed toggle
+- the attach-media control keeps the existing URL-or-upload flow and accepts images, audio, and video; uploaded audio uses the voice-note player, while uploaded video uses a compact native player; file-extension detection covers mobile file providers that omit the browser MIME type, while the server still verifies the media container before saving it
 - the first time a browser submits a new feed post, an in-site popup asks whether to enable browser notifications for replies
 - deleting a feed post removes voice note files referenced by the post body and its replies
 - writes derived `index.toml`
 - `@mentions` in BBCode are highlighted client-side for notification-aware feed posts
+- plain YouTube, Vimeo, and Dailymotion video URLs render as responsive embedded players and the original link text is hidden; URLs inside any rendered BBCode element remain unchanged
 
 Related:
 
@@ -32,8 +35,8 @@ Related:
 ### `/feed/posts/{id}`
 
 - single-post thread view for a feed item
-- logged-in users can reply to the post or to an individual comment with BBCode, image uploads, and recorded voice notes using the same inline speed-toggle playback controls
-- guests can reply to the post or to an individual comment without creating feed posts; they are identified by plaintext IP, may enter an optional display name that falls back to italic `Anonymous`, cannot use a registered account username as that display name, can link images but cannot upload files or voice notes, and do not get heading or tooltip BBCode controls; guest display names and reply bodies are filtered through `/feed/filters/*.txt`, matching body text is replaced with `★` plus the tooltip `this phrase was automatically filtered.`, and the BBCode preview shows the same filtering
+- logged-in users can reply to the post or to an individual comment with BBCode, image/audio/video uploads, and recorded voice notes using the same inline speed-toggle playback controls
+- guests can reply to the post or to an individual comment without creating feed posts; they are identified by plaintext IP, may enter an optional display name that falls back to italic `Anonymous`, cannot use a registered account username as that display name, can link media but cannot upload files or voice notes, and do not get heading or tooltip BBCode controls; guest display names and reply bodies are filtered through `/feed/filters/*.txt`, matching body text is replaced with `★` plus the tooltip `this phrase was automatically filtered.`, and the BBCode preview shows the same filtering
 - the first time a browser submits a comment, an in-site popup asks whether to enable browser notifications for replies to comments
 - guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text cannot be edited by guests after posting
 - reply edit/delete is allowed for the reply author, same-IP guest replies, admins, the original post owner, or accounts with `allowedPages` containing `comments`
@@ -49,6 +52,8 @@ Related:
 - create visibility depends on admin or `allowedPages` containing `journal`
 - published journal bodies are trusted HTML
 - preview/edit flows support draft files and optional `FORMAT:html`
+- the journal BBCode composer uses the same attach-media URL/upload flow and media rendering as feed posts; its eye button toggles an inline preview so pending image uploads can be right-clicked and drag-cropped before saving or publishing
+- plain YouTube, Vimeo, and Dailymotion video URLs render as responsive embedded players in previews and published posts; URLs contained by BBCode-generated HTML elements remain unchanged
 
 Related:
 
@@ -81,8 +86,14 @@ Related:
 
 ### `/gallery`
 
-- paginated listing of `data/images/*`
+- paginated listing of `data/images/*`; the grid lazily loads cached, center-cropped 500×500 JPEG thumbnails generated with PHP GD or ffmpeg, while the image viewer loads the original full-resolution file only after a thumbnail is clicked
+- gallery pagination uses the same adaptive, bottom-pinned single-line control as feed, journal, and guestbook
 - admin delete actions call `/api/gallery/delete`
+
+### `/tools` and `/others`
+
+- their static `content.html` post-card lists are discovered automatically and split into pages of at most 10 cards
+- when more than one page exists, both listings use the shared adaptive paginator and bottom-position preservation
 
 ### `/bookmarks`
 
@@ -120,6 +131,7 @@ Related:
 - admins can open a dedicated system diagnostics subsection in `/settings` to jump into `/settings/sysinfo`
 - admins can open `/settings/guests`, labeled as manage guests, to review guest feed replies and IP-backed guestbook posts grouped by IP, search by IP or username, individually delete either content type, ban or unban IPs across both posting surfaces, or purge all guest content from an IP after password confirmation
 - admins can open `/settings/banned-ips` to edit the separate hard-ban IP list; valid IPv4 and IPv6 addresses may be separated by spaces or newlines, and nginx redirects matching clients away from all pages and static files to `/error/blacklisted`; a durable first-party browser identifier carries an active ban to later IPs, while removing the original manually banned IP releases its associated IPs
+- admins can open `/settings/notices` to independently create or clear banner and one-time popup notices for logged-in users and guests, globally or for one exact page path; page-notice audience checkboxes allow logged-in users, guests, or both, page notices override the matching global notice type on that page, banners may be dismissible, popups can include a site-relative custom-link button, and every editor section is collapsible and closed by default
 - `/error/blacklisted` returns the stripped Blackprint denial page only to an actively hard-banned IP or associated browser identity; other direct visitors receive a server-side redirect to `/`
 - admins can open `/settings/sysinfo` to see live system diagnostics, PHP/runtime details, storage usage, website state, and key content counts in a dashboard-style view
 

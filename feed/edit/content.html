@@ -1,7 +1,7 @@
 <h1>edit feed post</h1>
 <h2>modify or remove your existing feed post</h2>
 <br>
-<form id="delete-feed-post-form" method="POST" style="display:none" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete feed post?" data-confirm-detail="this removes the feed post, attached voice notes, images, and replies." data-confirm-text="delete" data-cancel-text="cancel">
+<form id="delete-feed-post-form" method="POST" style="display:none" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete feed post?" data-confirm-detail="this removes the feed post, attached media, voice notes, and replies." data-confirm-text="delete" data-cancel-text="cancel">
 <input type="hidden" name="delete" value="1">
 </form>
 <form id="create-post-form" method="POST" enctype="multipart/form-data">
@@ -15,9 +15,9 @@
         <button type="button" id="bbcode-color-btn" class="bbcode-btn" data-tooltip="color"><i class="fa-solid fa-palette"></i></button>
         <input id="bbcode-color-input" type="color" style="display: none;">
         <label for="bbcode-image-input">
-            <button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach image"><i class="fa-solid fa-image"></i></button>
+            <button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach media"><i class="fa-solid fa-photo-film"></i></button>
         </label>
-        <input id="bbcode-image-input" name="image" type="file" accept="image/*" style="display: none;">
+        <input id="bbcode-image-input" name="images[]" type="file" accept="image/*,audio/*,video/*" multiple style="display: none;">
         <button type="button" class="bbcode-btn" data-tag="code=python" data-tooltip="code block"><i class="fa-solid fa-code"></i></button>
         <button type="button" id="bbcode-list-btn" class="bbcode-btn" data-tag="list" data-tooltip="list"><i class="fa-solid fa-list-ul"></i></button>
         <button type="button" id="bbcode-tooltip-btn" class="bbcode-btn" data-tooltip="tooltip"><i class="fa-solid fa-comment-dots"></i></button>

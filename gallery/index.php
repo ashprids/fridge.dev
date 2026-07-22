@@ -11,6 +11,60 @@ $title = 'gallery';
 $description = 'a listing of all images uploaded to the site.';
 $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
 
+function gallery_thumbnail_path(string $sourcePath, string $thumbnailDir): ?string
+{
+    if (!is_dir($thumbnailDir) && !@mkdir($thumbnailDir, 0777, true)) return null;
+    $thumbnailName = hash('sha256', basename($sourcePath)) . '.jpg';
+    $thumbnailPath = $thumbnailDir . DIRECTORY_SEPARATOR . $thumbnailName;
+    $sourceMtime = @filemtime($sourcePath) ?: 0;
+    if (is_file($thumbnailPath) && ((@filemtime($thumbnailPath) ?: 0) >= $sourceMtime)) return $thumbnailPath;
+
+    $info = @getimagesize($sourcePath);
+    $mime = is_array($info) ? (string)($info['mime'] ?? '') : '';
+    $loaders = [
+        'image/jpeg' => 'imagecreatefromjpeg',
+        'image/png' => 'imagecreatefrompng',
+        'image/gif' => 'imagecreatefromgif',
+        'image/webp' => 'imagecreatefromwebp',
+    ];
+    if (function_exists('imagecreatetruecolor') && isset($loaders[$mime]) && function_exists($loaders[$mime])) {
+        $source = @$loaders[$mime]($sourcePath);
+        if (!$source) return null;
+        $sourceWidth = imagesx($source);
+        $sourceHeight = imagesy($source);
+        if ($sourceWidth < 1 || $sourceHeight < 1) {
+            imagedestroy($source);
+            return null;
+        }
+        $cropSize = min($sourceWidth, $sourceHeight);
+        $sourceX = (int)floor(($sourceWidth - $cropSize) / 2);
+        $sourceY = (int)floor(($sourceHeight - $cropSize) / 2);
+        $thumbnail = imagecreatetruecolor(500, 500);
+        $background = imagecolorallocate($thumbnail, 255, 255, 255);
+        imagefill($thumbnail, 0, 0, $background);
+        imagecopyresampled($thumbnail, $source, 0, 0, $sourceX, $sourceY, 500, 500, $cropSize, $cropSize);
+        $saved = @imagejpeg($thumbnail, $thumbnailPath, 68);
+        imagedestroy($thumbnail);
+        imagedestroy($source);
+        return $saved ? $thumbnailPath : null;
+    }
+
+    // Production already requires ffmpeg for voice notes. Use it when PHP GD is
+    // unavailable so the gallery never silently falls back to full-size files.
+    $ffmpeg = trim((string)@shell_exec('command -v ffmpeg 2>/dev/null'));
+    if ($ffmpeg === '') return null;
+    $filter = 'scale=500:500:force_original_aspect_ratio=increase,crop=500:500';
+    $command = escapeshellarg($ffmpeg) . ' -nostdin -hide_banner -loglevel error -y -i '
+        . escapeshellarg($sourcePath) . ' -vf ' . escapeshellarg($filter)
+        . ' -frames:v 1 -q:v 8 ' . escapeshellarg($thumbnailPath) . ' 2>&1';
+    @exec($command, $output, $status);
+    if ($status !== 0 || !is_file($thumbnailPath)) {
+        @unlink($thumbnailPath);
+        return null;
+    }
+    return $thumbnailPath;
+}
+
 
 function find_template_file($filename) {
     $dir = __DIR__;
@@ -62,6 +116,7 @@ $content = file_get_contents($content_path);
 
 // Build gallery grid from /data/images, ordered by date added (newest first)
 $imagesDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images';
+$thumbnailDir = $imagesDir . DIRECTORY_SEPARATOR . 'thumbnails';
 $gridItems = '';
 $paginationHtml = '';
 if (is_dir($imagesDir)) {
@@ -101,6 +156,10 @@ if (is_dir($imagesDir)) {
     foreach ($pageImages as $img) {
         $filename = basename($img['path']);
         $url = '/data/images/' . rawurlencode($filename);
+        $thumbnailPath = gallery_thumbnail_path($img['path'], $thumbnailDir);
+        $thumbnailUrl = $thumbnailPath !== null
+            ? '/data/images/thumbnails/' . rawurlencode(basename($thumbnailPath))
+            : $url;
         $alt = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
         if ($img['width'] && $img['height']) {
             $resolution = $img['width'] . ' x ' . $img['height'];
@@ -117,7 +176,7 @@ if (is_dir($imagesDir)) {
         }
 
         $gridItems .= '<div class="grid-item">'
-            . '<img class="grid-image" src="' . $url . '" alt="' . $alt . '">'
+            . '<img class="grid-image" src="' . $thumbnailUrl . '" data-full-src="' . $url . '" alt="' . $alt . '" loading="lazy" decoding="async">'
             . '<div class="grid-caption">' . htmlspecialchars($resolution, ENT_QUOTES, 'UTF-8') . '</div>'
             . '<div class="grid-subcaption">' . $alt . '</div>'
             . $deleteForm
@@ -125,17 +184,14 @@ if (is_dir($imagesDir)) {
     }
 
     if ($totalPages > 1) {
-        $prevBtn = ($page > 1)
-            ? '<a href="/gallery?page=' . ($page - 1) . '" id="footer-button">Prev</a>'
-            : '';
-        $nextBtn = ($page < $totalPages)
-            ? '<a href="/gallery?page=' . ($page + 1) . '" id="footer-button">Next</a>'
-            : '';
-
-        $paginationHtml .= '<div id="pagination" style="margin-top:16px; display:flex; gap:8px;">'
-            . '<div style="flex:1; display:flex; justify-content:flex-start;">' . $prevBtn . '</div>'
-            . '<div style="flex:1; display:flex; justify-content:flex-end;">' . $nextBtn . '</div>'
-            . '</div>';
+        $items = $page > 1
+            ? '<a class="guestbook-page-btn pagination-arrow" href="/gallery?page=' . ($page - 1) . '#content-footer" aria-label="previous page">&lsaquo;</a>'
+            : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';
+        $items .= '<span class="guestbook-page-btn current" aria-current="page">' . $page . '</span>';
+        $items .= $page < $totalPages
+            ? '<a class="guestbook-page-btn pagination-arrow" href="/gallery?page=' . ($page + 1) . '#content-footer" aria-label="next page">&rsaquo;</a>'
+            : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&rsaquo;</span>';
+        $paginationHtml = '<nav class="guestbook-pagination content-pagination" aria-label="gallery pages" data-pagination-route="/gallery" data-pagination-current="' . $page . '" data-pagination-total="' . $totalPages . '" data-pagination-search="">' . $items . '</nav>';
     }
 }
 

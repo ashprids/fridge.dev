@@ -1003,3 +1003,4 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
         1px 1px 0 rgba(255, 252, 255, 0.78),
         0 2px 6px rgba(36, 20, 51, 0.16) !important;
 }
+body.bubblegum-theme .content-pagination .guestbook-page-btn { border-radius: 50%; }

@@ -1045,6 +1045,7 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
 
 .grid-image {
     width: 100%;
+    height: auto;
     aspect-ratio: 1;
     object-fit: cover;
     background-color: #1a1a1a00;
@@ -3321,3 +3322,4 @@ body.mobile-template #footer-buttons {
         linear-gradient(90deg, color-mix(in srgb, var(--links) 32%, transparent), color-mix(in srgb, var(--border) 24%, transparent)),
         color-mix(in srgb, var(--bg) 88%, var(--fg) 12%) !important;
 }
+body.classic-theme .content-pagination .guestbook-page-btn { border-radius: 0; }

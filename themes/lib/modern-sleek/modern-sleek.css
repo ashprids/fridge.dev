@@ -218,3 +218,4 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
     color: #ffffff !important;
     border-color: #3fa6e8 !important;
 }
+body.modern-sleek-theme .content-pagination .guestbook-page-btn { border-radius: 2px; }

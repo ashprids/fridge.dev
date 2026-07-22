@@ -113,8 +113,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $imageMap = [];
     $voiceMap = [];
     if ($isLoggedIn && !$postingRestricted && isset($_FILES['images']) && is_array($_FILES['images'])) {
-        $imageMap = fridg3_feed_process_uploaded_images($_FILES['images']);
-        $replyBody = fridg3_feed_replace_image_placeholders($replyBody, $imageMap);
+        $imageMap = fridg3_feed_process_uploaded_media($_FILES['images']);
+        $replyBody = fridg3_feed_replace_media_placeholders($replyBody, $imageMap);
+        if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $replyBody) === 1) {
+            fridg3_feed_delete_media_files_from_content($replyBody);
+            $replyBody = '';
+            $replyError = 'media upload failed. files must be supported and no larger than 8 MB.';
+        }
     }
     if ($isLoggedIn && !$postingRestricted && $replyAction === 'create' && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])) {
         $voiceMap = fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes']);
@@ -460,11 +465,11 @@ $replyToolbarHtml = '<div class="bbcode-toolbar">'
     . '<button type="button" id="bbcode-color-btn" class="bbcode-btn" data-tooltip="color"><i class="fa-solid fa-palette"></i></button>'
     . '<input id="bbcode-color-input" type="color" style="display: none;">'
     . '<label for="bbcode-image-input">'
-    . '<button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach image"><i class="fa-solid fa-image"></i></button>'
+    . '<button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach media"><i class="fa-solid fa-photo-film"></i></button>'
     . '</label>'
     . ($isLoggedIn
-        ? '<input id="bbcode-image-input" name="images[]" type="file" accept="image/*" multiple style="display: none;">'
-        : '<input id="bbcode-image-input" type="file" accept="image/*" multiple disabled style="display: none;">')
+        ? '<input id="bbcode-image-input" name="images[]" type="file" accept="image/*,audio/*,video/*" multiple style="display: none;">'
+        : '<input id="bbcode-image-input" type="file" accept="image/*,audio/*,video/*" multiple disabled style="display: none;">')
     . ($isLoggedIn
         ? '<button type="button" id="bbcode-voice-btn" class="bbcode-btn bbcode-voice-btn" data-tooltip="record voice note"><i class="fa-solid fa-microphone"></i></button>'
             . '<input id="bbcode-voice-input" name="voice_notes[]" type="file" accept="audio/*" multiple style="display: none;">'
@@ -620,11 +625,11 @@ $renderReply = function (array $reply, int $depth = 0) use (
             . '<button type="button" id="bbcode-color-btn" class="bbcode-btn" data-tooltip="color"><i class="fa-solid fa-palette"></i></button>'
             . '<input id="bbcode-color-input" type="color" style="display: none;">'
             . '<label for="bbcode-image-input">'
-            . '<button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach image"><i class="fa-solid fa-image"></i></button>'
+            . '<button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach media"><i class="fa-solid fa-photo-film"></i></button>'
             . '</label>'
             . ($isLoggedIn
-                ? '<input id="bbcode-image-input" name="images[]" type="file" accept="image/*" multiple style="display: none;">'
-                : '<input id="bbcode-image-input" type="file" accept="image/*" multiple disabled style="display: none;">')
+                ? '<input id="bbcode-image-input" name="images[]" type="file" accept="image/*,audio/*,video/*" multiple style="display: none;">'
+                : '<input id="bbcode-image-input" type="file" accept="image/*,audio/*,video/*" multiple disabled style="display: none;">')
             . '<button type="button" class="bbcode-btn" data-tag="code=python" data-tooltip="code block"><i class="fa-solid fa-code"></i></button>'
             . '<button type="button" id="bbcode-list-btn" class="bbcode-btn" data-tag="list" data-tooltip="list"><i class="fa-solid fa-list-ul"></i></button>'
             . ($isLoggedIn ? '<button type="button" id="bbcode-tooltip-btn" class="bbcode-btn" data-tooltip="tooltip"><i class="fa-solid fa-comment-dots"></i></button>' : '')

@@ -8,6 +8,9 @@ on:
 jobs:
   publish-dev-data:
     runs-on: ubuntu-latest
+    concurrency:
+      group: publish-dev-data
+      cancel-in-progress: false
     permissions:
       contents: read
 
@@ -60,12 +63,27 @@ jobs:
               [ -d data ] || { echo "data directory not found at $TARGET/data" >&2; exit 1; }
               [ -w "$REMOTE_WORK_DIR" ] || { echo "remote work directory is not writable: $REMOTE_WORK_DIR" >&2; exit 1; }
 
+              # A failed or cancelled earlier run can leave its workspace behind.
+              # Runs are serialized above, so this cannot remove an active run's files.
+              while IFS= read -r -d '' stale_work_dir; do
+                echo "Removing stale development workspace: $stale_work_dir" >&2
+                rm -rf -- "$stale_work_dir"
+              done < <(find "$REMOTE_WORK_DIR" -mindepth 1 -maxdepth 1 -type d -name 'dev-data.*' -print0)
+
+              work_dir=""
+              cleanup_failed_workspace() {
+                status=$?
+                [ -z "$work_dir" ] || rm -rf -- "$work_dir"
+                exit "$status"
+              }
+              trap cleanup_failed_workspace ERR
               work_dir="$(mktemp -d "${REMOTE_WORK_DIR%/}/dev-data.XXXXXX")"
               sanitized_data="${work_dir%/}/data"
 
               echo "Copying production data to temporary workspace: $work_dir" >&2
               mkdir -p "$sanitized_data"
               rsync -a --exclude '/etc/banlists/index/' data/ "$sanitized_data/"
+              trap - ERR
               printf "%s" "$work_dir"
           EOF
           )"

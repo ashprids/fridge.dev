@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $displayDateTime = date('Y-m-d H:i:s');
 
     $imageMap = isset($_FILES['images']) && is_array($_FILES['images'])
-        ? fridg3_feed_process_uploaded_images($_FILES['images'])
+        ? fridg3_feed_process_uploaded_media($_FILES['images'])
         : [];
     $voiceMap = isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])
         ? fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes'])
@@ -127,8 +127,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Build post file content
     $safeContent = $content; // store raw; renderer can sanitize/format later
-    $safeContent = fridg3_feed_replace_image_placeholders($safeContent, $imageMap);
+    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap);
     $safeContent = fridg3_feed_replace_voice_placeholders($safeContent, $voiceMap);
+    if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $safeContent) === 1) {
+        fridg3_feed_delete_media_files_from_content($safeContent);
+        header('Location: /feed/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
+        exit;
+    }
     if (preg_match('/\[voice:\d+\]/i', $safeContent) === 1) {
         foreach ($voiceMap as $voice) {
             fridg3_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');

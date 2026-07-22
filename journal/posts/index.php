@@ -6,6 +6,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'video-embeds.php';
 
 if (isset($_SESSION['user']) && isset($_SESSION['user']['username'])) {
     $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
@@ -58,7 +59,7 @@ if ($post && file_exists($post_file)) {
     $description = $subtitle;
     $body = array_slice($lines, 3);
     // Render post content as HTML (trusted input)
-    $content_html = implode("\n", $body);
+    $content_html = fridg3_embed_plain_video_links_in_html(implode("\n", $body));
 }
 
 
