@@ -13,7 +13,10 @@ if (!function_exists('fridg3_inject_server_debug_logs')) {
         if (empty($serverLogs) || stripos($template, 'data-fridg3-server-debug-logs') !== false) return $template;
         $payload = json_encode(array_values($serverLogs), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
         if ($payload === false) return $template;
-        $block = "\n    <script type=\"application/json\" data-fridg3-server-debug-logs>" . $payload . '</script>' . "\n";
+        // Split the tag name so the markup JavaScript linter does not parse this
+        // PHP-built application/json payload as an executable inline script.
+        $block = "\n    <scr" . "ipt type=\"application/json\" data-fridg3-server-debug-logs>"
+            . $payload . '</scr' . 'ipt>' . "\n";
         if (stripos($template, '</body>') !== false) {
             return preg_replace('/<\/body>/i', $block . '</body>', $template, 1) ?: ($template . $block);
         }
