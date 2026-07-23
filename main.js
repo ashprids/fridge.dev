@@ -174,6 +174,38 @@ let fridg3DebugHistoryRestored = false;
 let fridg3ServerHistoryRestored = false;
 let fridg3ServerDebugAuthorized = false;
 let fridg3DebugPersistTimer = null;
+const fridg3DeferredOutputUpdates = new Map();
+let fridg3SelectionUpdateListenerBound = false;
+
+function fridg3OutputHasActiveSelection(output) {
+    const selection = window.getSelection ? window.getSelection() : null;
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return false;
+    return output.contains(selection.anchorNode) || output.contains(selection.focusNode);
+}
+
+function fridg3FlushDeferredOutputUpdates() {
+    fridg3DeferredOutputUpdates.forEach((update, output) => {
+        if (fridg3OutputHasActiveSelection(output)) return;
+        fridg3DeferredOutputUpdates.delete(output);
+        update();
+    });
+    if (fridg3DeferredOutputUpdates.size === 0 && fridg3SelectionUpdateListenerBound) {
+        document.removeEventListener('selectionchange', fridg3FlushDeferredOutputUpdates);
+        fridg3SelectionUpdateListenerBound = false;
+    }
+}
+
+function fridg3RunAfterOutputSelection(output, update) {
+    if (!fridg3OutputHasActiveSelection(output)) {
+        update();
+        return;
+    }
+    fridg3DeferredOutputUpdates.set(output, update);
+    if (!fridg3SelectionUpdateListenerBound) {
+        document.addEventListener('selectionchange', fridg3FlushDeferredOutputUpdates);
+        fridg3SelectionUpdateListenerBound = true;
+    }
+}
 
 function fridg3PersistDebugHistory() {
     if (fridg3DebugPersistTimer) window.clearTimeout(fridg3DebugPersistTimer);
@@ -270,15 +302,27 @@ function fridg3DebugAppend(channel, value, processLog = false) {
         if (trimmed || !fridg3DebugEntryVisible(entry)) {
             fridg3RenderDebugOutput(output, fridg3DebugLogs[target]);
         } else {
-            output.append(fridg3CreateDebugLogLine(entry));
+            fridg3UpdateDebugOutputWithoutScrollJump(output, () => {
+                output.append(fridg3CreateDebugLogLine(entry));
+            });
         }
-        output.scrollTop = output.scrollHeight;
     }
 }
 
+function fridg3UpdateDebugOutputWithoutScrollJump(output, update) {
+    const wasAtBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 20;
+    const previousScrollTop = output.scrollTop;
+    update();
+    output.scrollTop = wasAtBottom ? output.scrollHeight : previousScrollTop;
+}
+
 function fridg3RenderDebugOutput(output, entries) {
-    output.replaceChildren();
-    entries.filter(fridg3DebugEntryVisible).forEach(entry => output.append(fridg3CreateDebugLogLine(entry)));
+    fridg3RunAfterOutputSelection(output, () => {
+        fridg3UpdateDebugOutputWithoutScrollJump(output, () => {
+            output.replaceChildren();
+            entries.filter(fridg3DebugEntryVisible).forEach(entry => output.append(fridg3CreateDebugLogLine(entry)));
+        });
+    });
 }
 
 function fridg3DebugEntryVisible(entry) {
@@ -404,9 +448,9 @@ function fridg3EnsureDebugConsole() {
         + '<span>loaded</span></label><label class="checkbox-label">'
         + '<input class="checkbox" type="checkbox" id="debug-process-logs-toggle">'
         + '<span>process</span></label><label class="checkbox-label">'
-        + '<input class="checkbox" type="checkbox" id="debug-server-warnings-toggle" checked>'
+        + '<input class="checkbox" type="checkbox" id="debug-server-warnings-toggle">'
         + '<span>warnings</span></label><label class="checkbox-label">'
-        + '<input class="checkbox" type="checkbox" id="debug-server-errors-toggle" checked>'
+        + '<input class="checkbox" type="checkbox" id="debug-server-errors-toggle">'
         + '<span>errors</span></label></div>'
         + '<div class="debug-log-search debug-admin-log-search" hidden><input type="search" data-debug-search="server" aria-label="search server log" placeholder="search server log"></div>'
         + '<span class="debug-process-log-status" hidden></span>'
@@ -767,18 +811,19 @@ function fridg3StopAccessLogPolling() {
 function fridg3RenderAccessLogs(entries) {
     const output = document.querySelector('.debug-console-access-output');
     if (!output) return;
-    const firstRender = output.dataset.rendered !== '1';
-    const wasAtBottom = firstRender || output.scrollHeight - output.scrollTop - output.clientHeight < 20;
-    const previousScrollTop = output.scrollTop;
     fridg3AccessLogs = entries.slice(-FRIDG3_ACCESS_LOG_LIMIT);
-    output.replaceChildren();
-    fridg3AccessLogs.filter(entry => {
+    fridg3RunAfterOutputSelection(output, () => {
+        const firstRender = output.dataset.rendered !== '1';
+        const wasAtBottom = firstRender || output.scrollHeight - output.scrollTop - output.clientHeight < 20;
+        const previousScrollTop = output.scrollTop;
+        output.replaceChildren();
+        fridg3AccessLogs.filter(entry => {
         const role = ['guest', 'user', 'admin'].includes(entry.role) ? entry.role : (entry.username ? 'user' : 'guest');
         const roleToggle = document.getElementById(`debug-access-${role}s-toggle`);
         if (roleToggle && !roleToggle.checked) return false;
         const bannedToggle = document.getElementById('debug-access-hard-banned-toggle');
         return !entry.hardBanned || !bannedToggle || bannedToggle.checked;
-    }).forEach(entry => {
+        }).forEach(entry => {
         const line = document.createElement('span');
         line.className = 'debug-log-entry';
         const date = new Date(entry.timestamp);
@@ -816,10 +861,11 @@ function fridg3RenderAccessLogs(entries) {
             document.createTextNode(`] ${entry.path || '/'}`)
         );
         fridg3HighlightDebugLine(line, 'access');
-        output.append(line);
+            output.append(line);
+        });
+        output.dataset.rendered = '1';
+        output.scrollTop = wasAtBottom ? output.scrollHeight : previousScrollTop;
     });
-    output.dataset.rendered = '1';
-    output.scrollTop = wasAtBottom ? output.scrollHeight : previousScrollTop;
 }
 
 async function fridg3PollAccessLogs() {
@@ -892,7 +938,7 @@ async function fridg3InitProcessLogControl(panel) {
         ].forEach(([selector, storageKey]) => {
             const filterToggle = panel.querySelector(selector);
             if (!filterToggle) return;
-            try { filterToggle.checked = localStorage.getItem(storageKey) !== 'false'; } catch (_) { /* ignore */ }
+            try { filterToggle.checked = localStorage.getItem(storageKey) === 'true'; } catch (_) { /* ignore */ }
             filterToggle.addEventListener('change', () => {
                 try { localStorage.setItem(storageKey, filterToggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
                 const output = panel.querySelector('.debug-console-server-output');
@@ -2093,7 +2139,12 @@ function loadPageIntoContent(url, addToHistory = true) {
 
         showSpaLoading();
 
-        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Fridg3-Page-Navigation': '1',
+            },
+        })
             .then(resp => {
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 return resp.text();
@@ -2524,7 +2575,10 @@ function bindSpaForm(form) {
         fetch(action, {
             method,
             body: method === 'GET' ? null : formData,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Fridg3-Page-Navigation': '1',
+            },
             credentials: 'same-origin',
         })
             .then(resp => {

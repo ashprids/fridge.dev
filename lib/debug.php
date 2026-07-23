@@ -152,13 +152,58 @@ if (!function_exists('fridg3_access_log_path')) {
     }
 }
 
+if (!function_exists('fridg3_access_normalize_path')) {
+    function fridg3_access_normalize_path(string $path): string
+    {
+        $path = '/' . ltrim($path, '/');
+        $path = rtrim($path, '/');
+        return $path === '' ? '/' : $path;
+    }
+}
+
+if (!function_exists('fridg3_access_compact_entries')) {
+    function fridg3_access_compact_entries(array $entries): array
+    {
+        $compacted = [];
+        $lastPathByVisitor = [];
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) continue;
+            $entry['path'] = fridg3_access_normalize_path((string)($entry['path'] ?? '/'));
+            if (preg_match('#^/chat(?:/|$)#i', $entry['path']) === 1) continue;
+            $visitor = (string)($entry['ip'] ?? 'unknown') . "\0" . strtolower((string)($entry['username'] ?? ''));
+            if (($lastPathByVisitor[$visitor] ?? null) === $entry['path']) continue;
+            $lastPathByVisitor[$visitor] = $entry['path'];
+            $compacted[] = $entry;
+        }
+        return $compacted;
+    }
+}
+
 if (!function_exists('fridg3_read_access_logs')) {
     function fridg3_read_access_logs(): array
     {
         $path = fridg3_access_log_path();
         if (!is_file($path) || !is_readable($path)) return [];
         $decoded = json_decode((string)@file_get_contents($path), true);
-        return is_array($decoded) ? array_slice($decoded, -10000) : [];
+        return is_array($decoded) ? array_slice(fridg3_access_compact_entries($decoded), -10000) : [];
+    }
+}
+
+if (!function_exists('fridg3_access_is_page_navigation')) {
+    function fridg3_access_is_page_navigation(): bool
+    {
+        $fetchDestination = strtolower(trim((string)($_SERVER['HTTP_SEC_FETCH_DEST'] ?? '')));
+        if ($fetchDestination === 'document') return true;
+        if ((string)($_SERVER['HTTP_X_FRIDG3_PAGE_NAVIGATION'] ?? '') === '1') return true;
+
+        // Older browsers may not send Fetch Metadata. In that case, accept only a
+        // non-XHR request which explicitly accepts HTML as a document response.
+        $acceptsHtml = stripos((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'text/html') !== false;
+        $isXmlHttpRequest = strcasecmp(
+            (string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''),
+            'XMLHttpRequest'
+        ) === 0;
+        return $fetchDestination === '' && $acceptsHtml && !$isXmlHttpRequest;
     }
 }
 
@@ -166,12 +211,13 @@ if (!function_exists('fridg3_write_access_log')) {
     function fridg3_write_access_log(): void
     {
         if (PHP_SAPI === 'cli' || defined('FRIDG3_SKIP_ACCESS_LOG')) return;
+        if (!fridg3_access_is_page_navigation()) return;
         $script = (string)($_SERVER['SCRIPT_FILENAME'] ?? '');
         if (strtolower(basename($script)) !== 'index.php') return;
         $path = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
-        $path = is_string($path) && $path !== '' ? substr($path, 0, 1000) : '/';
+        $path = fridg3_access_normalize_path(is_string($path) && $path !== '' ? substr($path, 0, 1000) : '/');
         if (preg_match('#^/api(?:/|$)#i', $path) === 1) return;
-        if (rtrim(strtolower($path), '/') === '/chat' && (string)($_GET['action'] ?? '') === 'active-account-chat') return;
+        if (preg_match('#^/chat(?:/|$)#i', $path) === 1) return;
         $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         if (filter_var($ip, FILTER_VALIDATE_IP) === false) $ip = 'unknown';
         $username = isset($_SESSION['user']['username']) ? substr((string)$_SESSION['user']['username'], 0, 100) : '';
@@ -199,7 +245,7 @@ if (!function_exists('fridg3_write_access_log')) {
         $entries = fridg3_read_access_logs();
         $decodedRecord = json_decode($record, true);
         if (is_array($decodedRecord)) $entries[] = $decodedRecord;
-        $entries = array_slice($entries, -10000);
+        $entries = array_slice(fridg3_access_compact_entries($entries), -10000);
         $json = json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($json !== false) {
             $temporary = $logPath . '.tmp.' . getmypid();
