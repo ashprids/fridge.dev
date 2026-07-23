@@ -99,7 +99,7 @@ the admin bypass uses the server session user `isAdmin` flag, so it still works 
 
 ## Local Dev Mode
 
-`lib/render.php` treats `localhost`, `127.x.x.x`, `0.0.0.0`, `::1`, `*.localhost`, `*.test`, or truthy `FRIDG3_DEV_MODE` as local development. Local renders inject a sidebar `dev mode` banner beside the maintenance banner.
+`lib/render.php` treats `localhost`, `127.x.x.x`, `0.0.0.0`, `::1`, `*.localhost`, `*.test`, or truthy `FRIDG3_DEV_MODE` as local development. Local renders inject a sidebar `dev mode` banner beside the maintenance banner, with a tooltip explaining that localhost-triggered developer mode can differ from production/server behavior and pointing developers to `/settings` for options.
 
 ## Page View Counting
 

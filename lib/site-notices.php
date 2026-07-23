@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+
 const FRIDG3_SITE_NOTICES_FILE = 'data/etc/site-notices.json';
 
 function fridg3_site_notices_path(string $startDir): ?string

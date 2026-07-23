@@ -217,7 +217,7 @@ on the same daily schedule as the private backup workflow, this workflow:
 5. keeps only the 10 newest zip files in that folder
 6. removes temporary server and runner files. Before each run, it removes stale `/home/deploy/dev-data.*` workspaces left by failed or cancelled runs; runs are serialized so it does not remove an active run's workspace. A workspace is also removed immediately if its initial production-data copy fails.
 
-the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership and entry IP metadata, feed guest reply IPs/browser tokens, shared posting ban lists, the site-wide hard-ban list and browser/IP associations, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state and browser notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft. the development archive additionally excludes `data/etc/hard-banned-ips.txt` and `data/etc/hard-ban-identities.json` entirely.
+the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership and entry IP metadata, feed guest reply IPs/browser tokens, shared posting ban lists, the site-wide hard-ban list and browser/IP associations, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state and browser notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft. the development archive additionally excludes `data/etc/hard-banned-ips.txt`, `data/etc/hard-ban-identities.json`, and the private `data/etc/access.json` access log entirely.
 
 setup notes live in `/.github/workflows/publish-dev-data-setup.md`.
 
@@ -227,6 +227,7 @@ setup notes live in `/.github/workflows/publish-dev-data-setup.md`.
 
 - the file must be writable by the server
 - the server copy is the one that matters
+- each generated file identifies itself with an automatic-generation comment and the local generation timestamp in `DD/MM/YY HH:MM:SS` format
 
 ## Operational Truths
 

@@ -1,5 +1,26 @@
 <?php
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+
+if (!function_exists('fridg3_inject_server_debug_logs')) {
+    function fridg3_inject_server_debug_logs($template) {
+        if (!fridg3_debug_current_user_is_admin()) return $template;
+        fridg3_debug_import_pending_submission_logs();
+        fridg3_debug_complete_submission();
+        fridg3_debug_capture_included_files();
+        fridg3_debug_log('[PHP] request completed with HTTP ' . http_response_code());
+        $serverLogs = $GLOBALS['fridg3_debug_server_logs'] ?? [];
+        if (empty($serverLogs) || stripos($template, 'data-fridg3-server-debug-logs') !== false) return $template;
+        $payload = json_encode(array_values($serverLogs), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+        if ($payload === false) return $template;
+        $block = "\n    <script type=\"application/json\" data-fridg3-server-debug-logs>" . $payload . '</script>' . "\n";
+        if (stripos($template, '</body>') !== false) {
+            return preg_replace('/<\/body>/i', $block . '</body>', $template, 1) ?: ($template . $block);
+        }
+        return $template . $block;
+    }
+}
+
 if (!function_exists('fridg3_find_relative_upward')) {
     function fridg3_find_relative_upward($startDir, $relativePath) {
         $dir = $startDir;
@@ -560,6 +581,7 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_replace_logged_in_discord_footer_button($template, $startDir) {
         $template = fridg3_inject_site_notices($template, $startDir);
+        $template = fridg3_inject_server_debug_logs($template);
         if (!fridg3_user_has_email_account($startDir)) {
             return $template;
         }
@@ -582,10 +604,10 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/js/settings.js' => '/js/settings.js',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260721-media-2',
-            '/js/bookmarks.js' => '/js/bookmarks.js?v=20260722-gallery-thumbs-1',
-            '/js/bbcode.js' => '/js/bbcode.js?v=20260722-media-13',
+            '/js/settings.js' => '/js/settings.js?v=20260723-debug-logging-1',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260723-debug-logging-1',
+            '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
+            '/js/bbcode.js' => '/js/bbcode.js?v=20260723-debug-logging-1',
         ];
 
         $missing = [];
@@ -595,9 +617,7 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
             }
         }
 
-        if (empty($missing)) {
-            return $template;
-        }
+        if (empty($missing)) return $template;
 
         $scriptBlock = "\n" . implode("\n", $missing) . "\n";
         if (stripos($template, '</body>') !== false) {
@@ -665,7 +685,13 @@ if (!function_exists('fridg3_inject_dev_mode_banner')) {
         }
 
         if ($isLocalDevServer && strpos($template, 'id="dev-mode-banner"') === false) {
-            $banner = '<span id="dev-mode-banner" style="color: #9fd6a3; display: block; line-height: 1.15;"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
+            $tooltip = "Developer mode was enabled because the server\n"
+                . "detected it was running on localhost.\n"
+                . "Check the settings page for options.\n\n"
+                . "Some features may work unexpectedly due to\n"
+                . "differences in the web server and your client's\n"
+                . "configurations.";
+            $banner = '<span id="dev-mode-banner" data-tooltip="' . htmlspecialchars($tooltip, ENT_QUOTES, 'UTF-8') . '" style="color: #9fd6a3; display: block; line-height: 1.15;"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
             if (strpos($template, 'id="maintenance-banner"') !== false) {
                 $template = preg_replace('/(<br><span id="maintenance-banner"[^>]*>.*?<\/span>)/is', '$1' . $banner, $template, 1) ?: $template;
             } else {

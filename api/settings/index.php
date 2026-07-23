@@ -69,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'colors' => null,
             'onekoEnabled' => null,
             'reduceMotion' => null,
+            'debugMode' => null,
             'browserNotificationsEnabled' => null,
             'journalBrowserNotificationsEnabled' => null,
             'titleAnimation' => 'wobble',
@@ -102,6 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             if (array_key_exists('reduceMotion', $account)) {
                 $result['settings']['reduceMotion'] = is_truthy_setting($account['reduceMotion']);
+            }
+            if (array_key_exists('debugMode', $account)) {
+                $result['settings']['debugMode'] = is_truthy_setting($account['debugMode']);
             }
             if (array_key_exists('browserNotificationsEnabled', $account)) {
                 $result['settings']['browserNotificationsEnabled'] = is_truthy_setting($account['browserNotificationsEnabled']);
@@ -177,6 +181,9 @@ $strictHardBansRaw = $strictHardBansProvided ? (string)$_POST['strictHardBans'] 
 
 $reduceMotionProvided = array_key_exists('reduceMotion', $_POST);
 $reduceMotionRaw = $reduceMotionProvided ? (string)$_POST['reduceMotion'] : null;
+
+$debugModeProvided = array_key_exists('debugMode', $_POST);
+$debugModeRaw = $debugModeProvided ? (string)$_POST['debugMode'] : null;
 
 $onekoProvided = array_key_exists('onekoEnabled', $_POST);
 $onekoRaw = $onekoProvided ? (string)$_POST['onekoEnabled'] : null;
@@ -356,12 +363,13 @@ if ($journalBrowserNotificationsProvided) {
     }
 }
 
-if ($reduceMotionProvided) {
+if ($reduceMotionProvided || $debugModeProvided) {
     $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
     $falsy  = ['0', 'false', 'no', 'n', 'off', 'disabled'];
     $accessibilityValues = [];
     $accessibilityInputs = [
         'reduceMotion' => [$reduceMotionProvided, $reduceMotionRaw, 'invalid_reduce_motion_value'],
+        'debugMode' => [$debugModeProvided, $debugModeRaw, 'invalid_debug_mode_value'],
     ];
 
     foreach ($accessibilityInputs as $key => [$provided, $raw, $error]) {
@@ -705,7 +713,7 @@ if ($strictHardBansProvided) {
     $didWork = true;
 }
 
-if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $enforceHardBansProvided || $strictHardBansProvided || $reduceMotionProvided || $onekoProvided || $browserNotificationsProvided || $journalBrowserNotificationsProvided || $toastPersonalityProvided) {
+if ($didWork || $intensityProvided || $themeProvided || $maintenanceProvided || $enforceHardBansProvided || $strictHardBansProvided || $reduceMotionProvided || $debugModeProvided || $onekoProvided || $browserNotificationsProvided || $journalBrowserNotificationsProvided || $toastPersonalityProvided) {
     echo json_encode(['ok' => true]);
     exit;
 }

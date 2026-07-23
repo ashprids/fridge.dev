@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'debug.php';
+
 header('Content-Type: application/json');
 
 function find_template_file($filename) {

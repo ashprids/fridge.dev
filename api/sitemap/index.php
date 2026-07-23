@@ -101,6 +101,7 @@ if (is_dir($journalDir)) {
 // Build sitemap XML
 $xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!-- This sitemap was automatically generated.' . "\n" . date('d/m/y H:i:s') . ' -->',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
 ];
 // Order by priority (desc), then loc (asc)

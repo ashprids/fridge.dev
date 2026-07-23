@@ -1,4 +1,5 @@
 (function() {
+    const debugLog = message => window.fridg3DebugClientLog?.(`[off-topic archive] ${message}`);
     'use strict';
 
     // Render the #off-topic archive in a Discord-like view.
@@ -418,6 +419,7 @@
             });
 
             statusEl.textContent = 'Loading archive...';
+            debugLog('archive request started');
 
             fetch(ARCHIVE_URL, { cache: 'default' })
                 .then(function(res) {
@@ -426,17 +428,21 @@
                 })
                 .then(function(data) {
                     rawMessages = (data && Array.isArray(data.messages)) ? data.messages : [];
+                    debugLog(`archive loaded (${rawMessages.length} messages)`);
                     filteredMessages = sortMessages(rawMessages, sortOrder);
                     renderChunk(true);
                     applyTwemoji();
                 })
                 .catch(function() {
+                    debugLog('archive request failed');
                     errorEl.style.display = 'block';
                     errorEl.textContent = 'Could not load archive right now. Please try again later.';
                     statusEl.textContent = '';
                     loadMoreBtn.style.display = 'none';
                 });
-        } catch (_) { /* no-op */ }
+        } catch (error) {
+            debugLog(`archive initialization failed: ${error.message || 'unknown error'}`);
+        }
     }
 
     window.fridg3InitOffTopicArchive = initOffTopicArchive;

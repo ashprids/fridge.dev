@@ -1,4 +1,5 @@
 // Toggleable glow settings
+const settingsDebugLog = message => window.fridg3DebugClientLog?.(`[settings] ${message}`);
 const GLOW_DEFAULT_INTENSITY = 'none';
 const GLOW_INTENSITY_KEY = 'glowIntensity';
 const GLOW_RADIUS_DEFAULT = '8px';
@@ -37,6 +38,7 @@ const FEED_NOTIFICATION_POLL_MS = 30000;
 const ACCESSIBILITY_PREFS_KEY = 'accessibilityPrefs';
 const ACCESSIBILITY_DEFAULTS = {
     reduceMotion: false,
+    debugMode: false,
 };
 const TITLE_ANIMATION_KEY = 'titleAnimation';
 const TITLE_ANIMATION_ALWAYS_KEY = 'titleAnimationAlways';
@@ -650,7 +652,10 @@ async function fetchFeedNotificationEvents(options = {}) {
         cache: 'no-store',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+        settingsDebugLog(`notification poll failed with HTTP ${res.status}`);
+        return [];
+    }
     const data = await res.json().catch(() => null);
     return data && data.ok && Array.isArray(data.events) ? data.events : [];
 }
@@ -695,7 +700,10 @@ async function pollFeedNotifications() {
         changed = true;
         showFeedBrowserNotification(event);
     });
-    if (changed) saveFeedNotificationSeenKeys(seen);
+    if (changed) {
+        saveFeedNotificationSeenKeys(seen);
+        settingsDebugLog('new browser notification events delivered');
+    }
 }
 
 function startFeedNotificationPolling() {
@@ -706,6 +714,7 @@ function startFeedNotificationPolling() {
     if (!hasAnyBrowserNotificationChannelEnabled()) return;
     pollFeedNotifications();
     feedNotificationPollTimer = window.setInterval(pollFeedNotifications, FEED_NOTIFICATION_POLL_MS);
+    settingsDebugLog('browser notification polling started');
 }
 
 async function setBrowserNotificationsEnabled(enabled, opts = {}) {
@@ -725,6 +734,7 @@ async function setBrowserNotificationsEnabled(enabled, opts = {}) {
         permission = await Notification.requestPermission();
     }
     if (permission !== 'granted') {
+        settingsDebugLog(`browser notification permission ${permission}`);
         if (opts.report !== false) await showSiteNotice('browser notifications blocked', 'enable notifications in your browser to use this.');
         return false;
     }
@@ -817,6 +827,7 @@ function bindFeedNotificationSubmitPrompt(form, kind) {
 function normalizeAccessibilityPrefs(prefs) {
     return Object.assign({}, ACCESSIBILITY_DEFAULTS, {
         reduceMotion: !!(prefs && prefs.reduceMotion),
+        debugMode: !!(prefs && prefs.debugMode),
     });
 }
 
@@ -841,6 +852,8 @@ function applyAccessibilityPrefs(prefs, opts = {}) {
     const root = document.documentElement;
     root.classList.toggle('access-reduced-motion', normalized.reduceMotion);
     root.classList.remove('access-high-contrast');
+    if (typeof window.fridg3SetDebugMode === 'function') window.fridg3SetDebugMode(normalized.debugMode);
+    settingsDebugLog(`accessibility preferences applied (reduced motion ${normalized.reduceMotion ? 'on' : 'off'}, debug ${normalized.debugMode ? 'on' : 'off'})`);
     if (opts.persistLocal !== false) {
         saveLocalAccessibilityPrefs(normalized);
     }
@@ -990,6 +1003,7 @@ function setOnekoEnabled(enabled, opts = {}) {
     } else {
         stopOneko();
     }
+    settingsDebugLog(`cursor cat ${enabled ? 'enabled' : 'disabled'}`);
 }
 
 function syncOnekoPreference() {
@@ -1024,7 +1038,7 @@ function syncOnekoPreference() {
             startFeedNotificationPolling();
         }
         const accessibilityPrefs = {};
-        ['reduceMotion'].forEach(key => {
+        ['reduceMotion', 'debugMode'].forEach(key => {
             if (typeof data.settings[key] === 'boolean') {
                 accessibilityPrefs[key] = data.settings[key];
             }
@@ -1230,6 +1244,7 @@ function initSettingsPage() {
         const path = rawPath.replace(/\/+$/, '') || '/';
         const saveBtn = document.getElementById('settings-save');
         if (!path.startsWith('/settings') && !saveBtn) return;
+        settingsDebugLog('settings page initialized');
 
         const glowGroup = document.getElementById('text-glow-group');
         const glowToggle = document.getElementById('text-glow-toggle');
@@ -1246,6 +1261,7 @@ function initSettingsPage() {
         const colorResetBtn = document.getElementById('color-reset');
         const mobileViewToggle = document.getElementById('mobile-friendly-toggle');
         const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+        const debugModeToggle = document.getElementById('debug-mode-toggle');
         const feedNotificationsToggle = document.getElementById('feed-notifications-toggle');
         const journalNotificationsToggle = document.getElementById('journal-notifications-toggle');
         const onekoToggle = document.getElementById('oneko-toggle');
@@ -1292,6 +1308,7 @@ function initSettingsPage() {
         const settingsSaveButtonText = saveBtn.textContent;
 
         const finishSettingsSave = async (reloadPage = false) => {
+            settingsDebugLog(`settings saved${reloadPage ? '; reload scheduled' : ''}`);
             saveBtn.textContent = 'saved!';
             saveBtn.disabled = true;
             await new Promise(resolve => window.setTimeout(resolve, 500));
@@ -1519,12 +1536,20 @@ function initSettingsPage() {
         const getAccessibilityValues = () => {
             return normalizeAccessibilityPrefs({
                 reduceMotion: !!(reduceMotionToggle && reduceMotionToggle.checked),
+                debugMode: !!(debugModeToggle && debugModeToggle.checked),
             });
         };
 
         const setAccessibilityToggles = (prefs) => {
             const normalized = normalizeAccessibilityPrefs(prefs);
             if (reduceMotionToggle) reduceMotionToggle.checked = normalized.reduceMotion;
+            if (debugModeToggle) {
+                const mobile = document.body.classList.contains('mobile-template')
+                    || (window.matchMedia && window.matchMedia('(max-width: 700px)').matches);
+                debugModeToggle.checked = normalized.debugMode;
+                debugModeToggle.disabled = mobile;
+                debugModeToggle.closest('.checkbox-label')?.classList.toggle('is-disabled', mobile);
+            }
             syncTitleAnimationAvailability(normalized.reduceMotion);
         };
 
@@ -1868,6 +1893,13 @@ function initSettingsPage() {
             });
         };
 
+        const devBootstrapServerLog = message => {
+            if (typeof window.fridg3DebugServerLog !== 'function') return;
+            let safeMessage = String(message || '').replace(/https?:\/\/\S+/gi, '[url omitted]').replace(/\s+/g, ' ').trim();
+            if (!safeMessage.startsWith('[BOOTSTRAP]')) safeMessage = '[BOOTSTRAP] ' + safeMessage;
+            window.fridg3DebugServerLog(safeMessage.slice(0, 2000));
+        };
+
         const showDevBootstrapProgressPopup = () => {
             const overlay = document.createElement('div');
             overlay.className = 'site-popup-overlay';
@@ -1902,6 +1934,7 @@ function initSettingsPage() {
             dialog.append(title, detail, logLine, meter, percent);
             overlay.append(dialog);
             document.body.append(overlay);
+            devBootstrapServerLog('popup opened progress=0% popup_text="starting..." popup_detail="waiting for server..."');
 
             return {
                 setProgress(value, message, isError = false, logMessage = '') {
@@ -1914,9 +1947,11 @@ function initSettingsPage() {
                         logLine.textContent = logMessage;
                     }
                     logLine.style.color = isError ? 'red' : 'var(--subtle)';
+                    devBootstrapServerLog(`popup updated progress=${Math.round(progress)}% state=${isError ? 'error' : 'working'} popup_text="${message || ''}" popup_detail="${logMessage || logLine.textContent || ''}"`);
                 },
                 finish(message, isError = false) {
                     this.setProgress(100, message, isError, isError ? 'failed: ' + message : 'done: ' + message);
+                    devBootstrapServerLog(`popup finished state=${isError ? 'error' : 'success'} popup_text="${message || ''}"`);
                 },
             };
         };
@@ -1925,13 +1960,18 @@ function initSettingsPage() {
             if (!devDataBootstrapBtn || devDataBootstrapBtn.dataset.bound === '1') return;
             devDataBootstrapBtn.dataset.bound = '1';
             devDataBootstrapBtn.addEventListener('click', async () => {
+                devBootstrapServerLog('confirmation popup opened popup_text="replace local data?"');
                 const confirmed = await showSitePopup({
                     title: 'replace local data?',
                     detail: 'this action will delete your existing local data directory, download the latest developer copy, and install it. this cannot be undone!',
                     okText: 'download',
                     cancelText: 'cancel',
                 });
-                if (!confirmed) return;
+                if (!confirmed) {
+                    devBootstrapServerLog('bootstrap cancelled at confirmation popup');
+                    return;
+                }
+                devBootstrapServerLog('bootstrap confirmed; disabling trigger button and opening progress popup');
 
                 const originalText = devDataBootstrapBtn.textContent;
                 devDataBootstrapBtn.disabled = true;
@@ -1947,6 +1987,10 @@ function initSettingsPage() {
                     if (!res.body || !res.body.getReader) {
                         const text = await res.text();
                         const lines = text.trim().split('\n').filter(Boolean);
+                        lines.forEach(line => {
+                            const event = JSON.parse(line);
+                            if (event.debug) devBootstrapServerLog(event.debug);
+                        });
                         const last = lines.length ? JSON.parse(lines[lines.length - 1]) : null;
                         if (!res.ok || !last || last.ok === false) {
                             throw new Error(last && last.message ? last.message : 'bootstrap failed');
@@ -1969,6 +2013,7 @@ function initSettingsPage() {
                         lines.forEach(line => {
                             if (!line.trim()) return;
                             const event = JSON.parse(line);
+                            if (event.debug) devBootstrapServerLog(event.debug);
                             lastMessage = event.message || lastMessage;
                             progressPopup.setProgress(event.progress, lastMessage, event.ok === false, event.log || ((event.stage ? event.stage + ': ' : '') + lastMessage));
                             if (event.ok === false) {
@@ -1978,6 +2023,7 @@ function initSettingsPage() {
                     }
                     if (buffer.trim()) {
                         const event = JSON.parse(buffer);
+                        if (event.debug) devBootstrapServerLog(event.debug);
                         lastMessage = event.message || lastMessage;
                         progressPopup.setProgress(event.progress, lastMessage, event.ok === false, event.log || ((event.stage ? event.stage + ': ' : '') + lastMessage));
                         if (event.ok === false) {
@@ -1989,10 +2035,12 @@ function initSettingsPage() {
                     }
                     progressPopup.finish(lastMessage || 'dev data installed.');
                 } catch (err) {
+                    devBootstrapServerLog(`client stream handling failed popup_text="${(err && err.message) ? err.message : 'bootstrap failed.'}"`);
                     progressPopup.finish((err && err.message) ? err.message : 'bootstrap failed.', true);
                 } finally {
                     devDataBootstrapBtn.textContent = originalText;
                     devDataBootstrapBtn.disabled = false;
+                    devBootstrapServerLog('bootstrap trigger button restored and enabled');
                 }
             });
         };
@@ -2157,7 +2205,7 @@ function initSettingsPage() {
                 applyThemeSelection(currentTheme);
 
                 const serverAccessibilityPrefs = {};
-                ['reduceMotion'].forEach(key => {
+                ['reduceMotion', 'debugMode'].forEach(key => {
                     if (typeof data.settings[key] === 'boolean') {
                         serverAccessibilityPrefs[key] = data.settings[key];
                     }
@@ -2254,6 +2302,10 @@ function initSettingsPage() {
             });
         }
 
+        if (debugModeToggle) {
+            debugModeToggle.addEventListener('change', () => applyAccessibilityPrefs(getAccessibilityValues()));
+        }
+
         document.addEventListener('change', event => {
             const control = event.target;
             if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)) return;
@@ -2279,6 +2331,7 @@ function initSettingsPage() {
         }, true);
 
         saveBtn.addEventListener('click', async function() {
+            settingsDebugLog('settings save requested');
             settingsDirty = false;
             saveBtn.disabled = true;
             const selected = glowToggle.checked ? 'medium' : 'none';
@@ -2293,6 +2346,7 @@ function initSettingsPage() {
                 if (isLoggedIn && window.fetch) {
                     const params = new URLSearchParams();
                     params.append('reduceMotion', accessibilityPrefs.reduceMotion ? 'on' : 'off');
+                    params.append('debugMode', accessibilityPrefs.debugMode ? 'on' : 'off');
                     fetch('/api/settings', {
                         method: 'POST',
                         headers: {
@@ -2348,6 +2402,7 @@ function initSettingsPage() {
                 params.append('glowIntensity', selected);
                 params.append('theme', selectedTheme);
                 params.append('reduceMotion', accessibilityPrefs.reduceMotion ? 'on' : 'off');
+                params.append('debugMode', accessibilityPrefs.debugMode ? 'on' : 'off');
                 params.append('onekoEnabled', onekoEnabled ? 'on' : 'off');
                 params.append('browserNotificationsEnabled', savedFeedNotificationsEnabled ? 'on' : 'off');
                 params.append('journalBrowserNotificationsEnabled', savedJournalNotificationsEnabled ? 'on' : 'off');
@@ -2376,7 +2431,7 @@ function initSettingsPage() {
                 }
 
                 try {
-                    await fetch('/api/settings', {
+                    const response = await fetch('/api/settings', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -2384,8 +2439,11 @@ function initSettingsPage() {
                         },
                         body: params.toString(),
                     });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     lastSavedTheme = selectedTheme;
-                } catch (_) {
+                    settingsDebugLog('account-backed settings synchronized');
+                } catch (error) {
+                    settingsDebugLog(`account-backed settings sync failed: ${error.message || 'unknown error'}`);
                     /* local settings already applied */
                 }
             } else {
@@ -2415,11 +2473,15 @@ function initSettingsPage() {
                 loadMaintenanceState();
                 bindSitemapButton();
             }
+            settingsDebugLog(`admin settings ${isAdmin ? 'enabled' : 'hidden'}`);
         }).catch(() => {
+            settingsDebugLog('admin status check failed');
             if (adminSection) adminSection.style.display = 'none';
             bindDevDataBootstrapButton();
         });
-    } catch (_) { /* no-op */ }
+    } catch (error) {
+        settingsDebugLog(`settings initialization failed: ${error.message || 'unknown error'}`);
+    }
 }
 
 window.addEventListener('DOMContentLoaded', initSettingsPage);

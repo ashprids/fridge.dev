@@ -41,6 +41,7 @@ all API routes live under `/api/*` and are handled by PHP.
 - allowed for admin sessions, or for local setups with no admin account yet
 - streams newline-delimited JSON progress while it finds the latest sanitized Google Drive developer data zip, downloads it, extracts it, deletes existing local `data/`, and installs the new copy
 - progress events may include a `log` field for the settings popup; download logs show byte counts/percentages, and extraction logs include entry counts/percentages
+- every streamed event also includes a sanitized `debug` message prefixed `[BOOTSTRAP]`; debug mode imports these into the admin server tab, alongside client-observed `[BOOTSTRAP]` records for confirmation, every progress-popup text/detail/percentage change, stream parsing, completion/failure, and button restoration. download URLs and query credentials are replaced with `[url omitted]`
 
 ### `/api/themes`
 
@@ -130,6 +131,7 @@ route-local JSON endpoints for the `/tools/upload` peer-to-peer transfer page, d
 - admin-only sitemap generator
 - scans routes and content files
 - writes `/sitemap.xml`
+- writes a two-line XML comment immediately after the declaration containing `This sitemap was automatically generated.` and the generation time in `DD/MM/YY HH:MM:SS` format
 
 ## Toast / Stream / Status
 

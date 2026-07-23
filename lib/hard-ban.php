@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+
 const FRIDG3_HARD_BAN_COOKIE = 'fridg3_hard_ban_id';
 
 if (!function_exists('fridg3_hard_ban_settings_path')) {

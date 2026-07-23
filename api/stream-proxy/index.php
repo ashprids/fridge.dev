@@ -1,5 +1,6 @@
 <?php
 // Simple same-origin stream proxy to avoid mixed-content issues for toast listen-along
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'debug.php';
 set_time_limit(0);
 ignore_user_abort(true);
 

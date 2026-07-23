@@ -1,5 +1,7 @@
 "use strict";
 
+const mdfpasteDebugLog = message => window.fridg3DebugClientLog?.(`[mdpaste] ${message}`);
+
 const fileInput = document.getElementById("markdown-file");
 const markdownInput = document.getElementById("markdown-input");
 const preview = document.getElementById("markdown-preview-body");
@@ -27,6 +29,7 @@ if (!fileInput || !markdownInput || !preview) {
 		copyLinkButton.addEventListener("click", copyShareLink);
 	}
 	updatePreview();
+	mdfpasteDebugLog("editor initialized");
 }
 
 function handleFileUpload(event) {
@@ -49,10 +52,12 @@ function handleFileUpload(event) {
 		markdownInput.value = String(reader.result || "");
 		setStatus("file loaded. preview updated.", false);
 		updatePreview();
+		mdfpasteDebugLog("local markdown file loaded");
 	};
 	reader.onerror = function onError() {
 		setStatus("could not read the file. try again.", true);
 		target.value = "";
+		mdfpasteDebugLog("local markdown file read failed");
 	};
 	reader.readAsText(file, "utf-8");
 }
@@ -71,6 +76,7 @@ async function createPaste(event) {
 		createButton.textContent = "creating...";
 	}
 	setStatus("saving paste...", false);
+	mdfpasteDebugLog("paste creation requested");
 
 	try {
 		const response = await fetch("/tools/mdpaste/", {
@@ -100,8 +106,10 @@ async function createPaste(event) {
 			shareLink.select();
 		}
 		setStatus(data.encrypted ? "encrypted paste created. send the password separately." : "paste created.", false);
+		mdfpasteDebugLog(`paste created${data.encrypted ? " with encryption" : ""}`);
 	} catch (error) {
 		setStatus(error.message || "could not create paste.", true);
+		mdfpasteDebugLog(`paste creation failed: ${error.message || "unknown error"}`);
 	} finally {
 		if (createButton) {
 			createButton.disabled = false;
@@ -118,10 +126,12 @@ async function copyShareLink() {
 	try {
 		await navigator.clipboard.writeText(shareLink.value);
 		setStatus("copied. delicious.", false);
+		mdfpasteDebugLog("share link copied");
 	} catch (error) {
 		shareLink.focus();
 		shareLink.select();
 		setStatus("copy failed, but the link is selected.", true);
+		mdfpasteDebugLog("clipboard copy failed");
 	}
 }
 

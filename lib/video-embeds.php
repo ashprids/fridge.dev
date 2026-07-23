@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+
 function fridg3_external_video_embed_data(string $rawUrl): ?array
 {
     $url = html_entity_decode(trim($rawUrl), ENT_QUOTES | ENT_HTML5, 'UTF-8');

@@ -32,6 +32,10 @@ if ($render_helper_path) {
     require_once $render_helper_path;
 }
 
+// Example of a route-specific non-process PHP debug entry. Shared request and
+// included-file entries are emitted automatically by lib/debug.php on all pages.
+fridg3_debug_log('[PHP] formatting example page initialized');
+
 $template_name = function_exists('get_preferred_template_name')
     ? get_preferred_template_name(__DIR__)
     : 'template.html';

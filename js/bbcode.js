@@ -1,5 +1,6 @@
 // BBCode formatting state (media + file list) is global so that
 // it can be reused when the editor is loaded via SPA navigation.
+const bbcodeDebugLog = message => window.fridg3DebugClientLog?.(`[editor/media] ${message}`);
 const bbcodeImages = new Map();
 const bbcodeMedia = new Map();
 const bbcodeVoiceNotes = new Map();
@@ -177,6 +178,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
                     if (event.data && event.data.size > 0) chunks.push(event.data);
                 });
                 recorder.addEventListener('error', () => {
+                    bbcodeDebugLog('voice recorder reported an error');
                     reset();
                     setText('recording failed');
                 });
@@ -196,6 +198,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
                     if (recordBtn) recordBtn.disabled = false;
                     recorder = null;
                     if (currentBlob.size <= 0) {
+                        bbcodeDebugLog('voice recording produced no audio');
                         reset();
                         setText('recording failed');
                         return;
@@ -215,6 +218,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
                     if (acceptBtn) acceptBtn.hidden = false;
                     if (discardBtn) discardBtn.hidden = false;
                     setText('preview your voice note');
+                    bbcodeDebugLog('voice recording stopped and preview is ready');
                     updateTimer();
                 });
                 recorder.start();
@@ -231,8 +235,10 @@ function fridg3CreateVoiceRecorder(container, onReady) {
                 if (acceptBtn) acceptBtn.hidden = true;
                 if (discardBtn) discardBtn.hidden = true;
                 setText('recording...');
+                bbcodeDebugLog('voice recording started');
                 updateTimer();
             } catch (_) {
+                bbcodeDebugLog('microphone permission or initialization failed');
                 reset();
                 setText('microphone access blocked');
             }
@@ -244,6 +250,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
             clearPreview();
             reset();
             setText('ready to record');
+            bbcodeDebugLog('voice recording discarded');
         });
     }
     if (acceptBtn) {
@@ -256,6 +263,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
             clearPreview();
             reset();
             setText('voice note added');
+            bbcodeDebugLog('voice note attached to editor');
             container.hidden = true;
         });
     }
@@ -758,6 +766,7 @@ function initBBCodeEditor() {
     const bbcodePreviewToggle = bbcodeScope.querySelector('#bbcode-preview-toggle');
     const bbcodeHeaderDropdown = bbcodeScope.querySelector('#bbcode-header-dropdown');
     const bbcodeButtons = bbcodeScope.querySelectorAll('.bbcode-btn');
+    if (bbcodeTextbox) bbcodeDebugLog('BBCode editor initialized');
 
     const refreshPreview = () => {
         if (!bbcodePreview || !isPreviewMode) return;
@@ -1036,6 +1045,7 @@ function initBBCodeEditor() {
         const kind = mediaKindForFile(file);
         if (!kind) return;
         if (file.size > MEDIA_UPLOAD_MAX_BYTES) {
+            bbcodeDebugLog(`rejected oversized ${kind} attachment`);
             if (typeof showSiteNotice === 'function') {
                 showSiteNotice('media too large', `${file.name || 'this file'} is larger than the 8 MB upload limit.`);
             }
@@ -1069,6 +1079,7 @@ function initBBCodeEditor() {
 
         if (kind !== 'image') {
             addPlaceholder(URL.createObjectURL(processedFile));
+            bbcodeDebugLog(`${kind} attachment queued`);
             return;
         }
 
@@ -1076,6 +1087,7 @@ function initBBCodeEditor() {
             const reader = new FileReader();
             reader.onload = function(event) {
                 addPlaceholder(event.target.result);
+                bbcodeDebugLog('image attachment queued');
                 resolve();
             };
             reader.readAsDataURL(processedFile);
@@ -1120,6 +1132,7 @@ function initBBCodeEditor() {
                     bbcodeTextbox.value = beforeText + newText + afterText;
                     bbcodeTextbox.focus();
                     bbcodeTextbox.setSelectionRange(start + newText.length, start + newText.length);
+                    bbcodeDebugLog(`${kind} URL attached`);
                 } else if (canSelectFile) {
                     // Open file picker
                     bbcodeImageInput.click();
@@ -1441,6 +1454,7 @@ function initToastFeedGenerator() {
         setStatus('', false);
         setEditorLocked(true, 'writing a post...');
         startPlaceholderAnimation();
+        bbcodeDebugLog(`Toast draft generation requested (${mode} mode)`);
 
         try {
             const params = new URLSearchParams();
@@ -1465,10 +1479,12 @@ function initToastFeedGenerator() {
             setEditorLocked(false, '');
             editor.focus();
             setStatus('draft ready.', false);
+            bbcodeDebugLog('Toast draft generation completed');
         } catch (err) {
             generatedDraftReady = false;
             setEditorLocked(true, 'generate a post first...');
             setStatus((err && err.message) ? err.message : 'generation failed.', true);
+            bbcodeDebugLog(`Toast draft generation failed: ${(err && err.message) ? err.message : 'unknown error'}`);
         } finally {
             stopPlaceholderAnimation();
             generateBtn.textContent = originalText;

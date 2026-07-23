@@ -1,4 +1,5 @@
 (function() {
+    const debugLog = message => window.fridg3DebugClientLog?.(`[music upload] ${message}`);
     const form = document.querySelector('[data-music-upload-form]');
     if (!form || form.dataset.musicUploadBound === '1') return;
     form.dataset.musicUploadBound = '1';
@@ -27,6 +28,7 @@
         const fragment = template.content.cloneNode(true);
         list.appendChild(fragment);
         updateRows();
+        debugLog(`track row added (${list.querySelectorAll('[data-music-track-row]').length} total)`);
     };
 
     if (!list.querySelector('[data-music-track-row]')) {
@@ -54,10 +56,12 @@
             list.insertBefore(row.nextElementSibling, row);
         } else if (button.matches('[data-music-track-remove]')) {
             row.remove();
+            debugLog('track row removed');
             if (!list.querySelector('[data-music-track-row]')) addTrack();
         }
         updateRows();
     });
 
     updateRows();
+    debugLog('release editor initialized');
 })();

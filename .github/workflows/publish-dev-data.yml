@@ -121,6 +121,7 @@ jobs:
               dev_data_excludes=(
                 'data/etc/hard-banned-ips.txt'
                 'data/etc/hard-ban-identities.json'
+                'data/etc/access.json*'
                 'data/etc/banlists/*'
               )
               if zip -r "$archive_path" data -x "${dev_data_excludes[@]}" >"$zip_log" 2>&1; then

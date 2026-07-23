@@ -1,4 +1,5 @@
 (function() {
+const debugLog = message => window.fridg3DebugClientLog?.(`[toast controls] ${message}`);
 function initToastDiscordBotPage() {
     const root = document.getElementById('control-panel-container');
     const listenButton = document.getElementById('listen-along-button');
@@ -15,6 +16,7 @@ function initToastDiscordBotPage() {
     const nameInput = document.getElementById('stream-name-input');
     const updateButton = document.getElementById('update-stream-button');
     const statusDiv = document.getElementById('stream-update-status');
+    let lastLoggedBotStatus = null;
 
     function setLiveControls(isLive) {
         const miniPlayerEl = document.getElementById('mini-player');
@@ -51,6 +53,7 @@ function initToastDiscordBotPage() {
             const isAdmin = data && data.isAdmin === true;
 
             if (root) root.style.display = isAdmin ? 'block' : 'none';
+            debugLog(`admin controls ${isAdmin ? 'enabled' : 'hidden'}`);
             if (statusToggle) statusToggle.disabled = !isAdmin;
             if (updateButton) {
                 updateButton.disabled = !isAdmin;
@@ -61,6 +64,7 @@ function initToastDiscordBotPage() {
         } catch (err) {
             console.error('Failed to check admin status:', err);
             if (root) root.style.display = 'none';
+            debugLog(`admin check failed: ${err.message || 'unknown error'}`);
             return false;
         }
     }
@@ -78,10 +82,15 @@ function initToastDiscordBotPage() {
                 nowPlayingName.textContent = streamName ? `Listening to ${streamName}` : 'Unknown';
             }
             setStatusUI(isOnline);
+            if (lastLoggedBotStatus !== isOnline) {
+                debugLog(`bot status changed to ${isOnline ? 'online' : 'offline'}`);
+                lastLoggedBotStatus = isOnline;
+            }
         } catch (err) {
             console.error('Failed to fetch bot status:', err);
             if (nowPlayingName) nowPlayingName.textContent = 'Unknown';
             setStatusUI(false);
+            debugLog(`bot status refresh failed: ${err.message || 'unknown error'}`);
         }
     }
 
@@ -100,9 +109,11 @@ function initToastDiscordBotPage() {
                 throw new Error(data.error || 'Failed to update status');
             }
             showStatus(`Status set to ${isOnline ? 'online' : 'offline'}.`);
+            debugLog(`bot status changed to ${isOnline ? 'online' : 'offline'}`);
         } catch (err) {
             showStatus(err.message, true);
             setStatusUI(!isOnline);
+            debugLog(`bot status change failed: ${err.message || 'unknown error'}`);
         } finally {
             statusToggle.disabled = false;
         }
@@ -144,12 +155,14 @@ function initToastDiscordBotPage() {
                     throw new Error(data.error || 'Failed to update stream');
                 }
                 showStatus('Stream updated and bot restarted!');
+                debugLog('stream configuration updated; bot restart requested');
                 urlInput.value = '';
                 nameInput.value = '';
                 updateNowPlaying();
                 setTimeout(() => location.reload(), 1500);
             } catch (err) {
                 showStatus('Error: ' + err.message, true);
+                debugLog(`stream update failed: ${err.message || 'unknown error'}`);
             } finally {
                 updateButton.disabled = false;
             }
@@ -164,6 +177,7 @@ function initToastDiscordBotPage() {
         clearInterval(window.__toastStatusInterval);
     }
     window.__toastStatusInterval = setInterval(updateNowPlaying, 5000);
+    debugLog('page controls initialized');
 }
 
 window.fridg3InitToastDiscordBotPage = initToastDiscordBotPage;

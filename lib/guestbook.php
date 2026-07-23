@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+
 if (!function_exists('fridg3_guestbook_dir')) {
     function fridg3_guestbook_dir(): string
     {

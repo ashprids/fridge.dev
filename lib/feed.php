@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+
 if (!function_exists('fridg3_feed_find_root')) {
     function fridg3_feed_find_root(): string
     {
@@ -1137,7 +1139,11 @@ if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
                 'name' => 'voice-note.' . pathinfo($destName, PATHINFO_EXTENSION),
                 'duration' => fridg3_feed_probe_audio_duration($destPath) ?? $sourceDuration ?? 0,
             ];
+            fridg3_debug_submission_log('[UPLOAD] feed/journal voice attachment saved bytes=' . (@filesize($destPath) ?: 0) . ' type=' . pathinfo($destName, PATHINFO_EXTENSION));
         }
+
+        $received = count(array_filter((array)($files['error'] ?? []), static fn($error) => (int)$error === UPLOAD_ERR_OK));
+        if ($received > 0) fridg3_debug_submission_log('[UPLOAD] feed/journal voice attachments processed received=' . $received . ' saved=' . count($voiceMap) . ' rejected=' . max(0, $received - count($voiceMap)));
 
         return $voiceMap;
     }
@@ -1293,6 +1299,7 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
                     'url' => '/data/images/' . $destName,
                     'name' => $origName ?: $destName,
                 ];
+                fridg3_debug_submission_log('[UPLOAD] feed/journal image attachment saved bytes=' . (@filesize($destPath) ?: 0) . ' type=' . $destExt);
             }
         }
 
@@ -1403,11 +1410,14 @@ if (!function_exists('fridg3_feed_process_uploaded_media')) {
                 'url' => '/data/' . $relativeDir . '/' . $destName,
                 'name' => (string)$originalName ?: $destName,
             ];
+            fridg3_debug_submission_log('[UPLOAD] feed/journal ' . $type . ' attachment saved bytes=' . (@filesize($directory . DIRECTORY_SEPARATOR . $destName) ?: 0) . ' type=' . $extension);
         }
         if ($finfo) {
             finfo_close($finfo);
         }
         ksort($mediaMap);
+        $received = count(array_filter((array)($files['error'] ?? []), static fn($error) => (int)$error === UPLOAD_ERR_OK));
+        if ($received > 0) fridg3_debug_submission_log('[UPLOAD] feed/journal media attachments processed received=' . $received . ' saved=' . count($mediaMap) . ' rejected=' . max(0, $received - count($mediaMap)));
         return $mediaMap;
     }
 }

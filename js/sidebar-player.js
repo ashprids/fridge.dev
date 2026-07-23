@@ -1,4 +1,5 @@
 // Sidebar toggle functionality
+const sidebarDebugLog = message => window.fridg3DebugClientLog?.(`[sidebar/player] ${message}`);
 const hideSidebarBtn = document.getElementById('hide-sidebar');
 const showSidebarBtn = document.getElementById('show-sidebar');
 const sidebar = document.getElementById('sidebar');
@@ -19,6 +20,7 @@ function setSidebarVisible(visible, persist = true) {
             localStorage.setItem(SIDEBAR_KEY, visible ? 'true' : 'false');
         } catch (_) { /* no-op */ }
     }
+    if (persist) sidebarDebugLog(`sidebar ${visible ? 'shown' : 'hidden'}`);
 }
 
 function updateMobileCollapsedHeader(visible) {
@@ -48,6 +50,7 @@ function initSidebarAndBBCode() {
     } else {
         setSidebarVisible(true, false);
     }
+    sidebarDebugLog('sidebar and shared content initialized');
 
     // Apply global glow effect based on saved intensity
     try {
@@ -430,6 +433,7 @@ function initMiniPlayer() {
             savePlayerState();
             updateVisibility();
             updatePlayingClass();
+            sidebarDebugLog('automatic track playback started');
         };
 
         const playAlbumTrack = (track, idx, albumMeta) => {
@@ -443,6 +447,7 @@ function initMiniPlayer() {
 
             audio.src = src;
             audio.play().catch(() => {});
+            sidebarDebugLog(`album track ${idx + 1} playback requested`);
             setLiveMode(false);
             setPlayIcon(true);
             clearActiveTracks();
@@ -954,6 +959,7 @@ function syncActiveChatSidebarButton() {
                     if (current) current.remove();
                     return;
                 }
+                sidebarDebugLog('active chat shortcut synchronized');
 
                 const link = current || document.createElement('a');
                 link.id = 'sidebar-active-chat';
@@ -969,6 +975,7 @@ function syncActiveChatSidebarButton() {
                 }
             })
             .catch(() => {
+                sidebarDebugLog('active chat shortcut request failed');
                 const current = document.getElementById('sidebar-active-chat');
                 if (current) current.remove();
             });
@@ -1040,6 +1047,7 @@ function initToastListenAlong() {
 
 async function playToastStreamInMiniPlayer() {
     try {
+        sidebarDebugLog('live stream playback requested');
         const response = await fetch('/api/discord-bot-status/');
         const data = await response.json();
 
@@ -1105,6 +1113,7 @@ async function playToastStreamInMiniPlayer() {
 
         audio.addEventListener('error', onError, { once: true });
         tryPlay(0);
+        sidebarDebugLog(`live stream started with ${candidates.length} source candidate(s)`);
 
         const playIcon = document.querySelector('#mini-player-play i');
         if (playIcon) {
@@ -1126,6 +1135,7 @@ async function playToastStreamInMiniPlayer() {
         } catch (_) { /* no-op */ }
     } catch (err) {
         console.error('Failed to start listen-along:', err);
+        sidebarDebugLog(`listen-along failed: ${err.message || 'unknown error'}`);
     }
 }
 
@@ -1200,7 +1210,9 @@ async function ensureToastLiveControlsOnLoad() {
             setToastLiveControls(true);
             audio.dataset.toastLive = '1';
         }
-    } catch (_) { /* no-op */ }
+    } catch (error) {
+        sidebarDebugLog(`live stream failed: ${error.message || 'unknown error'}`);
+    }
 }
 
 async function resolveToastStreamUrl(url) {

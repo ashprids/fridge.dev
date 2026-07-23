@@ -378,7 +378,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $htmlContent = bbcode_to_html($safeContent);
     $text = $postDate . PHP_EOL . $title . PHP_EOL . $description . PHP_EOL . $htmlContent . PHP_EOL;
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $postFilename;
-    file_put_contents($postFile, $text);
+    $postSaved = file_put_contents($postFile, $text) !== false;
+    fridg3_debug_submission_log('[SUBMISSION] journal post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . count($imageMap));
 
     // Redirect to feed after posting
     header('Location: /feed');

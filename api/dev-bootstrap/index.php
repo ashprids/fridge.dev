@@ -15,13 +15,31 @@ if (is_file($renderHelperPath)) {
 
 const FRIDG3_DEV_BOOTSTRAP_FOLDER_ID = '1dltxdqQjfUfGwEEXVxUrOw5fuv9nk_ex';
 
+function dev_bootstrap_debug_text(string $value): string
+{
+    $value = preg_replace('#https?://\S+#i', '[url omitted]', $value) ?? $value;
+    $value = preg_replace('/\s+/', ' ', trim($value)) ?? trim($value);
+    return substr($value, 0, 1000);
+}
+
 function dev_bootstrap_emit(string $stage, int $progress, string $message, array $extra = []): void
 {
+    $progress = max(0, min(100, $progress));
+    $debug = '[BOOTSTRAP] server update stage=' . dev_bootstrap_debug_text($stage)
+        . ' progress=' . $progress . '% popup_text="' . dev_bootstrap_debug_text($message) . '"';
+    if (isset($extra['log']) && is_string($extra['log']) && trim($extra['log']) !== '') {
+        $debug .= ' popup_detail="' . dev_bootstrap_debug_text($extra['log']) . '"';
+    }
+    if (isset($extra['archive']) && is_string($extra['archive']) && trim($extra['archive']) !== '') {
+        $debug .= ' archive="' . dev_bootstrap_debug_text(basename($extra['archive'])) . '"';
+    }
+    fridg3_debug_log($debug);
     echo json_encode(array_merge([
         'ok' => true,
         'stage' => $stage,
-        'progress' => max(0, min(100, $progress)),
+        'progress' => $progress,
         'message' => $message,
+        'debug' => $debug,
     ], $extra), JSON_UNESCAPED_SLASHES) . "\n";
     @ob_flush();
     flush();
@@ -30,10 +48,13 @@ function dev_bootstrap_emit(string $stage, int $progress, string $message, array
 function dev_bootstrap_fail(string $message, int $status = 500): never
 {
     http_response_code($status);
+    $debug = '[BOOTSTRAP] server failure progress=100% HTTP=' . $status . ' popup_text="' . dev_bootstrap_debug_text($message) . '"';
+    fridg3_debug_log($debug);
     echo json_encode([
         'ok' => false,
         'progress' => 100,
         'message' => $message,
+        'debug' => $debug,
     ], JSON_UNESCAPED_SLASHES) . "\n";
     @ob_flush();
     flush();
@@ -313,7 +334,16 @@ function dev_bootstrap_download_drive_file(array $archive, string $destPath): vo
         $downloadUrl = html_entity_decode((string)$actionMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8') . '?' . http_build_query($params);
     }
 
+    dev_bootstrap_emit('download', 26, 'resolved archive download...', [
+        'log' => $expectedBytes > 0
+            ? 'Google Drive response resolved; expected size ' . dev_bootstrap_format_bytes($expectedBytes)
+            : 'Google Drive response resolved; total size will be detected while downloading',
+    ]);
+
     if (!function_exists('curl_init')) {
+        dev_bootstrap_emit('download', 28, 'starting PHP stream download...', [
+            'log' => 'PHP cURL unavailable; using the native HTTPS stream first',
+        ]);
         try {
             dev_bootstrap_stream_download($downloadUrl, $destPath, $expectedBytes);
         } catch (Throwable $streamError) {
@@ -333,6 +363,11 @@ function dev_bootstrap_download_drive_file(array $archive, string $destPath): vo
     $lastProgress = 28;
     $lastLogAt = 0.0;
     $knownTotal = $expectedBytes;
+    dev_bootstrap_emit('download', 28, 'starting cURL download...', [
+        'log' => $knownTotal > 0
+            ? 'PHP cURL selected; expected size ' . dev_bootstrap_format_bytes($knownTotal)
+            : 'PHP cURL selected; waiting for the response content length',
+    ]);
     $ch = curl_init($downloadUrl);
     curl_setopt_array($ch, [
         CURLOPT_FILE => $out,
@@ -424,6 +459,10 @@ function dev_bootstrap_system_download(string $downloadUrl, string $destPath, in
             . ($previousError !== '' ? ': ' . $previousError : '')
             . '; install PHP cURL, system curl, or wget');
     }
+
+    dev_bootstrap_emit('download', 30, 'starting system download fallback...', [
+        'log' => $tool . ' selected' . ($expectedBytes > 0 ? '; expected size ' . dev_bootstrap_format_bytes($expectedBytes) : '; total size unknown'),
+    ]);
 
     $descriptorSpec = [
         0 => ['pipe', 'r'],
@@ -741,6 +780,10 @@ if (!$isAdmin && $hasAdminAccount) {
 }
 session_write_close();
 
+dev_bootstrap_emit('initialize', 2, 'preparing temporary bootstrap workspace...', [
+    'log' => 'authorization passed; request detached from the session lock',
+]);
+
 $bootstrapRoot = $root . DIRECTORY_SEPARATOR . '.bootstrap';
 $tmpRoot = $bootstrapRoot . DIRECTORY_SEPARATOR . 'run-' . bin2hex(random_bytes(6));
 $zipPath = $tmpRoot . DIRECTORY_SEPARATOR . 'dev-data.zip';
@@ -758,6 +801,10 @@ try {
         throw new RuntimeException('could not create temporary extraction directory');
     }
 
+    dev_bootstrap_emit('initialize', 5, 'temporary bootstrap workspace ready...', [
+        'log' => 'download and extraction destinations created',
+    ]);
+
     dev_bootstrap_emit('listing', 10, 'checking Google Drive folder...');
     $archive = dev_bootstrap_latest_archive_from_drive(FRIDG3_DEV_BOOTSTRAP_FOLDER_ID);
     dev_bootstrap_emit('found', 24, 'found ' . $archive['name'], [
@@ -774,6 +821,13 @@ try {
     dev_bootstrap_emit('delete', 90, 'deleting existing local data directory...');
     if (file_exists($dataPath) || is_link($dataPath)) {
         dev_bootstrap_remove_path($dataPath);
+        dev_bootstrap_emit('delete', 92, 'existing local data directory deleted...', [
+            'log' => 'old developer data removed; beginning replacement',
+        ]);
+    } else {
+        dev_bootstrap_emit('delete', 92, 'no existing local data directory found...', [
+            'log' => 'nothing needed to be deleted before installation',
+        ]);
     }
     dev_bootstrap_emit('install', 94, 'installing downloaded data directory...');
     if (!@rename($extractedDataDir, $dataPath)) {
@@ -797,6 +851,9 @@ try {
     if (is_dir($tmpRoot)) {
         try {
             dev_bootstrap_remove_path($tmpRoot);
+            dev_bootstrap_emit('cleanup', 100, isset($archive['name']) ? 'dev data installed from ' . $archive['name'] : 'cleaning temporary bootstrap files...', [
+                'log' => 'temporary download and extraction workspace removed',
+            ]);
         } catch (Throwable $ignored) {
             /* best effort */
         }

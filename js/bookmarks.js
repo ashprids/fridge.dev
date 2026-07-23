@@ -1,3 +1,5 @@
+const bookmarksDebugLog = message => window.fridg3DebugClientLog?.(`[bookmarks] ${message}`);
+
 function isLoggedIn() {
     try {
         return !!document.querySelector('a[href="/account/logout"]');
@@ -125,8 +127,10 @@ function attachBookmarkBehavior(bookmark) {
                 })
                     .then(resp => {
                         if (!resp.ok) throw new Error('bookmark failed');
+                        bookmarksDebugLog(`server bookmark ${nextMarked ? 'added' : 'removed'}`);
                     })
                     .catch(() => {
+                        bookmarksDebugLog('server bookmark update failed; UI reverted');
                         // Revert on failure so UI stays truthful
                         bookmark.dataset.bookmarked = currentlyMarked ? '1' : '0';
                         if (currentlyMarked) {
@@ -163,6 +167,7 @@ function attachBookmarkBehavior(bookmark) {
             }
             setStoredBookmarks(bookmarks);
             syncBookmarkIcons();
+            bookmarksDebugLog(`local bookmark ${idx === -1 ? 'added' : 'removed'}`);
 
             // Fire-and-forget server sync (will 401 when not logged in, which is fine)
             try {
@@ -187,6 +192,7 @@ function initScrollAndBookmarkIcons() {
             const y = parseInt(saved, 10);
             if (!isNaN(y)) {
                 window.scrollTo(0, y);
+                bookmarksDebugLog('saved scroll position restored');
             }
             sessionStorage.removeItem(scrollKey);
         }
@@ -310,6 +316,7 @@ async function submitGalleryDelete(form) {
         cancelText: 'cancel'
     });
     if (!confirmed) return;
+    bookmarksDebugLog('gallery deletion confirmed');
 
     const originalLabel = deleteButton ? deleteButton.innerHTML : '';
     if (deleteButton) {
@@ -341,7 +348,9 @@ async function submitGalleryDelete(form) {
         if (card) {
             card.remove();
         }
+        bookmarksDebugLog('gallery image deleted');
     } catch (err) {
+        bookmarksDebugLog(`gallery deletion failed: ${err.message || 'unknown error'}`);
         showSiteNotice('delete failed', err.message || 'failed to delete image.');
     } finally {
         if (deleteButton) {
@@ -387,6 +396,7 @@ function enhanceBookmarksPage() {
 
         const idsToAdd = localIds.filter(id => !existingIds.has(id));
         if (!idsToAdd.length) return;
+        bookmarksDebugLog(`hydrating ${idsToAdd.length} locally saved post(s)`);
 
         // If container only has placeholder text, clear it before adding posts
         if (!container.querySelector('#post')) {

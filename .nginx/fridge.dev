@@ -177,8 +177,8 @@ server {
     location = /guestbook/create { rewrite ^ /guestbook/create/index.php?$args last; }
 
     # API endpoints: rewrite to index.php to prevent 301 slash redirects on POST
-    location ~ ^/api/(bookmark|dev-bootstrap|feed-post|settings|toast-feed-generate)/?$ {
-        rewrite ^/api/(bookmark|dev-bootstrap|feed-post|settings|toast-feed-generate)/?$ /api/$1/index.php?$args last;
+    location ~ ^/api/(bookmark|debug-process-logs|dev-bootstrap|feed-post|settings|toast-feed-generate)/?$ {
+        rewrite ^/api/(bookmark|debug-process-logs|dev-bootstrap|feed-post|settings|toast-feed-generate)/?$ /api/$1/index.php?$args last;
     }
     location ~ ^/api/account/is-admin/?$ {
         rewrite ^/api/account/is-admin/?$ /api/account/is-admin/index.php?$args last;

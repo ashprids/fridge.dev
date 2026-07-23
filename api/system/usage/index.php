@@ -2,6 +2,8 @@
 // Returns JSON with current system usage metrics: CPU, memory, and disk usage percentages.
 // Uses /proc on Linux and wmic/PowerShell on Windows.
 
+require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'debug.php';
+
 header('Content-Type: application/json');
 
 function clamp_percent($value) {

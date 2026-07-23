@@ -143,7 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $text = '@' . $username . PHP_EOL . $displayDateTime . PHP_EOL . $safeContent . PHP_EOL;
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $timestampFilename . '.txt';
-    file_put_contents($postFile, $text);
+    $postSaved = file_put_contents($postFile, $text) !== false;
+    fridg3_debug_submission_log('[SUBMISSION] feed post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . (count($imageMap) + count($voiceMap)));
 
     $shouldQueueToastAutoReply = (
         strcasecmp((string)$username, 'toast') !== 0

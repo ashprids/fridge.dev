@@ -110,9 +110,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $written = fridg3_guestbook_write_entry($filepath, $timestamp_line, $name, $message, $client_ip);
             if ($written === false) {
+                fridg3_debug_submission_log('[SUBMISSION] guestbook entry save failed');
                 $status_message = 'could not save your message. please try again later.';
                 $status_class = 'error';
             } else {
+                fridg3_debug_submission_log('[SUBMISSION] guestbook entry save succeeded attachments=0');
                 $ip_index[$client_ip] = $filename;
                 @file_put_contents($ip_index_path, json_encode($ip_index, JSON_PRETTY_PRINT), LOCK_EX);
                 header('Location: /guestbook');

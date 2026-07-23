@@ -66,6 +66,7 @@ function showSitePopup(options) {
             input.autocomplete = 'off';
         }
 
+        const noButtons = config.noButtons === true;
         const actions = document.createElement('div');
         actions.className = 'site-popup-actions';
 
@@ -89,15 +90,18 @@ function showSitePopup(options) {
             actions.append(custom);
         }
 
-        const ok = document.createElement('button');
-        ok.className = 'site-popup-button site-popup-ok';
-        ok.type = 'button';
-        ok.textContent = config.okText || 'ok';
-        actions.append(ok);
+        let ok = null;
+        if (!noButtons) {
+            ok = document.createElement('button');
+            ok.className = 'site-popup-button site-popup-ok';
+            ok.type = 'button';
+            ok.textContent = config.okText || 'ok';
+            actions.append(ok);
+        }
 
         dialog.append(title, detail);
         if (input) dialog.append(input);
-        dialog.append(actions);
+        if (!noButtons) dialog.append(actions);
         overlay.append(dialog);
 
         const close = (value) => {
@@ -114,13 +118,15 @@ function showSitePopup(options) {
 
         if (cancel) cancel.addEventListener('click', () => close(input ? null : false));
         if (custom) custom.addEventListener('click', () => close('custom'));
-        ok.addEventListener('click', () => close(input ? input.value : true));
-        overlay.addEventListener('click', event => {
-            if (event.target === overlay) close(input ? null : false);
-        });
-        document.addEventListener('keydown', onKeydown);
+        if (ok) ok.addEventListener('click', () => close(input ? input.value : true));
+        if (!noButtons) {
+            overlay.addEventListener('click', event => {
+                if (event.target === overlay) close(input ? null : false);
+            });
+            document.addEventListener('keydown', onKeydown);
+        }
         document.body.append(overlay);
-        (input || ok).focus();
+        if (input || ok) (input || ok).focus();
         if (input) input.select();
     });
 }
@@ -148,6 +154,791 @@ function showSitePrompt(title, detail, value) {
 
 window.showSiteNotice = showSiteNotice;
 window.showSitePrompt = showSitePrompt;
+
+const fridg3DebugLogs = { client: [], server: [] };
+let fridg3AccessLogs = [];
+const FRIDG3_DEBUG_LOG_LIMIT = 1000;
+const FRIDG3_ACCESS_LOG_LIMIT = 10000;
+let fridg3ProcessLogTimer = null;
+let fridg3AccessLogTimer = null;
+let fridg3AccessLogRequestActive = false;
+let fridg3ProcessLogCursor = { identity: '', offset: 0 };
+let fridg3ProcessLogRequestActive = false;
+let fridg3DebugEnabled = false;
+let fridg3DebugStartupSeeded = false;
+let fridg3DebugListenersActive = false;
+let fridg3OriginalFetch = null;
+let fridg3OriginalConsoleError = null;
+let fridg3OriginalConsoleWarn = null;
+let fridg3DebugHistoryRestored = false;
+let fridg3ServerHistoryRestored = false;
+let fridg3ServerDebugAuthorized = false;
+let fridg3DebugPersistTimer = null;
+
+function fridg3PersistDebugHistory() {
+    if (fridg3DebugPersistTimer) window.clearTimeout(fridg3DebugPersistTimer);
+    fridg3DebugPersistTimer = null;
+    try {
+        sessionStorage.setItem('fridg3DebugClientHistory', JSON.stringify(fridg3DebugLogs.client));
+        if (fridg3ServerDebugAuthorized) {
+            sessionStorage.setItem('fridg3DebugServerHistory', JSON.stringify(fridg3DebugLogs.server));
+        }
+    } catch (_) { /* storage may be unavailable or full */ }
+}
+
+function fridg3ScheduleDebugHistoryPersist() {
+    if (fridg3DebugPersistTimer) return;
+    fridg3DebugPersistTimer = window.setTimeout(fridg3PersistDebugHistory, 100);
+}
+
+function fridg3ReadDebugHistory(key) {
+    try {
+        const parsed = JSON.parse(sessionStorage.getItem(key) || '[]');
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter(entry => entry && typeof entry.timestamp === 'string' && typeof entry.message === 'string')
+            .slice(-FRIDG3_DEBUG_LOG_LIMIT)
+            .map(entry => {
+                entry.channel = key.includes('Server') ? 'server' : 'client';
+                if (/^\[PHP\]\s+warning:/i.test(entry.message)) {
+                    entry.isError = false;
+                    entry.isWarning = true;
+                }
+                if (/^\[PHP\]\s+(?:loaded\s+|.*\brequest (?:initialized|completed)(?:\b|$))/i.test(entry.message)) {
+                    entry.category = 'loaded';
+                }
+                return entry;
+            });
+    } catch (_) {
+        return [];
+    }
+}
+
+function fridg3RestoreClientDebugHistory() {
+    if (fridg3DebugHistoryRestored) return;
+    fridg3DebugHistoryRestored = true;
+    fridg3DebugLogs.client.push(...fridg3ReadDebugHistory('fridg3DebugClientHistory'));
+}
+
+function fridg3RestoreServerDebugHistory() {
+    if (fridg3ServerHistoryRestored) return;
+    fridg3ServerHistoryRestored = true;
+    const restored = fridg3ReadDebugHistory('fridg3DebugServerHistory');
+    if (restored.length) {
+        fridg3DebugLogs.server.unshift(...restored);
+        if (fridg3DebugLogs.server.length > FRIDG3_DEBUG_LOG_LIMIT) {
+            fridg3DebugLogs.server.splice(0, fridg3DebugLogs.server.length - FRIDG3_DEBUG_LOG_LIMIT);
+        }
+    }
+}
+
+function fridg3DebugAppend(channel, value, processLog = false) {
+    if (!fridg3DebugEnabled) return;
+    const target = channel === 'server' ? 'server' : 'client';
+    const now = new Date();
+    const timestamp = [now.getHours(), now.getMinutes(), now.getSeconds()]
+        .map(part => String(part).padStart(2, '0'))
+        .join(':');
+    const message = typeof value === 'string' ? value : String(value);
+    const networkStatusMatch = message.match(/^\[(?:network|upload)\]\s+[A-Z]+\s+\S+\s+(\d{3})$/);
+    const networkStatus = networkStatusMatch ? Number(networkStatusMatch[1]) : 0;
+    const explicitPhpWarning = /^\[PHP\]\s+warning:/i.test(message);
+    const entry = {
+        timestamp,
+        message,
+        processLog,
+        channel: target,
+        category: /^\[PHP\]\s+(?:loaded\s+|.*\brequest (?:initialized|completed)(?:\b|$))/i.test(message)
+            ? 'loaded'
+            : /^\[(?:network|upload)\](?:\s|$)/i.test(message)
+            ? 'network'
+            : /^\[settings\](?:\s|$)/i.test(message)
+            || message === '[sidebar/player] sidebar and shared content initialized'
+            ? 'settings'
+            : '',
+        isError: !explicitPhpWarning && (networkStatus >= 400 || /(?:\berror\b|\bfailed\b|\bfailure\b|\bfatal\b|\bexception\b|\brejected\b|\bblocked\b|\binvalid\b|\bunavailable\b|HTTP\s+[45]\d\d)/i.test(message)),
+        isWarning: explicitPhpWarning || (networkStatus >= 300 && networkStatus < 400) || /(?:\bwarning\b|\bwarn(?:ed|ing)?\b)/i.test(message),
+        isSuccess: (networkStatus >= 200 && networkStatus < 300) || /(?:SPA form submission completed:\s*\/(?:feed|journal)\/create\b|(?:post|data|media|image|attachment|paste|file)[^\n]*(?:upload(?:ed)?|created|queued|saved(?: successfully)?)|(?:upload|save)[^\n]*(?:completed|succeeded|successful|saved))/i.test(message),
+    };
+    fridg3DebugLogs[target].push(entry);
+    const trimmed = fridg3DebugLogs[target].length > FRIDG3_DEBUG_LOG_LIMIT;
+    if (trimmed) fridg3DebugLogs[target].splice(0, fridg3DebugLogs[target].length - FRIDG3_DEBUG_LOG_LIMIT);
+    fridg3ScheduleDebugHistoryPersist();
+    const output = target === 'server'
+        ? document.querySelector('.debug-console-server-output')
+        : document.querySelector('.debug-console-client-output');
+    if (output) {
+        if (trimmed || !fridg3DebugEntryVisible(entry)) {
+            fridg3RenderDebugOutput(output, fridg3DebugLogs[target]);
+        } else {
+            output.append(fridg3CreateDebugLogLine(entry));
+        }
+        output.scrollTop = output.scrollHeight;
+    }
+}
+
+function fridg3RenderDebugOutput(output, entries) {
+    output.replaceChildren();
+    entries.filter(fridg3DebugEntryVisible).forEach(entry => output.append(fridg3CreateDebugLogLine(entry)));
+}
+
+function fridg3DebugEntryVisible(entry) {
+    if (entry.processLog) {
+        const toggle = document.getElementById('debug-process-logs-toggle');
+        if (toggle && !toggle.checked) return false;
+    }
+    if (entry.category === 'settings') {
+        const toggle = document.getElementById('debug-settings-logs-toggle');
+        if (toggle && !toggle.checked) return false;
+    }
+    if (entry.category === 'network') {
+        const toggle = document.getElementById('debug-network-logs-toggle');
+        if (toggle && !toggle.checked) return false;
+    }
+    if (entry.category === 'loaded') {
+        const toggle = document.getElementById('debug-loaded-logs-toggle');
+        if (toggle && !toggle.checked) return false;
+    }
+    const channel = entry.channel === 'server' || entry.processLog ? 'server' : 'client';
+    if (entry.isError) {
+        const toggle = document.getElementById(`debug-${channel}-errors-toggle`);
+        if (toggle && !toggle.checked) return false;
+    } else if (entry.isWarning) {
+        const toggle = document.getElementById(`debug-${channel}-warnings-toggle`);
+        if (toggle && !toggle.checked) return false;
+    }
+    return true;
+}
+
+function fridg3CreateDebugLogLine(entry) {
+    const line = document.createElement('span');
+    line.className = 'debug-log-entry';
+    const timestamp = document.createElement('span');
+    timestamp.className = 'debug-log-timestamp';
+    timestamp.textContent = `[${entry.timestamp}]`;
+    line.append(timestamp, document.createTextNode(' '));
+
+    if (entry.processLog) {
+        const processTag = document.createElement('span');
+        processTag.className = 'debug-log-source';
+        processTag.textContent = '[PROCESS]';
+        line.append(processTag, document.createTextNode(' '));
+    }
+
+    const sourceMatch = entry.message.match(/^(\[[^\]]+\])(?:\s+|$)(.*)$/s);
+    const message = document.createElement('span');
+    message.className = 'debug-log-message';
+    if (entry.isError) message.classList.add('is-error');
+    else if (entry.isWarning) message.classList.add('is-warning');
+    else if (entry.isSuccess) message.classList.add('is-success');
+    if (sourceMatch) {
+        const source = document.createElement('span');
+        source.className = 'debug-log-source';
+        source.textContent = sourceMatch[1];
+        line.append(source, document.createTextNode(' '));
+        message.textContent = sourceMatch[2];
+    } else {
+        message.textContent = entry.message;
+    }
+    line.append(message);
+    fridg3HighlightDebugLine(line, entry.channel === 'server' || entry.processLog ? 'server' : 'client');
+    return line;
+}
+
+function fridg3HighlightDebugLine(line, channel) {
+    const input = document.querySelector(`[data-debug-search="${channel}"]`);
+    const query = input ? input.value.trim() : '';
+    if (!query) return;
+    const lowerQuery = query.toLocaleLowerCase();
+    const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+        const text = node.nodeValue || '';
+        const lowerText = text.toLocaleLowerCase();
+        let cursor = 0;
+        let match = lowerText.indexOf(lowerQuery);
+        if (match === -1) return;
+        const fragment = document.createDocumentFragment();
+        while (match !== -1) {
+            fragment.append(document.createTextNode(text.slice(cursor, match)));
+            const mark = document.createElement('mark');
+            mark.className = 'debug-log-highlight';
+            mark.textContent = text.slice(match, match + query.length);
+            fragment.append(mark);
+            cursor = match + query.length;
+            match = lowerText.indexOf(lowerQuery, cursor);
+        }
+        fragment.append(document.createTextNode(text.slice(cursor)));
+        node.replaceWith(fragment);
+    });
+}
+
+function fridg3EnsureDebugConsole() {
+    let panel = document.getElementById('debug-console');
+    if (panel) return panel;
+    panel = document.createElement('aside');
+    panel.id = 'debug-console';
+    panel.hidden = true;
+    panel.setAttribute('aria-label', 'debug console');
+    panel.innerHTML = '<div class="debug-console-resize-handle" role="separator" tabindex="0" aria-label="resize debug console" aria-orientation="vertical"></div>'
+        + '<div class="debug-console-inner"><div class="debug-console-tabs" role="tablist">'
+        + '<button type="button" class="is-active" data-debug-tab="client" role="tab">client</button>'
+        + '<button type="button" class="is-disabled" data-admin-debug-tab data-debug-tab="server" role="tab" aria-disabled="true" '
+        + 'data-tooltip="These logs are unavailable to non-admins due to security concerns.">server</button>'
+        + '<button type="button" class="is-disabled" data-admin-debug-tab data-debug-tab="access" role="tab" aria-disabled="true" hidden>access</button></div>'
+        + '<div class="debug-console-client-panel is-active" data-debug-output="client" role="tabpanel">'
+        + '<div class="checkbox-group debug-client-log-options"><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-settings-logs-toggle" checked>'
+        + '<span>settings</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-network-logs-toggle" checked>'
+        + '<span>network</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-client-warnings-toggle" checked>'
+        + '<span>warnings</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-client-errors-toggle" checked>'
+        + '<span>errors</span></label></div>'
+        + '<div class="debug-log-search"><input type="search" data-debug-search="client" aria-label="search client log" placeholder="search client log"></div>'
+        + '<pre class="debug-console-output debug-console-client-output"></pre></div>'
+        + '<div class="debug-console-server-panel" data-debug-output="server" role="tabpanel">'
+        + '<div class="checkbox-group debug-server-log-options" hidden><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-loaded-logs-toggle" checked>'
+        + '<span>loaded</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-process-logs-toggle">'
+        + '<span>process</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-server-warnings-toggle" checked>'
+        + '<span>warnings</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-server-errors-toggle" checked>'
+        + '<span>errors</span></label></div>'
+        + '<div class="debug-log-search debug-admin-log-search" hidden><input type="search" data-debug-search="server" aria-label="search server log" placeholder="search server log"></div>'
+        + '<span class="debug-process-log-status" hidden></span>'
+        + '<pre class="debug-console-output debug-console-server-output"></pre></div>'
+        + '<div class="debug-console-access-panel" data-debug-output="access" role="tabpanel">'
+        + '<div class="checkbox-group debug-access-log-options" hidden><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-access-guests-toggle" checked><span>guests</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-access-users-toggle" checked><span>users</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-access-admins-toggle" checked><span>admins</span></label><label class="checkbox-label">'
+        + '<input class="checkbox" type="checkbox" id="debug-access-hard-banned-toggle" checked><span>hard-banned</span></label></div>'
+        + '<div class="debug-log-search debug-admin-log-search" hidden><input type="search" data-debug-search="access" aria-label="search access log" placeholder="search access log"></div>'
+        + '<pre class="debug-console-output debug-console-access-output"></pre></div></div>';
+    panel.addEventListener('click', event => {
+        const button = event.target.closest('[data-debug-tab]');
+        if (!button) return;
+        if (button.getAttribute('aria-disabled') === 'true') return;
+        fridg3SelectDebugTab(panel, button.dataset.debugTab, true);
+    });
+    document.body.append(panel);
+    fridg3InitDebugConsoleResize(panel);
+    if (typeof initTooltips === 'function') initTooltips();
+    fridg3InitClientLogControls(panel);
+    fridg3InitAccessLogControls(panel);
+    fridg3InitDebugSearch(panel);
+    Object.keys(fridg3DebugLogs).forEach(channel => {
+        const output = channel === 'server'
+            ? panel.querySelector('.debug-console-server-output')
+            : panel.querySelector('.debug-console-client-output');
+        if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs[channel]);
+    });
+    fridg3InitProcessLogControl(panel);
+    return panel;
+}
+
+function fridg3InitAccessLogControls(panel) {
+    [
+        ['#debug-access-guests-toggle', 'debugIncludeAccessGuests'],
+        ['#debug-access-users-toggle', 'debugIncludeAccessUsers'],
+        ['#debug-access-admins-toggle', 'debugIncludeAccessAdmins'],
+        ['#debug-access-hard-banned-toggle', 'debugIncludeAccessHardBanned'],
+    ].forEach(([selector, storageKey]) => {
+        const toggle = panel.querySelector(selector);
+        if (!toggle) return;
+        try { toggle.checked = localStorage.getItem(storageKey) !== 'false'; } catch (_) { /* ignore */ }
+        toggle.addEventListener('change', () => {
+            try { localStorage.setItem(storageKey, toggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
+            fridg3RenderAccessLogs(fridg3AccessLogs);
+        });
+    });
+}
+
+function fridg3InitDebugSearch(panel) {
+    panel.querySelectorAll('[data-debug-search]').forEach(input => {
+        const channel = input.dataset.debugSearch;
+        try { input.value = sessionStorage.getItem(`fridg3DebugSearch:${channel}`) || ''; } catch (_) { /* ignore */ }
+        input.addEventListener('input', () => {
+            try { sessionStorage.setItem(`fridg3DebugSearch:${channel}`, input.value); } catch (_) { /* ignore */ }
+            if (channel === 'access') {
+                fridg3RenderAccessLogs(fridg3AccessLogs);
+                return;
+            }
+            const output = panel.querySelector(`.debug-console-${channel}-output`);
+            if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs[channel]);
+        });
+    });
+}
+
+function fridg3InitDebugConsoleResize(panel) {
+    const handle = panel.querySelector('.debug-console-resize-handle');
+    if (!handle || handle.dataset.bound === '1') return;
+    handle.dataset.bound = '1';
+    try {
+        const savedWidth = Number(localStorage.getItem('fridg3DebugConsoleWidth'));
+        if (savedWidth >= 260 && savedWidth <= window.innerWidth * 0.9) panel.style.width = `${savedWidth}px`;
+    } catch (_) { /* ignore */ }
+    handle.addEventListener('pointerdown', event => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        const startX = event.clientX;
+        const startWidth = panel.getBoundingClientRect().width;
+        handle.setPointerCapture(event.pointerId);
+        const move = moveEvent => {
+            const width = Math.max(260, Math.min(window.innerWidth * 0.9, startWidth + startX - moveEvent.clientX));
+            panel.style.width = `${Math.round(width)}px`;
+        };
+        const stop = stopEvent => {
+            handle.removeEventListener('pointermove', move);
+            handle.removeEventListener('pointerup', stop);
+            handle.removeEventListener('pointercancel', stop);
+            try { localStorage.setItem('fridg3DebugConsoleWidth', String(Math.round(panel.getBoundingClientRect().width))); } catch (_) { /* ignore */ }
+            if (handle.hasPointerCapture(stopEvent.pointerId)) handle.releasePointerCapture(stopEvent.pointerId);
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', stop);
+        handle.addEventListener('pointercancel', stop);
+    });
+    handle.addEventListener('keydown', event => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const direction = event.key === 'ArrowLeft' ? 1 : -1;
+        const width = Math.max(260, Math.min(window.innerWidth * 0.9, panel.getBoundingClientRect().width + direction * 20));
+        panel.style.width = `${Math.round(width)}px`;
+        try { localStorage.setItem('fridg3DebugConsoleWidth', String(Math.round(width))); } catch (_) { /* ignore */ }
+    });
+}
+
+function fridg3SelectDebugTab(panel, channel, persist = false) {
+    const button = panel.querySelector(`[data-debug-tab="${channel}"]`);
+    if (!button || button.getAttribute('aria-disabled') === 'true') return false;
+    panel.querySelectorAll('[data-debug-tab]').forEach(tab => tab.classList.toggle('is-active', tab === button));
+    panel.querySelectorAll('[data-debug-output]').forEach(output => output.classList.toggle('is-active', output.dataset.debugOutput === channel));
+    if (persist) {
+        try { sessionStorage.setItem('fridg3DebugSelectedTab', channel); } catch (_) { /* ignore */ }
+    }
+    return true;
+}
+
+function fridg3InitClientLogControls(panel) {
+    const controls = [
+        ['#debug-settings-logs-toggle', 'debugIncludeSettingsLogs'],
+        ['#debug-network-logs-toggle', 'debugIncludeNetworkLogs'],
+        ['#debug-client-warnings-toggle', 'debugIncludeClientWarnings'],
+        ['#debug-client-errors-toggle', 'debugIncludeClientErrors'],
+    ];
+    controls.forEach(([selector, storageKey]) => {
+        const toggle = panel.querySelector(selector);
+        if (!toggle) return;
+        try { toggle.checked = localStorage.getItem(storageKey) !== 'false'; } catch (_) { /* ignore */ }
+        toggle.addEventListener('change', () => {
+            try { localStorage.setItem(storageKey, toggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
+            const output = panel.querySelector('.debug-console-client-output');
+            if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs.client);
+        });
+    });
+}
+
+function fridg3SetDebugMode(enabled) {
+    const mobile = document.body.classList.contains('mobile-template')
+        || (window.matchMedia && window.matchMedia('(max-width: 700px)').matches);
+    const shouldEnable = enabled === true && !mobile;
+    fridg3DebugEnabled = shouldEnable;
+    if (!shouldEnable) {
+        fridg3DeactivateDebugRuntime();
+        const existingPanel = document.getElementById('debug-console');
+        if (existingPanel) existingPanel.hidden = true;
+        return;
+    }
+    fridg3ActivateDebugRuntime();
+    fridg3EnsureDebugConsole().hidden = false;
+}
+
+window.fridg3DebugClientLog = value => fridg3DebugAppend('client', value);
+window.fridg3DebugServerLog = value => fridg3DebugAppend('server', value);
+window.fridg3DebugProcessLog = value => fridg3DebugAppend('server', value, true);
+window.fridg3SetDebugMode = fridg3SetDebugMode;
+
+function fridg3DebugWindowError(event) {
+    window.fridg3DebugClientLog(`uncaught JavaScript error: ${event.message || 'unknown error'}`);
+}
+
+function fridg3DebugUnhandledRejection(event) {
+    const reason = event.reason && event.reason.message ? event.reason.message : 'unknown rejection';
+    window.fridg3DebugClientLog(`unhandled promise rejection: ${reason}`);
+}
+
+function fridg3DebugOnline() { window.fridg3DebugClientLog('browser network connection restored'); }
+function fridg3DebugOffline() { window.fridg3DebugClientLog('warning: browser network connection lost'); }
+function fridg3DebugVisibilityChange() {
+    window.fridg3DebugClientLog(`page visibility changed to ${document.visibilityState}`);
+}
+
+function fridg3ActivateDebugRuntime() {
+    fridg3RestoreClientDebugHistory();
+    if (!fridg3DebugListenersActive) {
+        window.addEventListener('error', fridg3DebugWindowError);
+        window.addEventListener('unhandledrejection', fridg3DebugUnhandledRejection);
+        window.addEventListener('online', fridg3DebugOnline);
+        window.addEventListener('offline', fridg3DebugOffline);
+        document.addEventListener('visibilitychange', fridg3DebugVisibilityChange);
+        window.addEventListener('pagehide', fridg3PersistDebugHistory);
+        fridg3DebugListenersActive = true;
+    }
+    fridg3EnableFetchTracing();
+    fridg3EnableConsoleTracing();
+    if (!fridg3DebugStartupSeeded) {
+        fridg3DebugStartupSeeded = true;
+        window.fridg3DebugClientLog('(JS) debug log loaded successfully');
+        window.fridg3DebugServerLog('(PHP) debug log loaded successfully');
+    }
+    fridg3CollectServerDebugLogs(document);
+}
+
+function fridg3DeactivateDebugRuntime() {
+    fridg3StopProcessLogPolling();
+    fridg3StopAccessLogPolling();
+    fridg3PersistDebugHistory();
+    if (fridg3DebugListenersActive) {
+        window.removeEventListener('error', fridg3DebugWindowError);
+        window.removeEventListener('unhandledrejection', fridg3DebugUnhandledRejection);
+        window.removeEventListener('online', fridg3DebugOnline);
+        window.removeEventListener('offline', fridg3DebugOffline);
+        document.removeEventListener('visibilitychange', fridg3DebugVisibilityChange);
+        window.removeEventListener('pagehide', fridg3PersistDebugHistory);
+        fridg3DebugListenersActive = false;
+    }
+    if (fridg3OriginalFetch) {
+        window.fetch = fridg3OriginalFetch;
+        fridg3OriginalFetch = null;
+    }
+    if (fridg3OriginalConsoleError) {
+        console.error = fridg3OriginalConsoleError;
+        fridg3OriginalConsoleError = null;
+    }
+    if (fridg3OriginalConsoleWarn) {
+        console.warn = fridg3OriginalConsoleWarn;
+        fridg3OriginalConsoleWarn = null;
+    }
+}
+
+function fridg3EnableFetchTracing() {
+    if (!window.fetch || fridg3OriginalFetch) return;
+    fridg3OriginalFetch = window.fetch;
+    window.fetch = async function debugFetch(input, init) {
+        const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+        let path = 'request';
+        try { path = new URL(typeof input === 'string' ? input : input.url, window.location.href).pathname; } catch (_) { /* keep generic path */ }
+        const quiet = path === '/api/debug-process-logs' || path === '/api/debug-access-logs' || path === '/api/system/usage/' || path === '/api/feed-notifications';
+        const requestBody = init && Object.prototype.hasOwnProperty.call(init, 'body')
+            ? init.body
+            : typeof Request !== 'undefined' && input instanceof Request && input.body ? input.body : null;
+        const isUpload = method !== 'GET' && method !== 'HEAD' && requestBody != null;
+        if (!quiet) window.fridg3DebugClientLog(`[network] ${method} ${path} started`);
+        if (isUpload) window.fridg3DebugClientLog(`[upload] ${method} ${path} started`);
+        try {
+            const tracedInit = Object.assign({}, init || {});
+            tracedInit.headers = new Headers((init && init.headers) || (input && input.headers) || undefined);
+            tracedInit.headers.set('X-Fridg3-Debug', '1');
+            const response = await fridg3OriginalFetch.call(this, input, tracedInit);
+            fridg3ImportPhpDebugHeader(response);
+            if (!quiet || !response.ok) {
+                window.fridg3DebugClientLog(`[network] ${method} ${path} ${response.status}`);
+            }
+            if (isUpload) window.fridg3DebugClientLog(`[upload] ${method} ${path} ${response.status}`);
+            return response;
+        } catch (error) {
+            window.fridg3DebugClientLog(`[network] ${method} ${path} failed: ${error.message || 'network error'}`);
+            if (isUpload) window.fridg3DebugClientLog(`[upload] ${method} ${path} failed: ${error.message || 'network error'}`);
+            throw error;
+        }
+    };
+}
+
+function fridg3ImportPhpDebugHeader(response) {
+    if (!fridg3DebugEnabled || !response || !response.headers) return;
+    const encoded = response.headers.get('X-Fridg3-Debug-Logs');
+    if (!encoded) return;
+    try {
+        const binary = window.atob(encoded);
+        const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+        const json = new TextDecoder('utf-8').decode(bytes);
+        const logs = JSON.parse(json);
+        if (Array.isArray(logs)) logs.forEach(window.fridg3DebugServerLog);
+    } catch (error) {
+        window.fridg3DebugClientLog(`PHP debug header failed to decode: ${error.message || 'unknown error'}`);
+    }
+}
+
+function fridg3EnableConsoleTracing() {
+    if (!window.console) return;
+    if (!fridg3OriginalConsoleError) {
+        fridg3OriginalConsoleError = console.error;
+        console.error = function debugConsoleError(...args) {
+            const summary = typeof args[0] === 'string' ? args[0] : 'console error';
+            window.fridg3DebugClientLog(`console error: ${summary}`);
+            return fridg3OriginalConsoleError.apply(this, args);
+        };
+    }
+    if (!fridg3OriginalConsoleWarn) {
+        fridg3OriginalConsoleWarn = console.warn;
+        console.warn = function debugConsoleWarn(...args) {
+            const summary = typeof args[0] === 'string' ? args[0] : 'console warning';
+            window.fridg3DebugClientLog(`console warning: ${summary}`);
+            return fridg3OriginalConsoleWarn.apply(this, args);
+        };
+    }
+}
+
+function fridg3CollectServerDebugLogs(sourceDocument) {
+    if (!fridg3DebugEnabled) return;
+    const source = sourceDocument || document;
+    const payload = source.querySelector('[data-fridg3-server-debug-logs]');
+    if (!payload || payload.dataset.debugCollected === '1') return;
+    payload.dataset.debugCollected = '1';
+    try {
+        const logs = JSON.parse(payload.textContent || '[]');
+        if (Array.isArray(logs)) logs.forEach(window.fridg3DebugServerLog);
+    } catch (_) { /* ignore malformed debug payloads */ }
+}
+
+try {
+    const initialPrefs = JSON.parse(localStorage.getItem('accessibilityPrefs') || '{}');
+    if (initialPrefs.debugMode === true) fridg3SetDebugMode(true);
+} catch (_) { /* debug mode stays dormant */ }
+
+function fridg3StopProcessLogPolling() {
+    if (fridg3ProcessLogTimer) window.clearInterval(fridg3ProcessLogTimer);
+    fridg3ProcessLogTimer = null;
+    fridg3ProcessLogCursor = { identity: '', offset: 0 };
+}
+
+async function fridg3PollProcessLogs() {
+    const toggle = document.getElementById('debug-process-logs-toggle');
+    if (!toggle || !toggle.checked || fridg3ProcessLogRequestActive) return;
+    fridg3ProcessLogRequestActive = true;
+    const params = new URLSearchParams();
+    if (fridg3ProcessLogCursor.identity) {
+        params.set('identity', fridg3ProcessLogCursor.identity);
+        params.set('offset', String(fridg3ProcessLogCursor.offset));
+    }
+    try {
+        const response = await fetch('/api/debug-process-logs?' + params.toString(), {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'process log unavailable');
+        fridg3ProcessLogCursor = { identity: data.identity || '', offset: Number(data.offset) || 0 };
+        (data.lines || []).forEach(window.fridg3DebugProcessLog);
+    } catch (_) {
+        const status = document.querySelector('.debug-process-log-status');
+        if (status) {
+            status.hidden = false;
+            status.textContent = 'process log unavailable';
+        }
+        toggle.checked = false;
+        try { localStorage.setItem('debugIncludeProcessLogs', 'false'); } catch (_) { /* ignore */ }
+        fridg3StopProcessLogPolling();
+        const output = document.querySelector('.debug-console-server-output');
+        if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs.server);
+    } finally {
+        fridg3ProcessLogRequestActive = false;
+    }
+}
+
+function fridg3StartProcessLogPolling() {
+    fridg3StopProcessLogPolling();
+    fridg3PollProcessLogs();
+    fridg3ProcessLogTimer = window.setInterval(fridg3PollProcessLogs, 2000);
+    window.fridg3DebugClientLog('PHP process-log polling enabled');
+}
+
+function fridg3StopAccessLogPolling() {
+    if (fridg3AccessLogTimer) window.clearInterval(fridg3AccessLogTimer);
+    fridg3AccessLogTimer = null;
+}
+
+function fridg3RenderAccessLogs(entries) {
+    const output = document.querySelector('.debug-console-access-output');
+    if (!output) return;
+    const firstRender = output.dataset.rendered !== '1';
+    const wasAtBottom = firstRender || output.scrollHeight - output.scrollTop - output.clientHeight < 20;
+    const previousScrollTop = output.scrollTop;
+    fridg3AccessLogs = entries.slice(-FRIDG3_ACCESS_LOG_LIMIT);
+    output.replaceChildren();
+    fridg3AccessLogs.filter(entry => {
+        const role = ['guest', 'user', 'admin'].includes(entry.role) ? entry.role : (entry.username ? 'user' : 'guest');
+        const roleToggle = document.getElementById(`debug-access-${role}s-toggle`);
+        if (roleToggle && !roleToggle.checked) return false;
+        const bannedToggle = document.getElementById('debug-access-hard-banned-toggle');
+        return !entry.hardBanned || !bannedToggle || bannedToggle.checked;
+    }).forEach(entry => {
+        const line = document.createElement('span');
+        line.className = 'debug-log-entry';
+        const date = new Date(entry.timestamp);
+        const time = Number.isNaN(date.getTime())
+            ? '--:--:--'
+            : [date.getHours(), date.getMinutes(), date.getSeconds()].map(part => String(part).padStart(2, '0')).join(':');
+        const timestamp = document.createElement('span');
+        timestamp.className = 'debug-log-timestamp';
+        timestamp.textContent = `[${time}]`;
+        const status = Number(entry.status) || 0;
+        const statusElement = document.createElement('span');
+        statusElement.className = 'debug-access-status';
+        if (status >= 200 && status < 300) statusElement.classList.add('is-success');
+        else if (status >= 300 && status < 400) statusElement.classList.add('is-warning');
+        else if (status >= 400) statusElement.classList.add('is-error');
+        statusElement.textContent = String(status || '---');
+        const ip = document.createElement('span');
+        ip.className = 'debug-access-ip' + (entry.hardBanned ? ' is-hard-banned' : '');
+        ip.textContent = entry.ip || 'unknown';
+        line.append(
+            timestamp,
+            document.createTextNode(' ['),
+            ip,
+            document.createTextNode(']')
+        );
+        if (entry.username) {
+            const username = document.createElement('span');
+            username.className = 'debug-access-username';
+            username.textContent = `@${entry.username}`;
+            line.append(document.createTextNode(' ['), username, document.createTextNode(']'));
+        }
+        line.append(
+            document.createTextNode(' ['),
+            statusElement,
+            document.createTextNode(`] ${entry.path || '/'}`)
+        );
+        fridg3HighlightDebugLine(line, 'access');
+        output.append(line);
+    });
+    output.dataset.rendered = '1';
+    output.scrollTop = wasAtBottom ? output.scrollHeight : previousScrollTop;
+}
+
+async function fridg3PollAccessLogs() {
+    if (!fridg3DebugEnabled || !fridg3ServerDebugAuthorized || fridg3AccessLogRequestActive) return;
+    fridg3AccessLogRequestActive = true;
+    try {
+        const response = await fetch('/api/debug-access-logs', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (response.status === 403) {
+            fridg3ServerDebugAuthorized = false;
+            fridg3StopAccessLogPolling();
+            return;
+        }
+        const data = await response.json();
+        if (!response.ok || !data.ok || !Array.isArray(data.entries)) return;
+        fridg3RenderAccessLogs(data.entries);
+    } catch (_) { /* retain the last successful access-log view */ }
+    finally { fridg3AccessLogRequestActive = false; }
+}
+
+function fridg3StartAccessLogPolling() {
+    fridg3StopAccessLogPolling();
+    fridg3PollAccessLogs();
+    fridg3AccessLogTimer = window.setInterval(fridg3PollAccessLogs, 5000);
+}
+
+async function fridg3InitProcessLogControl(panel) {
+    const option = panel.querySelector('.debug-server-log-options');
+    const loadedToggle = panel.querySelector('#debug-loaded-logs-toggle');
+    const toggle = panel.querySelector('#debug-process-logs-toggle');
+    const status = panel.querySelector('.debug-process-log-status');
+    if (!option || !loadedToggle || !toggle || toggle.dataset.bound === '1') return;
+    toggle.dataset.bound = '1';
+    try {
+        const response = await fetch('/api/debug-process-logs', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const data = await response.json();
+        if (response.status === 403 || !data.isAdmin && !data.ok) {
+            fridg3ServerDebugAuthorized = false;
+            fridg3DebugLogs.server.length = 0;
+            try { sessionStorage.removeItem('fridg3DebugServerHistory'); } catch (_) { /* ignore */ }
+            return;
+        }
+        fridg3ServerDebugAuthorized = true;
+        fridg3RestoreServerDebugHistory();
+        fridg3ScheduleDebugHistoryPersist();
+        panel.querySelectorAll('[data-admin-debug-tab]').forEach(tab => {
+            tab.removeEventListener('mouseenter', tab._tooltipMouseEnter);
+            tab.removeEventListener('mousemove', tab._tooltipMouseMove);
+            tab.removeEventListener('mouseleave', tab._tooltipMouseLeave);
+            tab.classList.remove('is-disabled');
+            tab.removeAttribute('aria-disabled');
+            tab.removeAttribute('data-tooltip');
+            tab.hidden = false;
+        });
+        panel.querySelectorAll('.debug-admin-log-search').forEach(search => { search.hidden = false; });
+        const accessOptions = panel.querySelector('.debug-access-log-options');
+        if (accessOptions) accessOptions.hidden = false;
+        document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.remove());
+        option.hidden = false;
+        [
+            ['#debug-server-warnings-toggle', 'debugIncludeServerWarnings'],
+            ['#debug-server-errors-toggle', 'debugIncludeServerErrors'],
+        ].forEach(([selector, storageKey]) => {
+            const filterToggle = panel.querySelector(selector);
+            if (!filterToggle) return;
+            try { filterToggle.checked = localStorage.getItem(storageKey) !== 'false'; } catch (_) { /* ignore */ }
+            filterToggle.addEventListener('change', () => {
+                try { localStorage.setItem(storageKey, filterToggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
+                const output = panel.querySelector('.debug-console-server-output');
+                if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs.server);
+            });
+        });
+        let selectedTab = 'client';
+        try { selectedTab = sessionStorage.getItem('fridg3DebugSelectedTab') || 'client'; } catch (_) { /* ignore */ }
+        fridg3SelectDebugTab(panel, ['server', 'access'].includes(selectedTab) ? selectedTab : 'client');
+        fridg3StartAccessLogPolling();
+        try { loadedToggle.checked = localStorage.getItem('debugIncludeLoadedLogs') !== 'false'; } catch (_) { /* ignore */ }
+        loadedToggle.addEventListener('change', () => {
+            try { localStorage.setItem('debugIncludeLoadedLogs', loadedToggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
+            const output = panel.querySelector('.debug-console-server-output');
+            if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs.server);
+        });
+        const serverOutput = panel.querySelector('.debug-console-server-output');
+        if (serverOutput) fridg3RenderDebugOutput(serverOutput, fridg3DebugLogs.server);
+        if (!data.ok) {
+            toggle.disabled = true;
+            status.hidden = false;
+            status.textContent = 'process log unavailable';
+            return;
+        }
+        fridg3ProcessLogCursor = { identity: data.identity || '', offset: Number(data.offset) || 0 };
+        window.fridg3DebugProcessLog(`monitoring ${data.source || 'PHP process log'}`);
+        (data.lines || []).forEach(window.fridg3DebugProcessLog);
+        try { toggle.checked = localStorage.getItem('debugIncludeProcessLogs') === 'true'; } catch (_) { /* ignore */ }
+        const renderProcessLogs = () => {
+            const output = panel.querySelector('.debug-console-server-output');
+            if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs.server);
+        };
+        renderProcessLogs();
+        toggle.addEventListener('change', () => {
+            try { localStorage.setItem('debugIncludeProcessLogs', toggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
+            status.hidden = true;
+            if (toggle.checked) fridg3StartProcessLogPolling();
+            else {
+                fridg3StopProcessLogPolling();
+                window.fridg3DebugClientLog('PHP process-log polling disabled');
+            }
+            renderProcessLogs();
+        });
+        if (toggle.checked) fridg3StartProcessLogPolling();
+    } catch (_) { /* keep the admin-only control hidden */ }
+}
 
 let activeSiteNoticePopupId = '';
 
@@ -202,6 +993,7 @@ function initSiteNotices(sourceDocument) {
                 dismissButton.addEventListener('click', () => {
                     markSiteNoticeSeen('banner', id);
                     banner.remove();
+                    window.fridg3DebugClientLog('site notice banner dismissed');
                 }, { once: true });
             }
         }
@@ -216,6 +1008,7 @@ function initSiteNotices(sourceDocument) {
     }
 
     activeSiteNoticePopupId = popup.id;
+    window.fridg3DebugClientLog('site notice popup displayed');
     showSitePopup({
         title: typeof popup.title === 'string' && popup.title ? popup.title : 'notice',
         detail: popup.message,
@@ -469,6 +1262,7 @@ function initAsciiTime() {
                 el._asciiTimeInterval = window.setInterval(render, 1000);
             } catch (err) {
                 console.error('Failed to load ASCII time:', err);
+                window.fridg3DebugClientLog(`ASCII clock failed: ${err.message || 'unknown error'}`);
                 el.textContent = 'time unavailable';
             }
         };
@@ -672,6 +1466,7 @@ function initAsciiUsage() {
                     return JSON.parse(text) || {};
                 } catch (parseErr) {
                     console.error('Invalid usage JSON from', url, parseErr, text);
+                    window.fridg3DebugClientLog('system usage endpoint returned invalid JSON');
                     return {};
                 }
             };
@@ -708,6 +1503,7 @@ function initAsciiUsage() {
                 applyReadings(derived);
             } catch (err) {
                 console.error('Failed to load system usage:', err);
+                window.fridg3DebugClientLog(`system usage refresh failed: ${err.message || 'unknown error'}`);
                 if (cpuEl) cpuEl.textContent = 'usage unavailable';
                 if (memEl) memEl.textContent = 'usage unavailable';
                 if (diskEl) diskEl.textContent = 'usage unavailable';
@@ -723,6 +1519,7 @@ function initAsciiUsage() {
                 if (cpuEl) cpuEl._usageInterval = interval;
             } catch (err) {
                 console.error('Failed to init ASCII usage:', err);
+                window.fridg3DebugClientLog(`system usage widget initialization failed: ${err.message || 'unknown error'}`);
                 if (cpuEl) cpuEl.textContent = 'usage unavailable';
                 if (memEl) memEl.textContent = 'usage unavailable';
                 if (diskEl) diskEl.textContent = 'usage unavailable';
@@ -1281,6 +2078,8 @@ function updatePageViewFooter(rawUrl) {
 
 function loadPageIntoContent(url, addToHistory = true) {
     try {
+        const debugPath = (() => { try { return new URL(url, window.location.href).pathname; } catch (_) { return 'internal page'; } })();
+        window.fridg3DebugClientLog(`SPA navigation started: ${debugPath}`);
         const contentEl = document.getElementById('content');
         if (!contentEl || !window.fetch || !window.DOMParser) {
             window.location.href = url;
@@ -1309,6 +2108,7 @@ function loadPageIntoContent(url, addToHistory = true) {
                 }
 
                 syncSpaPageAssets(doc);
+                fridg3CollectServerDebugLogs(doc);
                 contentEl.innerHTML = newContent.innerHTML;
                 executeContentScripts(contentEl);
 
@@ -1398,14 +2198,17 @@ function loadPageIntoContent(url, addToHistory = true) {
                         hljs.highlightElement(block);
                     });
                 }
+                window.fridg3DebugClientLog(`SPA navigation completed: ${debugPath}`);
             })
-            .catch(() => {
+            .catch((error) => {
+                window.fridg3DebugClientLog(`SPA navigation failed (${debugPath}): ${error.message || 'unknown error'}; using full navigation`);
                 window.location.href = url;
             })
             .finally(() => {
                 hideSpaLoading();
             });
-    } catch (_) {
+    } catch (error) {
+        window.fridg3DebugClientLog(`SPA navigation setup failed: ${error.message || 'unknown error'}`);
         hideSpaLoading();
         window.location.href = url;
     }
@@ -1688,11 +2491,23 @@ function bindSpaForm(form) {
         }
 
         e.preventDefault();
+        const debugAction = (() => { try { return new URL(action, window.location.href).pathname; } catch (_) { return 'internal form'; } })();
+        window.fridg3DebugClientLog(`SPA form submission started: ${method} ${debugAction}`);
 
         const contentEl = document.getElementById('content');
         if (!contentEl || !window.fetch || !window.DOMParser) {
             form.submit();
             return;
+        }
+
+        let waitPopup = null;
+        if (e.submitter && e.submitter.hasAttribute('data-post-submit-wait')) {
+            showSitePopup({
+                title: 'please wait...',
+                detail: "your post is being uploaded to the website, this shouldn't take long.",
+                noButtons: true
+            });
+            waitPopup = document.querySelector('.site-popup-overlay:last-of-type');
         }
 
         const formData = new FormData(form);
@@ -1714,6 +2529,7 @@ function bindSpaForm(form) {
         })
             .then(resp => {
                 if (!resp.ok) {
+                    window.fridg3DebugClientLog(`SPA form returned HTTP ${resp.status}; using full navigation`);
                     // Fallback to normal navigation on error
                     window.location.href = action;
                     return null;
@@ -1733,6 +2549,7 @@ function bindSpaForm(form) {
                 }
 
                 syncSpaPageAssets(doc);
+                fridg3CollectServerDebugLogs(doc);
                 contentEl.innerHTML = newContent.innerHTML;
                 executeContentScripts(contentEl);
 
@@ -1807,9 +2624,14 @@ function bindSpaForm(form) {
                         hljs.highlightElement(block);
                     });
                 }
+                window.fridg3DebugClientLog(`SPA form submission completed: ${debugAction}`);
             })
-            .catch(() => {
+            .catch((error) => {
+                window.fridg3DebugClientLog(`SPA form submission failed (${debugAction}): ${error.message || 'unknown error'}`);
                 window.location.href = action;
+            })
+            .finally(() => {
+                if (waitPopup) waitPopup.remove();
             });
     });
 }

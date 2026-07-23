@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'debug.php';
+
 const MDP_MAX_BYTES = 524288;
 const MDP_TTL_SECONDS = 2592000;
 const MDP_KDF_ITERATIONS = 210000;
