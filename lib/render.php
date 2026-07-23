@@ -83,6 +83,29 @@ if (!function_exists('fridg3_is_local_dev_server')) {
     }
 }
 
+if (!function_exists('fridg3_dev_data_copy_is_missing')) {
+    function fridg3_dev_data_copy_is_missing($startDir): bool {
+        $rootDir = dirname(__DIR__);
+        $dataDir = $rootDir . DIRECTORY_SEPARATOR . 'data';
+        if (!is_dir($dataDir)) {
+            return true;
+        }
+
+        $expectedFiles = [
+            'accounts/accounts.json',
+            'etc/wip',
+        ];
+        foreach ($expectedFiles as $relativePath) {
+            $path = $dataDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            if (!is_file($path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('fridg3_is_work_in_progress_enabled')) {
     function fridg3_is_work_in_progress_enabled($startDir): bool {
         $wipPath = fridg3_find_relative_upward($startDir, 'data/etc/wip');
@@ -105,6 +128,13 @@ if (!function_exists('fridg3_get_request_path')) {
         $path = is_string($path) ? $path : '/';
         $path = rtrim($path, '/');
         return $path === '' ? '/' : $path;
+    }
+}
+
+if (!function_exists('fridg3_is_settings_request_path')) {
+    function fridg3_is_settings_request_path(): bool {
+        $path = fridg3_get_request_path();
+        return $path === '/settings' || str_starts_with($path, '/settings/');
     }
 }
 
@@ -582,8 +612,37 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         return $injection . $template;
     }
 
+    function fridg3_inject_missing_dev_data_popup($template, $startDir) {
+        if (!fridg3_is_local_dev_server() || !fridg3_dev_data_copy_is_missing($startDir) || fridg3_is_settings_request_path()) {
+            return $template;
+        }
+        if (stripos($template, 'id="missing-dev-data-runtime"') !== false) {
+            return $template;
+        }
+
+        $payload = [
+            'id' => 'missing-dev-data-v1',
+            'title' => 'dev data is missing',
+            'message' => 'this local developer-mode site does not have the downloaded data copy yet. open settings and use the dev bootstrap button to download the latest dev data.',
+            'buttonLabel' => 'open settings',
+            'buttonUrl' => '/settings',
+        ];
+        $json = json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            return $template;
+        }
+
+        $runtime = '<script id="missing-dev-data-runtime" type="application/json">' . $json . '</script>';
+        if (stripos($template, '</body>') !== false) {
+            return preg_replace('/<\/body>/i', $runtime . '</body>', $template, 1) ?: ($template . $runtime);
+        }
+
+        return $template . $runtime;
+    }
+
     function fridg3_replace_logged_in_discord_footer_button($template, $startDir) {
         $template = fridg3_inject_site_notices($template, $startDir);
+        $template = fridg3_inject_missing_dev_data_popup($template, $startDir);
         $template = fridg3_inject_server_debug_logs($template);
         if (!fridg3_user_has_email_account($startDir)) {
             return $template;

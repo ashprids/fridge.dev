@@ -1156,6 +1156,61 @@ function initSiteNotices(sourceDocument) {
 window.fridg3InitSiteNotices = initSiteNotices;
 window.addEventListener('DOMContentLoaded', () => initSiteNotices());
 
+let activeMissingDevDataPopupId = '';
+
+function readMissingDevDataPopup(sourceDocument) {
+    const source = sourceDocument || document;
+    const runtime = source.getElementById('missing-dev-data-runtime');
+    if (!runtime) return null;
+
+    try {
+        const data = JSON.parse(runtime.textContent || 'null');
+        return data && typeof data === 'object' ? data : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function initMissingDevDataPopup(sourceDocument) {
+    const popup = readMissingDevDataPopup(sourceDocument || document);
+    if (!popup || typeof popup.id !== 'string' || typeof popup.message !== 'string') {
+        return;
+    }
+
+    const storageKey = `fridg3_missing_dev_data_popup_${popup.id}`;
+    try {
+        if (sessionStorage.getItem(storageKey) === '1') return;
+    } catch (_) {
+        /* storage can be blocked */
+    }
+
+    if (activeMissingDevDataPopupId === popup.id) {
+        return;
+    }
+
+    activeMissingDevDataPopupId = popup.id;
+    window.fridg3DebugClientLog('missing dev data popup displayed');
+    showSitePopup({
+        title: typeof popup.title === 'string' && popup.title ? popup.title : 'dev data is missing',
+        detail: popup.message,
+        okText: 'later',
+        customText: typeof popup.buttonLabel === 'string' ? popup.buttonLabel : 'open settings'
+    }).then(result => {
+        activeMissingDevDataPopupId = '';
+        try {
+            sessionStorage.setItem(storageKey, '1');
+        } catch (_) {
+            /* no-op */
+        }
+        if (result === 'custom' && typeof popup.buttonUrl === 'string' && /^\/(?!\/)/.test(popup.buttonUrl)) {
+            window.location.assign(popup.buttonUrl);
+        }
+    });
+}
+
+window.fridg3InitMissingDevDataPopup = initMissingDevDataPopup;
+window.addEventListener('DOMContentLoaded', () => initMissingDevDataPopup());
+
 function consumeLegacyDomainRedirectNotice() {
     try {
         const currentUrl = new URL(window.location.href);
@@ -2284,6 +2339,7 @@ function loadPageIntoContent(url, addToHistory = true) {
                 syncAccountFooterButton();
                 syncActiveChatSidebarButton();
                 initSiteNotices(doc);
+                initMissingDevDataPopup(doc);
 
                 if (addToHistory && window.history && window.history.pushState) {
                     window.history.pushState({ spa: true, url: url }, '', url);
@@ -2728,6 +2784,7 @@ function bindSpaForm(form) {
                 syncAccountFooterButton();
                 syncActiveChatSidebarButton();
                 initSiteNotices(doc);
+                initMissingDevDataPopup(doc);
 
                 if (window.history && window.history.pushState) {
                     window.history.pushState({ spa: true, url: finalUrl }, '', finalUrl);

@@ -225,12 +225,12 @@ server {
     }
 
 
-    # Fallback
-    location / { try_files $uri $uri/ /index.php?$args; }
+    # Missing paths render the 404 handler while preserving the requested URL.
+    location / { try_files $uri $uri/ /error/404/index.php?$args; }
 
     # Custom error redirects
     error_page 403 /error/403;
-    error_page 404 /error/404;
+    error_page 404 /error/404/index.php;
     error_page 500 502 503 504 /error/50x;
 
     location = /error/403 { root /var/www/fridge.dev; }

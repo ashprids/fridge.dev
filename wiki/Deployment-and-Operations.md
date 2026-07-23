@@ -153,7 +153,7 @@ legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled 
 
 production nginx needs explicit rewrites for PHP routes that accept path-style ids. without these, nginx falls through to the root `/index.php` fallback before the route can parse the URL.
 
-the generic `location /` fallback should route missing paths to `/error/404`, not `/index.php`, so nonexistent URLs do not quietly render the homepage.
+the generic `location /` fallback routes missing paths internally to `/error/404/index.php`, not `/index.php`, so nonexistent URLs render the error page with a `404` response while retaining the originally requested URL.
 
 POST-only API directory routes also need POST-safe rewrites when called without `index.php`; otherwise nginx can normalize the directory URL with a redirect and the browser may retry as `GET`. `/api/dev-bootstrap` and `/api/toast-feed-generate` are included in that rewrite list.
 

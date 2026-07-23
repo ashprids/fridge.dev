@@ -88,7 +88,7 @@ this matters a lot.
 
 the repo ignores `/data`, but the site expects it to exist. if you want more than static wrapper pages, you need local runtime data.
 
-the easiest path is opening `/settings` with developer mode on and using the dev bootstrap button to download the latest sanitized developer copy from the public Google Drive folder: <https://drive.google.com/drive/folders/1dltxdqQjfUfGwEEXVxUrOw5fuv9nk_ex>. the button is only rendered in developer mode, deletes the existing `data/`, extracts the archive, and installs the new copy as `data/`. the automated path needs PHP HTTPS support and either the PHP zip extension or the system `unzip` command. you can still download a zip manually from that folder and unzip it into the repo root so it creates `data/`.
+the easiest path is opening `/settings` with developer mode on and using the dev bootstrap button to download the latest sanitized developer copy from the public Google Drive folder: <https://drive.google.com/drive/folders/1dltxdqQjfUfGwEEXVxUrOw5fuv9nk_ex>. when developer mode is on and the expected data copy is missing, the shared frontend shows a popup that sends you to `/settings`. the button is only rendered in developer mode, deletes the existing `data/`, extracts the archive, and installs the new copy as `data/`. the automated path needs PHP HTTPS support and either the PHP zip extension or the system `unzip` command. you can still download a zip manually from that folder and unzip it into the repo root so it creates `data/`.
 
 setup details for the sanitized copy live in `.github/workflows/publish-dev-data-setup.md`.
 

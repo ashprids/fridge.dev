@@ -161,6 +161,13 @@ if (!function_exists('fridg3_access_normalize_path')) {
     }
 }
 
+if (!function_exists('fridg3_access_is_error_path')) {
+    function fridg3_access_is_error_path(string $path): bool
+    {
+        return preg_match('#^/error(?:/|$)#i', fridg3_access_normalize_path($path)) === 1;
+    }
+}
+
 if (!function_exists('fridg3_access_compact_entries')) {
     function fridg3_access_compact_entries(array $entries): array
     {
@@ -169,6 +176,7 @@ if (!function_exists('fridg3_access_compact_entries')) {
         foreach ($entries as $entry) {
             if (!is_array($entry)) continue;
             $entry['path'] = fridg3_access_normalize_path((string)($entry['path'] ?? '/'));
+            if (fridg3_access_is_error_path($entry['path'])) continue;
             if (preg_match('#^/chat(?:/|$)#i', $entry['path']) === 1) continue;
             $visitor = (string)($entry['ip'] ?? 'unknown') . "\0" . strtolower((string)($entry['username'] ?? ''));
             if (($lastPathByVisitor[$visitor] ?? null) === $entry['path']) continue;
@@ -218,6 +226,7 @@ if (!function_exists('fridg3_write_access_log')) {
         $path = fridg3_access_normalize_path(is_string($path) && $path !== '' ? substr($path, 0, 1000) : '/');
         if (preg_match('#^/api(?:/|$)#i', $path) === 1) return;
         if (preg_match('#^/chat(?:/|$)#i', $path) === 1) return;
+        if (fridg3_access_is_error_path($path)) return;
         $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown');
         if (filter_var($ip, FILTER_VALIDATE_IP) === false) $ip = 'unknown';
         $username = isset($_SESSION['user']['username']) ? substr((string)$_SESSION['user']['username'], 0, 100) : '';
