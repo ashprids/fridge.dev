@@ -107,11 +107,18 @@ try {
     assertHardBanResult(!fridg3_hard_ban_contains('2200::1'), 'address above cross-bucket IPv6 CIDR was matched');
     assertHardBanResult(fridg3_hard_ban_contains('2001:db8:abcd::42'), 'source IPv6 CIDR was not matched');
     assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.1'), 'unlisted IP was matched');
+    assertHardBanResult(fridg3_hard_ban_whitelist_write(['198.51.100.8', '203.0.113.91']), 'could not write hard-ban whitelist');
+    assertHardBanResult(!fridg3_hard_ban_contains('198.51.100.8'), 'whitelist did not override a manual hard ban');
+    assertHardBanResult(!fridg3_hard_ban_contains('203.0.113.91'), 'whitelist did not override a source CIDR');
+    assertHardBanResult(fridg3_hard_ban_whitelist_write([]), 'could not clear hard-ban whitelist');
 
     $identifier = str_repeat('a', 64);
     $_SERVER['HTTP_USER_AGENT'] = 'hard-ban-test-agent';
     assertHardBanResult(fridg3_hard_ban_register_identifier('198.51.100.8', $identifier), 'banned identity was not registered');
     assertHardBanResult(fridg3_hard_ban_check_client('192.0.2.44', $identifier), 'strict mode did not propagate the identity ban');
+    assertHardBanResult(fridg3_hard_ban_whitelist_write(['192.0.2.44']), 'could not write identity whitelist override');
+    assertHardBanResult(!fridg3_hard_ban_check_client('192.0.2.44', $identifier), 'whitelist did not override an identity hard ban');
+    assertHardBanResult(fridg3_hard_ban_whitelist_write([]), 'could not clear identity whitelist override');
     assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.44'), 'strict mode copied an associated IP into the effective IP ban set');
     assertHardBanResult(!fridg3_hard_ban_source_contains('198.51.100.8'), 'manual hard ban leaked into the source-list index');
     $identityData = fridg3_hard_ban_load_identities();

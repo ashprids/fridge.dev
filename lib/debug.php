@@ -173,14 +173,25 @@ if (!function_exists('fridg3_access_compact_entries')) {
     {
         $compacted = [];
         $lastPathByVisitor = [];
+        $lastIndexByVisitor = [];
         foreach ($entries as $entry) {
             if (!is_array($entry)) continue;
             $entry['path'] = fridg3_access_normalize_path((string)($entry['path'] ?? '/'));
             if (fridg3_access_is_error_path($entry['path'])) continue;
             if (preg_match('#^/chat(?:/|$)#i', $entry['path']) === 1) continue;
             $visitor = (string)($entry['ip'] ?? 'unknown') . "\0" . strtolower((string)($entry['username'] ?? ''));
-            if (($lastPathByVisitor[$visitor] ?? null) === $entry['path']) continue;
+            if (($lastPathByVisitor[$visitor] ?? null) === $entry['path']) {
+                $previousIndex = $lastIndexByVisitor[$visitor] ?? null;
+                if (
+                    is_int($previousIndex)
+                    && (int)($compacted[$previousIndex]['status'] ?? 0) !== (int)($entry['status'] ?? 0)
+                ) {
+                    $compacted[$previousIndex] = $entry;
+                }
+                continue;
+            }
             $lastPathByVisitor[$visitor] = $entry['path'];
+            $lastIndexByVisitor[$visitor] = count($compacted);
             $compacted[] = $entry;
         }
         return $compacted;

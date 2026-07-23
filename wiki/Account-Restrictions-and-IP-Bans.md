@@ -47,6 +47,8 @@ Hard bans are exact IPv4 or IPv6 addresses stored in `data/etc/hard-banned-ips.t
 
 Additional read-only sources may be placed in `.txt` files anywhere beneath `data/etc/banlists/`; subdirectories are scanned recursively. Every valid whitespace-separated IP or CIDR subnet in those files is included in the effective hard-ban set. Both IPv4 CIDRs (`/0` through `/32`) and IPv6 CIDRs (`/0` through `/128`) are supported. Source-list entries are deliberately not copied into `hard-banned-ips.txt` and do not appear in the `/settings/banned-ips` textarea.
 
+Admins can right-click an IP in the access debug log to add it to the manual hard-ban list. Right-clicking an effective hard ban instead offers to whitelist the exact IP in the `whitelistedIps` array in `data/etc/hard-ban-settings.json`; this override takes precedence over the manual list, source-list IPs and CIDRs, and identity propagation. Hard-banning the same IP later removes its whitelist override.
+
 Source files are tokenized in fixed-size chunks and compiled into a binary range index beneath `data/etc/banlists/index/`. Exact IPs and CIDRs share the same fixed-width range representation, split by IP version and first address byte. Each bucket is externally sorted in bounded-memory chunks, and overlapping ranges are merged before publication. Authorization checks use binary search against the relevant bucket rather than scanning every record. The cache key includes every source path's inode, size, modification time, and change time; changing, adding, or removing a source list therefore builds and atomically publishes a new index. Concurrent builders are serialized with a file lock, while steady-state lookups take a lock-free ready-index path. Interrupted build directories are removed by the next locked index access, and superseded signature versions older than one hour are pruned. If the index cannot be created, matching falls back to the bounded-memory source scanner rather than failing the authorization request.
 
 Neither index construction nor fallback scanning loads a complete source file or expands the complete effective list into a PHP array. Tokens longer than the maximum possible supported IP/CIDR representation are treated as invalid and skipped without buffering the rest of that token. A large new index can make the first request after a source change or index deletion slower; subsequent requests reuse it. The `index/` directory must be writable by the PHP-FPM user and remains protected by nginx's block on the complete `data/etc/banlists/` tree.
@@ -103,11 +105,12 @@ The warning exists only in developer mode and is intended for testing restrictio
 The following files contain operational IP or browser identity information and must never be served directly:
 
 - `data/etc/hard-banned-ips.txt`
+- `data/etc/hard-ban-settings.json`
 - `data/etc/hard-ban-identities.json`
 - `data/etc/banlists/*.txt`
 - `data/feed/banned_ips.json`
 
-Nginx explicitly blocks the two hard-ban files, and the general private-data rules protect the posting-ban JSON. The developer-data sanitizer empties the hard-ban list and identity records as defense in depth. The development archive command then excludes both hard-ban files entirely:
+Nginx explicitly blocks the hard-ban data files, and the general private-data rules protect the posting-ban JSON. The developer-data sanitizer empties the hard-ban list, whitelist setting, and identity records as defense in depth. The development archive command then excludes the IP-bearing hard-ban data files entirely:
 
 - `data/etc/hard-banned-ips.txt`
 - `data/etc/hard-ban-identities.json`

@@ -219,6 +219,8 @@ Global hard-ban enforcement settings managed by admins through `/settings`.
 
 - `strictIdentityEnforcement` defaults to `true` when the file or key is absent
 - `enforcementEnabled` defaults to `true` when the file or key is absent; when `false`, the authorization endpoint allows requests before resolving the client IP or reading ban and identity data
+- `whitelistedIps` contains exact IPv4 or IPv6 overrides managed from the admin access-log context menu; these addresses bypass manual hard bans, source-list IPs and CIDRs, and browser-identity propagation
+- right-clicking a hard-banned access-log IP adds it to `whitelistedIps`; hard-banning that IP later removes the override and adds the IP to `hard-banned-ips.txt`
 - when `true`, recognized banned identities enforce the ban on later IPs directly without modifying the manual hard-ban list or source index
 - when switching to `false`, previously propagated associated IPs are removed from the manual list while identity-group primary IPs remain; after the switch, the identity JSON is entirely ignored and is neither read nor updated until strict enforcement is enabled again
 

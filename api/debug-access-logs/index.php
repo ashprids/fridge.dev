@@ -15,12 +15,73 @@ if (!isset($_SESSION['user']['isAdmin']) || $_SESSION['user']['isAdmin'] !== tru
 }
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
+    $action = (string)($_SERVER['HTTP_X_FRIDG3_DEBUG_ACTION'] ?? '');
     if (
         strcasecmp((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') !== 0
-        || (string)($_SERVER['HTTP_X_FRIDG3_DEBUG_ACTION'] ?? '') !== 'clear'
+        || !in_array($action, ['clear', 'hard-ban', 'whitelist'], true)
     ) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'invalid_request']);
+        exit;
+    }
+
+    if ($action !== 'clear') {
+        $ip = trim((string)($_POST['ip'] ?? ''));
+        if (filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'invalid_ip']);
+            exit;
+        }
+
+        $directory = dirname(fridg3_hard_ban_path());
+        if (!is_dir($directory) && !@mkdir($directory, 0750, true) && !is_dir($directory)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'hard_ban_write_failed']);
+            exit;
+        }
+        $lock = @fopen($directory . DIRECTORY_SEPARATOR . 'hard-ban-admin.lock', 'c');
+        if ($lock === false || !flock($lock, LOCK_EX)) {
+            if ($lock !== false) fclose($lock);
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'hard_ban_write_failed']);
+            exit;
+        }
+
+        $saved = false;
+        if ($action === 'whitelist') {
+            $whitelist = fridg3_hard_ban_whitelist_load();
+            if (!fridg3_hard_ban_list_contains($whitelist, $ip)) {
+                $whitelist[] = $ip;
+            }
+            $saved = fridg3_hard_ban_whitelist_write($whitelist);
+        } else {
+            $hardBans = fridg3_hard_ban_load();
+            if (!fridg3_hard_ban_list_contains($hardBans, $ip)) {
+                $hardBans[] = $ip;
+            }
+            $saved = fridg3_hard_ban_admin_save($hardBans);
+            if ($saved) {
+                $whitelist = array_values(array_filter(
+                    fridg3_hard_ban_whitelist_load(),
+                    static fn(string $allowedIp): bool => !fridg3_hard_ban_ips_equal($allowedIp, $ip)
+                ));
+                $saved = fridg3_hard_ban_whitelist_write($whitelist);
+            }
+        }
+
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        if (!$saved) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'hard_ban_write_failed']);
+            exit;
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'ip' => $ip,
+            'hardBanned' => $action === 'hard-ban',
+        ]);
         exit;
     }
 
@@ -64,7 +125,6 @@ foreach ((array)($accounts['accounts'] ?? []) as $account) {
     $name = strtolower((string)($account['username'] ?? ''));
     if ($name !== '') $adminUsernames[$name] = true;
 }
-$manualHardBans = fridg3_hard_ban_load();
 $banResults = [];
 $entries = [];
 foreach (fridg3_read_access_logs() as $entry) {
@@ -76,7 +136,7 @@ foreach (fridg3_read_access_logs() as $entry) {
         $role = $username === '' ? 'guest' : (isset($adminUsernames[strtolower($username)]) ? 'admin' : 'user');
     }
     if (!array_key_exists($ip, $banResults)) {
-        $banResults[$ip] = fridg3_hard_ban_list_contains($manualHardBans, $ip) || fridg3_hard_ban_source_contains($ip);
+        $banResults[$ip] = fridg3_hard_ban_contains($ip);
     }
     $entries[] = [
         'timestamp' => (string)($entry['timestamp'] ?? ''),

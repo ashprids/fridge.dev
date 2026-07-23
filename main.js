@@ -516,6 +516,86 @@ function fridg3InitAccessLogControls(panel) {
             fridg3RenderAccessLogs(fridg3AccessLogs);
         });
     });
+    const output = panel.querySelector('.debug-console-access-output');
+    if (output) {
+        output.addEventListener('contextmenu', event => {
+            const ipElement = event.target.closest('.debug-access-ip[data-access-ip]');
+            if (!ipElement) return;
+            event.preventDefault();
+            fridg3OpenAccessIpMenu(ipElement, event.clientX, event.clientY);
+        });
+    }
+}
+
+function fridg3OpenAccessIpMenu(ipElement, clientX, clientY) {
+    document.querySelectorAll('.debug-access-context-menu').forEach(menu => menu.remove());
+    const ip = ipElement.dataset.accessIp || '';
+    const hardBanned = ipElement.classList.contains('is-hard-banned');
+    const action = hardBanned ? 'whitelist' : 'hard-ban';
+    const menu = document.createElement('div');
+    menu.className = 'debug-access-context-menu';
+    menu.setAttribute('role', 'menu');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'menuitem');
+    button.innerHTML = hardBanned
+        ? '<i class="fa-solid fa-check" aria-hidden="true"></i><span>whitelist IP</span>'
+        : '<i class="fa-solid fa-ban" aria-hidden="true"></i><span>hard-ban IP</span>';
+    menu.append(button);
+    document.body.append(menu);
+
+    const bounds = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(clientX, window.innerWidth - bounds.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(clientY, window.innerHeight - bounds.height - 8))}px`;
+
+    const close = () => {
+        menu.remove();
+        document.removeEventListener('pointerdown', closeOnOutsideClick);
+        document.removeEventListener('keydown', closeOnEscape);
+    };
+    const closeOnOutsideClick = event => {
+        if (!menu.contains(event.target)) close();
+    };
+    const closeOnEscape = event => {
+        if (event.key === 'Escape') close();
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    button.addEventListener('click', async () => {
+        close();
+        const confirmed = await showSitePopup({
+            title: hardBanned ? `whitelist ${ip}?` : `hard-ban ${ip}?`,
+            detail: hardBanned
+                ? 'this IP will bypass manual hard bans, source banlists, and identity-based hard bans.'
+                : 'this IP will be added to the custom hard-ban list.',
+            okText: hardBanned ? 'whitelist IP' : 'hard-ban IP',
+            cancelText: 'cancel',
+        });
+        if (!confirmed) return;
+        try {
+            const params = new URLSearchParams({ ip });
+            const response = await fetch('/api/debug-access-logs', {
+                method: 'POST',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Fridg3-Debug-Action': action,
+                },
+                body: params.toString(),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) throw new Error(data.error || 'hard-ban update failed');
+            fridg3AccessLogs.forEach(entry => {
+                if (entry.ip === ip) entry.hardBanned = data.hardBanned === true;
+            });
+            fridg3RenderAccessLogs(fridg3AccessLogs);
+        } catch (_) {
+            await showSiteNotice('unable to update hard bans', `the hard-ban state for ${ip} could not be saved.`);
+        }
+    });
+    button.focus();
 }
 
 function fridg3InitDebugSearch(panel) {
@@ -916,6 +996,7 @@ function fridg3RenderAccessLogs(entries) {
         const ip = document.createElement('a');
         ip.className = 'debug-access-ip' + (entry.hardBanned ? ' is-hard-banned' : '');
         ip.textContent = entry.ip || 'unknown';
+        ip.dataset.accessIp = entry.ip || '';
         ip.href = `https://whatismyipaddress.com/ip/${encodeURIComponent(entry.ip || 'unknown')}`;
         ip.target = '_blank';
         ip.rel = 'noopener noreferrer';

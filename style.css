@@ -3057,7 +3057,7 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .site-popup-overlay {
     position: fixed;
     inset: 0;
-    z-index: 1600;
+    z-index: 2147483647;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3266,6 +3266,35 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .debug-console-access-output .debug-access-ip.is-hard-banned:active { color: #ff5f5f; }
 .debug-console-access-output .debug-access-ip:hover,
 .debug-console-access-output .debug-access-ip.is-hard-banned:hover { color: #5fa8ff; }
+.debug-access-context-menu {
+    position: fixed;
+    z-index: 2147483647;
+    min-width: 170px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--bg) 94%, var(--fg) 6%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.48);
+}
+.debug-access-context-menu button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--fg);
+    font: 13px "MainRegular", var(--emoji-font), monospace;
+    text-align: left;
+    cursor: pointer;
+}
+.debug-access-context-menu button:hover,
+.debug-access-context-menu button:focus {
+    background: color-mix(in srgb, var(--links) 22%, transparent);
+    outline: none;
+}
 .debug-access-username { color: #e5c45a; }
 .debug-client-log-options,
 .debug-server-log-options,

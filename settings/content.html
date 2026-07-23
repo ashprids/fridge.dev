@@ -26,7 +26,7 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <div class="checkbox-group">
     <label class="checkbox-label">
         <input type="checkbox" class="checkbox" id="enforce-hard-bans-toggle">
-        <span data-tooltip="<b>when enabled:</b>\nrequests are checked against the manual\nhard-ban list, source ban lists, and the\nconfigured identity enforcement policy.\n\n<b>when disabled:</b>\nthe authorization endpoint immediately\nallows every request. it does not resolve\nthe client IP, read any ban list, inspect\nidentity data, or perform a hard-ban check.">enforce hard bans</span>
+        <span data-tooltip="<b>when enabled:</b>\nrequests are checked against exact-IP\nwhitelist overrides, the manual hard-ban\nlist, source ban lists, and the configured\nidentity enforcement policy.\n\n<b>when disabled:</b>\nthe authorization endpoint immediately\nallows every request. it does not resolve\nthe client IP, read any ban list, inspect\nidentity data, or perform a hard-ban check.">enforce hard bans</span>
     </label>
 </div>
 <div class="checkbox-group">

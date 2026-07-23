@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+define('FRIDG3_SKIP_ACCESS_LOG', true);
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
 
