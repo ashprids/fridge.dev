@@ -632,6 +632,8 @@ function fridg3SelectDebugTab(panel, channel, persist = false) {
     if (persist) {
         try { sessionStorage.setItem('fridg3DebugSelectedTab', channel); } catch (_) { /* ignore */ }
     }
+    if (channel === 'access' && fridg3ServerDebugAuthorized) fridg3StartAccessLogPolling();
+    else fridg3StopAccessLogPolling();
     return true;
 }
 
@@ -944,7 +946,14 @@ function fridg3RenderAccessLogs(entries) {
 }
 
 async function fridg3PollAccessLogs() {
-    if (!fridg3DebugEnabled || !fridg3ServerDebugAuthorized || fridg3AccessLogRequestActive) return;
+    const accessPanel = document.querySelector('.debug-console-access-panel');
+    if (
+        !fridg3DebugEnabled
+        || !fridg3ServerDebugAuthorized
+        || !accessPanel
+        || !accessPanel.classList.contains('is-active')
+        || fridg3AccessLogRequestActive
+    ) return;
     fridg3AccessLogRequestActive = true;
     try {
         const response = await fetch('/api/debug-access-logs', {
@@ -959,6 +968,7 @@ async function fridg3PollAccessLogs() {
         }
         const data = await response.json();
         if (!response.ok || !data.ok || !Array.isArray(data.entries)) return;
+        if (!accessPanel.classList.contains('is-active')) return;
         fridg3RenderAccessLogs(data.entries);
     } catch (_) { /* retain the last successful access-log view */ }
     finally { fridg3AccessLogRequestActive = false; }
@@ -967,7 +977,7 @@ async function fridg3PollAccessLogs() {
 function fridg3StartAccessLogPolling() {
     fridg3StopAccessLogPolling();
     fridg3PollAccessLogs();
-    fridg3AccessLogTimer = window.setInterval(fridg3PollAccessLogs, 5000);
+    fridg3AccessLogTimer = window.setInterval(fridg3PollAccessLogs, 1000);
 }
 
 async function fridg3InitProcessLogControl(panel) {
@@ -1023,7 +1033,6 @@ async function fridg3InitProcessLogControl(panel) {
         let selectedTab = 'client';
         try { selectedTab = sessionStorage.getItem('fridg3DebugSelectedTab') || 'client'; } catch (_) { /* ignore */ }
         fridg3SelectDebugTab(panel, ['server', 'access'].includes(selectedTab) ? selectedTab : 'client');
-        fridg3StartAccessLogPolling();
         try { loadedToggle.checked = localStorage.getItem('debugIncludeLoadedLogs') !== 'false'; } catch (_) { /* ignore */ }
         loadedToggle.addEventListener('change', () => {
             try { localStorage.setItem('debugIncludeLoadedLogs', loadedToggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
