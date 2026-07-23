@@ -14,6 +14,48 @@ if (!isset($_SESSION['user']['isAdmin']) || $_SESSION['user']['isAdmin'] !== tru
     exit;
 }
 
+if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
+    if (
+        strcasecmp((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') !== 0
+        || (string)($_SERVER['HTTP_X_FRIDG3_DEBUG_ACTION'] ?? '') !== 'clear'
+    ) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_request']);
+        exit;
+    }
+
+    $logPath = fridg3_access_log_path();
+    $directory = dirname($logPath);
+    if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'clear_failed']);
+        exit;
+    }
+    $lock = @fopen($logPath . '.lock', 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) {
+        if ($lock !== false) fclose($lock);
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'clear_failed']);
+        exit;
+    }
+    $temporary = $logPath . '.tmp.' . getmypid();
+    $cleared = @file_put_contents($temporary, "[]\n") !== false;
+    if ($cleared) {
+        @chmod($temporary, 0600);
+        $cleared = @rename($temporary, $logPath);
+    }
+    if (!$cleared && is_file($temporary)) @unlink($temporary);
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    if (!$cleared) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'clear_failed']);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'entries' => []]);
+    exit;
+}
+
 $adminUsernames = [];
 $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
 $accounts = json_decode((string)@file_get_contents($accountsPath), true);

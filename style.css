@@ -3252,8 +3252,20 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .debug-access-status.is-success { color: #67c77a; }
 .debug-access-status.is-warning { color: #e5a13a; }
 .debug-access-status.is-error { color: #ff5f5f; }
-.debug-access-ip { color: #c7c7c7; }
-.debug-access-ip.is-hard-banned { color: #ff5f5f; }
+.debug-console-access-output .debug-access-ip,
+.debug-console-access-output .debug-access-ip:visited,
+.debug-console-access-output .debug-access-ip:hover,
+.debug-console-access-output .debug-access-ip:active {
+    color: #c7c7c7;
+    cursor: pointer;
+    text-decoration: none;
+}
+.debug-console-access-output .debug-access-ip.is-hard-banned,
+.debug-console-access-output .debug-access-ip.is-hard-banned:visited,
+.debug-console-access-output .debug-access-ip.is-hard-banned:hover,
+.debug-console-access-output .debug-access-ip.is-hard-banned:active { color: #ff5f5f; }
+.debug-console-access-output .debug-access-ip:hover,
+.debug-console-access-output .debug-access-ip.is-hard-banned:hover { color: #5fa8ff; }
 .debug-access-username { color: #e5c45a; }
 .debug-client-log-options,
 .debug-server-log-options,
@@ -3274,6 +3286,33 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .debug-access-log-options[hidden],
 .debug-process-log-status[hidden],
 .debug-admin-log-search[hidden] { display: none; }
+.debug-log-clear-button {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding: 0;
+    border: 0 !important;
+    border-radius: 0 !important;
+    appearance: none;
+    background: none !important;
+    box-shadow: none !important;
+    color: var(--fg);
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+}
+.debug-log-clear-button:hover,
+.debug-log-clear-button:focus-visible,
+.debug-log-clear-button:active {
+    border: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
+    color: var(--links);
+    outline: none;
+}
+.debug-log-clear-button:disabled {
+    cursor: default;
+    opacity: .5;
+}
 .debug-log-search {
     flex: 0 0 auto;
     margin: 6px 8px;

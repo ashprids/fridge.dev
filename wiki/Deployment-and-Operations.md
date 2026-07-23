@@ -139,6 +139,8 @@ the repo-tracked files in `.nginx/` are the source for the production nginx conf
 - `.nginx/fridge.dev` corresponds to `/etc/nginx/sites-enabled/fridge.dev`
 - production uses these through symlinks, so edits here are real server config edits, not examples
 
+The HTTP config trusts `CF-Connecting-IP` only when the direct peer belongs to one of Cloudflare's published IPv4 or IPv6 proxy networks. Nginx's Real IP module then replaces `$remote_addr` before access checks, PHP-FPM handling, and access logging, so application logs contain the visitor address instead of a Cloudflare edge address. Keep the `set_real_ip_from` list synchronized with Cloudflare's authoritative IP-ranges page; never replace it with an unrestricted range.
+
 when adding routes, APIs, uploads, redirects, or private data folders, check `.nginx/fridge.dev` as part of the feature. a correct PHP route can still fail if nginx redirects POSTs, misses a clean-url rewrite, or accidentally exposes/blocklists the wrong `/data` path.
 
 nginx uses `client_max_body_size 0` and the repo-root `.user.ini` disables PHP's aggregate request/upload limits. Individual application handlers remain responsible for validating MIME types and enforcing per-file limits; feed and journal media attachments are capped at 8 MB per file.

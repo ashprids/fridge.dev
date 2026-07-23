@@ -299,7 +299,7 @@ function fridg3DebugAppend(channel, value, processLog = false) {
         ? document.querySelector('.debug-console-server-output')
         : document.querySelector('.debug-console-client-output');
     if (output) {
-        if (trimmed || !fridg3DebugEntryVisible(entry)) {
+        if (trimmed || !fridg3DebugEntryVisible(entry) || !fridg3DebugSearchMatches(target, entry.message)) {
             fridg3RenderDebugOutput(output, fridg3DebugLogs[target]);
         } else {
             fridg3UpdateDebugOutputWithoutScrollJump(output, () => {
@@ -317,10 +317,13 @@ function fridg3UpdateDebugOutputWithoutScrollJump(output, update) {
 }
 
 function fridg3RenderDebugOutput(output, entries) {
+    const channel = output.classList.contains('debug-console-server-output') ? 'server' : 'client';
     fridg3RunAfterOutputSelection(output, () => {
         fridg3UpdateDebugOutputWithoutScrollJump(output, () => {
             output.replaceChildren();
-            entries.filter(fridg3DebugEntryVisible).forEach(entry => output.append(fridg3CreateDebugLogLine(entry)));
+            entries
+                .filter(entry => fridg3DebugEntryVisible(entry) && fridg3DebugSearchMatches(channel, entry.message))
+                .forEach(entry => output.append(fridg3CreateDebugLogLine(entry)));
         });
     });
 }
@@ -417,6 +420,12 @@ function fridg3HighlightDebugLine(line, channel) {
     });
 }
 
+function fridg3DebugSearchMatches(channel, text) {
+    const input = document.querySelector(`[data-debug-search="${channel}"]`);
+    const query = input ? input.value.trim().toLocaleLowerCase() : '';
+    return !query || String(text || '').toLocaleLowerCase().includes(query);
+}
+
 function fridg3EnsureDebugConsole() {
     let panel = document.getElementById('debug-console');
     if (panel) return panel;
@@ -439,7 +448,9 @@ function fridg3EnsureDebugConsole() {
         + '<input class="checkbox" type="checkbox" id="debug-client-warnings-toggle" checked>'
         + '<span>warnings</span></label><label class="checkbox-label">'
         + '<input class="checkbox" type="checkbox" id="debug-client-errors-toggle" checked>'
-        + '<span>errors</span></label></div>'
+        + '<span>errors</span></label>'
+        + '<button type="button" class="debug-log-clear-button" data-debug-clear="client" aria-label="clear client log" data-tooltip="clear client log">'
+        + '<i class="fa-solid fa-trash" aria-hidden="true"></i></button></div>'
         + '<div class="debug-log-search"><input type="search" data-debug-search="client" aria-label="search client log" placeholder="search client log"></div>'
         + '<pre class="debug-console-output debug-console-client-output"></pre></div>'
         + '<div class="debug-console-server-panel" data-debug-output="server" role="tabpanel">'
@@ -451,7 +462,9 @@ function fridg3EnsureDebugConsole() {
         + '<input class="checkbox" type="checkbox" id="debug-server-warnings-toggle">'
         + '<span>warnings</span></label><label class="checkbox-label">'
         + '<input class="checkbox" type="checkbox" id="debug-server-errors-toggle">'
-        + '<span>errors</span></label></div>'
+        + '<span>errors</span></label>'
+        + '<button type="button" class="debug-log-clear-button" data-debug-clear="server" aria-label="clear server log" data-tooltip="clear server log">'
+        + '<i class="fa-solid fa-trash" aria-hidden="true"></i></button></div>'
         + '<div class="debug-log-search debug-admin-log-search" hidden><input type="search" data-debug-search="server" aria-label="search server log" placeholder="search server log"></div>'
         + '<span class="debug-process-log-status" hidden></span>'
         + '<pre class="debug-console-output debug-console-server-output"></pre></div>'
@@ -460,7 +473,9 @@ function fridg3EnsureDebugConsole() {
         + '<input class="checkbox" type="checkbox" id="debug-access-guests-toggle" checked><span>guests</span></label><label class="checkbox-label">'
         + '<input class="checkbox" type="checkbox" id="debug-access-users-toggle" checked><span>users</span></label><label class="checkbox-label">'
         + '<input class="checkbox" type="checkbox" id="debug-access-admins-toggle" checked><span>admins</span></label><label class="checkbox-label">'
-        + '<input class="checkbox" type="checkbox" id="debug-access-hard-banned-toggle" checked><span>hard-banned</span></label></div>'
+        + '<input class="checkbox" type="checkbox" id="debug-access-hard-banned-toggle" checked><span>hard-banned</span></label>'
+        + '<button type="button" class="debug-log-clear-button" data-debug-clear="access" aria-label="clear access log" data-tooltip="clear access log">'
+        + '<i class="fa-solid fa-trash" aria-hidden="true"></i></button></div>'
         + '<div class="debug-log-search debug-admin-log-search" hidden><input type="search" data-debug-search="access" aria-label="search access log" placeholder="search access log"></div>'
         + '<pre class="debug-console-output debug-console-access-output"></pre></div></div>';
     panel.addEventListener('click', event => {
@@ -475,6 +490,7 @@ function fridg3EnsureDebugConsole() {
     fridg3InitClientLogControls(panel);
     fridg3InitAccessLogControls(panel);
     fridg3InitDebugSearch(panel);
+    fridg3InitDebugClearControls(panel);
     Object.keys(fridg3DebugLogs).forEach(channel => {
         const output = channel === 'server'
             ? panel.querySelector('.debug-console-server-output')
@@ -514,6 +530,57 @@ function fridg3InitDebugSearch(panel) {
             }
             const output = panel.querySelector(`.debug-console-${channel}-output`);
             if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs[channel]);
+        });
+    });
+}
+
+function fridg3InitDebugClearControls(panel) {
+    panel.querySelectorAll('[data-debug-clear]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const channel = button.dataset.debugClear;
+            const confirmed = await showSitePopup({
+                title: `clear ${channel} log?`,
+                detail: `this will remove all entries from the ${channel} log.`,
+                okText: 'clear log',
+                cancelText: 'cancel',
+            });
+            if (!confirmed) return;
+
+            if (channel === 'access') {
+                button.disabled = true;
+                try {
+                    const response = await fetch('/api/debug-access-logs', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        cache: 'no-store',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-Fridg3-Debug-Action': 'clear',
+                        },
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.ok) throw new Error(data.error || 'clear failed');
+                    fridg3AccessLogs = [];
+                    fridg3RenderAccessLogs([]);
+                } catch (_) {
+                    await showSiteNotice('unable to clear access log', 'the access log could not be cleared.');
+                } finally {
+                    button.disabled = false;
+                }
+                return;
+            }
+
+            fridg3DebugLogs[channel].length = 0;
+            if (channel === 'client') {
+                fridg3DebugHistoryRestored = true;
+                try { sessionStorage.removeItem('fridg3DebugClientHistory'); } catch (_) { /* ignore */ }
+            } else {
+                fridg3ServerHistoryRestored = true;
+                try { sessionStorage.removeItem('fridg3DebugServerHistory'); } catch (_) { /* ignore */ }
+            }
+            const output = panel.querySelector(`.debug-console-${channel}-output`);
+            if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs[channel]);
+            fridg3ScheduleDebugHistoryPersist();
         });
     });
 }
@@ -822,7 +889,11 @@ function fridg3RenderAccessLogs(entries) {
         const roleToggle = document.getElementById(`debug-access-${role}s-toggle`);
         if (roleToggle && !roleToggle.checked) return false;
         const bannedToggle = document.getElementById('debug-access-hard-banned-toggle');
-        return !entry.hardBanned || !bannedToggle || bannedToggle.checked;
+        if (entry.hardBanned && bannedToggle && !bannedToggle.checked) return false;
+        return fridg3DebugSearchMatches(
+            'access',
+            `${entry.ip || ''} ${entry.username ? `@${entry.username}` : ''} ${entry.status || ''} ${entry.path || '/'}`
+        );
         }).forEach(entry => {
         const line = document.createElement('span');
         line.className = 'debug-log-entry';
@@ -840,9 +911,13 @@ function fridg3RenderAccessLogs(entries) {
         else if (status >= 300 && status < 400) statusElement.classList.add('is-warning');
         else if (status >= 400) statusElement.classList.add('is-error');
         statusElement.textContent = String(status || '---');
-        const ip = document.createElement('span');
+        const ip = document.createElement('a');
         ip.className = 'debug-access-ip' + (entry.hardBanned ? ' is-hard-banned' : '');
         ip.textContent = entry.ip || 'unknown';
+        ip.href = `https://whatismyipaddress.com/ip/${encodeURIComponent(entry.ip || 'unknown')}`;
+        ip.target = '_blank';
+        ip.rel = 'noopener noreferrer';
+        ip.setAttribute('data-no-external-popup', '');
         line.append(
             timestamp,
             document.createTextNode(' ['),
