@@ -1168,10 +1168,64 @@ if (!function_exists('fridg3_feed_replace_voice_placeholders')) {
 }
 
 if (!function_exists('fridg3_feed_save_jpeg_under_limit')) {
+    function fridg3_feed_save_jpeg_with_ffmpeg(string $srcPath, string $destPath, int $maxBytes): bool
+    {
+        $ffmpeg = '';
+        foreach (['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg'] as $candidate) {
+            if (is_file($candidate) && is_executable($candidate)) {
+                $ffmpeg = $candidate;
+                break;
+            }
+        }
+        if ($ffmpeg === '') return false;
+
+        $imageInfo = @getimagesize($srcPath);
+        $width = is_array($imageInfo) ? (int)($imageInfo[0] ?? 0) : 0;
+        $height = is_array($imageInfo) ? (int)($imageInfo[1] ?? 0) : 0;
+        if ($width < 1 || $height < 1) return false;
+
+        $tmpPath = tempnam(dirname($destPath), '.image-');
+        if ($tmpPath === false) return false;
+
+        $filters = [
+            '[1:v][0:v]overlay=shortest=1,format=yuv420p',
+            '[1:v][0:v]overlay=shortest=1,scale=2400:2400:force_original_aspect_ratio=decrease,format=yuv420p',
+            '[1:v][0:v]overlay=shortest=1,scale=1600:1600:force_original_aspect_ratio=decrease,format=yuv420p',
+        ];
+        $saved = false;
+        foreach ($filters as $filter) {
+            foreach ([7, 13, 19, 25, 31] as $quality) {
+                $command = escapeshellarg($ffmpeg)
+                    . ' -nostdin -hide_banner -loglevel error -y -i ' . escapeshellarg($srcPath)
+                    . ' -f lavfi -i ' . escapeshellarg('color=c=white:s=' . $width . 'x' . $height)
+                    . ' -filter_complex ' . escapeshellarg($filter)
+                    . ' -frames:v 1 -c:v mjpeg -q:v ' . $quality
+                    . ' -f image2 ' . escapeshellarg($tmpPath) . ' 2>/dev/null';
+                $output = [];
+                $status = 1;
+                @exec($command, $output, $status);
+                clearstatcache(true, $tmpPath);
+                $size = @filesize($tmpPath);
+                if ($status === 0 && $size !== false && $size > 0 && $size <= $maxBytes) {
+                    $saved = true;
+                    break 2;
+                }
+            }
+        }
+        if (!$saved) {
+            @unlink($tmpPath);
+            return false;
+        }
+
+        $moved = @rename($tmpPath, $destPath);
+        if (!$moved) @unlink($tmpPath);
+        return $moved;
+    }
+
     function fridg3_feed_save_jpeg_under_limit(string $srcPath, string $mime, string $destPath, int $maxBytes = 1000000): bool
     {
         if (!function_exists('imagecreatetruecolor')) {
-            return false;
+            return fridg3_feed_save_jpeg_with_ffmpeg($srcPath, $destPath, $maxBytes);
         }
 
         $createMap = [
@@ -1254,6 +1308,9 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
         for ($i = 0; $i < $count; $i++) {
             $error = $files['error'][$i] ?? UPLOAD_ERR_NO_FILE;
             if ($error !== UPLOAD_ERR_OK) {
+                if ((int)$error !== UPLOAD_ERR_NO_FILE) {
+                    fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=upload_error code=' . (int)$error);
+                }
                 continue;
             }
 
@@ -1261,19 +1318,20 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
             $origName = $files['name'][$i] ?? ('image_' . $i);
             $uploadSize = (int)($files['size'][$i] ?? 0);
             if ($tmpPath === '' || $uploadSize <= 0 || $uploadSize > 8 * 1024 * 1024) {
+                fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=size bytes=' . max(0, $uploadSize));
                 continue;
             }
 
             $imageInfo = @getimagesize($tmpPath);
             $mime = is_array($imageInfo) && isset($imageInfo['mime']) ? $imageInfo['mime'] : '';
             if (!isset($allowed[$mime])) {
+                fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=invalid_image');
                 continue;
             }
 
             $ext = $allowed[$mime];
             $sizeBytes = @filesize($tmpPath) ?: 0;
-            $mustJpeg = ($mime === 'image/png');
-            $mustCompress = $mustJpeg || ($sizeBytes > 1000000);
+            $mustCompress = $sizeBytes > 1000000;
             $randomBase = bin2hex(random_bytes(8));
             $destExt = $mustCompress ? 'jpg' : $ext;
             $destName = $randomBase . '.' . $destExt;
@@ -1300,6 +1358,8 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
                     'name' => $origName ?: $destName,
                 ];
                 fridg3_debug_submission_log('[UPLOAD] feed/journal image attachment saved bytes=' . (@filesize($destPath) ?: 0) . ' type=' . $destExt);
+            } else {
+                fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=compression_or_write_failed type=' . $ext . ' bytes=' . $sizeBytes);
             }
         }
 

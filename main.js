@@ -2751,8 +2751,9 @@ function bindSpaForm(form) {
     if (!form || form.dataset.spaBound === '1') return;
     form.dataset.spaBound = '1';
 
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', async function(e) {
         if (e.defaultPrevented) return;
+        const submitter = e.submitter;
 
         const method = (form.getAttribute('method') || 'GET').toUpperCase();
         const action = form.getAttribute('action') || (window.location.pathname + window.location.search);
@@ -2772,8 +2773,27 @@ function bindSpaForm(form) {
             return;
         }
 
+        const cardImageInput = form.querySelector('input[type="file"][name="card_image"]');
+        const cardImageFile = cardImageInput && cardImageInput.files ? cardImageInput.files[0] : null;
+        if (
+            cardImageFile
+            && cardImageFile.size > 1000000
+            && typeof window.fridg3CompressImageToJpegUnder1MB === 'function'
+            && typeof DataTransfer === 'function'
+        ) {
+            try {
+                const compressed = await window.fridg3CompressImageToJpegUnder1MB(cardImageFile, 1000000);
+                const transfer = new DataTransfer();
+                transfer.items.add(compressed);
+                cardImageInput.files = transfer.files;
+                window.fridg3DebugClientLog(`[upload] journal card image compressed ${cardImageFile.size} -> ${compressed.size} bytes`);
+            } catch (_) {
+                window.fridg3DebugClientLog('[upload] journal card image browser compression unavailable; using server fallback');
+            }
+        }
+
         let waitPopup = null;
-        if (e.submitter && e.submitter.hasAttribute('data-post-submit-wait')) {
+        if (submitter && submitter.hasAttribute('data-post-submit-wait')) {
             showSitePopup({
                 title: 'please wait...',
                 detail: "your post is being uploaded to the website, this shouldn't take long.",
@@ -2789,8 +2809,8 @@ function bindSpaForm(form) {
 
         // Ensure the clicked submit button's name/value (e.g., delete=1)
         // are included in the payload so multi-action forms work.
-        if (e.submitter && e.submitter.name) {
-            formData.append(e.submitter.name, e.submitter.value != null ? e.submitter.value : '');
+        if (submitter && submitter.name) {
+            formData.append(submitter.name, submitter.value != null ? submitter.value : '');
         }
 
         fetch(action, {

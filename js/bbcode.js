@@ -633,6 +633,7 @@ async function compressImageToJpegUnder1MB(file, maxBytes = 1000000) {
         img.src = url;
     });
 }
+window.fridg3CompressImageToJpegUnder1MB = compressImageToJpegUnder1MB;
 
 function replaceQueuedMediaFile(index, replacement) {
     const files = Array.from(mediaFileStore.files);

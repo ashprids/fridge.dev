@@ -36,7 +36,7 @@ if that prints a version, you’re chilling.
 
 this repo’s GitHub Actions lint job uses PHP `8.3`, so using PHP 8.3 locally is the safest move if you want fewer "works on my machine" plot twists.
 
-enable the PHP GD extension if you want image uploads and the gallery's cached 500×500 thumbnails to behave like production.
+enable the PHP GD extension if you want image uploads and the gallery's cached 500×500 thumbnails to use the primary image-processing path. When GD is unavailable, an installed `ffmpeg` provides the JPEG compression and thumbnail fallback.
 
 voice notes in chat/feed also need `ffmpeg` and `ffprobe` on the PATH. without those, uploads will fail closed instead of storing huge browser blobs, which is annoying but correct.
 

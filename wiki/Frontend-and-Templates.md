@@ -53,7 +53,7 @@ larger shared frontend systems live in `/js/`, loaded by both desktop and mobile
 client performance notes: templates preload only the IBM VGA font and the regular Iosevka face needed by initial content; do not re-add the 400KB+ Bold Italic preload unless it becomes render-critical again. title-animation settling samples active letter transforms every 80ms rather than every animation frame and skips computed-style reads while the document is hidden, preserving smooth exits without continuous high-frequency layout/style queries.
 - feed and journal use compact windowed pagination; Blackprint keeps its frame and 30×30 controls square, while every selectable theme supplies its own pager surface, corner treatment, and shadow/glow styling without changing the single-line layout
 - `/js/bookmarks.js`: bookmark/save icons, anonymous bookmark storage, image modal behavior, and `/bookmarks` hydration
-- `/js/bbcode.js`: BBCode editor, attach-media URL/upload flow for images, audio, and video, inline media players, voice notes, feed generator, `parseBBCode`, and plain-link video embeds for YouTube, Vimeo, and Dailymotion; right-clicking a queued image in the feed inline preview opens a crop action with a drag-selection editor that replaces the pending upload, while the journal eye button submits the draft to its dedicated full-post preview route; queued editor files are appended directly when `main.js` builds an SPA submission payload, and automatic video conversion examines only top-level text so links inside BBCode-rendered elements are not embedded
+- `/js/bbcode.js`: BBCode editor, attach-media URL/upload flow for images, audio, and video, inline media players, voice notes, feed generator, `parseBBCode`, and plain-link video embeds for YouTube, Vimeo, and Dailymotion; right-clicking a queued image in the feed inline preview opens a crop action with a drag-selection editor that replaces the pending upload, while the journal eye button submits the draft to its dedicated full-post preview route; queued editor files are appended directly when `main.js` builds an SPA submission payload, journal card images over 1 MB are resized and converted to a sub-1 MB JPEG in the browser before that payload is built, and automatic video conversion examines only top-level text so links inside BBCode-rendered elements are not embedded
 
 page-specific behavior belongs in a route-local `{page-name}.js` file and the page's `content.html` should include that script. examples:
 
@@ -67,7 +67,7 @@ the mini player is shared chrome. `/music` album cards should open the site popu
 
 ## Popups And External Links
 
-use the on-site popup helpers in `main.js`, not native browser `alert()`, `confirm()`, or `prompt()`. submitting a new feed or journal post shows a non-dismissible, buttonless `please wait...` popup with `uploading post...` body text until the SPA request finishes; journal draft saves do not show it.
+use the on-site popup helpers in `main.js`, not native browser `alert()`, `confirm()`, or `prompt()`. submitting a new feed or journal post, or saving changes to a journal post, shows a non-dismissible, buttonless `please wait...` popup with the shared upload message until the SPA request finishes; journal draft saves and previews do not show it.
 
 - notices: `showSiteNotice(title, detail)`
 - confirmations: `showSitePopup({ title, detail/html, okText, cancelText })`
