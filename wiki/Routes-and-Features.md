@@ -49,10 +49,11 @@ Related:
 ### `/journal`
 
 - list/search/paginate journal posts from `data/journal/*.txt`
+- journal listing cards use an optional uploaded card image, falling back to the first image in each post body, as a faded edge-to-edge background; local images use the same cached 500×500 JPEG thumbnails as the gallery to avoid loading full-size files, while posts without either image retain the normal card surface
 - create visibility depends on admin or `allowedPages` containing `journal`
 - published journal bodies are trusted HTML
 - preview/edit flows support draft files and optional `FORMAT:html`
-- the journal BBCode composer uses the same attach-media URL/upload flow and media rendering as feed posts; its eye button toggles an inline preview so pending image uploads can be right-clicked and drag-cropped before saving or publishing
+- the journal BBCode composer uses the same attach-media URL/upload flow and media rendering as feed posts; its eye button saves the current draft and opens the dedicated full-post journal preview
 - plain YouTube, Vimeo, and Dailymotion video URLs render as responsive embedded players in previews and published posts; URLs contained by BBCode-generated HTML elements remain unchanged
 
 Related:

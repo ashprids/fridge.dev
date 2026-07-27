@@ -862,7 +862,7 @@ function initBBCodeEditor() {
 
     bbcodeButtons.forEach(button => {
         button.addEventListener('click', function() {
-            if (this.id === 'bbcode-preview-toggle' || this.id === 'bbcode-image-btn' || this.id === 'bbcode-voice-btn' || this.id === 'bbcode-color-btn' || this.id === 'bbcode-tooltip-btn' || this.id === 'bbcode-link-btn' || this.id === 'bbcode-spoiler-btn') return;
+            if (this.id === 'bbcode-preview-toggle' || this.id === 'journal-preview-button' || this.id === 'bbcode-image-btn' || this.id === 'bbcode-voice-btn' || this.id === 'bbcode-color-btn' || this.id === 'bbcode-tooltip-btn' || this.id === 'bbcode-link-btn' || this.id === 'bbcode-spoiler-btn') return;
             
             const tag = this.getAttribute('data-tag');
             const start = bbcodeTextbox.selectionStart;

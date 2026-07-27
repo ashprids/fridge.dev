@@ -5,11 +5,17 @@
 <input type="hidden" name="post" value="{post_id}">
 <input type="hidden" name="delete" value="1">
 </form>
-<form id="create-post-form" method="POST">
+<form id="create-post-form" method="POST" enctype="multipart/form-data">
 <input type="hidden" name="post" value="{post_id}">
 <input id="textbox" type="text" name="title" placeholder="title" value="{title_value}">
 <br><br>
 <textarea id="textbox" class="large" name="description" placeholder="description" style="height: 54px;">{description_value}</textarea>
+<br><br>
+<label class="journal-card-image-field">
+    <span>card image <small>(optional; otherwise the first post image is used)</small></span>
+    <input name="card_image" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+</label>
+<div class="journal-current-card-image-controls">{current_card_image}</div>
 <br><br>
 <textarea id="textbox" class="large" name="content" placeholder="raw html content" style="height: 380px;">{content_value}</textarea>
 <br>

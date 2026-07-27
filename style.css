@@ -2571,6 +2571,90 @@ hr {
     text-decoration: none;
 }
 
+.journal-post-link > :not(.journal-card-background) {
+    position: relative;
+    z-index: 1;
+}
+
+.journal-card-background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+    opacity: 0.14;
+    filter: saturate(0.7);
+    pointer-events: none;
+}
+
+.journal-card-image-field,
+.journal-current-card-image-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 13px;
+    color: var(--fg);
+}
+
+.journal-card-image-field > span {
+    color: var(--subtle);
+    font-size: 12px;
+}
+
+.journal-card-image-field input[type="file"] {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-height: 38px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    line-height: 1.2;
+}
+
+.journal-card-image-field input[type="file"]::file-selector-button,
+.journal-card-image-field input[type="file"]::-webkit-file-upload-button {
+    box-sizing: border-box;
+    height: 24px;
+    margin: 0 10px 0 0;
+    padding: 2px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.journal-card-image-field input[type="file"]:hover::file-selector-button,
+.journal-card-image-field input[type="file"]:hover::-webkit-file-upload-button {
+    background: rgba(172, 172, 172, 0.1);
+}
+
+.journal-card-image-field input[type="file"]:focus {
+    outline: none;
+    border-color: var(--links);
+}
+
+.journal-card-image-field input[type="file"]:focus-visible {
+    outline: 2px solid var(--links);
+    outline-offset: 2px;
+}
+
+.journal-current-card-image-controls {
+    margin-top: 8px;
+    color: var(--subtle);
+}
+
 #post > :first-child {
     display: flex;
     gap: 8px;

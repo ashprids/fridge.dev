@@ -7,6 +7,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 
 // Require logged-in user with permission to create posts
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -376,10 +377,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     // Convert BBCode to HTML
     $htmlContent = bbcode_to_html($safeContent);
-    $text = $postDate . PHP_EOL . $title . PHP_EOL . $description . PHP_EOL . $htmlContent . PHP_EOL;
+    $cardImageUpload = isset($_FILES['card_image']) && is_array($_FILES['card_image'])
+        ? fridg3_journal_process_card_image($_FILES['card_image'])
+        : ['provided' => false, 'url' => ''];
+    if ($cardImageUpload['provided'] && $cardImageUpload['url'] === '') {
+        fridg3_feed_delete_media_files_from_content($safeContent);
+        header('Location: /journal/create?error=' . rawurlencode('card image upload failed. use a supported image no larger than 8 MB.'));
+        exit;
+    }
+    $text = fridg3_journal_build_post(
+        $postDate,
+        $title,
+        $description,
+        $htmlContent,
+        $cardImageUpload['url']
+    );
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $postFilename;
     $postSaved = file_put_contents($postFile, $text) !== false;
-    fridg3_debug_submission_log('[SUBMISSION] journal post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . count($imageMap));
+    $savedAttachmentCount = count($imageMap) + ($cardImageUpload['url'] !== '' ? 1 : 0);
+    fridg3_debug_submission_log('[SUBMISSION] journal post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . $savedAttachmentCount);
 
     // Redirect to feed after posting
     header('Location: /feed');

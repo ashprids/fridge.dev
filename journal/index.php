@@ -6,6 +6,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'image-thumbnails.php';
 
 $title = 'journal';
 $description = 'long-form updates and blog posts.';
@@ -123,6 +125,29 @@ if (!$content_path) {
     die('content.html not found. report this issue to me@fridge.dev.');
 }
 
+function journal_first_image_src(string $body): string {
+    if (!preg_match(
+        '~<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))~i',
+        $body,
+        $matches
+    )) {
+        return '';
+    }
+
+    $src = '';
+    foreach ([1, 2, 3] as $group) {
+        if (isset($matches[$group]) && $matches[$group] !== '') {
+            $src = trim($matches[$group]);
+            break;
+        }
+    }
+    if ($src === '') {
+        return '';
+    }
+
+    return fridg3_journal_valid_image_src($src);
+}
+
 
 // Build journal grid from /data/journal
 $posts_dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
@@ -155,13 +180,20 @@ if (is_dir($posts_dir)) {
 
     // Load basic metadata (date, title, description) for each post
     foreach ($post_files as $pf) {
-        $lines = @file($pf, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($lines === false || count($lines) < 3) {
+        $rawPost = @file_get_contents($pf);
+        $parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+        if ($parsedPost === null) {
             continue;
         }
-        $dateStr = trim($lines[0]);
-        $postTitle = $lines[1] ?? '';
-        $desc = $lines[2] ?? '';
+        $dateStr = trim($parsedPost['date']);
+        $postTitle = $parsedPost['title'];
+        $desc = $parsedPost['description'];
+        $firstImageSrc = $parsedPost['cardImage'] !== ''
+            ? $parsedPost['cardImage']
+            : journal_first_image_src($parsedPost['body']);
+        if ($firstImageSrc !== '') {
+            $firstImageSrc = fridg3_local_image_thumbnail_url($firstImageSrc, dirname(__DIR__));
+        }
         $ts = strtotime($dateStr);
         if ($ts === false) {
             $ts = 0;
@@ -172,6 +204,7 @@ if (is_dir($posts_dir)) {
             'timestamp' => $ts,
             'title' => $postTitle,
             'description' => $desc,
+            'firstImageSrc' => $firstImageSrc,
         ];
     }
 
@@ -204,6 +237,12 @@ if (is_dir($posts_dir)) {
         $post_date = htmlspecialchars($post['date'] ?? '', ENT_QUOTES, 'UTF-8');
         $post_title = htmlspecialchars($post['title'] ?? '', ENT_QUOTES, 'UTF-8');
         $post_description = htmlspecialchars($post['description'] ?? '', ENT_QUOTES, 'UTF-8');
+        $backgroundImageHtml = '';
+        if (($post['firstImageSrc'] ?? '') !== '') {
+            $backgroundImageHtml = '<img class="journal-card-background" src="'
+                . htmlspecialchars($post['firstImageSrc'], ENT_QUOTES, 'UTF-8')
+                . '" alt="" aria-hidden="true" loading="lazy">';
+        }
         $filename = basename($post['path'], '.txt');
         $safeFilename = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
         $bookmarkId = 'journal:' . $filename;
@@ -220,6 +259,7 @@ if (is_dir($posts_dir)) {
             . $actionsHtml
             . '<span id="post-title">' . $post_title . '</span>'
             . '<span id="post-description">' . $post_description . '</span>'
+            . $backgroundImageHtml
             . '</a>';
         $post_items .= $item . "\n";
     }

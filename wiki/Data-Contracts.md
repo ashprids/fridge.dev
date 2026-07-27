@@ -248,7 +248,10 @@ published journal post:
 1. `YYYY-MM-DD`
 2. title
 3. description
-4. trusted HTML body
+4. optional `CARD_IMAGE:<url>`
+5. trusted HTML body
+
+`CARD_IMAGE` points to an uploaded image used by the journal listing card. When it is absent, the listing falls back to the first image in the trusted HTML body.
 
 draft format:
 
@@ -280,7 +283,7 @@ plus:
 
 - uploaded images used across feed, journal, and gallery content
 - expected web path is `/data/images/<filename>`
-- `data/images/thumbnails/` contains regenerable 500×500 JPEG gallery thumbnails keyed by a hash of the original filename; these are excluded from the top-level gallery listing and removed alongside originals by the gallery delete API
+- `data/images/thumbnails/` contains regenerable 500×500 JPEG thumbnails used by gallery tiles and local journal card backgrounds, keyed by a hash of the original filename; these are excluded from the top-level gallery listing and removed alongside originals by the gallery delete API
 
 Feed and journal attachment uploads use typed temporary `[img:N]`, `[audio:N]`, or `[video:N]` editor placeholders. Every source media attachment is capped at 8 MB. Images become `[img=...]` records and retain the existing 1 MB post-compression limit. Audio becomes `[audio=...]` and is stored beneath `data/audio/uploads/`; video becomes `[video=...]` and is stored beneath `data/video/`. Allowed audio formats are MP3, AAC, M4A, OGG, WAV, FLAC, and WebM; allowed video formats are MP4, WebM, Ogg video, and QuickTime. Because libmagic can report audio-only WebM, MP4/M4A, and Ogg containers as their shared video/application container types, validated shared containers declared by the browser as audio are classified as audio; MIME parameters such as WebM codecs are ignored during this comparison. Temporary media indexes are reset when SPA navigation creates a new editor, and content with an unresolved upload placeholder is rejected rather than persisted.
 

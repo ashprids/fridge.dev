@@ -6,6 +6,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
     header('Location: /account/login');
@@ -52,16 +54,18 @@ if (!is_file($postFile)) {
     exit;
 }
 
-$lines = @file($postFile, FILE_IGNORE_NEW_LINES);
-if ($lines === false || count($lines) < 3) {
+$rawPost = @file_get_contents($postFile);
+$parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+if ($parsedPost === null) {
     header('Location: /journal');
     exit;
 }
 
-$postDate = (string)($lines[0] ?? date('Y-m-d'));
-$postTitle = (string)($lines[1] ?? '');
-$postSubtitle = (string)($lines[2] ?? '');
-$postHtml = implode("\n", array_slice($lines, 3));
+$postDate = $parsedPost['date'] !== '' ? $parsedPost['date'] : date('Y-m-d');
+$postTitle = $parsedPost['title'];
+$postSubtitle = $parsedPost['description'];
+$postHtml = $parsedPost['body'];
+$postCardImage = $parsedPost['cardImage'];
 $postingRestricted = fridg3_current_user_posting_restricted();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted && !isset($_POST['delete'])) {
@@ -111,7 +115,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postSubtitle = $newDescription;
         $postHtml = $newContent;
     } else {
-        $text = $postDate . PHP_EOL . $newTitle . PHP_EOL . $newDescription . PHP_EOL . $newContent . PHP_EOL;
+        $cardImageUpload = isset($_FILES['card_image']) && is_array($_FILES['card_image'])
+            ? fridg3_journal_process_card_image($_FILES['card_image'])
+            : ['provided' => false, 'url' => ''];
+        if ($cardImageUpload['provided'] && $cardImageUpload['url'] === '') {
+            header('Location: /journal/edit?post=' . rawurlencode($postId) . '&error=' . rawurlencode('card image upload failed. use a supported image no larger than 8 MB.'));
+            exit;
+        }
+        $newCardImage = $postCardImage;
+        if (isset($_POST['remove_card_image'])) {
+            $newCardImage = '';
+        }
+        if ($cardImageUpload['url'] !== '') {
+            $newCardImage = $cardImageUpload['url'];
+        }
+        $text = fridg3_journal_build_post(
+            $postDate,
+            $newTitle,
+            $newDescription,
+            $newContent,
+            $newCardImage
+        );
         @file_put_contents($postFile, $text);
         header('Location: /journal/posts/' . urlencode($postId));
         exit;
@@ -166,6 +190,14 @@ $content = str_replace('{post_id}', htmlspecialchars($postId, ENT_QUOTES, 'UTF-8
 $content = str_replace('{title_value}', htmlspecialchars($postTitle, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{description_value}', htmlspecialchars($postSubtitle, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{content_value}', htmlspecialchars($postHtml, ENT_QUOTES, 'UTF-8'), $content);
+$currentCardImageHtml = '';
+if ($postCardImage !== '') {
+    $currentCardImageHtml = '<span class="journal-current-card-image">current custom image: <a href="'
+        . htmlspecialchars($postCardImage, ENT_QUOTES, 'UTF-8')
+        . '" target="_blank" rel="noopener">view image</a></span>'
+        . '<label class="checkbox-label"><input class="checkbox" type="checkbox" name="remove_card_image" value="1"><span>remove custom card image</span></label>';
+}
+$content = str_replace('{current_card_image}', $currentCardImageHtml, $content);
 if ($postingRestricted) {
     $deleteButton = '<button id="two-buttons" type="submit" form="delete-journal-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>';
     $content = fridg3_disable_composer_controls($content);

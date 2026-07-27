@@ -6,6 +6,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'video-embeds.php';
 
 if (isset($_SESSION['user']) && isset($_SESSION['user']['username'])) {
@@ -52,14 +53,16 @@ $content_html = '';
 $description = '';
 
 if ($post && file_exists($post_file)) {
-    $lines = file($post_file, FILE_IGNORE_NEW_LINES);
-    $date = htmlspecialchars($lines[0] ?? '', ENT_QUOTES, 'UTF-8');
-    $title = htmlspecialchars($lines[1] ?? '', ENT_QUOTES, 'UTF-8');
-    $subtitle = htmlspecialchars($lines[2] ?? '', ENT_QUOTES, 'UTF-8');
-    $description = $subtitle;
-    $body = array_slice($lines, 3);
-    // Render post content as HTML (trusted input)
-    $content_html = fridg3_embed_plain_video_links_in_html(implode("\n", $body));
+    $rawPost = @file_get_contents($post_file);
+    $parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+    if ($parsedPost !== null) {
+        $date = htmlspecialchars($parsedPost['date'], ENT_QUOTES, 'UTF-8');
+        $title = htmlspecialchars($parsedPost['title'], ENT_QUOTES, 'UTF-8');
+        $subtitle = htmlspecialchars($parsedPost['description'], ENT_QUOTES, 'UTF-8');
+        $description = $subtitle;
+        // Render post content as HTML (trusted input)
+        $content_html = fridg3_embed_plain_video_links_in_html($parsedPost['body']);
+    }
 }
 
 

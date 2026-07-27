@@ -6,6 +6,11 @@
 <br><br>
 <textarea id="textbox" class="large" type="text" name="description" placeholder="description" style="height: 54px;"></textarea>
 <br><br>
+<label class="journal-card-image-field">
+    <span>card image <small>(optional; otherwise the first post image is used)</small></span>
+    <input name="card_image" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+</label>
+<br><br>
 <div class="bbcode-editor">
     <div class="bbcode-toolbar">
         <button type="button" class="bbcode-btn" data-tag="b" data-tooltip="bold"><i class="fa-solid fa-bold"></i></button>
@@ -29,7 +34,7 @@
             <option value="h4">sub-heading</option>
             <option value="h5">caption</option>
         </select>
-        <button type="button" id="bbcode-preview-toggle" class="bbcode-btn" data-tooltip="toggle preview"><i class="fa-solid fa-eye"></i></button>
+        <button type="submit" id="journal-preview-button" class="bbcode-btn" name="open_preview" value="1" data-tooltip="preview journal post"><i class="fa-solid fa-eye"></i></button>
     </div>
     <textarea id="bbcode-textbox" name="content"></textarea>
     <div id="bbcode-preview" style="display: none;"></div>
