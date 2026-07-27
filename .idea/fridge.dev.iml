@@ -16,6 +16,7 @@
       <excludeFolder url="file://$MODULE_DIR$/data/music" />
       <excludeFolder url="file://$MODULE_DIR$/data/newsletter" />
       <excludeFolder url="file://$MODULE_DIR$/data/upload" />
+      <excludeFolder url="file://$MODULE_DIR$/data/video" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

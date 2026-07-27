@@ -6,3 +6,5 @@ sitemap.xml
 .codex
 .vscode
 .agents
+id_ed25519
+.user.ini

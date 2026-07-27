@@ -1,11 +1,11 @@
 <h1>edit journal post</h1>
 <h2>edit title, description, and raw HTML content</h2>
 <br>
-<form id="delete-journal-post-form" method="POST" style="display:none" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete journal post?" data-confirm-detail="this removes the journal post from the site." data-confirm-text="delete" data-cancel-text="cancel">
+<form id="delete-journal-post-form" method="POST" action="/journal/edit/" style="display:none" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete journal post?" data-confirm-detail="this removes the journal post from the site." data-confirm-text="delete" data-cancel-text="cancel">
 <input type="hidden" name="post" value="{post_id}">
 <input type="hidden" name="delete" value="1">
 </form>
-<form id="create-post-form" method="POST" enctype="multipart/form-data">
+<form id="create-post-form" method="POST" action="/journal/edit/" enctype="multipart/form-data">
 <input type="hidden" name="post" value="{post_id}">
 <input id="textbox" type="text" name="title" placeholder="title" value="{title_value}">
 <br><br>

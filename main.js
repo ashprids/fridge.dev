@@ -574,7 +574,7 @@ function fridg3OpenAccessIpMenu(ipElement, clientX, clientY) {
         if (!confirmed) return;
         try {
             const params = new URLSearchParams({ ip });
-            const response = await fetch('/api/debug-access-logs', {
+            const response = await fetch('/api/debug-access-logs/', {
                 method: 'POST',
                 credentials: 'same-origin',
                 cache: 'no-store',
@@ -629,7 +629,7 @@ function fridg3InitDebugClearControls(panel) {
             if (channel === 'access') {
                 button.disabled = true;
                 try {
-                    const response = await fetch('/api/debug-access-logs', {
+                    const response = await fetch('/api/debug-access-logs/', {
                         method: 'POST',
                         credentials: 'same-origin',
                         cache: 'no-store',
@@ -826,7 +826,7 @@ function fridg3EnableFetchTracing() {
         const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
         let path = 'request';
         try { path = new URL(typeof input === 'string' ? input : input.url, window.location.href).pathname; } catch (_) { /* keep generic path */ }
-        const quiet = path === '/api/debug-process-logs' || path === '/api/debug-access-logs' || path === '/api/system/usage/' || path === '/api/feed-notifications';
+        const quiet = path === '/api/debug-process-logs' || path === '/api/debug-access-logs/' || path === '/api/system/usage/' || path === '/api/feed-notifications';
         const requestBody = init && Object.prototype.hasOwnProperty.call(init, 'body')
             ? init.body
             : typeof Request !== 'undefined' && input instanceof Request && input.body ? input.body : null;
@@ -1037,7 +1037,7 @@ async function fridg3PollAccessLogs() {
     ) return;
     fridg3AccessLogRequestActive = true;
     try {
-        const response = await fetch('/api/debug-access-logs', {
+        const response = await fetch('/api/debug-access-logs/', {
             credentials: 'same-origin',
             cache: 'no-store',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
