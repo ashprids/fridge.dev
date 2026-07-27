@@ -231,6 +231,9 @@ ensureDirectory(dirname($hardBanPath));
 if (file_put_contents($hardBanPath, '', LOCK_EX) === false) {
     throw new RuntimeException('failed to clear the hard-ban IP list');
 }
+$hardBanSettings = readJsonObject($root, 'etc/hard-ban-settings.json');
+$hardBanSettings['whitelistedIps'] = [];
+writeJson($root, 'etc/hard-ban-settings.json', $hardBanSettings);
 writeJson($root, 'etc/hard-ban-identities.json', ['identities' => new stdClass()]);
 clearDirectory($root, 'etc/banlists');
 

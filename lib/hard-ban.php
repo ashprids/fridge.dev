@@ -44,25 +44,42 @@ if (!function_exists('fridg3_hard_ban_write_settings')) {
     function fridg3_hard_ban_write_settings(array $updates): bool
     {
         $path = fridg3_hard_ban_settings_path();
-        $existing = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
-        $settings = is_array($existing) ? array_merge($existing, $updates) : $updates;
         $directory = dirname($path);
         if (!is_dir($directory) && !@mkdir($directory, 0750, true)) {
             return false;
         }
-        $encoded = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($encoded === false) {
+
+        $lock = @fopen($path . '.lock', 'c');
+        if ($lock === false || !flock($lock, LOCK_EX)) {
+            if ($lock !== false) fclose($lock);
             return false;
         }
-        $tempPath = tempnam($directory, 'hard_ban_settings_');
-        if ($tempPath === false) {
-            return false;
+
+        try {
+            $existing = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
+            $settings = is_array($existing) ? array_merge($existing, $updates) : $updates;
+            $encoded = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if ($encoded === false) {
+                return false;
+            }
+            $tempPath = tempnam($directory, 'hard_ban_settings_');
+            if ($tempPath === false) {
+                return false;
+            }
+            $permissions = @fileperms($path);
+            $written = @file_put_contents($tempPath, $encoded . PHP_EOL, LOCK_EX) !== false;
+            if ($written) {
+                @chmod($tempPath, $permissions === false ? 0640 : $permissions & 0777);
+            }
+            $saved = $written && @rename($tempPath, $path);
+            if (!$saved && is_file($tempPath)) {
+                @unlink($tempPath);
+            }
+            return $saved;
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
         }
-        $saved = @file_put_contents($tempPath, $encoded . PHP_EOL, LOCK_EX) !== false && @rename($tempPath, $path);
-        if (!$saved && is_file($tempPath)) {
-            @unlink($tempPath);
-        }
-        return $saved;
     }
 }
 
@@ -174,6 +191,23 @@ if (!function_exists('fridg3_hard_ban_load')) {
         }
 
         return fridg3_hard_ban_parse($raw)['ips'];
+    }
+}
+
+if (!function_exists('fridg3_hard_ban_whitelist_load')) {
+    function fridg3_hard_ban_whitelist_load(): array
+    {
+        $path = fridg3_hard_ban_settings_path();
+        if (!is_file($path)) {
+            return [];
+        }
+
+        $decoded = json_decode((string)@file_get_contents($path), true);
+        if (!is_array($decoded) || !is_array($decoded['whitelistedIps'] ?? null)) {
+            return [];
+        }
+
+        return fridg3_hard_ban_parse(implode(' ', array_map('strval', $decoded['whitelistedIps'])))['ips'];
     }
 }
 
@@ -894,6 +928,15 @@ if (!function_exists('fridg3_hard_ban_write')) {
     }
 }
 
+if (!function_exists('fridg3_hard_ban_whitelist_write')) {
+    function fridg3_hard_ban_whitelist_write(array $ips): bool
+    {
+        $parsed = fridg3_hard_ban_parse(implode(' ', array_map('strval', $ips)));
+        return $parsed['invalid'] === []
+            && fridg3_hard_ban_write_settings(['whitelistedIps' => $parsed['ips']]);
+    }
+}
+
 if (!function_exists('fridg3_hard_ban_client_ip')) {
     function fridg3_hard_ban_client_ip(): string
     {
@@ -922,6 +965,9 @@ if (!function_exists('fridg3_hard_ban_contains')) {
         }
 
         $normalizedCandidate = (string)@inet_ntop($packedCandidate);
+        if (fridg3_hard_ban_list_contains(fridg3_hard_ban_whitelist_load(), $normalizedCandidate)) {
+            return false;
+        }
         return fridg3_hard_ban_list_contains(fridg3_hard_ban_load(), $normalizedCandidate)
             || fridg3_hard_ban_source_contains($normalizedCandidate);
     }
@@ -1158,6 +1204,9 @@ if (!function_exists('fridg3_hard_ban_check_client')) {
         if (!fridg3_hard_ban_enforcement_enabled()) {
             return false;
         }
+        if (fridg3_hard_ban_list_contains(fridg3_hard_ban_whitelist_load(), $ip)) {
+            return false;
+        }
         if (!fridg3_hard_ban_strict_enabled()) {
             // Relaxed mode deliberately ignores the complete identity store.
             return fridg3_hard_ban_contains($ip);
@@ -1191,6 +1240,9 @@ if (!function_exists('fridg3_hard_ban_would_block_client')) {
     function fridg3_hard_ban_would_block_client(string $ip, string $identifier): bool
     {
         if (!fridg3_hard_ban_enforcement_enabled()) {
+            return false;
+        }
+        if (fridg3_hard_ban_list_contains(fridg3_hard_ban_whitelist_load(), $ip)) {
             return false;
         }
         if (fridg3_hard_ban_contains($ip)) {

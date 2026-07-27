@@ -15,7 +15,7 @@ error routes are the main exception:
 - `error/50x/index.html`
 - `error/wip/index.php`
 
-production nginx redirects unknown paths to `/error/404` instead of falling back to the homepage.
+production nginx internally renders `/error/404/index.php` for unknown paths instead of falling back to the homepage. the original requested URL stays visible and receives the `404` response. root `index.php` also rejects non-homepage request paths as a fallback guard against stale webserver configuration.
 
 ## Upward File Lookup
 

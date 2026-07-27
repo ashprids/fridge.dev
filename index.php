@@ -1,4 +1,11 @@
 <?php
+$requestPath = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+$requestPath = is_string($requestPath) && $requestPath !== '' ? $requestPath : '/';
+if (!in_array($requestPath, ['/', '/index.php'], true)) {
+    require __DIR__ . '/error/404/index.php';
+    return;
+}
+
 $sessionBootstrapDir = __DIR__;
 while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessionBootstrapDir) !== $sessionBootstrapDir) {
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
@@ -6,20 +13,22 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 
-function find_template_file($filename) {
-    $dir = __DIR__;
-    $prev_dir = '';
-    
-    while ($dir !== $prev_dir) {
-        $filepath = $dir . DIRECTORY_SEPARATOR . $filename;
-        if (file_exists($filepath)) {
-            return $filepath;
+if (!function_exists('find_template_file')) {
+    function find_template_file($filename) {
+        $dir = __DIR__;
+        $prev_dir = '';
+
+        while ($dir !== $prev_dir) {
+            $filepath = $dir . DIRECTORY_SEPARATOR . $filename;
+            if (file_exists($filepath)) {
+                return $filepath;
+            }
+            $prev_dir = $dir;
+            $dir = dirname($dir);
         }
-        $prev_dir = $dir;
-        $dir = dirname($dir);
+
+        return null;
     }
-    
-    return null;
 }
 
 $render_helper_path = find_template_file('lib/render.php');
