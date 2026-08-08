@@ -1,334 +1,263 @@
+(function () {
 "use strict";
 
-const mdfpasteDebugLog = message => window.fridg3DebugClientLog?.(`[mdpaste] ${message}`);
-
+const debugLog = message => window.fridg3DebugClientLog?.(`[mdpaste] ${message}`);
 const fileInput = document.getElementById("markdown-file");
+const uploadButton = document.getElementById("markdown-upload-button");
 const markdownInput = document.getElementById("markdown-input");
-const preview = document.getElementById("markdown-preview-body");
+const preview = document.getElementById("markdown-preview");
+const previewToggle = document.getElementById("markdown-preview-toggle");
+const formattingActions = document.getElementById("markdown-formatting-actions");
 const form = document.getElementById("mdpaste-form");
 const passwordInput = document.getElementById("password-input");
 const statusLine = document.getElementById("status-line");
 const resultBox = document.getElementById("result-box");
 const shareLink = document.getElementById("share-link");
-const copyLinkButton = document.getElementById("copy-link-btn");
-const createButton = document.getElementById("create-link-btn");
+const copyButton = document.getElementById("copy-link-btn");
+const createButton = form?.querySelector('button[type="submit"]');
 const hardBreaksInput = document.getElementById("hard-breaks-input");
+let previewOpen = false;
 
-if (!fileInput || !markdownInput || !preview) {
-	// Do nothing when this script is loaded on a page without the mdfpaste UI.
-} else {
-	fileInput.addEventListener("change", handleFileUpload);
-	markdownInput.addEventListener("input", updatePreview);
-	if (hardBreaksInput) {
-		hardBreaksInput.addEventListener("change", updatePreview);
-	}
-	if (form) {
-		form.addEventListener("submit", createPaste);
-	}
-	if (copyLinkButton && shareLink) {
-		copyLinkButton.addEventListener("click", copyShareLink);
-	}
-	updatePreview();
-	mdfpasteDebugLog("editor initialized");
+if (fileInput && markdownInput && preview && previewToggle) {
+    fileInput.addEventListener("change", handleFileUpload);
+    uploadButton?.addEventListener("click", () => fileInput.click());
+    previewToggle.addEventListener("click", togglePreview);
+    formattingActions?.addEventListener("click", applyMarkdownFormatting);
+    formattingActions?.addEventListener("change", applyMarkdownFormatting);
+    hardBreaksInput?.addEventListener("change", refreshOpenPreview);
+    form?.addEventListener("submit", createPaste);
+    copyButton?.addEventListener("click", copyShareLink);
+    debugLog("editor initialized");
+}
+
+function togglePreview() {
+    previewOpen = !previewOpen;
+    if (previewOpen) renderPreview();
+    markdownInput.hidden = previewOpen;
+    preview.hidden = !previewOpen;
+    previewToggle.setAttribute("aria-pressed", String(previewOpen));
+    previewToggle.classList.toggle("active", previewOpen);
+    previewToggle.setAttribute("data-tooltip", previewOpen ? "return to editor" : "toggle preview");
+    if (formattingActions) formattingActions.hidden = previewOpen;
+    if (!previewOpen) markdownInput.focus();
+    debugLog(previewOpen ? "preview opened" : "preview closed");
+}
+
+function applyMarkdownFormatting(event) {
+    const control = event.target.closest("[data-markdown-action], [data-markdown-select]");
+    if (!control || !formattingActions?.contains(control) || previewOpen) return;
+    if (control.matches("select") && event.type !== "change") return;
+    if (!control.matches("select") && event.type !== "click") return;
+    const action = control.dataset.markdownAction || control.value;
+    if (control.matches("select")) control.value = "";
+    if (!action) return;
+    const start = markdownInput.selectionStart;
+    const end = markdownInput.selectionEnd;
+    const selected = markdownInput.value.slice(start, end);
+    if (action === "article-header") {
+        const now = new Date();
+        const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+        const title = (selected.trim() || "Article title").replace(/\s+/g, " ").replace(/"/g, '\\"');
+        if (selected) markdownInput.setRangeText("", start, end, "start");
+        markdownInput.setSelectionRange(0, 0);
+        const beforeTitle = '---\ntitle: "';
+        const header = `${beforeTitle}${title}"\nauthor: "Author"\ndate: ${date}\ntags:\n  - tag\n---\n\n`;
+        replaceEditorSelection(header, beforeTitle.length, title.length);
+        return;
+    }
+    const wrappers = {
+        bold: ["**", "**", "bold text"],
+        italic: ["*", "*", "italic text"],
+        underline: ["<u>", "</u>", "underlined text"],
+        strikethrough: ["~~", "~~", "strikethrough text"],
+        highlight: ["==", "==", "highlighted text"],
+        code: ["`", "`", "code"]
+    };
+    if (wrappers[action]) {
+        const [before, after, placeholder] = wrappers[action];
+        replaceEditorSelection(before + (selected || placeholder) + after, before.length, (selected || placeholder).length);
+        return;
+    }
+    if (action === "link") {
+        const label = selected || "link text";
+        replaceEditorSelection(`[${label}](https://example.com)`, 1, label.length);
+        return;
+    }
+    if (action === "image") {
+        const alt = selected || "image description";
+        replaceEditorSelection(`![${alt}](https://example.com/image.png)`, 2, alt.length);
+        return;
+    }
+    if (action === "code-block") {
+        const code = selected || "code";
+        replaceEditorSelection(`\n\`\`\`\n${code}\n\`\`\`\n`, 5, code.length);
+        return;
+    }
+    if (action === "horizontal-rule") {
+        replaceEditorSelection("\n---\n", 5, 0);
+        return;
+    }
+    if (action === "table") {
+        const table = "| heading | heading |\n| --- | --- |\n| cell | cell |";
+        replaceEditorSelection(table, 2, 7);
+        return;
+    }
+    const prefixes = {
+        task: "- [ ] ",
+        quote: "> "
+    };
+    const headingMatch = action.match(/^heading-([1-6])$/);
+    const prefix = headingMatch ? "#".repeat(Number(headingMatch[1])) + " " : prefixes[action];
+    if (!prefix) return;
+    const lineStart = markdownInput.value.lastIndexOf("\n", start - 1) + 1;
+    const nextLineBreak = markdownInput.value.indexOf("\n", end);
+    const lineEnd = nextLineBreak === -1 ? markdownInput.value.length : nextLineBreak;
+    const lines = markdownInput.value.slice(lineStart, lineEnd).split("\n");
+    const replacement = lines.map(line => prefix + line).join("\n");
+    markdownInput.setSelectionRange(lineStart, lineEnd);
+    replaceEditorSelection(replacement, prefix.length, replacement.length - prefix.length);
+}
+
+function replaceEditorSelection(replacement, selectionOffset, selectionLength) {
+    const start = markdownInput.selectionStart;
+    const end = markdownInput.selectionEnd;
+    markdownInput.setRangeText(replacement, start, end, "end");
+    const selectionStart = start + selectionOffset;
+    markdownInput.setSelectionRange(selectionStart, selectionStart + selectionLength);
+    markdownInput.focus();
+}
+
+function refreshOpenPreview() {
+    if (previewOpen) renderPreview();
+}
+
+async function renderPreview() {
+    preview.innerHTML = "<p>rendering preview...</p>";
+    try {
+        const response = await fetch("/tools/mdpaste/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                action: "preview",
+                markdown: markdownInput.value,
+                hardBreaks: !!hardBreaksInput?.checked
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || "could not render preview.");
+        preview.innerHTML = data.html;
+        if (typeof window.fridg3RenderMdpasteEnhancements === "function") await window.fridg3RenderMdpasteEnhancements(preview);
+        if (typeof window.hljs !== "undefined") {
+            preview.querySelectorAll("pre code").forEach(block => window.hljs.highlightElement(block));
+        }
+    } catch (error) {
+        preview.textContent = error.message || "could not render preview.";
+    }
 }
 
 function handleFileUpload(event) {
-	const target = event.target;
-	const file = target.files && target.files[0];
-
-	if (!file) {
-		return;
-	}
-
-	const filename = file.name.toLowerCase();
-	if (!filename.endsWith(".md") && !filename.endsWith(".txt")) {
-		setStatus("only .md and .txt files are allowed.", true);
-		target.value = "";
-		return;
-	}
-
-	const reader = new FileReader();
-	reader.onload = function onLoad() {
-		markdownInput.value = String(reader.result || "");
-		setStatus("file loaded. preview updated.", false);
-		updatePreview();
-		mdfpasteDebugLog("local markdown file loaded");
-	};
-	reader.onerror = function onError() {
-		setStatus("could not read the file. try again.", true);
-		target.value = "";
-		mdfpasteDebugLog("local markdown file read failed");
-	};
-	reader.readAsText(file, "utf-8");
+    const target = event.target;
+    const file = target.files?.[0];
+    if (!file) return;
+    if (!/\.(md|txt)$/i.test(file.name)) {
+        setStatus("only .md and .txt files are allowed.", true);
+        target.value = "";
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        markdownInput.value = String(reader.result || "");
+        markdownInput.dispatchEvent(new Event("input", { bubbles: true }));
+        refreshOpenPreview();
+        setStatus("file loaded.", false);
+        debugLog("local Markdown file loaded");
+    };
+    reader.onerror = () => {
+        setStatus("could not read the file. try again.", true);
+        target.value = "";
+    };
+    reader.readAsText(file, "utf-8");
 }
 
 async function createPaste(event) {
-	event.preventDefault();
+    event.preventDefault();
+    const markdown = markdownInput.value || "";
+    if (!markdown.trim()) {
+        setStatus("error: empty file!", true);
+        return;
+    }
+    const unsafeTags = findUnsupportedTags(markdown);
+    if (unsafeTags.length && typeof window.showSitePopup === "function") {
+        const elementName = unsafeTags.join(", ");
+        const confirmed = await window.showSitePopup({
+            title: "unsupported tags",
+            detail: `Your paste contains ${elementName} tags, which aren't supported due to security issues.`,
+            cancelText: "go back",
+            okText: "upload anyway"
+        });
+        if (!confirmed) return;
+    }
+    if (createButton) {
+        createButton.disabled = true;
+        createButton.textContent = "creating...";
+    }
+    setStatus("saving paste...", false);
+    try {
+        const response = await fetch("/tools/mdpaste/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                markdown,
+                password: passwordInput?.value || "",
+                hardBreaks: !!hardBreaksInput?.checked
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || "could not create paste.");
+        if (shareLink && resultBox) {
+            shareLink.value = new URL(data.url, window.location.origin).toString();
+            resultBox.hidden = false;
+            shareLink.focus();
+            shareLink.select();
+        }
+        setStatus(data.encrypted ? "encrypted paste created. send the password separately." : "paste created.", false);
+    } catch (error) {
+        setStatus(error.message || "could not create paste.", true);
+    } finally {
+        if (createButton) {
+            createButton.disabled = false;
+            createButton.textContent = "create link";
+        }
+    }
+}
 
-	const markdown = markdownInput.value || "";
-	if (!markdown.trim()) {
-		setStatus("error: empty file!", true);
-		return;
-	}
-
-	if (createButton) {
-		createButton.disabled = true;
-		createButton.textContent = "creating...";
-	}
-	setStatus("saving paste...", false);
-	mdfpasteDebugLog("paste creation requested");
-
-	try {
-		const response = await fetch("/tools/mdpaste/", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json"
-			},
-			body: JSON.stringify({
-				markdown,
-				password: passwordInput ? passwordInput.value : "",
-				hardBreaks: hardBreaksInput ? hardBreaksInput.checked : false
-			})
-		});
-		const data = await response.json().catch(function () {
-			return {};
-		});
-
-		if (!response.ok || !data.ok) {
-			throw new Error(data.error || "could not create paste.");
-		}
-
-		const absoluteUrl = new URL(data.url, window.location.origin).toString();
-		if (shareLink && resultBox) {
-			shareLink.value = absoluteUrl;
-			resultBox.hidden = false;
-			shareLink.focus();
-			shareLink.select();
-		}
-		setStatus(data.encrypted ? "encrypted paste created. send the password separately." : "paste created.", false);
-		mdfpasteDebugLog(`paste created${data.encrypted ? " with encryption" : ""}`);
-	} catch (error) {
-		setStatus(error.message || "could not create paste.", true);
-		mdfpasteDebugLog(`paste creation failed: ${error.message || "unknown error"}`);
-	} finally {
-		if (createButton) {
-			createButton.disabled = false;
-			createButton.textContent = "create link";
-		}
-	}
+function findUnsupportedTags(markdown) {
+    const unsafe = new Set(["script", "iframe", "object", "embed", "form", "input", "button", "textarea", "select", "option", "style", "link", "meta", "base", "frame", "frameset", "svg"]);
+    const found = new Set();
+    String(markdown).replace(/<\/?([a-z][a-z0-9-]*)\b[^>]*>/gi, (_match, tag) => {
+        const name = tag.toLowerCase();
+        if (unsafe.has(name)) found.add(name);
+        return _match;
+    });
+    return Array.from(found);
 }
 
 async function copyShareLink() {
-	if (!shareLink || !shareLink.value) {
-		return;
-	}
-
-	try {
-		await navigator.clipboard.writeText(shareLink.value);
-		setStatus("copied. delicious.", false);
-		mdfpasteDebugLog("share link copied");
-	} catch (error) {
-		shareLink.focus();
-		shareLink.select();
-		setStatus("copy failed, but the link is selected.", true);
-		mdfpasteDebugLog("clipboard copy failed");
-	}
+    if (!shareLink?.value) return;
+    try {
+        await navigator.clipboard.writeText(shareLink.value);
+        setStatus("copied. delicious.", false);
+    } catch (_) {
+        shareLink.focus();
+        shareLink.select();
+        setStatus("copy failed, but the link is selected.", true);
+    }
 }
 
 function setStatus(message, isError) {
-	if (!statusLine) {
-		return;
-	}
-	statusLine.textContent = message;
-	statusLine.classList.toggle("is-error", Boolean(isError));
+    if (!statusLine) return;
+    statusLine.textContent = message;
+    statusLine.classList.toggle("is-error", !!isError);
 }
 
-function updatePreview() {
-	const raw = markdownInput.value || "";
-	preview.innerHTML = renderMarkdown(raw, hardBreaksInput ? hardBreaksInput.checked : false);
-}
-
-function escapeHtml(value) {
-	return value
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/\"/g, "&quot;")
-		.replace(/'/g, "&#39;");
-}
-
-function applyInline(text) {
-	let out = escapeHtml(text);
-	out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
-	out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-	out = out.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-	out = out.replace(/~~([^~]+)~~/g, "<del>$1</del>");
-	out = out.replace(/!\[\[([^\]]+)\]\]/g, function renderObsidianImage(match, target) {
-		const src = safeObsidianImageUrl(target);
-		return src ? '<img src="' + escapeAttribute(src) + '" alt="">' : match;
-	});
-	out = out.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+|\/data\/images\/[^\s)]+)\)/g, '<img src="$2" alt="$1">');
-	out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
-	return out;
-}
-
-function escapeAttribute(value) {
-	return String(value).replace(/"/g, "&quot;");
-}
-
-function safeObsidianImageUrl(target) {
-	const cleanTarget = String(target || "").replace(/\|.*$/, "").trim();
-	if (/^https?:\/\//i.test(cleanTarget) || cleanTarget.startsWith("/data/images/")) {
-		return cleanTarget;
-	}
-	if (/^[A-Za-z0-9][A-Za-z0-9._ -]+\.(png|jpe?g|gif|webp|svg)$/i.test(cleanTarget)) {
-		return "/data/images/" + encodeURIComponent(cleanTarget);
-	}
-	return "";
-}
-
-function renderMarkdown(markdown, hardBreaks) {
-	const lines = markdown.replace(/\r\n/g, "\n").split("\n");
-	const html = [];
-	let paragraph = [];
-	let inCode = false;
-	let codeBuffer = [];
-	let inUl = false;
-	let inOl = false;
-	let inBlockquote = false;
-
-	const flushParagraph = function flushParagraph() {
-		if (!paragraph.length) {
-			return;
-		}
-		html.push("<p>" + applyInline(paragraph.join(hardBreaks ? "\n" : " ")).replace(/\n/g, "<br>") + "</p>");
-		paragraph = [];
-	};
-
-	const closeLists = function closeLists() {
-		if (inUl) {
-			html.push("</ul>");
-			inUl = false;
-		}
-		if (inOl) {
-			html.push("</ol>");
-			inOl = false;
-		}
-	};
-
-	const closeQuote = function closeQuote() {
-		if (inBlockquote) {
-			html.push("</blockquote>");
-			inBlockquote = false;
-		}
-	};
-
-	for (let i = 0; i < lines.length; i += 1) {
-		const line = lines[i];
-		const trimmed = line.trim();
-
-		if (trimmed.startsWith("```")) {
-			flushParagraph();
-			closeLists();
-			closeQuote();
-			if (!inCode) {
-				inCode = true;
-				codeBuffer = [];
-			} else {
-				html.push("<pre><code>" + escapeHtml(codeBuffer.join("\n")) + "</code></pre>");
-				inCode = false;
-			}
-			continue;
-		}
-
-		if (inCode) {
-			codeBuffer.push(line);
-			continue;
-		}
-
-		if (!trimmed) {
-			flushParagraph();
-			closeLists();
-			closeQuote();
-			continue;
-		}
-
-		const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
-		if (heading) {
-			flushParagraph();
-			closeLists();
-			closeQuote();
-			const level = heading[1].length;
-			html.push("<h" + level + ">" + applyInline(heading[2]) + "</h" + level + ">");
-			continue;
-		}
-
-		if (trimmed === "---" || trimmed === "***") {
-			flushParagraph();
-			closeLists();
-			closeQuote();
-			html.push("<hr>");
-			continue;
-		}
-
-		const ul = trimmed.match(/^[-*]\s+(.+)$/);
-		if (ul) {
-			flushParagraph();
-			closeQuote();
-			if (inOl) {
-				html.push("</ol>");
-				inOl = false;
-			}
-			if (!inUl) {
-				html.push("<ul>");
-				inUl = true;
-			}
-			html.push("<li>" + applyInline(ul[1]) + "</li>");
-			continue;
-		}
-
-		const ol = trimmed.match(/^\d+\.\s+(.+)$/);
-		if (ol) {
-			flushParagraph();
-			closeQuote();
-			if (inUl) {
-				html.push("</ul>");
-				inUl = false;
-			}
-			if (!inOl) {
-				html.push("<ol>");
-				inOl = true;
-			}
-			html.push("<li>" + applyInline(ol[1]) + "</li>");
-			continue;
-		}
-
-		const quote = trimmed.match(/^>\s?(.*)$/);
-		if (quote) {
-			flushParagraph();
-			closeLists();
-			if (!inBlockquote) {
-				html.push("<blockquote>");
-				inBlockquote = true;
-			}
-			html.push("<p>" + applyInline(quote[1]) + "</p>");
-			continue;
-		}
-
-		if (inBlockquote) {
-			closeQuote();
-		}
-
-		paragraph.push(trimmed);
-	}
-
-	flushParagraph();
-	closeLists();
-	closeQuote();
-
-	if (inCode) {
-		html.push("<pre><code>" + escapeHtml(codeBuffer.join("\n")) + "</code></pre>");
-	}
-
-	return html.length ? html.join("\n") : "<p>your formatted markdown will appear here automatically.</p>";
-}
+})();

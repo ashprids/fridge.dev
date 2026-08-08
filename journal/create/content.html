@@ -11,34 +11,7 @@
     <input name="card_image" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
 </label>
 <br><br>
-<div class="bbcode-editor">
-    <div class="bbcode-toolbar">
-        <button type="button" class="bbcode-btn" data-tag="b" data-tooltip="bold"><i class="fa-solid fa-bold"></i></button>
-        <button type="button" class="bbcode-btn" data-tag="i" data-tooltip="italic"><i class="fa-solid fa-italic"></i></button>
-        <button type="button" class="bbcode-btn" data-tag="u" data-tooltip="underline"><i class="fa-solid fa-underline"></i></button>
-        <button type="button" class="bbcode-btn" data-tag="s" data-tooltip="strikethrough"><i class="fa-solid fa-strikethrough"></i></button>
-        <button type="button" id="bbcode-spoiler-btn" class="bbcode-btn" data-tooltip="spoiler"><i class="fa-solid fa-eye-slash"></i></button>
-        <button type="button" id="bbcode-color-btn" class="bbcode-btn" data-tooltip="color"><i class="fa-solid fa-palette"></i></button>
-        <input id="bbcode-color-input" type="color" style="display: none;">
-        <label for="bbcode-image-input">
-            <button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach media"><i class="fa-solid fa-photo-film"></i></button>
-        </label>
-        <input id="bbcode-image-input" name="images[]" type="file" accept="image/*,audio/*,video/*" multiple style="display: none;">
-        <button type="button" class="bbcode-btn" data-tag="code=python" data-tooltip="code block"><i class="fa-solid fa-code"></i></button>
-            <button type="button" id="bbcode-list-btn" class="bbcode-btn" data-tag="list" data-tooltip="list"><i class="fa-solid fa-list-ul"></i></button>
-        <button type="button" id="bbcode-tooltip-btn" class="bbcode-btn" data-tooltip="tooltip"><i class="fa-solid fa-comment-dots"></i></button>
-        <button type="button" id="bbcode-link-btn" class="bbcode-btn" data-tooltip="link"><i class="fa-solid fa-link"></i></button>
-        <select id="bbcode-header-dropdown" class="bbcode-dropdown" data-tooltip="heading">
-            <option value="">headings</option>
-            <option value="h3">heading</option>
-            <option value="h4">sub-heading</option>
-            <option value="h5">caption</option>
-        </select>
-        <button type="submit" id="journal-preview-button" class="bbcode-btn" name="open_preview" value="1" data-tooltip="preview journal post"><i class="fa-solid fa-eye"></i></button>
-    </div>
-    <textarea id="bbcode-textbox" name="content"></textarea>
-    <div id="bbcode-preview" style="display: none;"></div>
-</div>
+{markdown_editor}
 <br><br>
 <button id="two-buttons" type="submit" name="save_draft" value="1">save draft</button><button id="two-buttons" type="submit" data-post-submit-wait>post</button>
 <br><br>

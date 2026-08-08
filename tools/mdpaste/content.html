@@ -1,87 +1,569 @@
-<!doctype html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>mdpaste | fridge.dev</title>
-	<meta
-		name="description"
-		content="quickly paste markdown content and share with others."
-	>
-	<meta name="robots" content="noindex,nofollow">
-	<link rel="stylesheet" href="/tools/mdpaste/style.css">
+<style>
+    .mdpaste-page {
+        display: grid;
+        gap: 16px;
+        min-width: 0;
+        max-width: 100%;
+    }
 
-    <!-- favicons + app formatting -->
-    <link rel="icon" type="image/png" href="/resources/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/resources/favicon.svg" />
-    <link rel="shortcut icon" href="/resources/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/resources/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="fridge.dev" />
-    <link rel="manifest" href="/resources/site.webmanifest" />
-</head>
+    .mdpaste-page,
+    .mdpaste-page * {
+        border-radius: 0 !important;
+    }
 
-<body>
-	<main class="page">
-		<header class="service-header" aria-labelledby="page-title">
-			<a class="home-link" href="/others/">fridge.dev / tools</a>
-			<h1 id="page-title">mdpaste</h1>
-			<p>paste markdown, preview it, then ship a share link.<br>encrypted pastes are locked before they're stored on disk.</p>
-		</header>
+    .mdpaste-page > h2 {
+        margin-bottom: 0;
+    }
 
-		<section class="workspace" aria-label="Markdown paste editor">
-			<form class="editor-panel" id="mdpaste-form">
-				<div class="panel-header">
-					<h2>write</h2>
-					<label for="markdown-file" class="btn btn-secondary" id="upload-trigger">upload file</label>
-					<input id="markdown-file" type="file" accept=".md,.txt,text/markdown,text/plain" aria-label="Upload markdown or text file">
-				</div>
+    #mdpaste-form {
+        display: grid;
+        gap: 16px;
+        min-width: 0;
+        max-width: 100%;
+        margin: 0;
+    }
 
-				<label class="field-label" for="markdown-input">markdown text</label>
-				<textarea
-					id="markdown-input"
-					class="markdown-input"
-					placeholder="# Title&#10;&#10;Write markdown here or upload a .md file..."
-				></textarea>
+    .mdpaste-editor-shell {
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+    }
 
-				<div class="password-row">
-					<label class="password-wrap" for="password-input">
-						<span class="field-label">password (optional)</span>
-						<input
-							id="password-input"
-							type="password"
-							class="password-input"
-							placeholder="leave blank for public"
-							autocomplete="new-password"
-						>
-					</label>
-					<button type="submit" class="btn" id="create-link-btn">create link</button>
-				</div>
+    .mdpaste-actions,
+    .mdpaste-share-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
 
-				<label class="checkbox-option" for="hard-breaks-input">
-					<input id="hard-breaks-input" type="checkbox">
-					<span>keep single line breaks</span>
-				</label>
+    .mdpaste-file-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+    }
 
-				<p class="status-line" id="status-line" role="status" aria-live="polite">stored for 30 days. max size: 512 KiB.</p>
-				<div class="result-box" id="result-box" hidden>
-					<label class="field-label" for="share-link">share link</label>
-					<div class="share-row">
-						<input id="share-link" class="share-link" type="url" readonly>
-						<button type="button" class="btn btn-secondary" id="copy-link-btn">copy</button>
-					</div>
-				</div>
-			</form>
+    .mdpaste-copy-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 16px;
+        box-sizing: border-box;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        background: var(--bg);
+        color: var(--fg);
+        font: inherit;
+        text-align: center;
+        cursor: pointer;
+    }
 
-			<section class="preview-panel" aria-labelledby="preview-title">
-				<div class="panel-header">
-					<h2 id="preview-title">preview</h2>
-				</div>
-				<article id="markdown-preview-body" class="markdown-body">
-					<p>your formatted markdown will appear here automatically.</p>
-				</article>
-			</section>
-		</section>
-	</main>
-	<script src="/tools/mdpaste/main.js?v=20260723-debug-logging-1" defer></script>
-</body>
-</html>
+    .mdpaste-copy-button:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .mdpaste-editor,
+    .mdpaste-preview {
+        width: 100%;
+        min-height: 120px;
+        max-height: 85dvh;
+        overflow: auto;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "MainRegular", var(--emoji-font), monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .mdpaste-editor:focus {
+        border-color: var(--links);
+        box-shadow: none !important;
+    }
+
+    .mdpaste-editor {
+        display: block;
+        height: 240px;
+        resize: vertical;
+        white-space: pre-wrap;
+        tab-size: 4;
+    }
+
+    .mdpaste-preview {
+        margin: 0;
+        white-space: normal;
+    }
+
+    .mdpaste-preview[hidden] {
+        display: none;
+    }
+
+    .mdpaste-editor[hidden] {
+        display: none;
+    }
+
+    .mdpaste-preview > :first-child {
+        margin-top: 0;
+    }
+
+    .mdpaste-preview h1 { font-size: 2em; }
+    .mdpaste-preview h2 { font-size: 1.5em; }
+    .mdpaste-preview h3 { font-size: 1.17em; }
+    .mdpaste-preview h4 { font-size: 1em; }
+    .mdpaste-preview h5 { font-size: 0.83em; }
+    .mdpaste-preview h6 { font-size: 0.67em; }
+
+    .mdpaste-preview h1,
+    .mdpaste-preview h2,
+    .mdpaste-preview h3,
+    .mdpaste-preview h4,
+    .mdpaste-preview h5,
+    .mdpaste-preview h6 {
+        margin: 1em 0 0.5em;
+        font-family: inherit;
+        font-weight: bold;
+        line-height: 1.2;
+    }
+
+    .mdpaste-preview img {
+        max-width: 100%;
+        height: auto;
+    }
+
+    .mdpaste-preview pre {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow: auto;
+        margin: 14px 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+        line-height: 1.45;
+        white-space: pre;
+        box-sizing: border-box;
+    }
+
+    .mdpaste-preview pre code,
+    .mdpaste-preview pre code.hljs {
+        display: block;
+        padding: 12px !important;
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+    }
+
+    .mdpaste-preview :not(pre) > code {
+        display: inline-block;
+        padding: 1px 6px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        font-family: inherit;
+        line-height: 1.2;
+        vertical-align: baseline;
+    }
+
+    .mdpaste-preview kbd {
+        display: inline-block;
+        padding: 1px 6px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        font-family: inherit;
+        line-height: 1.2;
+    }
+
+    .mdpaste-preview blockquote {
+        max-width: 100%;
+        margin: 14px 0;
+        padding: 12px 16px;
+        border-left: 2px solid var(--links);
+        background: rgba(255, 255, 255, 0.08);
+        box-sizing: border-box;
+    }
+
+    .mdpaste-preview blockquote blockquote {
+        margin: 12px 0 0;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .mdpaste-preview blockquote > :first-child,
+    .mdpaste-preview .mdpaste-alert > :first-child { margin-top: 0; }
+    .mdpaste-preview blockquote > :last-child,
+    .mdpaste-preview .mdpaste-alert > :last-child { margin-bottom: 0; }
+
+    .mdpaste-preview ol .mdpaste-roman-list,
+    .mdpaste-preview .mdpaste-roman-list { list-style-type: lower-roman; }
+
+    .mdpaste-preview li > ul,
+    .mdpaste-preview li > ol { margin: 6px 0; }
+
+    .mdpaste-preview hr {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .mdpaste-table-scroll {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .mdpaste-preview table {
+        width: 100%;
+        max-width: 100%;
+        border-collapse: collapse;
+    }
+
+    .mdpaste-preview th,
+    .mdpaste-preview td {
+        padding: 8px;
+        border: 1px solid var(--border);
+    }
+
+    .mdpaste-preview th { background: rgba(255, 255, 255, 0.09); }
+
+    .mdpaste-preview .checkbox {
+        width: 12px !important;
+        height: 12px !important;
+        margin: 0 6px 0 0 !important;
+        vertical-align: -1px;
+    }
+
+    .mdpaste-indented-code { width: 100% !important; margin-left: 0 !important; }
+    .mdpaste-indented-code code { padding-left: 36px !important; }
+
+    .mdpaste-code-figure { max-width: 100%; margin: 14px 0; }
+    .mdpaste-code-figure figcaption { display: flex; gap: 10px; padding: 5px 8px; color: var(--subtle); font-size: 12px; border-bottom: 1px solid var(--border); }
+    .mdpaste-code-figure pre { margin-top: 0; }
+
+    .mdpaste-preview details { max-width: 100%; margin: 14px 0; }
+    .mdpaste-preview summary { cursor: pointer; }
+    .mdpaste-details-content { padding-top: 8px; }
+
+    .mdpaste-article-header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .mdpaste-preview .mdpaste-article-title { margin: 0 !important; font-family: "MainBold", var(--emoji-font), monospace; font-size: 24px !important; line-height: 1.25 !important; }
+    .mdpaste-article-subtitle { margin: 0; font-family: "MainItalic", monospace; font-size: 14px; line-height: 1.5; color: var(--subtle); }
+    .mdpaste-article-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .mdpaste-article-date { font-family: "MainItalic", monospace; font-size: 12px; color: var(--subtle); }
+    .mdpaste-article-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .mdpaste-article-tags span { padding: 2px 7px; border: 1px solid var(--border); color: var(--subtle); font-size: 12px; }
+
+    .mdpaste-preview .mdpaste-alert {
+        max-width: 100%;
+        margin: 14px 0;
+        padding: 12px 16px;
+        border-left: 3px solid var(--links);
+        background: rgba(255, 255, 255, 0.06);
+        box-sizing: border-box;
+    }
+
+    .mdpaste-alert-title { display: block; margin-bottom: 6px; }
+    .mdpaste-alert-warning,
+    .mdpaste-alert-caution { border-left-color: #d69b68 !important; }
+    .mdpaste-alert-tip { border-left-color: #79b98b !important; }
+
+    .mdpaste-math {
+        font-family: "STIX Two Math", "Cambria Math", "Times New Roman", serif;
+    }
+
+    .mdpaste-math-display {
+        max-width: 100%;
+        overflow-x: auto;
+        margin: 14px 0;
+        padding: 8px 0;
+        text-align: center;
+        white-space: pre;
+        box-sizing: border-box;
+    }
+
+    .mdpaste-footnotes {
+        margin-top: 28px;
+        font-size: 0.88em;
+        color: var(--subtle);
+    }
+
+    .mdpaste-footnotes { opacity: 0.72; }
+    .mdpaste-footnotes hr { width: 100%; margin-left: 0; }
+    .mdpaste-footnotes li { padding-left: 4px; margin-bottom: 12px; }
+    .mdpaste-footnotes li p { display: inline; margin: 0; }
+    .mdpaste-footnote-backref { display: inline-block; margin-left: 8px; vertical-align: baseline; }
+
+    .mdpaste-mermaid { max-width: 100%; overflow-x: auto; text-align: center; }
+    .mdpaste-mermaid svg { max-width: 100%; height: auto; font-family: "MainRegular", var(--emoji-font), monospace !important; }
+    .mdpaste-mermaid text,
+    .mdpaste-mermaid .label,
+    .mdpaste-mermaid .nodeLabel { font-family: "MainRegular", var(--emoji-font), monospace !important; }
+
+    .mdpaste-preview abbr {
+        color: var(--links);
+        text-decoration-line: underline;
+        text-decoration-style: dotted;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 3px;
+        cursor: help;
+    }
+
+    .mdpaste-preview .feed-audio-note,
+    .mdpaste-preview .feed-video-attachment { max-width: 100%; }
+
+    .mdpaste-editor-shell .bbcode-toolbar {
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: nowrap;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+    .mdpaste-formatting-actions,
+    .mdpaste-editor-actions {
+        display: inline-flex;
+        flex-wrap: nowrap;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .mdpaste-formatting-actions {
+        flex: 1 1 auto;
+        width: 0;
+        min-width: 0;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+
+    .mdpaste-formatting-actions::-webkit-scrollbar {
+        height: 3px;
+    }
+
+    .mdpaste-formatting-actions::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .mdpaste-formatting-actions::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+    }
+
+    .mdpaste-formatting-actions:hover::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb-hover);
+    }
+
+    .mdpaste-formatting-actions > * {
+        flex: 0 0 auto;
+    }
+
+    .mdpaste-formatting-actions .bbcode-btn,
+    .mdpaste-editor-shell .mdpaste-heading-dropdown {
+        height: 32px;
+        box-sizing: border-box;
+    }
+
+    .mdpaste-editor-shell .bbcode-btn,
+    .mdpaste-editor-shell .bbcode-btn:hover,
+    .mdpaste-editor-shell .bbcode-btn:focus,
+    .mdpaste-editor-shell .bbcode-btn:focus-visible,
+    .mdpaste-editor-shell .bbcode-btn:active,
+    .mdpaste-editor-shell .bbcode-dropdown,
+    .mdpaste-editor-shell .bbcode-dropdown:hover,
+    .mdpaste-editor-shell .bbcode-dropdown:focus,
+    .mdpaste-editor-shell .bbcode-dropdown:active {
+        box-shadow: none !important;
+    }
+
+    .mdpaste-editor-shell .mdpaste-heading-dropdown {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    .mdpaste-heading-dropdown i {
+        pointer-events: none;
+    }
+
+    .mdpaste-heading-dropdown .bbcode-dropdown {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        border: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .mdpaste-heading-dropdown .bbcode-dropdown:focus {
+        outline: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .mdpaste-formatting-actions[hidden] {
+        display: none;
+    }
+
+    .mdpaste-editor-actions {
+        flex: 0 0 auto;
+        margin-left: auto;
+        padding-left: 10px;
+        border-left: 1px solid var(--border);
+    }
+
+    .mdpaste-options {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+        gap: 12px;
+        align-items: end;
+    }
+
+    .mdpaste-options #form-button {
+        width: auto;
+        min-width: 130px;
+        height: 32px;
+        margin: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .mdpaste-password-label {
+        display: grid;
+        gap: 6px;
+        color: var(--subtle);
+    }
+
+    .mdpaste-break-option {
+        width: fit-content;
+        margin: 0;
+        line-height: 14px;
+    }
+
+    .mdpaste-break-option .checkbox {
+        margin: 0;
+    }
+
+    .mdpaste-status {
+        min-height: 20px;
+        margin: 0;
+        color: var(--subtle);
+    }
+
+    .mdpaste-status.is-error {
+        color: #f08c8c;
+    }
+
+    .mdpaste-result {
+        display: grid;
+        gap: 7px;
+    }
+
+    .mdpaste-share-row .text-input {
+        flex: 1 1 260px;
+    }
+
+    .mdpaste-share-row .mdpaste-copy-button {
+        height: 32px;
+    }
+
+    @media (max-width: 620px) {
+        .mdpaste-editor {
+            height: 220px;
+            min-height: 100px;
+            max-height: 80dvh;
+        }
+
+        .mdpaste-options {
+            grid-template-columns: 1fr;
+        }
+
+        .mdpaste-options #form-button {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="mdpaste-page">
+    <h1>mdpaste</h1>
+    <h2>write and share Markdown-formatted notes. Password-protected pastes are encrypted before storage.</h2>
+
+    <form id="mdpaste-form">
+        <div class="bbcode-editor mdpaste-editor-shell">
+            <div class="bbcode-toolbar">
+                <div class="mdpaste-formatting-actions" id="markdown-formatting-actions" aria-label="Markdown formatting">
+                    <button type="button" class="bbcode-btn" data-markdown-action="article-header" data-tooltip="article header" aria-label="insert article header"><i class="fa-solid fa-newspaper" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="bold" data-tooltip="bold" aria-label="bold"><i class="fa-solid fa-bold" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="italic" data-tooltip="italic" aria-label="italic"><i class="fa-solid fa-italic" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="underline" data-tooltip="underline" aria-label="underline"><i class="fa-solid fa-underline" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="strikethrough" data-tooltip="strikethrough" aria-label="strikethrough"><i class="fa-solid fa-strikethrough" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="highlight" data-tooltip="highlight" aria-label="highlight"><i class="fa-solid fa-highlighter" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="link" data-tooltip="link" aria-label="link"><i class="fa-solid fa-link" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="image" data-tooltip="image" aria-label="image"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="quote" data-tooltip="blockquote" aria-label="blockquote"><i class="fa-solid fa-quote-left" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="code" data-tooltip="inline code" aria-label="inline code"><i class="fa-solid fa-code" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="code-block" data-tooltip="code block" aria-label="code block"><i class="fa-solid fa-file-code" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="task" data-tooltip="task" aria-label="task"><i class="fa-solid fa-square-check" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="horizontal-rule" data-tooltip="horizontal rule" aria-label="horizontal rule"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
+                    <button type="button" class="bbcode-btn" data-markdown-action="table" data-tooltip="table" aria-label="table"><i class="fa-solid fa-table" aria-hidden="true"></i></button>
+                    <label class="bbcode-btn mdpaste-heading-dropdown" data-tooltip="heading" aria-label="heading level">
+                        <i class="fa-solid fa-heading" aria-hidden="true"></i>
+                        <select class="bbcode-dropdown" data-markdown-select aria-label="heading level">
+                            <option value="">headings</option>
+                            <option value="heading-1">heading 1</option>
+                            <option value="heading-2">heading 2</option>
+                            <option value="heading-3">heading 3</option>
+                            <option value="heading-4">heading 4</option>
+                            <option value="heading-5">heading 5</option>
+                            <option value="heading-6">heading 6</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="mdpaste-editor-actions">
+                    <button type="button" id="markdown-upload-button" class="bbcode-btn" data-tooltip="upload .md or .txt file" aria-label="upload Markdown or text file"><i class="fa-solid fa-upload" aria-hidden="true"></i></button>
+                    <input class="mdpaste-file-input" id="markdown-file" type="file" accept=".md,.txt,text/markdown,text/plain">
+                    <button type="button" id="markdown-preview-toggle" class="bbcode-btn" data-tooltip="toggle preview" aria-pressed="false"><i class="fa-solid fa-eye"></i></button>
+                </div>
+            </div>
+            <textarea id="markdown-input" class="mdpaste-editor" aria-label="Markdown text" spellcheck="true" placeholder="Write or upload markdown here, then use the preview button to view your text with formatting."></textarea>
+            <article id="markdown-preview" class="mdpaste-preview" hidden></article>
+        </div>
+        <br>
+        <div class="mdpaste-options">
+            <label class="mdpaste-password-label" for="password-input">
+                password (optional)
+                <input id="password-input" type="password" class="text-input" placeholder="leave blank for public" autocomplete="new-password">
+            </label>
+            <button type="submit" id="form-button">create link</button>
+        </div>
+
+        <label class="checkbox-label mdpaste-break-option" for="hard-breaks-input" data-tooltip="when disabled, two line breaks are required\n to show text on a new line.">
+            <input class="checkbox" id="hard-breaks-input" type="checkbox">
+            <span>keep single line breaks</span>
+        </label>
+        <br><br>
+        <div class="mdpaste-result" id="result-box" hidden>
+            <label for="share-link">share link</label>
+            <div class="mdpaste-share-row">
+                <input id="share-link" class="text-input" type="url" readonly placeholder="your shareable link will appear here">
+                <button type="button" class="mdpaste-copy-button" id="copy-link-btn">copy</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script src="/tools/mdpaste/render.js?v=20260808-rich-rendering-5"></script>
+<script src="/tools/mdpaste/main.js?v=20260808-markdown-editor-highlighting-1"></script>

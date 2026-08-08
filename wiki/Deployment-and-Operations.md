@@ -1,169 +1,109 @@
 # Deployment and Operations
 
-For the complete moderation-layer model behind account restrictions, posting bans, and nginx hard bans, see [Account Restrictions and IP Bans](Account-Restrictions-and-IP-Bans).
+For the complete moderation-layer model behind account restrictions, posting bans, and Nginx hard bans, see [Restrictions and Moderation](Restrictions-and-Moderation).
 
 ## Deployment Flow
 
-deployment is GitHub Actions driven.
+Deployment is GitHub Actions driven.
 
-current chain:
+Current chain:
 
-1. push to `main`
+1. Push to `main`
 2. `code lint` workflow runs
-3. if lint passes, `deploy to fridge.dev` runs from the successful workflow event
-4. repo is rsynced to `/var/www/fridge.dev`
-5. nginx validates the deployed configuration and gracefully reloads
-6. the hard-ban source index is built or reused as the PHP-FPM `http` user
-7. the Toast Discord bot is gracefully restarted from the deployed copy
-8. the deploy workflow asks Toast to post a patch notice approval preview in Discord channel `1526075637096255548`; an admin `✅` reaction posts it to update channel `1455194403642802309` and pings role `1408064850688475197`
+3. If lint passes, `deploy to fridge.dev` runs from the successful workflow event
+4. Repo is rsynced to `/var/www/fridge.dev`
+5. Nginx validates the deployed configuration and gracefully reloads
+6. The hard-ban source index is built or reused as the PHP-FPM `http` user
+7. Toast's service is restarted and the patch-notice flow runs as documented on [Toast](Toast#local-service-and-production-operation)
 
 ## Deploy Workflow
 
 `/.github/workflows/deploy.yml`
 
-main details:
+Main details:
 
-- triggered by successful `code lint` workflow completion
-- only deploys pushes to `main`
-- installs `rsync` and `openssh-client`
-- uses `DEPLOY_KEY`
-- deploy target is `deploy@45.76.134.105:/var/www/fridge.dev`
-- the workflow verifies `/var/www/fridge.dev` exists and is writable before rsync, and refuses any unexpected target path
-- after rsync, the workflow runs `nginx -t` and reloads nginx only if validation succeeds, making tracked `.nginx/` changes active without interrupting existing connections
-- after rsync, the workflow creates `data/etc/banlists/index` as `http`, verifies that `http` can read the source directory and write the index directory, then asks PHP running as `http` to build or reuse the hard-ban source index so a public request does not pay the one-time rebuild cost
-- if index preparation or construction fails, the workflow prints the relevant directory permissions, largest partial index files, and filesystem usage to distinguish ownership from capacity failures
-- after rsync, ssh stops any `toast` GNU screen session owned by `deploy`, stops any `toast` session owned by `http`, prepares `others/toast-discord-bot/bot/toast-bot.log` for `http`, then runs `/var/www/fridge.dev/others/toast-discord-bot/bot/start.sh` as `http`
-- the restart step needs passwordless sudo for `deploy` to run the Toast bot as `http`; Toast writes DM history, feed notification state, and patch approval state under `/data`, which is owned by `http:http`
-- because the `http` user home is not a normal login home, the workflow sets `SCREENDIR=/tmp/toast-screen-http` for `http`-owned screen commands and creates that socket directory as `http` with mode `700` before start
+- Triggered by successful `code lint` workflow completion
+- Only deploys pushes to `main`
+- Installs `rsync` and `openssh-client`
+- Uses `DEPLOY_KEY`
+- Deploy target is `deploy@45.76.134.105:/var/www/fridge.dev`
+- The workflow verifies `/var/www/fridge.dev` exists and is writable before rsync, and refuses any unexpected target path
+- After rsync, the workflow runs `nginx -t` and reloads Nginx only if validation succeeds, making tracked `.nginx/` changes active without interrupting existing connections
+- After rsync, the workflow creates `data/etc/banlists/index` as `http`, verifies that `http` can read the source directory and write the index directory, then asks PHP running as `http` to build or reuse the hard-ban source index so a public request does not pay the one-time rebuild cost
+- If index preparation or construction fails, the workflow prints the relevant directory permissions, largest partial index files, and filesystem usage to distinguish ownership from capacity failures
+- Toast's restart user, screen environment, writable state, and log preparation are documented on [Toast](Toast#local-service-and-production-operation)
 
-## Toast Patch Notice Commit Format
+## Toast Integration
 
-after a successful `main` deploy, the workflow sends Toast a list of non-merge commits using each commit's subject (`git log %s`) and full body (`git log %b`). Toast turns each commit into Discord patch-note bullets and posts the fully formatted patch notice preview in approval channel `1526075637096255548`. Toast reacts to that preview with `✅`; when an admin approves with `✅`, Toast posts the update to channel `1455194403642802309` and pings role `1408064850688475197`.
-
-Pending approval message IDs and payloads are persisted in `/data/etc/toast-patch-approvals.json`, so older messages remain actionable after a bot restart. The raw reaction handler also fetches uncached approval messages from Discord. For a legacy Toast-authored approval embed created before persistence was added, Toast reconstructs the notice from the embed's commit URL and patch-note fields and sends it to the standard update channel.
-
-```text
-• commit subject
-
-• first body note
-
-• second body note
-```
-
-format commits like this when the Discord patch notice should read cleanly:
-
-```text
-Short user-facing summary
-
-Concrete patch note detail
-
-Second useful detail, if needed
-```
-
-rules to keep in mind:
-
-- the Discord embed shows the deployed build ID followed by the patch-note fields, without introductory or pull-request source text
-- the first bullet is the commit subject and does not include the commit ID
-- body notes are separated by blank lines in the commit body
-- every body note starts with its own bullet
-- long patch notes are split across multiple Discord embed fields instead of being cut off
-- Markdown and Discord mentions are escaped by Toast, so write plain text instead of relying on formatting or pings
-- merge commits are excluded from the shipped commit list
-
-example:
-
-```bash
-git commit -m "Add a settings system info dashboard" \
-  -m "Give admins a live view of server, PHP, storage, and site health." \
-  -m "Load shared runtime scripts through rendered pages so settings controls keep working."
-```
-
-same message as plain text for VS Code's source control commit message box:
-
-```text
-Add a settings system info dashboard
-
-Give admins a live view of server, PHP, storage, and site health.
-
-Load shared runtime scripts through rendered pages so settings controls keep working.
-```
-
-that appears in Toast's Discord embed as three patch-note bullets: one for the subject and one for each body note.
-
-admins can manually post the same style of update directly from Discord with Toast's `/shareupdate` command:
-
-- `/shareupdate latest` posts the currently deployed `HEAD` commit from the bot's local repo
-- `/shareupdate <commit ID>` posts a specific 7-40 character commit SHA
-
-the command uses the same embed formatter and update channel as approved deploy notices, so it also pings role `1408064850688475197`.
+Toast restart behavior, patch-notice formatting, approval flow, and manual update commands are documented on [Toast](Toast#patch-notices).
 
 ## What Does Not Deploy
 
-deployment uses `.rsyncignore`, so these are excluded:
+Deployment uses `.rsyncignore`, so these are excluded:
 
 - `/data/**`
 - `sitemap.xml`
-- repo docs and local config files
+- Repo docs and local config files
 - `.github/**`
 - `/scripts/**`
-- local editor/codex folders
+- Local editor/codex folders
 - `/others/toast-discord-bot/bot/venv/**`
 
-that means production runtime data is expected to already exist on the server.
+That means production runtime data is expected to already exist on the server.
 
 ## Server Permissions
 
-from `README.md`:
+From `README.md`:
 
-- project files should belong to `deploy:http`
-- directories should be `755`
-- files should be `644`
+- Project files should belong to `deploy:http`
+- Directories should be `755`
+- Files should be `644`
 - `/data` and `sitemap.xml` need `http:http` ownership for webserver writes
-- Toast runs as `http` in production so it can update `/data/etc/toast-dm-history.json` and `/data/etc/toast-feed-notify-state.json`; only `toast-bot.log` in the bot code directory is made writable for that runtime user
+- Toast's production ownership requirements are documented on [Toast](Toast#local-service-and-production-operation)
 
-the deploy user needs passwordless sudo for the Toast restart step:
+The deploy user needs the passwordless sudo allowances described on [Toast](Toast#local-service-and-production-operation), alongside the Nginx allowances below:
 
 ```sudoers
 deploy ALL=(http) NOPASSWD: ALL
 deploy ALL=(root) NOPASSWD: /usr/bin/nginx -t, /usr/bin/systemctl reload nginx
 ```
 
-install that with `visudo`, preferably as a small file under `/etc/sudoers.d/`, because typoing sudoers directly is how servers become decorative bricks.
-The root allowance is deliberately restricted to validating and gracefully reloading nginx. The workflow prepares `toast-bot.log` as `deploy` with group `http` and mode `664`, so no root sudo is needed for log setup.
+Install that with `visudo`, preferably as a small file under `/etc/sudoers.d/`, because typoing sudoers directly is how servers become decorative bricks.
+The root allowance is deliberately restricted to validating and gracefully reloading Nginx. Toast-specific log setup is documented on [Toast](Toast#local-service-and-production-operation).
 
 ## Nginx Config Source
 
-the repo-tracked files in `.nginx/` are the source for the production nginx config.
+The repo-tracked files in `.nginx/` are the source for the production Nginx config.
 
 - `.nginx/nginx.conf` corresponds to `/etc/nginx/nginx.conf`
 - `.nginx/fridge.dev` corresponds to `/etc/nginx/sites-enabled/fridge.dev`
-- production uses these through symlinks, so edits here are real server config edits, not examples
+- Production uses these through symlinks, so edits here are real server config edits, not examples
 
 The HTTP config trusts `CF-Connecting-IP` only when the direct peer belongs to one of Cloudflare's published IPv4 or IPv6 proxy networks. Nginx's Real IP module then replaces `$remote_addr` before access checks, PHP-FPM handling, and access logging, so application logs contain the visitor address instead of a Cloudflare edge address. Keep the `set_real_ip_from` list synchronized with Cloudflare's authoritative IP-ranges page; never replace it with an unrestricted range.
 
-when adding routes, APIs, uploads, redirects, or private data folders, check `.nginx/fridge.dev` as part of the feature. a correct PHP route can still fail if nginx redirects POSTs, misses a clean-url rewrite, or accidentally exposes/blocklists the wrong `/data` path.
+When adding routes, APIs, uploads, redirects, or private data folders, check `.nginx/fridge.dev` as part of the feature. A correct PHP route can still fail if Nginx redirects POSTs, misses a clean-url rewrite, or accidentally exposes/blocklists the wrong `/data` path.
 
-nginx uses `client_max_body_size 0` and the repo-root `.user.ini` disables PHP's aggregate request/upload limits. Individual application handlers remain responsible for validating MIME types and enforcing per-file limits; feed and journal media attachments are capped at 8 MB per file.
+Nginx uses `client_max_body_size 0` and the repo-root `.user.ini` disables PHP's aggregate request/upload limits. Individual application handlers remain responsible for validating MIME types and enforcing per-file limits; feed and journal media attachments are capped at 8 MB per file.
 
 Production must provision `data/audio/uploads/` and `data/video/` as writable by the PHP-FPM `http` user. Failed mixed-media submissions call the shared media cleanup helper so successfully moved files are removed before the request redirects with an upload error.
 
-legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled in Cloudflare, not nginx. the redirect must append `legacy_domain=fridg3.org`; the frontend consumes that marker for the one-time rebrand popup and then removes it from the URL.
+Legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled in Cloudflare, not Nginx. The redirect must append `legacy_domain=fridg3.org`; the frontend consumes that marker for the one-time rebrand popup and then removes it from the URL.
 
 ## Nginx Clean URLs
 
-production nginx needs explicit rewrites for PHP routes that accept path-style ids. without these, nginx falls through to the root `/index.php` fallback before the route can parse the URL.
+Production Nginx needs explicit rewrites for PHP routes that accept path-style ids. Without these, Nginx falls through to the root `/index.php` fallback before the route can parse the URL.
 
-the generic `location /` fallback routes missing paths internally to `/error/404/index.php`, not `/index.php`, so nonexistent URLs render the error page with a `404` response while retaining the originally requested URL.
+The generic `location /` fallback routes missing paths internally to `/error/404/index.php`, not `/index.php`, so nonexistent URLs render the error page with a `404` response while retaining the originally requested URL.
 
-POST-only API directory routes also need POST-safe rewrites when called without `index.php`; otherwise nginx can normalize the directory URL with a redirect and the browser may retry as `GET`. `/api/dev-bootstrap` and `/api/toast-feed-generate` are included in that rewrite list.
+POST-only API directory routes also need POST-safe rewrites when called without `index.php`; otherwise Nginx can normalize the directory URL with a redirect and the browser may retry as `GET`. `/api/dev-bootstrap` is included in that rewrite list; Toast's API route is documented on [Toast](Toast#ai-feed-posts).
 
-the contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access. `/data/guestbook` and `/data/guestbook/` are also blocked because entry files contain moderation-only IP metadata; the public guestbook remains available through its PHP routes. account form routes such as `/account/login`, `/account/change-password`, and `/account/admin/edit` are also rewritten directly to their PHP handlers so POST bodies are not lost to trailing-slash redirects.
+The contact route is configured POST-safe at `/contact`, old `/email` paths redirect to `/contact`, and `/data/contact/` is blocked from direct web access. `/data/guestbook` and `/data/guestbook/` are also blocked because entry files contain moderation-only IP metadata; the public guestbook remains available through its PHP routes. Account form routes such as `/account/login`, `/account/change-password`, and `/account/admin/edit` are also rewritten directly to their PHP handlers so POST bodies are not lost to trailing-slash redirects.
 
-site-wide hard bans are stored in `data/etc/hard-banned-ips.txt`, augmented by read-only `.txt` source files recursively discovered beneath `data/etc/banlists/` and containing exact IPs or IPv4/IPv6 CIDR subnets, and enforced by nginx `auth_request` through the internal `/_hard-ban-check` location. Exact-IP exceptions in the `whitelistedIps` array in `data/etc/hard-ban-settings.json` take precedence over manual, source-list, and identity bans. That FastCGI location must disable request-body forwarding, clear `CONTENT_LENGTH`, and use `GET`: authorization subrequests do not contain the parent request body, so retaining a POST body's declared length makes PHP-FPM wait for bytes that never arrive. PHP-FPM compiles source lists into fixed-width binary range buckets beneath `data/etc/banlists/index/`; its source-stat signature automatically invalidates the index when a list changes, and a lock prevents concurrent rebuilds. build-time external sorting merges overlapping ranges with bounded memory, then steady-state checks take the lock-free ready path and binary-search one bucket. index construction and its streaming fallback use fixed-size token chunks, keeping memory bounded even for large files or lines. the index directory must be writable by `http`; deleting it or updating a source makes the next deployment prewarm or request rebuild it. a denied subrequest returns `401`, which nginx converts into a `302` redirect to `/error/blacklisted`; that route, files beneath its directory, and font files beneath `/resources` explicitly disable the authorization check so the redirect cannot loop and the stripped Blackprint page can render. browser/IP associations live in `data/etc/hard-ban-identities.json`; the global `strictIdentityEnforcement`, `enforcementEnabled`, and `whitelistedIps` policies live in `data/etc/hard-ban-settings.json`. disabling strict enforcement releases previously propagated IPs, then causes the identity JSON to be entirely ignored until strict enforcement is enabled again. disabling overall enforcement makes the authorization endpoint allow requests before client-IP resolution or any ban-data lookup. authenticated admins also receive an immediate allow response; shared rendering performs a read-only rule preview and displays the hard-ban banner when an admin would otherwise be blocked. the physical checker route, hard-ban data files, settings, source-list directory, and binary index must remain inaccessible to clients. this requires nginx's standard `ngx_http_auth_request_module`.
+Site-wide hard bans are stored in `data/etc/hard-banned-ips.txt`, augmented by read-only `.txt` source files recursively discovered beneath `data/etc/banlists/` and containing exact IPs or IPv4/IPv6 CIDR subnets, and enforced by Nginx `auth_request` through the internal `/_hard-ban-check` location. Exact-IP exceptions in the `whitelistedIps` array in `data/etc/hard-ban-settings.json` take precedence over manual, source-list, and identity bans. That FastCGI location must disable request-body forwarding, clear `CONTENT_LENGTH`, and use `GET`: authorization subrequests do not contain the parent request body, so retaining a POST body's declared length makes PHP-FPM wait for bytes that never arrive. PHP-FPM compiles source lists into fixed-width binary range buckets beneath `data/etc/banlists/index/`; its source-stat signature automatically invalidates the index when a list changes, and a lock prevents concurrent rebuilds. Build-time external sorting merges overlapping ranges with bounded memory, then steady-state checks take the lock-free ready path and binary-search one bucket. Index construction and its streaming fallback use fixed-size token chunks, keeping memory bounded even for large files or lines. The index directory must be writable by `http`; deleting it or updating a source makes the next deployment prewarm or request rebuild it. A denied subrequest returns `401`, which Nginx converts into a `302` redirect to `/error/blacklisted`; that route, files beneath its directory, and font files beneath `/resources` explicitly disable the authorization check so the redirect cannot loop and the stripped Blackprint page can render. Browser/IP associations live in `data/etc/hard-ban-identities.json`; the global `strictIdentityEnforcement`, `enforcementEnabled`, and `whitelistedIps` policies live in `data/etc/hard-ban-settings.json`. Disabling strict enforcement releases previously propagated IPs, then causes the identity JSON to be entirely ignored until strict enforcement is enabled again. Disabling overall enforcement makes the authorization endpoint allow requests before client-IP resolution or any ban-data lookup. Authenticated admins also receive an immediate allow response; shared rendering performs a read-only rule preview and displays the hard-ban banner when an admin would otherwise be blocked. The physical checker route, hard-ban data files, settings, source-list directory, and binary index must remain inaccessible to clients. This requires Nginx's standard `ngx_http_auth_request_module`.
 
-the upload API posts to `/tools/upload/?api=*`; keep the exact `/tools/upload` nginx rewrite so stale no-slash requests hit PHP directly instead of losing their POST body to a trailing-slash redirect. cursed but real.
+The upload API posts to `/tools/upload/?api=*`; keep the exact `/tools/upload` Nginx rewrite so stale no-slash requests hit PHP directly instead of losing their POST body to a trailing-slash redirect. Cursed but real.
 
-mdpaste share links use `/tools/mdpaste/s/{id}` and need this block before the generic `location /` fallback. keep the regexes quoted, because nginx treats unquoted `{16}` like cursed config syntax.
+Mdpaste share links use `/tools/mdpaste/s/{id}` and need this block before the generic `location /` fallback. Keep the regexes quoted, because Nginx treats unquoted `{16}` like cursed config syntax.
 
 ```nginx
 # mdpaste clean URLs
@@ -174,66 +114,21 @@ location /tools/mdpaste/s/ { try_files $uri $uri/ /tools/mdpaste/s/index.php?$ar
 location /tools/mdpaste/   { try_files $uri $uri/ /tools/mdpaste/index.php?$args; }
 ```
 
-## Backup Workflow
+## Data Protection Workflows
 
-`/.github/workflows/backup-data.yml`
-
-what it does:
-
-1. ssh to the server
-2. remove stale temporary backup zips from `/home/deploy`
-3. verify `deploy` can read/traverse `/var/www/fridge.dev/data`, excluding the rebuildable hard-ban index cache
-4. zip `/var/www/fridge.dev/data` into a temporary archive under `/home/deploy`, excluding that generated cache
-5. download the archive to the runner
-6. upload it to Google Drive using `rclone`
-7. keep only the 10 newest backups
-8. delete temp archives from runner and server
-
-triggers:
-
-- manual `workflow_dispatch`
-- scheduled daily cron at `0 0 * * *`
-
-required secrets:
-
-- `DEPLOY_KEY`
-- `GDRIVE_BACKUP_FOLDER_ID`
-- `RCLONE_CONFIG`
-
-setup notes live in `/.github/workflows/backup-data-setup.md`.
-
-if archive creation fails with `zip` exit code `18`, at least one non-cache path under `/data` was unreadable to `deploy`. run the unreadable-path check from `/.github/workflows/backup-data-setup.md`, then fix ownership/permissions before rerunning the workflow. `data/etc/banlists/index/` is deliberately omitted because its restrictive runtime permissions must not break backups and it can be rebuilt from the backed-up banlist sources.
-
-the backup and developer-data workflows also refuse to run if `TARGET` is anything other than `/var/www/fridge.dev`, so a stale workflow variable cannot accidentally back up or publish the wrong site tree.
-
-## Developer Data Copy
-
-`/.github/workflows/publish-dev-data.yml`
-
-on the same daily schedule as the private backup workflow, this workflow:
-
-1. copies production `/var/www/fridge.dev/data` into a temporary server workspace
-2. runs `/.github/scripts/sanitize-dev-data.php` against the copy
-3. zips the sanitized directory as `DD-MM-YY_hh-mm-ss.zip`
-4. uploads it to the public Google Drive developer data folder
-5. keeps only the 10 newest zip files in that folder
-6. removes temporary server and runner files. Before each run, it removes stale `/home/deploy/dev-data.*` workspaces left by failed or cancelled runs; runs are serialized so it does not remove an active run's workspace. A workspace is also removed immediately if its initial production-data copy fails.
-
-the sanitizer currently clears accounts, login/page-view/IP/rate-limit logs, guestbook IP ownership and entry IP metadata, feed guest reply IPs/browser tokens, shared posting ban lists, the site-wide hard-ban list, hard-ban whitelist setting, and browser/IP associations, blanks Toast bot and Groq credentials, blanks Toast private lore, clears Toast DM/notification state and browser notification state, clears webhooks, removes upload room tokens, clears encrypted mdpaste records, clears encrypted chat data and local chat keys, replaces the off-topic Discord archive with an empty placeholder, and replaces private journal drafts with a harmless placeholder draft. the development archive additionally excludes `data/etc/hard-banned-ips.txt`, `data/etc/hard-ban-identities.json`, and the private `data/etc/access.json` access log entirely.
-
-setup notes live in `/.github/workflows/publish-dev-data-setup.md`.
+Private production backups are documented on [Backup Data](Backup-data). Sanitized public development copies, including their privacy transformations and archive exclusions, are documented on [Developer Data](Developer-data). Both workflows validate that their deployment target is exactly `/var/www/fridge.dev` before operating.
 
 ## Sitemap Generation
 
-`sitemap.xml` is not deployed from git. it is generated by `/api/sitemap`, which means:
+`sitemap.xml` is not deployed from git. It is generated by `/api/sitemap`, which means:
 
-- the file must be writable by the server
-- the server copy is the one that matters
-- each generated file identifies itself with an automatic-generation comment and the local generation timestamp in `DD/MM/YY HH:MM:SS` format
+- The file must be writable by the server
+- The server copy is the one that matters
+- Each generated file identifies itself with an automatic-generation comment and the local generation timestamp in `DD/MM/YY HH:MM:SS` format
 
 ## Operational Truths
 
-- this repo is source code, not a full backup
+- This repo is source code, not a full backup
 - `/data` is operational state
-- if prod data disappears, git will not magically save you
-- if file permissions are wrong, deploys and runtime writes will get weird fast
+- If prod data disappears, git will not magically save you
+- If file permissions are wrong, deploys and runtime writes will get weird fast

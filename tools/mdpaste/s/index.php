@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
+fridg3_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib.php';
 
 $id = mdp_share_id_from_request();
@@ -10,88 +12,130 @@ $error = '';
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $alreadyCleanUrl = is_string($requestPath) && preg_match('#^/tools/mdpaste/s/[a-fA-F0-9]{16}/?$#', $requestPath);
-if ($id !== '' && isset($_GET['id']) && !$alreadyCleanUrl && $_SERVER['REQUEST_METHOD'] === 'GET') {
-	header('Location: /tools/mdpaste/s/' . rawurlencode($id), true, 301);
-	exit;
+if ($id !== '' && isset($_GET['id']) && !$alreadyCleanUrl && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    header('Location: /tools/mdpaste/s/' . rawurlencode($id), true, 301);
+    exit;
 }
 
 try {
-	$paste = $id !== '' ? mdp_load_paste($id) : null;
+    $paste = $id !== '' ? mdp_load_paste($id) : null;
 } catch (Throwable $exception) {
-	$paste = null;
+    $paste = null;
 }
 
 if ($paste !== null && empty($paste['encrypted'])) {
-	$markdown = mdp_decrypt_paste($paste, '');
+    $markdown = mdp_decrypt_paste($paste, '');
 }
 
-if ($paste !== null && !empty($paste['encrypted']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
-	$password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
-	$markdown = mdp_decrypt_paste($paste, $password);
-	if ($markdown === null) {
-		$error = 'wrong password. tragic, but recoverable.';
-	}
+if ($paste !== null && !empty($paste['encrypted']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
+    $markdown = mdp_decrypt_paste($paste, $password);
+    if ($markdown === null) {
+        $error = 'wrong password. tragic, but recoverable.';
+    }
 }
 
-$title = 'mdpaste | fridge.dev';
-$description = 'a markdown file has been shared with you! view it here.';
+$title = 'mdpaste';
+$description = 'a markdown file has been shared with you.';
+
+if ($paste === null) {
+    http_response_code(404);
+    $pasteContent = '<h1>not found</h1><h2>that paste is missing, expired, or never existed.</h2>'
+        . '<a class="mdpaste-view-action" href="/tools/mdpaste/">create a paste</a>';
+} elseif ($markdown === null) {
+    $errorHtml = $error !== '' ? '<p id="error">' . mdp_h($error) . '</p>' : '';
+    $pasteContent = '<h1>locked paste</h1>'
+        . '<h2>this paste is encrypted. enter its password to view the markdown.</h2>'
+        . $errorHtml
+        . '<form class="form-card mdpaste-unlock-form" method="post">'
+        . '<label for="password">password</label>'
+        . '<input class="text-input" id="password" name="password" type="password" autocomplete="current-password" autofocus required>'
+        . '<button id="form-button" type="submit">unlock</button>'
+        . '</form>';
+} else {
+    $meta = '';
+    if (!empty($paste['encrypted'])) {
+        $meta .= '<span>encrypted</span>';
+    }
+    $downloadFilename = mdp_download_filename($markdown);
+    $rawPayload = json_encode(
+        ['markdown' => $markdown, 'filename' => $downloadFilename],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
+    );
+    $metaHtml = $meta !== '' ? '<div class="mdpaste-view-meta">' . $meta . '</div>' : '';
+    $pasteContent = '<div class="mdpaste-paste-actions">'
+        . '<button type="button" id="mdpaste-download" data-tooltip="download file" aria-label="download file"><i class="fa-solid fa-download"></i></button>'
+        . '<button type="button" id="mdpaste-font-toggle" data-tooltip="toggle serif font" aria-label="toggle serif font" aria-pressed="false"><i class="fa-solid fa-font"></i></button>'
+        . '<button type="button" id="mdpaste-format-toggle" data-tooltip="toggle formatting" aria-label="toggle formatting" aria-pressed="false"><i class="fa-solid fa-code"></i></button>'
+        . '</div>' . $metaHtml
+        . '<article class="mdpaste-markdown" id="mdpaste-formatted">'
+        . mdp_render_markdown($markdown, !empty($paste['hard_breaks']))
+        . '</article>'
+        . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code>' . mdp_h($markdown) . '</code></pre>'
+        . '<script id="mdpaste-source-data" type="application/json">' . ($rawPayload ?: '{}') . '</script>';
+}
+
+$renderHelperPath = mdp_find_up('lib' . DIRECTORY_SEPARATOR . 'render.php');
+if ($renderHelperPath !== null) {
+    require_once $renderHelperPath;
+}
+$templateName = function_exists('get_preferred_template_name')
+    ? get_preferred_template_name(__DIR__)
+    : 'template.html';
+$templatePath = mdp_find_up($templateName);
+if ($templatePath === null && $templateName !== 'template.html') {
+    $templatePath = mdp_find_up('template.html');
+}
+if ($templatePath === null) {
+    die('page template not found. report this issue to me@fridge.dev.');
+}
+
+$template = (string)file_get_contents($templatePath);
+if (function_exists('apply_preferred_theme_stylesheet')) {
+    $template = apply_preferred_theme_stylesheet($template, __DIR__);
+}
+$template = preg_replace('/<span id="show-sidebar"[^>]*>.*?<\/span>\s*/is', '', $template, 1) ?: $template;
+$template = preg_replace(
+    '/(<div id="page-wrapper">\s*)<div id="sidebar">.*?(<div id="container">)/is',
+    '$1$2',
+    $template,
+    1
+) ?: $template;
+$template = preg_replace('/<body class="([^"]*)">/i', '<body class="$1 mdpaste-shared-page">', $template, 1) ?: $template;
+$template = preg_replace(
+    '/<div id="site-notice-banner-region">.*?<script id="site-notice-runtime"[^>]*>.*?<\/script>/is',
+    '',
+    $template,
+    1
+) ?: $template;
+$template = preg_replace(
+    '/<div id="content-footer">\s*<span id="content-footer-views"[^>]*>.*?<\/span>\s*<\/div>/is',
+    '',
+    $template,
+    1
+) ?: $template;
+$template = str_replace('</head>', '<meta name="robots" content="noindex,nofollow">' . "\n</head>", $template);
+
+$contentPath = __DIR__ . DIRECTORY_SEPARATOR . 'content.html';
+if (!is_file($contentPath)) {
+    die('content.html not found. report this issue to me@fridge.dev.');
+}
+$content = str_replace('{paste_content}', $pasteContent, (string)file_get_contents($contentPath));
+$html = str_replace(
+    ['{content}', '{title}', '{description}'],
+    [$content, $title, $description],
+    $template
+);
+
+$userGreeting = '';
+if (isset($_SESSION['user']['name'])) {
+    $userName = htmlspecialchars((string)$_SESSION['user']['name'], ENT_QUOTES, 'UTF-8');
+    $userGreeting = '<div id="user-greeting">Hello, ' . $userName . '!</div>';
+    $accountButton = '<a href="/account"><div id="footer-button" data-tooltip="access your fridge.dev account"><i class="fa-solid fa-user"></i></div></a>';
+    $logoutButton = '<a href="/account/logout"><div id="footer-button" data-tooltip="log out"><i class="fa-solid fa-right-from-bracket"></i></div></a>';
+    $html = str_replace($accountButton, $logoutButton, $html);
+}
+$html = str_replace('{user_greeting}', $userGreeting, $html);
+
 header('Content-Type: text/html; charset=utf-8');
-?>
-<!doctype html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title><?= mdp_h($title) ?></title>
-	<meta name="description" content="<?= mdp_h($description) ?>">
-	<meta name="robots" content="noindex,nofollow">
-	<link rel="stylesheet" href="/tools/mdpaste/style.css">
-	<link rel="icon" type="image/png" href="/resources/favicon-96x96.png" sizes="96x96">
-	<link rel="shortcut icon" href="/resources/favicon-96x96.png">
-	<link rel="apple-touch-icon" sizes="180x180" href="/resources/apple-touch-icon.png">
-	<meta name="apple-mobile-web-app-title" content="fridge.dev">
-	<link rel="manifest" href="/resources/site.webmanifest">
-</head>
-<body>
-	<main class="page">
-		<?php if ($paste === null): ?>
-			<section class="unlock-panel">
-				<a class="home-link" href="/tools/mdpaste/">mdpaste</a>
-				<h1>not found</h1>
-				<p>that paste is missing, expired, or never existed. brutal.</p>
-			</section>
-		<?php elseif ($markdown === null): ?>
-			<section class="unlock-panel" aria-labelledby="unlock-title">
-				<a class="home-link" href="/tools/mdpaste/">mdpaste</a>
-				<h1 id="unlock-title">locked paste</h1>
-				<p>this paste is encrypted. password goes in, markdown comes out.</p>
-				<?php if ($error !== ''): ?>
-					<p class="error-text"><?= mdp_h($error) ?></p>
-				<?php endif; ?>
-				<form class="unlock-form" method="post">
-					<label class="field-label" for="password">password</label>
-					<input class="password-input" id="password" name="password" type="password" autocomplete="current-password" autofocus required>
-					<button class="btn" type="submit">unlock</button>
-				</form>
-			</section>
-		<?php else: ?>
-			<section class="view-panel" aria-labelledby="paste-title">
-				<div class="panel-header">
-					<h1 id="paste-title">mdpaste</h1>
-					<a class="btn btn-secondary" href="/tools/mdpaste/">new paste</a>
-				</div>
-				<div class="view-meta">
-					<span>created <?= mdp_h(date('Y-m-d H:i', (int)$paste['created_at'])) ?></span>
-					<span>expires <?= mdp_h(date('Y-m-d H:i', (int)$paste['expires_at'])) ?></span>
-					<?php if (!empty($paste['encrypted'])): ?>
-						<span>encrypted</span>
-					<?php endif; ?>
-				</div>
-				<article class="markdown-body">
-					<?= mdp_render_markdown($markdown, !empty($paste['hard_breaks'])) ?>
-				</article>
-			</section>
-		<?php endif; ?>
-	</main>
-</body>
-</html>
+echo $html;

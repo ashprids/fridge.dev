@@ -20,21 +20,7 @@ Before creating a workspace, the workflow removes any stale `/home/deploy/dev-da
 
 ## Required GitHub Secrets
 
-Create these repository secrets in `Settings` -> `Secrets and variables` -> `Actions`.
-
-### `DEPLOY_KEY`
-
-This should be the same private SSH key used by the deploy workflow.
-
-It must allow SSH access to:
-
-```text
-deploy@45.76.134.105
-```
-
-### `RCLONE_CONFIG`
-
-This is the same rclone config used by the private backup workflow. It must contain a remote named `gdrive`.
+The workflow reuses `DEPLOY_KEY` and `RCLONE_CONFIG` from the private backup workflow. Their SSH requirements, exact `gdrive` remote name, configuration shape, and setup procedure are documented once on [Backup Data](Backup-data#required-github-secrets).
 
 ## Required GitHub Variables
 

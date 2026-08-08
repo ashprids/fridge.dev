@@ -8,6 +8,7 @@ require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
 
 // Require logged-in user with permission to create posts
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -43,6 +44,12 @@ $postingRestricted = fridg3_current_user_posting_restricted();
 if (!$canCreatePost) {
     header('Location: /journal');
     exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && str_contains(strtolower((string)($_SERVER['CONTENT_TYPE'] ?? '')), 'application/json')) {
+    $payload = json_decode((string)file_get_contents('php://input'), true);
+    if (!is_array($payload) || ($payload['action'] ?? '') !== 'preview') mdp_json_response(['ok' => false, 'error' => 'invalid preview request'], 400);
+    mdp_json_response(['ok' => true, 'html' => mdp_render_markdown((string)($payload['markdown'] ?? ''))]);
 }
 
 $title = 'create journal post';
@@ -304,6 +311,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $imageMap = isset($_FILES['images']) && is_array($_FILES['images'])
         ? fridg3_feed_process_uploaded_media($_FILES['images'])
         : [];
+    $voiceMap = isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])
+        ? fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes'])
+        : [];
 
     // Save draft: /data/journal/drafts/[title_with_underscores].txt
     if ($isDraft) {
@@ -323,16 +333,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // For drafts, update BBCode media placeholders to point at uploaded files
         $draftContent = $content;
-        $draftContent = fridg3_feed_replace_media_placeholders($draftContent, $imageMap);
+        $draftContent = fridg3_feed_replace_media_placeholders($draftContent, $imageMap, true);
+        $draftContent = fridg3_feed_replace_voice_placeholders($draftContent, $voiceMap, true);
         if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $draftContent) === 1) {
             fridg3_feed_delete_media_files_from_content($draftContent);
             header('Location: /journal/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
             exit;
         }
+        if (preg_match('/\[voice:\d+\]/i', $draftContent) === 1) {
+            header('Location: /journal/create?error=' . rawurlencode('voice note failed. keep it under 2 minutes and try again.'));
+            exit;
+        }
 
         // Line 1: owner (USER:username), line 2: title, line 3: description, remaining: BBCode body (with image URLs)
         $ownerLine = 'USER:' . $username;
-        $draftText = $ownerLine . PHP_EOL . $title . PHP_EOL . $description . PHP_EOL . $draftContent;
+        $draftText = $ownerLine . PHP_EOL . $title . PHP_EOL . $description . PHP_EOL . 'FORMAT:markdown' . PHP_EOL . $draftContent;
         @file_put_contents($draftPath, $draftText);
 
         if ($openPreview) {
@@ -356,7 +371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $maxNum = 0;
     if (is_array($files)) {
         foreach ($files as $file) {
-            if (preg_match('/^(\d+)\.txt$/', $file, $matches)) {
+            if (preg_match('/^(\d+)\.(?:txt|md)$/', $file, $matches)) {
                 $num = (int)$matches[1];
                 if ($num > $maxNum) {
                     $maxNum = $num;
@@ -365,18 +380,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     $nextNum = $maxNum + 1;
-    $postFilename = $nextNum . '.txt';
+    $postFilename = $nextNum . '.md';
 
     // Build post file content
     $safeContent = $content; // store raw; renderer can sanitize/format later
-    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap);
+    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap, true);
+    $safeContent = fridg3_feed_replace_voice_placeholders($safeContent, $voiceMap, true);
     if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $safeContent) === 1) {
         fridg3_feed_delete_media_files_from_content($safeContent);
         header('Location: /journal/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
         exit;
     }
-    // Convert BBCode to HTML
-    $htmlContent = bbcode_to_html($safeContent);
+    if (preg_match('/\[voice:\d+\]/i', $safeContent) === 1) {
+        header('Location: /journal/create?error=' . rawurlencode('voice note failed. keep it under 2 minutes and try again.'));
+        exit;
+    }
     $cardImageUpload = isset($_FILES['card_image']) && is_array($_FILES['card_image'])
         ? fridg3_journal_process_card_image($_FILES['card_image'])
         : ['provided' => false, 'url' => ''];
@@ -385,20 +403,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /journal/create?error=' . rawurlencode('card image upload failed. use a supported image no larger than 8 MB.'));
         exit;
     }
-    $text = fridg3_journal_build_post(
+    $text = fridg3_journal_build_v2_post(
         $postDate,
         $title,
         $description,
-        $htmlContent,
+        $safeContent,
         $cardImageUpload['url']
     );
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $postFilename;
     $postSaved = file_put_contents($postFile, $text) !== false;
-    $savedAttachmentCount = count($imageMap) + ($cardImageUpload['url'] !== '' ? 1 : 0);
+    $savedAttachmentCount = count($imageMap) + count($voiceMap) + ($cardImageUpload['url'] !== '' ? 1 : 0);
     fridg3_debug_submission_log('[SUBMISSION] journal post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . $savedAttachmentCount);
 
-    // Redirect to feed after posting
-    header('Location: /feed');
+    header('Location: /journal/posts/' . rawurlencode((string)$nextNum));
     exit;
     }
 }
@@ -479,6 +496,7 @@ if (is_dir($draftsDir)) {
         $draftTitle = htmlspecialchars($lines[$offset] ?? '', ENT_QUOTES, 'UTF-8');
         $draftDescription = htmlspecialchars($lines[$offset + 1] ?? '', ENT_QUOTES, 'UTF-8');
         $bodyLines = array_slice($lines, $offset + 2);
+        if (isset($bodyLines[0]) && preg_match('/^FORMAT:[a-zA-Z0-9_-]+$/', (string)$bodyLines[0])) array_shift($bodyLines);
         $draftBodyRaw = implode(PHP_EOL, $bodyLines);
         $draftBodyAttr = htmlspecialchars($draftBodyRaw, ENT_QUOTES, 'UTF-8');
 
@@ -507,6 +525,19 @@ if (is_dir($draftsDir)) {
 }
 
 $content = file_get_contents($content_path);
+$markdownEditor = (string)file_get_contents(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'markdown-editor.html');
+$viewerTemplate = (string)file_get_contents(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'content.html');
+if (preg_match('/<style>(.*?)<\/style>/s', $viewerTemplate, $viewerStyles)) $markdownEditor = '<style>' . $viewerStyles[1] . '</style>' . $markdownEditor;
+$markdownEditor = str_replace(
+    ['{voice_controls}', '{voice_inputs}', '{content_value}'],
+    [
+        '<button type="button" id="bbcode-voice-btn" class="bbcode-btn bbcode-voice-btn" data-tooltip="record voice note"><i class="fa-solid fa-microphone"></i></button>',
+        '<input id="bbcode-voice-input" name="voice_notes[]" type="file" accept="audio/*" multiple hidden><div class="bbcode-voice-recorder" hidden></div>',
+        '',
+    ],
+    $markdownEditor
+);
+$content = str_replace('{markdown_editor}', $markdownEditor, $content);
 // Replace {drafts} placeholder with rendered draft list
 $content = str_replace('{drafts}', $draftItems, $content);
 if ($postingRestricted) {

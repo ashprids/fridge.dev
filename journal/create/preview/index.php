@@ -8,6 +8,8 @@ require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'video-embeds.php';
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
+require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
 
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
     header('Location: /account/login');
@@ -263,7 +265,10 @@ $title = $hasDraft ? $draftTitle : 'preview';
 $description = $hasDraft ? $draftSubtitle : 'preview draft';
 $contentHtml = '<p>no draft found. save a draft from the journal editor first.</p><p><a href="/journal/create">return to editor</a></p>';
 if ($hasDraft) {
-    if ($draftFormat === 'html') {
+    if ($draftFormat === 'markdown') {
+        $viewerTemplate = (string)file_get_contents(dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 's' . DIRECTORY_SEPARATOR . 'content.html');
+        $contentHtml = str_replace('{paste_content}', '<article class="mdpaste-markdown">' . mdp_render_markdown($draftBody) . '</article>', $viewerTemplate);
+    } elseif ($draftFormat === 'html') {
         $contentHtml = $draftBody;
     } else {
         $contentHtml = bbcode_to_html($draftBody);
@@ -275,6 +280,7 @@ $content = file_get_contents($content_path);
 $content = str_replace('{title}', htmlspecialchars($hasDraft ? $draftTitle : 'draft preview', ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{subtitle}', htmlspecialchars($hasDraft ? $draftSubtitle : 'journal post preview', ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{date}', htmlspecialchars($draftDate, ENT_QUOTES, 'UTF-8'), $content);
+$content = str_replace('{content_class}', $draftFormat === 'markdown' ? 'journal-markdown-preview' : '', $content);
 $content = str_replace('{content}', $contentHtml, $content);
 
 $html = str_replace('{content}', $content, $template);

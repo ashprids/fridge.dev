@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 $sessionBootstrapDir = __DIR__;
 while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessionBootstrapDir) !== $sessionBootstrapDir) {
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
@@ -70,20 +71,16 @@ function feed_notifications_load_posts(): array {
 function feed_notifications_load_journal_posts(): array {
     $journalDir = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
     $posts = [];
-    $files = glob($journalDir . DIRECTORY_SEPARATOR . '*.txt');
-    if ($files === false) {
-        return $posts;
-    }
+    $files = fridg3_journal_post_files($journalDir);
 
     foreach ($files as $path) {
-        $lines = @file($path, FILE_IGNORE_NEW_LINES);
-        if ($lines === false || count($lines) < 3) {
-            continue;
-        }
+        $raw = @file_get_contents($path);
+        $parsed = $raw !== false ? fridg3_journal_parse_post($raw) : null;
+        if ($parsed === null) continue;
         $postId = pathinfo((string)$path, PATHINFO_FILENAME);
-        $date = trim((string)($lines[0] ?? ''));
-        $title = trim((string)($lines[1] ?? ''));
-        $description = trim((string)($lines[2] ?? ''));
+        $date = trim($parsed['date']);
+        $title = trim($parsed['title']);
+        $description = trim($parsed['description']);
         if ($postId === '' || $date === '' || $title === '') {
             continue;
         }

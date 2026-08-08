@@ -48,8 +48,9 @@ if ($postId === '') {
     exit;
 }
 
-$postFile = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal' . DIRECTORY_SEPARATOR . $postId . '.txt';
-if (!is_file($postFile)) {
+$journalDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
+$postFile = fridg3_journal_post_path($journalDir, $postId);
+if ($postFile === null || !is_file($postFile)) {
     header('Location: /journal');
     exit;
 }
@@ -66,6 +67,7 @@ $postTitle = $parsedPost['title'];
 $postSubtitle = $parsedPost['description'];
 $postHtml = $parsedPost['body'];
 $postCardImage = $parsedPost['cardImage'];
+$postFormat = $parsedPost['format'];
 $postingRestricted = fridg3_current_user_posting_restricted();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted && !isset($_POST['delete'])) {
@@ -103,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $draftFilename = 'edit_' . $postId . '_' . $safeBase . '.txt';
         $draftPath = $draftsDir . DIRECTORY_SEPARATOR . $draftFilename;
         $ownerLine = 'USER:' . $currentUsername;
-        $draftText = $ownerLine . PHP_EOL . $newTitle . PHP_EOL . $newDescription . PHP_EOL . 'FORMAT:html' . PHP_EOL . $newContent;
+        $draftText = $ownerLine . PHP_EOL . $newTitle . PHP_EOL . $newDescription . PHP_EOL . 'FORMAT:' . ($postFormat === 'v2' ? 'markdown' : 'html') . PHP_EOL . $newContent;
         @file_put_contents($draftPath, $draftText);
 
         if ($openPreview) {
@@ -115,6 +117,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postSubtitle = $newDescription;
         $postHtml = $newContent;
     } else {
+        $imageMap = $postFormat === 'v2' && isset($_FILES['images']) && is_array($_FILES['images'])
+            ? fridg3_feed_process_uploaded_media($_FILES['images']) : [];
+        $voiceMap = $postFormat === 'v2' && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])
+            ? fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes']) : [];
+        if ($postFormat === 'v2') {
+            $newContent = fridg3_feed_replace_media_placeholders($newContent, $imageMap, true);
+            $newContent = fridg3_feed_replace_voice_placeholders($newContent, $voiceMap, true);
+            if (preg_match('/\[(?:media|img|audio|video|voice):\d+\]/i', $newContent) === 1) {
+                header('Location: /journal/edit?post=' . rawurlencode($postId) . '&error=' . rawurlencode('one or more media uploads failed.'));
+                exit;
+            }
+        }
         $cardImageUpload = isset($_FILES['card_image']) && is_array($_FILES['card_image'])
             ? fridg3_journal_process_card_image($_FILES['card_image'])
             : ['provided' => false, 'url' => ''];
@@ -129,13 +143,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($cardImageUpload['url'] !== '') {
             $newCardImage = $cardImageUpload['url'];
         }
-        $text = fridg3_journal_build_post(
-            $postDate,
-            $newTitle,
-            $newDescription,
-            $newContent,
-            $newCardImage
-        );
+        $text = $postFormat === 'v2'
+            ? fridg3_journal_build_v2_post(date('Y-m-d'), $newTitle, $newDescription, $newContent, $newCardImage)
+            : fridg3_journal_build_post($postDate, $newTitle, $newDescription, $newContent, $newCardImage);
         @file_put_contents($postFile, $text);
         header('Location: /journal/posts/' . urlencode($postId));
         exit;
@@ -185,7 +195,7 @@ if (!$content_path) {
     die('content.html not found. report this issue to me@fridge.dev.');
 }
 
-$content = file_get_contents($content_path);
+$content = file_get_contents($postFormat === 'v2' ? (__DIR__ . DIRECTORY_SEPARATOR . 'markdown-content.html') : $content_path);
 $content = str_replace('{post_id}', htmlspecialchars($postId, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{title_value}', htmlspecialchars($postTitle, ENT_QUOTES, 'UTF-8'), $content);
 $content = str_replace('{description_value}', htmlspecialchars($postSubtitle, ENT_QUOTES, 'UTF-8'), $content);
@@ -198,6 +208,21 @@ if ($postCardImage !== '') {
         . '<label class="checkbox-label"><input class="checkbox" type="checkbox" name="remove_card_image" value="1"><span>remove custom card image</span></label>';
 }
 $content = str_replace('{current_card_image}', $currentCardImageHtml, $content);
+if ($postFormat === 'v2') {
+    $markdownEditor = (string)file_get_contents(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'markdown-editor.html');
+    $viewerTemplate = (string)file_get_contents(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'content.html');
+    if (preg_match('/<style>(.*?)<\/style>/s', $viewerTemplate, $viewerStyles)) $markdownEditor = '<style>' . $viewerStyles[1] . '</style>' . $markdownEditor;
+    $markdownEditor = str_replace(
+        ['{voice_controls}', '{voice_inputs}', '{content_value}'],
+        [
+            '<button type="button" id="bbcode-voice-btn" class="bbcode-btn bbcode-voice-btn" data-tooltip="record voice note"><i class="fa-solid fa-microphone"></i></button>',
+            '<input id="bbcode-voice-input" name="voice_notes[]" type="file" accept="audio/*" multiple hidden><div class="bbcode-voice-recorder" hidden></div>',
+            htmlspecialchars($postHtml, ENT_QUOTES, 'UTF-8'),
+        ],
+        $markdownEditor
+    );
+    $content = str_replace('{markdown_editor}', $markdownEditor, $content);
+}
 if ($postingRestricted) {
     $deleteButton = '<button id="two-buttons" type="submit" form="delete-journal-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>';
     $content = fridg3_disable_composer_controls($content);

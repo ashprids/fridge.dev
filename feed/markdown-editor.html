@@ -1,0 +1,27 @@
+<div class="bbcode-editor feed-markdown-editor" data-editor-format="markdown">
+    <div class="bbcode-toolbar feed-markdown-toolbar">
+        <div class="feed-markdown-formatting" data-markdown-formatting>
+            <button type="button" class="bbcode-btn" data-markdown-action="bold" data-tooltip="bold"><i class="fa-solid fa-bold"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="italic" data-tooltip="italic"><i class="fa-solid fa-italic"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="underline" data-tooltip="underline"><i class="fa-solid fa-underline"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="strikethrough" data-tooltip="strikethrough"><i class="fa-solid fa-strikethrough"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="highlight" data-tooltip="highlight"><i class="fa-solid fa-highlighter"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="link" data-tooltip="link"><i class="fa-solid fa-link"></i></button>
+            <button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach media"><i class="fa-solid fa-photo-film"></i></button>
+            {voice_controls}
+            <button type="button" class="bbcode-btn" data-markdown-action="quote" data-tooltip="blockquote"><i class="fa-solid fa-quote-left"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="code" data-tooltip="inline code"><i class="fa-solid fa-code"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="code-block" data-tooltip="code block"><i class="fa-solid fa-file-code"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="table" data-tooltip="table"><i class="fa-solid fa-table"></i></button>
+            <button type="button" class="bbcode-btn" data-markdown-action="spoiler" data-tooltip="spoiler text"><i class="fa-solid fa-eye-slash"></i></button>
+        </div>
+        <div class="feed-markdown-actions">
+            <button type="button" id="feed-markdown-guide" class="bbcode-btn" data-tooltip="formatting guide"><i class="fa-solid fa-book-open"></i></button>
+            <button type="button" id="bbcode-preview-toggle" class="bbcode-btn" data-tooltip="toggle preview"><i class="fa-solid fa-eye"></i></button>
+        </div>
+    </div>
+    <input id="bbcode-image-input" name="images[]" type="file" accept="image/*,audio/*,video/*" multiple hidden>
+    {voice_inputs}
+    <textarea id="bbcode-textbox" name="content"></textarea>
+    <div id="bbcode-preview" class="feed-markdown-preview" style="display: none;"></div>
+</div>

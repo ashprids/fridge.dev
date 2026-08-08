@@ -2,54 +2,58 @@
 
 ## High-Level Shape
 
-the site is a classic folder-routed PHP app with a shared shell and file-based storage.
+The site is a classic folder-routed PHP app with a shared shell and file-based storage.
 
-usual pattern:
+Usual pattern:
 
-1. bootstrap shared session handling via `lib/session.php`
-2. set `$title` and `$description`
-3. locate the preferred template
-4. load route-local `content.html`
-5. inject dynamic placeholders
-6. echo final HTML
+1. Bootstrap shared session handling via `lib/session.php`
+2. Set `$title` and `$description`
+3. Locate the preferred template
+4. Load route-local `content.html`
+5. Inject dynamic placeholders
+6. Echo final HTML
 
 ## Shared Building Blocks
 
 - `template.html`
-  default desktop shell with sidebar, footer, placeholders, and global asset includes
+  Default desktop shell with sidebar, footer, placeholders, and global asset includes
 - `template_mobile.html`
-  alternate shell for mobile-friendly view
+  Alternate shell for mobile-friendly view
 - `lib/render.php`
-  shared helpers for upward file lookup and mobile template selection
+  Shared helpers for upward file lookup and mobile template selection
 - `lib/session.php`
-  shared session bootstrap, persistent cookie config, `mustResetPassword` enforcement, and admin-cookie refresh helper
+  Shared session bootstrap, persistent cookie config, `mustResetPassword` enforcement, and admin-cookie refresh helper
 - `lib/feed.php`
-  feed-specific helpers for reply persistence, permission checks, datetime formatting, and inline image upload replacement
+  Feed-specific helpers for reply persistence, permission checks, datetime formatting, and inline image upload replacement
 - `main.js`
-  shared client behavior layer
+  Shared client behavior layer
 - `style.css`
-  global styling and component rules
+  Global styling and component rules
 
 ## Template Selection
 
-mobile/desktop template choice is centralized in `lib/render.php`.
+Mobile/desktop template choice is centralized in `lib/render.php`.
 
-mobile mode is enabled when any of these are true:
+Mobile mode is enabled when any of these are true:
 
-- host is `m.fridge.dev`
-- cookie `mobile_friendly_view` is truthy
+- Host is `m.fridge.dev`
+- Cookie `mobile_friendly_view` is truthy
 
-the `mobile_friendly_view` preference is browser-only and is not stored in account JSON.
+The `mobile_friendly_view` preference is browser-only and is not stored in account JSON.
 
-if the mobile template is requested but missing, routes fall back to `template.html`.
+Production may switch between `fridge.dev` and `m.fridge.dev` to match the active layout. Developer mode never performs that host redirect: enabling mobile view sets the same cookie and reloads the current local URL, allowing `template_mobile.html` to render on the development host.
 
-## Session And Auth Model
+Developer mode is detected for `localhost`, loopback addresses, `.localhost` and `.test` hostnames, RFC1918 private IPv4 addresses (`10/8`, `172.16/12`, and `192.168/16`), IPv4 link-local addresses (`169.254/16`), and IPv6 unique-local or link-local addresses. This allows another device on the same LAN to use the development features when opening a server such as `http://192.168.1.20:8000`.
 
-- logged-in state lives in `$_SESSION['user']`
-- frontend admin awareness uses a non-HttpOnly `is_admin` cookie
-- backend authorization is still done in PHP, which is correct and non-cursed
+If the mobile template is requested but missing, routes fall back to `template.html`.
 
-common session fields:
+## Session and Auth Model
+
+- Logged-in state lives in `$_SESSION['user']`
+- Frontend admin awareness uses a non-HttpOnly `is_admin` cookie
+- Backend authorization is still done in PHP, which is correct and non-cursed
+
+Common session fields:
 
 - `username`
 - `name`
@@ -59,9 +63,9 @@ common session fields:
 
 ## Persistence Model
 
-there is no database. the app reads and writes JSON, TXT, HTML, and media files under `/data`.
+There is no database. The app reads and writes JSON, TXT, HTML, and media files under `/data`.
 
-main stores:
+Main stores:
 
 - `data/accounts/accounts.json`
 - `data/accounts/login_attempts.json`
@@ -76,9 +80,9 @@ main stores:
 
 ## Important Couplings
 
-- many routes still do literal string replacement on the footer account button to swap login/logout
+- Many routes still do literal string replacement on the footer account button to swap login/logout
 - `main.js` assumes certain DOM ids exist across templates
-- bookmarks are stored in `accounts.json`, but some old code paths still reference a legacy `/data/users` pattern
-- contact submissions are private runtime JSON under `data/contact/` and must never be web-served directly
-- toast’s Discord bot is not just a stream bot anymore; it also maintains local DM history plus feed notification state under `data/etc/` and receives contact notification requests from PHP over `127.0.0.1:8765`
-- page views are updated from shared frontend flow, so nav changes can silently break view counts
+- Bookmarks are stored in `accounts.json`, but some old code paths still reference a legacy `/data/users` pattern
+- Contact submissions are private runtime JSON under `data/contact/` and must never be web-served directly
+- Toast's cross-system role and service boundaries are documented on [Toast](Toast)
+- Page views are updated from shared frontend flow, so nav changes can silently break view counts

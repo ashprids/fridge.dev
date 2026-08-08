@@ -1184,6 +1184,10 @@ function readSiteNoticePopup(sourceDocument) {
 
 function initSiteNotices(sourceDocument) {
     const source = sourceDocument || document;
+    if (source.body?.classList.contains('mdpaste-shared-page')) {
+        document.getElementById('site-notice-banner-region')?.remove();
+        return;
+    }
     if (source !== document) {
         const incomingBanner = source.getElementById('site-notice-banner-region');
         const currentBanner = document.getElementById('site-notice-banner-region');
@@ -1379,9 +1383,13 @@ function autoScaleAsciiFont() {
         }).then(function(shouldSwitch) {
             if (!shouldSwitch) return;
             try {
+                setMobileViewCookie(true);
+                if (isDeveloperModeActive()) {
+                    window.location.reload();
+                    return;
+                }
                 const targetUrl = new URL(window.location.href);
                 targetUrl.hostname = 'm.fridge.dev';
-                setMobileViewCookie(true);
                 hostRedirectInProgress = true;
                 hideSpaLoading();
                 window.setTimeout(() => {
@@ -1877,6 +1885,10 @@ function isMobileDevice() {
     );
 }
 
+function isDeveloperModeActive() {
+    return !!document.getElementById('dev-mode-banner');
+}
+
 function redirectMobileVisitorsToMobileHost() {
     try {
         const currentUrl = new URL(window.location.href);
@@ -1884,6 +1896,10 @@ function redirectMobileVisitorsToMobileHost() {
         const mobile = isMobileDevice();
         syncMobileViewCookieWithCurrentHost();
         const mobileViewPreference = readMobileViewCookie();
+
+        // Developer mode uses the mobile-view cookie and the current host. Local
+        // development servers cannot serve the production m.fridge.dev host.
+        if (isDeveloperModeActive()) return;
 
         if (host === 'fridge.dev' && mobile && mobileViewPreference !== false) {
             currentUrl.hostname = 'm.fridge.dev';
@@ -2166,6 +2182,23 @@ function executeContentScripts(rootEl) {
     } catch (_) { /* no-op */ }
 }
 
+function initSpaMarkdownViews(rootEl) {
+    const root = rootEl && rootEl.querySelectorAll ? rootEl : document;
+    const run = () => {
+        if (typeof window.fridg3InitMdpasteView === 'function') {
+            Promise.resolve(window.fridg3InitMdpasteView(root)).catch(() => {});
+            return true;
+        }
+        return false;
+    };
+    if (run()) return;
+    const renderer = Array.from(root.querySelectorAll('script[src]')).find(script => {
+        try { return new URL(script.src, window.location.href).pathname === '/tools/mdpaste/render.js'; }
+        catch (_) { return false; }
+    });
+    if (renderer) renderer.addEventListener('load', run, { once: true });
+}
+
 function updateContentFooterSpacing() {
     try {
         const containerEl = document.getElementById('container');
@@ -2382,6 +2415,7 @@ function loadPageIntoContent(url, addToHistory = true) {
                 fridg3CollectServerDebugLogs(doc);
                 contentEl.innerHTML = newContent.innerHTML;
                 executeContentScripts(contentEl);
+                initSpaMarkdownViews(contentEl);
 
                 const newTitle = doc.querySelector('title');
                 if (newTitle) {
@@ -2847,6 +2881,7 @@ function bindSpaForm(form) {
                 fridg3CollectServerDebugLogs(doc);
                 contentEl.innerHTML = newContent.innerHTML;
                 executeContentScripts(contentEl);
+                initSpaMarkdownViews(contentEl);
 
                 const newTitle = doc.querySelector('title');
                 if (newTitle) {
@@ -3077,9 +3112,108 @@ function initLoginPage() {
 
 window.initLoginPage = initLoginPage;
 
+function markdownSyntaxHighlightHtml(value, fullMarkdown) {
+    const ranges = [];
+    const addMatches = (pattern) => {
+        for (const match of value.matchAll(pattern)) {
+            if (match.index === undefined || (match.index > 0 && value[match.index - 1] === '\\')) continue;
+            ranges.push([match.index, match.index + match[0].length]);
+        }
+    };
+
+    addMatches(/^```[^\n]*\n[\s\S]*?^```[ \t]*$/gm);
+    addMatches(/`+[^`\n]+`+/g);
+    addMatches(/!\[[^\]\n]*\]\([^\s)]+(?:\s+["'][^"'\n]+["'])?\)/g);
+    addMatches(/\[[^\]\n]+\]\([^\s)]+(?:\s+["'][^"'\n]+["'])?\)/g);
+    addMatches(/\*\*[^\n]+?\*\*/g);
+    addMatches(/(?<!\*)\*[^*\n]+\*(?!\*)/g);
+    addMatches(/~~[^~\n]+~~/g);
+    addMatches(/==[^=\n]+==/g);
+    addMatches(/\|\|[^|\n]+\|\|/g);
+    addMatches(/<u>[^\n]*?<\/u>/gi);
+    addMatches(/(?<!\S)!fa[ \t]+(?:solid|regular|brands)[ \t]+[a-z0-9][a-z0-9-]*\b/gi);
+    addMatches(/(?<!\S)!frdg\b/gi);
+    addMatches(/^\s*>\s?.+$/gm);
+    addMatches(/^\s*(?:[-+*]|\d+\.)\s+.+$/gm);
+    addMatches(/^\s*\|.+\|\s*$/gm);
+
+    if (fullMarkdown) {
+        addMatches(/^#{1,6}\s+.+$/gm);
+        addMatches(/^\s*-\s+\[[ xX]\]\s+.+$/gm);
+        addMatches(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm);
+        addMatches(/^\$\$\s*$[\s\S]*?^\$\$\s*$/gm);
+        addMatches(/\$[^$\n]+\$/g);
+        addMatches(/^---\s*$[\s\S]*?^---\s*$/gm);
+    }
+
+    ranges.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+    const merged = [];
+    ranges.forEach(range => {
+        const previous = merged[merged.length - 1];
+        if (previous && range[0] <= previous[1]) previous[1] = Math.max(previous[1], range[1]);
+        else merged.push(range.slice());
+    });
+    const escape = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let cursor = 0;
+    let html = '';
+    merged.forEach(([start, end]) => {
+        html += escape(value.slice(cursor, start));
+        html += '<span class="markdown-syntax-valid">' + escape(value.slice(start, end)) + '</span>';
+        cursor = end;
+    });
+    return html + escape(value.slice(cursor)) + '\n';
+}
+
+function initMarkdownSyntaxHighlighting(root = document) {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('#markdown-input, .bbcode-editor[data-editor-format="markdown"] textarea').forEach(textarea => {
+        if (textarea.dataset.markdownHighlightBound === '1') return;
+        const initialHeight = textarea.offsetHeight;
+        const editorBackground = window.getComputedStyle(textarea).background;
+        textarea.dataset.markdownHighlightBound = '1';
+        const wrapper = document.createElement('div');
+        const highlight = document.createElement('pre');
+        wrapper.className = 'markdown-highlight-shell';
+        wrapper.style.height = initialHeight + 'px';
+        highlight.className = 'markdown-highlight-layer';
+        highlight.style.background = editorBackground;
+        highlight.setAttribute('aria-hidden', 'true');
+        textarea.parentNode.insertBefore(wrapper, textarea);
+        wrapper.append(highlight, textarea);
+        textarea.classList.add('markdown-highlight-input');
+        textarea.style.setProperty('background', 'transparent', 'important');
+        textarea.style.setProperty('color', 'transparent', 'important');
+        const fullMarkdown = textarea.id === 'markdown-input' || Boolean(textarea.closest('.journal-markdown-editor'));
+        const update = () => {
+            highlight.innerHTML = markdownSyntaxHighlightHtml(textarea.value, fullMarkdown);
+            highlight.scrollTop = textarea.scrollTop;
+            highlight.scrollLeft = textarea.scrollLeft;
+        };
+        const syncSize = () => {
+            wrapper.style.height = textarea.offsetHeight + 'px';
+            wrapper.hidden = textarea.hidden || textarea.style.display === 'none';
+        };
+        textarea.addEventListener('input', update);
+        textarea.addEventListener('scroll', update, { passive: true });
+        textarea.addEventListener('change', update);
+        if (typeof ResizeObserver === 'function') new ResizeObserver(syncSize).observe(textarea);
+        new MutationObserver(() => { syncSize(); update(); }).observe(textarea, { attributes: true, attributeFilter: ['hidden', 'style', 'class'] });
+        textarea._refreshMarkdownHighlight = () => { syncSize(); update(); };
+        syncSize();
+        update();
+    });
+}
+
+window.initMarkdownSyntaxHighlighting = initMarkdownSyntaxHighlighting;
+window.refreshMarkdownSyntaxHighlighting = function () {
+    initMarkdownSyntaxHighlighting(document);
+    document.querySelectorAll('.markdown-highlight-input').forEach(textarea => textarea._refreshMarkdownHighlight?.());
+};
+
 function setupSpaForms() {
     try {
         initLoginPage();
+        initMarkdownSyntaxHighlighting(document);
 
         const loginForm = document.getElementById('login-form');
         // Login should perform a full POST + redirect so that
@@ -3110,6 +3244,14 @@ function setupSpaForms() {
 }
 
 window.addEventListener('DOMContentLoaded', setupSpaForms);
+document.addEventListener('click', event => {
+    if (!event.target.closest?.('.bbcode-editor[data-editor-format="markdown"], .mdpaste-editor-shell')) return;
+    window.requestAnimationFrame(() => window.refreshMarkdownSyntaxHighlighting());
+});
+document.addEventListener('change', event => {
+    if (!event.target.closest?.('.bbcode-editor[data-editor-format="markdown"], .mdpaste-editor-shell')) return;
+    window.requestAnimationFrame(() => window.refreshMarkdownSyntaxHighlighting());
+});
 
 function initFeedReplyTargets() {
     const form = document.getElementById('feed-reply-form');

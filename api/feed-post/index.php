@@ -37,16 +37,10 @@ if ($raw === false) {
     exit;
 }
 
-$lines = preg_split("/(\r\n|\n|\r)/", $raw);
-$usernameLine = isset($lines[0]) ? trim($lines[0]) : '';
-$dateLine = isset($lines[1]) ? trim($lines[1]) : '';
-$body = '';
-if (count($lines) > 2) {
-    $body = implode("\n", array_slice($lines, 2));
-}
-
-// Normalize username
-$username = ltrim($usernameLine, '@');
+$parsedPost = fridg3_feed_parse_post($raw);
+$username = $parsedPost['username'];
+$dateLine = $parsedPost['date'];
+$body = $parsedPost['body'];
 
 $replyCount = count(fridg3_feed_load_replies($id));
 
@@ -56,6 +50,8 @@ $response = [
     'date_raw' => $dateLine,
     'date_human' => fridg3_feed_humanize_datetime($dateLine),
     'body' => $body,
+    'format' => $parsedPost['format'],
+    'rendered_html' => $parsedPost['format'] === 'v2' ? fridg3_feed_render_post_body($body, 'v2') : null,
     'reply_count' => $replyCount,
 ];
 

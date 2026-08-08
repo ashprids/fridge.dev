@@ -4,20 +4,20 @@
 
 ### `/`
 
-homepage with dynamic latest feed, latest journal, and music cards.
+Homepage with dynamic latest feed, latest journal, and music cards.
 
 ### `/feed`
 
-- list/search/paginate feed posts from `data/feed/*.txt`
-- feed and journal pagination measures the available content width to show as many background-free page controls as fit on one line, expanding across the row only when enough pages exist to fill it and otherwise shrink-wrapping at the center; it retains previous/next, first/last, current-page context, and ellipses across remaining gaps, while selecting a page pins the viewport to the bottom through delayed image loading and layout changes
-- create visibility depends on admin or `allowedPages` containing `feed`
-- create composer supports recorded voice notes; accepted recordings request browser noise suppression, echo cancellation, and auto gain when available, are previewed before posting, capped at 2 minutes, transcoded to compressed `.m4a`, stored under `data/audio/voice/`, and played with inline controls that include a `1x`/`1.5x`/`2x` speed toggle
-- the attach-media control keeps the existing URL-or-upload flow and accepts images, audio, and video; uploaded audio uses the voice-note player, while uploaded video uses a compact native player; file-extension detection covers mobile file providers that omit the browser MIME type, while the server still verifies the media container before saving it
-- the first time a browser submits a new feed post, an in-site popup asks whether to enable browser notifications for replies
-- deleting a feed post removes voice note files referenced by the post body and its replies
-- writes derived `index.toml`
+- List/search/paginate feed posts from `data/feed/*.txt`
+- Feed and journal pagination measures the available content width to show as many background-free page controls as fit on one line, expanding across the row only when enough pages exist to fill it and otherwise shrink-wrapping at the center; it retains previous/next, first/last, current-page context, and ellipses across remaining gaps, while selecting a page pins the viewport to the bottom through delayed image loading and layout changes
+- Create visibility depends on admin or `allowedPages` containing `feed`
+- Create composer supports recorded voice notes; accepted recordings request browser noise suppression, echo cancellation, and auto gain when available, are previewed before posting, capped at 2 minutes, transcoded to compressed `.m4a`, stored under `data/audio/voice/`, and played with inline controls that include a `1x`/`1.5x`/`2x` speed toggle
+- The attach-media control keeps the existing URL-or-upload flow and accepts images, audio, and video; uploaded audio uses the voice-note player, while uploaded video uses a compact native player; file-extension detection covers mobile file providers that omit the browser MIME type, while the server still verifies the media container before saving it
+- The first time a browser submits a new feed post, an in-site popup asks whether to enable browser notifications for replies
+- Deleting a feed post removes voice note files referenced by the post body and its replies
+- Writes derived `index.toml`
 - `@mentions` in BBCode are highlighted client-side for notification-aware feed posts
-- plain YouTube, Vimeo, and Dailymotion video URLs render as responsive embedded players and the original link text is hidden; URLs inside any rendered BBCode element remain unchanged
+- Plain YouTube, Vimeo, and Dailymotion video URLs render as responsive embedded players and the original link text is hidden; URLs inside any rendered BBCode element remain unchanged
 
 Related:
 
@@ -27,34 +27,33 @@ Related:
 
 ### `/feed/create`
 
-- requires admin or `allowedPages` containing `feed`
-- hardcoded `toast` sees a Groq-powered post generator before the BBCode editor
-- Toast generation can be random or prompt-guided, uses already-published non-Toast feed posts only as weak text style samples, has a 5-step length slider from one-liner to trauma dump, then fills and unlocks the editor
-- if a non-Toast post mentions `@toast`, Toast may automatically add a reply to that post using the post as context after a 1 minute delay
+- Requires admin or `allowedPages` containing `feed`
+- Toast's feed generator and mention behavior are documented on [Toast](Toast#ai-feed-posts)
 
 ### `/feed/posts/{id}`
 
-- single-post thread view for a feed item
-- logged-in users can reply to the post or to an individual comment with BBCode, image/audio/video uploads, and recorded voice notes using the same inline speed-toggle playback controls
-- guests can reply to the post or to an individual comment without creating feed posts; they are identified by plaintext IP, may enter an optional display name that falls back to italic `Anonymous`, cannot use a registered account username as that display name, can link media but cannot upload files or voice notes, and do not get heading or tooltip BBCode controls; guest display names and reply bodies are filtered through `/feed/filters/*.txt`, matching body text is replaced with `★` plus the tooltip `this phrase was automatically filtered.`, and the BBCode preview shows the same filtering
-- the first time a browser submits a comment, an in-site popup asks whether to enable browser notifications for replies to comments
-- guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text cannot be edited by guests after posting
-- reply edit/delete is allowed for the reply author, same-IP guest replies, admins, the original post owner, or accounts with `allowedPages` containing `comments`
-- replies persist under `data/feed/replies/{postId}.json`; comment replies stay in the same flat list with optional `parentId` metadata and render directly beneath their parent comment
-- guest replies can store a same-browser notification token so logged-out visitors can receive browser notifications when someone replies to their comments
-- deleting a reply removes voice note files referenced by that reply
-- admin IP moderation actions appear beside guest reply edit/delete icons; admins can ban an IP or purge guest replies by exact plaintext IP without deleting the feed post or changing the IP ban list
-- when a non-Toast user replies to a Toast-owned post or mentions `@toast` in a reply, Toast may automatically reply after a 1 minute delay with a short old-style Twitter-sized response and starts by mentioning that user
+- Single-post thread view for a feed item
+- New replies use the same restricted Markdown editor, toolbar, syntax highlighting, preview renderer, media uploads, and recorded voice notes as new feed posts; `format: "v2"` distinguishes them from existing legacy BBCode replies, whose rendering and edit controls remain unchanged
+- Guests can reply to the post or to an individual comment without creating feed posts; they receive the same Markdown editor shell and guide but no upload or voice controls, are identified by plaintext IP, may enter an optional display name that falls back to italic `Anonymous`, cannot use a registered account username as that display name, and can still link media manually; guest display names and reply bodies are filtered through `/feed/filters/*.txt`, matching body text is replaced with `★` plus the tooltip `this phrase was automatically filtered.`, and Markdown previews apply the same filtering
+- The first time a browser submits a comment, an in-site popup asks whether to enable browser notifications for replies to comments
+- Guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text cannot be edited by guests after posting
+- Reply edit/delete is allowed for the reply author, same-IP guest replies, admins, the original post owner, or accounts with `allowedPages` containing `comments`
+- Replies persist under `data/feed/replies/{postId}.json`; comment replies stay in the same flat list with optional `parentId` metadata and render directly beneath their parent comment
+- Guest replies can store a same-browser notification token so logged-out visitors can receive browser notifications when someone replies to their comments
+- Deleting a reply removes voice note files referenced by that reply
+- Admin IP moderation actions appear beside guest reply edit/delete icons; admins can ban an IP or purge guest replies by exact plaintext IP without deleting the feed post or changing the IP ban list
+- Toast's automatic thread replies are documented on [Toast](Toast#automatic-feed-replies)
 
 ### `/journal`
 
-- list/search/paginate journal posts from `data/journal/*.txt`
-- journal listing cards use an optional uploaded card image, falling back to the first image in each post body, as a faded edge-to-edge background; local images use the same cached 500×500 JPEG thumbnails as the gallery to avoid loading full-size files, while posts without either image retain the normal card surface
-- create visibility depends on admin or `allowedPages` containing `journal`
-- published journal bodies are trusted HTML
-- preview/edit flows support draft files and optional `FORMAT:html`
-- the journal BBCode composer uses the same attach-media URL/upload flow and media rendering as feed posts; its eye button saves the current draft and opens the dedicated full-post journal preview
-- plain YouTube, Vimeo, and Dailymotion video URLs render as responsive embedded players in previews and published posts; URLs contained by BBCode-generated HTML elements remain unchanged
+- List/search/paginate legacy `.txt` and v2 `.md` journal posts from `data/journal`
+- Journal listing cards use an optional uploaded card image, falling back to the first image in each post body, as a faded edge-to-edge background; local images use the same cached 500×500 JPEG thumbnails as the gallery to avoid loading full-size files, while posts without either image retain the normal card surface
+- Create visibility depends on admin or `allowedPages` containing `journal`
+- New posts are full Markdown files beginning with `v2`; their generated front matter maps the title and description directly, adds the publish date, omits `author`, and keeps an optional uploaded `card_image` out of the visible body
+- The journal Markdown composer exposes the full mdpaste formatting toolbar except its manual article-header control, links to `/formatting/markdown`, and retains feed media uploads, image cropping, and recorded voice notes; its delegated eye-button action works after direct or SPA loading, saves the current content as a Markdown draft, and opens the dedicated journal preview page
+- Published v2 posts use the mdpaste reading view inside the normal journal site layout, retaining the sidebar and content placement while adding title-based `.md` download, Fira Sans, and raw/formatted controls; toolbar space is reserved in the article header so long titles wrap without overlapping the controls, and the shared Markdown initializer reruns after direct loads, SPA navigation, and SPA preview submission so MathJax, Mermaid, media, and viewer controls do not require a refresh
+- Legacy `.txt` journal posts retain their trusted HTML rendering and legacy edit behavior while sharing the same top-right edit styling, title-clearance spacing, and Fira Sans toggle as v2 posts
+- Draft previews recognize `FORMAT:markdown`, `FORMAT:html`, and unmarked legacy BBCode bodies; Markdown previews use the same shared element styles as `/formatting/markdown`, while the older journal typography rules remain isolated to legacy preview bodies
 
 Related:
 
@@ -66,11 +65,11 @@ Related:
 
 ### `/guestbook`
 
-- list entries from `data/guestbook/*.txt`
-- one-post-per-IP gate via `data/guestbook/ip_index.json`
-- new entries store an `IP:` metadata line; IPs in the shared feed ban list cannot submit guestbook posts
-- owner/admin edit and delete flow
-- admins can ban an entry IP or password-confirm a purge of both feed replies and guestbook posts associated with that IP
+- List entries from `data/guestbook/*.txt`
+- One-post-per-IP gate via `data/guestbook/ip_index.json`
+- New entries store an `IP:` metadata line; IPs in the shared feed ban list cannot submit guestbook posts
+- Owner/admin edit and delete flow
+- Admins can ban an entry IP or password-confirm a purge of both feed replies and guestbook posts associated with that IP
 
 Related:
 
@@ -79,239 +78,240 @@ Related:
 
 ### `/music`
 
-- builds album grids from `data/music/frdg3/*.json` and `data/music/cactile/*.json`
-- songs reference `data/audio/*`
-- integrates with the shared mini player; album and other multi-track release clicks open an on-site popup track picker, while single-track releases play directly
-- admins see upload buttons for each artist; `/music/upload` saves audio files to `data/audio/` and creates release JSON in that artist's `data/music/{artist}/` folder
+- Builds album grids from `data/music/frdg3/*.json` and `data/music/cactile/*.json`
+- Songs reference `data/audio/*`
+- Integrates with the shared mini player; album and other multi-track release clicks open an on-site popup track picker, while single-track releases play directly
+- Admins see upload buttons for each artist; `/music/upload` saves audio files to `data/audio/` and creates release JSON in that artist's `data/music/{artist}/` folder
 - `/music/upload` supports `single`, `remix`, and `album` release types; all release types can add multiple track rows and reorder them before saving, can optionally set a scheduled publish date/time, and release order is assigned automatically from the current highest order for the selected artist
 
 ### `/gallery`
 
-- paginated listing of `data/images/*`; the grid lazily loads cached, center-cropped 500×500 JPEG thumbnails generated with PHP GD or ffmpeg, while the image viewer loads the original full-resolution file only after a thumbnail is clicked
-- gallery pagination uses the same adaptive, bottom-pinned single-line control as feed, journal, and guestbook
-- admin delete actions call `/api/gallery/delete`
+- Paginated listing of `data/images/*`; the grid lazily loads cached, center-cropped 500×500 JPEG thumbnails generated with PHP GD or ffmpeg, while the image viewer loads the original full-resolution file only after a thumbnail is clicked
+- Gallery pagination uses the same adaptive, bottom-pinned single-line control as feed, journal, and guestbook
+- Admin delete actions call `/api/gallery/delete`
 
 ### `/tools` and `/others`
 
-- their static `content.html` post-card lists are discovered automatically and split into pages of at most 10 cards
-- when more than one page exists, both listings use the shared adaptive paginator and bottom-position preservation
+- Their static `content.html` post-card lists are discovered automatically and split into pages of at most 10 cards
+- When more than one page exists, both listings use the shared adaptive paginator and bottom-position preservation
 
 ### `/bookmarks`
 
-- server-rendered bookmark listing for logged-in users
-- client-side localStorage enhancement for anonymous users
-- supports feed and journal bookmark ids; legacy `newsletter:*` ids are ignored
+- Server-rendered bookmark listing for logged-in users
+- Client-side localStorage enhancement for anonymous users
+- Supports feed and journal bookmark ids; legacy `newsletter:*` ids are ignored
 
 ### `/tools/upload`
 
-- displayed as `serverless upload`; the route remains stable for existing transfer links
-- browser-to-browser encrypted file transfer using WebRTC data channels
-- accounts with `postingRestricted` and clients on the shared banned-IP list cannot create, join, or signal upload rooms; the page disables its controls and every API action independently enforces the restriction
+- Displayed as `serverless upload`; the route remains stable for existing transfer links
+- Browser-to-browser encrypted file transfer using WebRTC data channels
+- Accounts with `postingRestricted` and clients on the shared banned-IP list cannot create, join, or signal upload rooms; the page disables its controls and every API action independently enforces the restriction
 - PHP stores only short-lived room/signaling metadata under `data/upload/rooms.json`; uploaded file bytes are never stored server-side
-- creating a room chooses whether the creator is the sender or receiver, then produces a `/tools/upload/?r={token}` share link
-- access is limited to the creator browser plus the first guest browser through the HttpOnly `fridg3_upload_peer` cookie; later browsers receive `room_full`
-- peers exchange ephemeral ECDH public keys through signaling and encrypt file chunks with AES-GCM before sending
-- plaintext chunks are kept below WebRTC's common 64 KiB message edge after encryption overhead to avoid truncated or dropped data-channel frames
-- sender and receiver compute a streaming SHA-256 checksum; the receiver only sends the success ack when file size, chunk count, and checksum match
-- enforces a 100 GB client-side file limit; browsers with File System Access API support stream received chunks to disk, while fallback browsers download after completion
-- both peers see transfer progress; sender progress reaches 100% only after the receiver confirms completion, and receiver progress reaches 100% after the file is written or downloaded, so either side can close the page once their bar is full
-- rooms end when either peer closes the tab via a close beacon, with a short heartbeat timeout fallback for crashed or disconnected tabs
+- Creating a room chooses whether the creator is the sender or receiver, then produces a `/tools/upload/?r={token}` share link
+- Access is limited to the creator browser plus the first guest browser through the HttpOnly `fridg3_upload_peer` cookie; later browsers receive `room_full`
+- Peers exchange ephemeral ECDH public keys through signaling and encrypt file chunks with AES-GCM before sending
+- Plaintext chunks are kept below WebRTC's common 64 KiB message edge after encryption overhead to avoid truncated or dropped data-channel frames
+- Sender and receiver compute a streaming SHA-256 checksum; the receiver only sends the success ack when file size, chunk count, and checksum match
+- Enforces a 100 GB client-side file limit; browsers with File System Access API support stream received chunks to disk, while fallback browsers download after completion
+- Both peers see transfer progress; sender progress reaches 100% only after the receiver confirms completion, and receiver progress reaches 100% after the file is written or downloaded, so either side can close the page once their bar is full
+- Rooms end when either peer closes the tab via a close beacon, with a short heartbeat timeout fallback for crashed or disconnected tabs
 
 ### `/settings`
 
 - UI shell only
-- persistence handled by `/api/settings`
-- changing a settings control marks the page dirty; link navigation to another page uses an in-site confirmation popup whose primary action saves before continuing, while saving and refreshing the current page never prompt
-- successful saves briefly change the main button label to `saved!`; theme or mobile-view changes then reload automatically using the newly persisted preference
-- includes accessibility toggles for mobile view and reduced motion, notification toggles for feed events and new journal posts, plus theme selection, a text glow toggle, optional cursor cat, and an in-site title-animation picker with live previews, always-playing mode, and default-on character desync
-- title animation controls and previews are disabled with an explanatory message whenever reduced motion or mobile view is active; mobile view also disables the title gradient
-- browser notifications use the Notification API while the site is open; logged-in users can receive feed mention/reply events matching Toast Discord feed DMs, guests can receive replies to comments made from the same browser, and both can receive new journal post alerts; logged-in notification events are deduped server-side so a fresh browser login does not replay old matching events
-- developer mode can bootstrap a blank-password `admin` / `Administrator` account when no admin accounts exist, and can download the latest sanitized developer data zip, delete local `data/`, and install the new copy
-- shows a Discord linking action for logged-in users and disables it once `discordUserId` is already linked
-- when logged in as hardcoded `toast`, shows a JSON editor for shared Toast personalities stored in `data/etc/toast-personality.json`
-- admins can open a dedicated system diagnostics subsection in `/settings` to jump into `/settings/sysinfo`
-- admins can open `/settings/guests`, labeled as manage guests, to review guest feed replies and IP-backed guestbook posts grouped by IP, search by IP or username, individually delete either content type, ban or unban IPs across both posting surfaces, or purge all guest content from an IP after password confirmation
-- admins can open `/settings/banned-ips` to edit the separate hard-ban IP list; valid IPv4 and IPv6 addresses may be separated by spaces or newlines, and nginx redirects matching clients away from all pages and static files to `/error/blacklisted`; the access debug log also supports right-click hard-ban and exact-IP whitelist actions; whitelist entries override manual, source-list, and identity hard bans; a durable first-party browser identifier carries an active ban to later IPs, while removing the original manually banned IP releases its associated IPs
-- admins can open `/settings/notices` to independently create or clear banner and one-time popup notices for logged-in users and guests, globally or for one exact page path; page-notice audience checkboxes allow logged-in users, guests, or both, page notices override the matching global notice type on that page, banners may be dismissible, popups can include a site-relative custom-link button, and every editor section is collapsible and closed by default
+- Persistence handled by `/api/settings`
+- Changing a settings control marks the page dirty; link navigation to another page uses an in-site confirmation popup whose primary action saves before continuing, while saving and refreshing the current page never prompt
+- Successful saves briefly change the main button label to `saved!`; theme or mobile-view changes then reload automatically using the newly persisted preference
+- Includes accessibility toggles for mobile view and reduced motion, notification toggles for feed events and new journal posts, plus theme selection, a text glow toggle, optional cursor cat, and an in-site title-animation picker with live previews, always-playing mode, and default-on character desync
+- Title animation controls and previews are disabled with an explanatory message whenever reduced motion or mobile view is active; mobile view also disables the title gradient
+- Browser notifications use the Notification API while the site is open; logged-in users can receive feed mention/reply events, guests can receive replies to comments made from the same browser, and both can receive new journal post alerts; Discord parity is documented on [Toast](Toast#notifications-and-website-integration)
+- Developer mode can bootstrap a blank-password `admin` / `Administrator` account when no admin accounts exist, and can download the latest sanitized developer data zip, delete local `data/`, and install the new copy
+- Shows a Discord linking action for logged-in users and disables it once `discordUserId` is already linked
+- Toast-only settings behavior is documented on [Toast](Toast#personality-sources)
+- Admins can open a dedicated system diagnostics subsection in `/settings` to jump into `/settings/sysinfo`
+- Admins can open `/settings/guests`, labeled as manage guests, to review guest feed replies and IP-backed guestbook posts grouped by IP, search by IP or username, individually delete either content type, ban or unban IPs across both posting surfaces, or purge all guest content from an IP after password confirmation
+- Admins can open `/settings/banned-ips` to edit the separate hard-ban IP list; valid IPv4 and IPv6 addresses may be separated by spaces or newlines, and Nginx redirects matching clients away from all pages and static files to `/error/blacklisted`; access-log moderation controls are documented on [Debug Mode](Debug-Mode#access-tab), while the enforcement model is documented on [Restrictions and Moderation](Restrictions-and-Moderation)
+- Admins can open `/settings/notices` to independently create or clear banner and one-time popup notices for logged-in users and guests, globally or for one exact page path; page-notice audience checkboxes allow logged-in users, guests, or both, page notices override the matching global notice type on that page, banners may be dismissible, popups can include a site-relative custom-link button, and every editor section is collapsible and closed by default
 - `/error/blacklisted` returns the stripped Blackprint denial page only to an actively hard-banned IP or associated browser identity; other direct visitors receive a server-side redirect to `/`
-- admins can open `/settings/sysinfo` to see live system diagnostics, PHP/runtime details, storage usage, website state, and key content counts in a dashboard-style view
+- Admins can open `/settings/sysinfo` to see live system diagnostics, PHP/runtime details, storage usage, website state, and key content counts in a dashboard-style view
 
 ## Account Routes
 
 ### `/account`
 
-currently just redirects:
+Currently just redirects:
 
-- logged in -> `/`
-- logged out -> `/account/login`
+- Logged in -> `/`
+- Logged out -> `/account/login`
 
 ### `/account/login`
 
-- secure session config
+- Secure session config
 - CSRF protection
-- login throttling via `data/accounts/login_attempts.json`
-- reads `data/accounts/accounts.json`
-- sets session user payload and `is_admin` cookie
-- session cookies use the `fridg3_session` name, last 90 days, use `SameSite=Lax`, and are shared across `fridge.dev`, `www.fridge.dev`, `m.fridge.dev`, and other `*.fridge.dev` hosts so mobile/desktop host switches do not look like a logout
-- successful login/logout clears the legacy `PHPSESSID` cookie on both the shared domain and current host so stale host-only cookies cannot shadow the shared session
-- username `toast` is reserved for a hardcoded virtual account; it prompts for admin credentials, then logs in as non-admin Toast with fixed `feed` and `comments` permissions
-- users with `mustResetPassword` are redirected into the password-change flow before using the rest of the site
+- Login throttling via `data/accounts/login_attempts.json`
+- Reads `data/accounts/accounts.json`
+- Sets session user payload and `is_admin` cookie
+- Session cookies use the `fridg3_session` name, last 90 days, use `SameSite=Lax`, and are shared across `fridge.dev`, `www.fridge.dev`, `m.fridge.dev`, and other `*.fridge.dev` hosts so mobile/desktop host switches do not look like a logout
+- Successful login/logout clears the legacy `PHPSESSID` cookie on both the shared domain and current host so stale host-only cookies cannot shadow the shared session
+- The reserved Toast identity and login behavior are documented on [Toast](Toast#website-identity)
+- Users with `mustResetPassword` are redirected into the password-change flow before using the rest of the site
 
 ### `/account/logout`
 
-destroys session and auth cookies, then redirects back to login.
+Destroys session and auth cookies, then redirects back to login.
 
 ### `/account/create`
 
-admin-only account creation flow that writes to `data/accounts/accounts.json`.
+Admin-only account creation flow that writes to `data/accounts/accounts.json`.
 
-- can seed `discordUserId`
-- can seed an optional `emailAddress` for fridge.dev mailboxes
-- can grant `comments` and `chat` permissions
-- can create the account with `postingRestricted` already enabled
-- newly created accounts are flagged with `mustResetPassword`
-- username `toast` is reserved and cannot be created as a normal account
-- if a Discord id is provided, it asks the local toast bot to DM the invite credentials
-- if that DM fails, the account is still created and the UI now shows the bot's concrete failure reason instead of a generic HTTP 500
-- local dev mode shows a random dev-account generator that creates `userXXXX` / `User #XXXX` with feed/comment permissions, a blank password, no forced password reset, and no Discord invite
+- Can seed `discordUserId`
+- Can seed an optional `emailAddress` for fridge.dev mailboxes
+- Can grant `comments` and `chat` permissions
+- Can create the account with `postingRestricted` already enabled
+- Newly created accounts are flagged with `mustResetPassword`
+- Toast's reserved username and account-invite integration are documented on [Toast](Toast#notifications-and-website-integration)
+- If that DM fails, the account is still created and the UI now shows the bot's concrete failure reason instead of a generic HTTP 500
+- Local dev mode shows a random dev-account generator that creates `userXXXX` / `User #XXXX` with feed/comment permissions, a blank password, no forced password reset, and no Discord invite
 
 ### `/account/change-password` and `/account/password`
 
-both update the current user password hash in `accounts.json`.
+Both update the current user password hash in `accounts.json`.
 
-- first-login forced password reset lands here via `?first_login=1`
+- First-login forced password reset lands here via `?first_login=1`
 
 ### `/account/link-discord`
 
-- logged-in-only Discord linking flow
-- validates the Discord user id, checks uniqueness across accounts, and asks the local toast bot to verify the member is in the server
-- stores `discordUserId` on the account and assigns the Discord `registered` role through the bot
+- Logged-in-only Discord linking flow
+- Validates the Discord user id and checks uniqueness across accounts; Toast's verification and role assignment are documented on [Toast](Toast#notifications-and-website-integration)
+- Stores `discordUserId` on the account and assigns the Discord `registered` role through the bot
 
 ### `/account/admin`
 
-not covered in the older references, but very real.
+Not covered in the older references, but very real.
 
-- admin-only account directory
-- reads all accounts and renders permission badges
-- links to per-account edit page
+- Admin-only account directory
+- Reads all accounts and renders permission badges
+- Links to per-account edit page
 
 ### `/account/admin/edit`
 
-- admin-only account editor
-- supports rename, display-name change, optional `emailAddress`, permission changes, reset password, and delete
-- delete confirmation plays a centered rip-in-half account card animation before the destructive POST continues
-- the `purge user content` danger button must purge all user-owned content; currently this includes feed posts, attached images, voice notes, and reply data
-- preserves unknown extra account fields through an editable JSON object field
-- blocks deleting the currently logged-in account
-- includes `comments` and `chat` as grantable `allowedPages` permissions
-- includes a `restricted from posting` checkbox backed by `postingRestricted`; restricted accounts retain their page permissions and deletion/moderation access, but cannot create or edit posts, replies, chat messages, or guestbook entries
-- password resets now preserve the account and flip `mustResetPassword` back on
+- Admin-only account editor
+- Supports rename, display-name change, optional `emailAddress`, permission changes, reset password, and delete
+- Delete confirmation plays a centered rip-in-half account card animation before the destructive POST continues
+- The `purge user content` danger button must purge all user-owned content; currently this includes feed posts, attached images, voice notes, and reply data
+- Preserves unknown extra account fields through an editable JSON object field
+- Blocks deleting the currently logged-in account
+- Includes `comments` and `chat` as grantable `allowedPages` permissions
+- Includes a `restricted from posting` checkbox backed by `postingRestricted`; restricted accounts retain their page permissions and deletion/moderation access, but cannot create or edit posts, replies, chat messages, or guestbook entries
+- Password resets now preserve the account and flip `mustResetPassword` back on
 
 Helpers live in `account/admin/helpers.php`.
 
 ### `/account/email`
 
-- shows fridge.dev email web-client and custom-client setup details
-- if the logged-in account has a valid `emailAddress`, the page shows that assigned fridge.dev address near the top
-- shared shell rendering swaps the footer Discord button to this route only for accounts with a valid `emailAddress`
+- Shows fridge.dev email web-client and custom-client setup details
+- If the logged-in account has a valid `emailAddress`, the page shows that assigned fridge.dev address near the top
+- Shared shell rendering swaps the footer Discord button to this route only for accounts with a valid `emailAddress`
 
 ## Private Chat Routes
 
 ### `/chat`
 
-one-time private conversation manager.
+One-time private conversation manager.
 
-- requires admin or `allowedPages` containing `chat`
-- creates conversations with a recipient label
-- lists active conversation files from `data/chat/*.json`
-- shows canonical share links shaped like `https://fridge.dev/chat/{conversationId}` that copy to clipboard when clicked
-- can end a conversation through an in-site confirmation popup, which deletes the encrypted JSON file immediately
+- Requires admin or `allowedPages` containing `chat`
+- Creates conversations with a recipient label
+- Lists active conversation files from `data/chat/*.json`
+- Shows canonical share links shaped like `https://fridge.dev/chat/{conversationId}` that copy to clipboard when clicked
+- Can end a conversation through an in-site confirmation popup, which deletes the encrypted JSON file immediately
 
 ### `/chat/{conversationId}`
 
-one-to-one conversation view.
+One-to-one conversation view.
 
-- managers can open without claiming recipient access
-- the first non-manager visitor sees a concise chat invite/auth page and receives an HttpOnly recipient cookie
-- the recipient's first full chat view shows an in-site security/help popup explaining browser/account locking, encrypted storage, replies, and reactions
-- later visits from that browser are allowed through
-- if the recipient is logged into an account when they open an unclaimed invite, the chat links to that account instead of a browser cookie
-- logged-in recipients with an active linked chat get a sidebar button above the mini-player/sidebar footer and can delete that chat themselves
-- other browsers without the matching cookie get a custom access-denied page
-- if the backing file is deleted, returning recipients see the ended-conversation page
-- messages are stored inside the encrypted per-conversation JSON envelope under `data/chat`
-- image/file attachments up to 8 MB are stored as encrypted per-chat blobs and served only after chat access checks
-- the composer `+` menu supports file upload or recording a voice note; voice notes are previewed before send, capped at 2 minutes, transcoded to compressed `.m4a`, and stored as encrypted chat attachments
-- selecting an attachment shows an attached-file indicator before send; image attachments use the site image viewer, while audio, voice, and video attachments embed with custom themed playback controls inside the chat; audio/voice controls include the `1x`/`1.5x`/`2x` speed toggle
-- messages can visually reply to a previous message, and clicking/tapping a message opens reply/react/delete actions; message deletion uses an in-site confirmation popup, and deleted messages stay in place as dimmed `message deleted` placeholders
-- reactions are emoji-based, searchable from the message context menu or the desktop-only emoji button beside the composer; the picker loads Emoji 16 Emojibase data from jsDelivr, lazy-renders results as users search/scroll, supports typed or pasted emoji from the search box, and falls back to a tiny local set if unavailable
-- both sides send active/away presence heartbeats plus short-lived typing state, and the page live-polls whether the other side is online, away, or offline while showing a non-layout-shifting typing indicator inside the message box
-- message sends update the current page immediately, and open chat pages poll for new messages; unfocused/hidden chat tabs play `/chat/alert.ogg` and prefix the page title with an unread count when the other side sends new messages
-- message timestamps show time only, with a date divider inserted at the first message for each day
+- Managers can open without claiming recipient access
+- The first non-manager visitor sees a concise chat invite/auth page and receives an HttpOnly recipient cookie
+- The recipient's first full chat view shows an in-site security/help popup explaining browser/account locking, encrypted storage, replies, and reactions
+- Later visits from that browser are allowed through
+- If the recipient is logged into an account when they open an unclaimed invite, the chat links to that account instead of a browser cookie
+- Logged-in recipients with an active linked chat get a sidebar button above the mini-player/sidebar footer and can delete that chat themselves
+- Other browsers without the matching cookie get a custom access-denied page
+- If the backing file is deleted, returning recipients see the ended-conversation page
+- Messages are stored inside the encrypted per-conversation JSON envelope under `data/chat`
+- Image/file attachments up to 8 MB are stored as encrypted per-chat blobs and served only after chat access checks
+- The composer `+` menu supports file upload or recording a voice note; voice notes are previewed before send, capped at 2 minutes, transcoded to compressed `.m4a`, and stored as encrypted chat attachments
+- Selecting an attachment shows an attached-file indicator before send; image attachments use the site image viewer, while audio, voice, and video attachments embed with custom themed playback controls inside the chat; audio/voice controls include the `1x`/`1.5x`/`2x` speed toggle
+- Messages can visually reply to a previous message, and clicking/tapping a message opens reply/react/delete actions; message deletion uses an in-site confirmation popup, and deleted messages stay in place as dimmed `message deleted` placeholders
+- Reactions are emoji-based, searchable from the message context menu or the desktop-only emoji button beside the composer; the picker loads Emoji 16 Emojibase data from jsDelivr, lazy-renders results as users search/scroll, supports typed or pasted emoji from the search box, and falls back to a tiny local set if unavailable
+- Both sides send active/away presence heartbeats plus short-lived typing state, and the page live-polls whether the other side is online, away, or offline while showing a non-layout-shifting typing indicator inside the message box
+- Message sends update the current page immediately, and open chat pages poll for new messages; unfocused/hidden chat tabs play `/chat/alert.ogg` and prefix the page title with an unread count when the other side sends new messages
+- Message timestamps show time only, with a date divider inserted at the first message for each day
 
 ## Contact Route
 
 ### `/contact`
 
-- accounts with `postingRestricted` and clients on the shared banned-IP list cannot submit the public form; the server enforces the restriction and the form renders with its controls disabled
-- public contact form with name, email, message, and server-side anti-spam checks
-- replies are sent manually from `me@fridge.dev`
-- accepted submissions are stored under `data/contact/*.json`
-- after storage, PHP asks the local toast service to send a Discord channel notification
+- Accounts with `postingRestricted` and clients on the shared banned-IP list cannot submit the public form; the server enforces the restriction and the form renders with its controls disabled
+- Public contact form with name, email, message, and server-side anti-spam checks
+- Replies are sent manually from `me@fridge.dev`
+- Accepted submissions are stored under `data/contact/*.json`
+- The contact notification integration is documented on [Toast](Toast#notifications-and-website-integration)
 
 ### `/contact?dashboard=1`
 
-- admin-only contact submission dashboard
-- lists submissions newest-first
-- supports permanent delete
+- Admin-only contact submission dashboard
+- Lists submissions newest-first
+- Supports permanent delete
 
 Retired legacy paths:
 
-- `/email` and `/email/*` redirect to `/contact` in nginx
-- newsletter and mailing-list routes have been removed
+- `/email` and `/email/*` redirect to `/contact` in Nginx
+- Newsletter and mailing-list routes have been removed
 
 ## Other Public Routes
 
 ### `/discord`
 
-simple wrapper page for the Discord community entry point.
+Simple wrapper page for the Discord community entry point.
 
 ### `/merch`
 
-simple wrapper page for merch links/content.
+Simple wrapper page for merch links/content.
 
 ### `/others`
 
-misc landing page for routes that do not fit elsewhere.
+Misc landing page for routes that do not fit elsewhere.
 
 Subroutes:
 
 - `/others/firefox-theme`
 - `/others/off-topic-archive`
-- `/others/toast-discord-bot`
+- Toast's website routes are documented on [Toast](Toast#discord-service)
 - `/others/fridge-builds-websites`
 
 ### `/others/firefox-theme`
 
-- public page for the fridge.dev blackprint Firefox theme
-- explains the two-step install flow: install the signed theme from Mozilla Add-ons, then run the local userChrome setup for square chrome styling
+- Public page for the fridge.dev Blackprint Firefox theme
+- Explains the two-step install flow: install the signed theme from Mozilla Add-ons, then run the local userChrome setup for square chrome styling
 - `build-downloads.sh` refreshes the downloadable userChrome setup package and the AMO-ready source zip
-- the userChrome setup package extracts to a `fridg3-firefox-userchrome` folder containing `userChrome.css`, `install-linux.sh`, `install-windows.bat`, and `install-windows.ps1`
-- userChrome setup scripts prompt for install/update or uninstall; uninstall removes only the fridge.dev profile CSS file and import line
+- The userChrome setup package extracts to a `fridg3-firefox-userchrome` folder containing `userChrome.css`, `install-linux.sh`, `install-windows.bat`, and `install-windows.ps1`
+- UserChrome setup scripts prompt for install/update or uninstall; uninstall removes only the fridge.dev profile CSS file and import line
 - `userChrome.css` remains outside the add-ons upload package because Firefox WebExtension themes cannot install profile chrome stylesheets
 
 ### `/wiki`
 
-developer-facing documentation rendered from Markdown files in `/wiki/`.
+Developer-facing documentation rendered from Markdown files in `/wiki/`.
 
-- uses the site shell while hiding normal navigation so the docs can use a full-height two-column layout
-- sidebar ordering follows `_Sidebar.md`, with any extra Markdown pages appended after the listed pages
-- renderer supports headings, paragraphs, links, inline code, fenced code blocks, blockquotes, horizontal rules, and simple ordered/unordered lists
-- blackprint-specific styling lives in `wiki/content.html`, with a sticky sidebar, constrained reading width, themed code blocks, and a compact mobile page grid
+- Uses the normal site shell and replaces its standard navigation links with the wiki page list; the usual sidebar styling, header, player, account greeting, sidebar footer controls, content panel, themes, and mobile layout remain unchanged, while the content page-view footer is omitted
+- Shows a `Developer Wiki` indicator in the standard sidebar header; the general developer-mode indicator is hidden on `/wiki` to avoid displaying two development labels, while its hidden marker continues to support developer-only frontend behavior
+- Sidebar ordering follows `_Sidebar.md`, with any extra Markdown pages appended after the listed pages
+- Renderer supports headings, paragraphs, links, inline code, fenced code blocks, blockquotes, horizontal rules, and simple ordered/unordered lists
+- Markdown links, angle-bracket URLs, and plain `http(s)` URLs are automatically rendered as safe links that open in a new tab; URLs inside inline or fenced code remain literal
+- Markdown renders directly inside the standard content panel and inherits the active site's normal theme styling; `wiki/content.html` adds no wiki-specific visual theme
 
 ### `/tools`
 
-tools and utilities landing page.
+Tools and utilities landing page.
 
 Subroutes:
 
@@ -321,50 +321,45 @@ Any current or future tool that creates, uploads, or shares user content must en
 
 ### `/tools/mdpaste`
 
-standalone markdown paste service for sharing notes without exposing a whole vault.
+Markdown paste service for sharing notes without exposing a whole vault. Its editor and shared-paste views use the standard site template, preferred theme, sidebar, and mobile layout.
 
-- accepts pasted markdown or client-loaded `.md` / `.txt` files
-- live previews markdown before publishing
-- supports normal markdown images plus Obsidian-style `![[image.png]]` embeds that point at `/data/images`
-- optional hard-break mode keeps single line breaks in formatted paragraphs
+- Accepts pasted markdown or client-loaded `.md` / `.txt` files
+- Uses the standard feed-style eye button to toggle between the editable Markdown source and a formatted preview
+- Preview and published links share the site-wide Markdown renderer documented by `/formatting/markdown` and its canonical `formatting/markdown/formatting.md` source
+- The horizontally scrolling editor toolbar provides selection-aware shortcuts for common Markdown formatting and supported rich elements, including a compact site-styled heading-level dropdown and an article-header button that inserts supported `title`, `author`, `date`, and `tags` front matter at the start of the document. Markdown textareas use a synchronized, non-editable highlighting layer to colour recognized syntax with the active link colour while preserving native caret, selection, scrolling, resizing, and SPA behavior. These controls stay separate from file upload and preview actions and are hidden while the rendered preview is open
+- The renderer preserves nested blockquotes, mixed and Roman-numbered child lists, nested tasks, internal and angle-bracket links, protected inline code, GitHub alerts, Font Awesome `!fa style icon-name` icons, the inline fridge.dev `!frdg` icon, mathematical notation, constrained tables, and feed-style audio/video players
+- YAML front matter renders as a journal-style article header using `title`, `author`, `date`, and `tags` while ignoring `draft`; MathJax typesets TeX notation and Mermaid renders fenced flowchart/sequence diagrams after direct or SPA loading
+- Security-sensitive HTML tags remain escaped; creating a paste containing one displays an on-site warning with `go back` and `upload anyway` choices, and acknowledging the warning does not enable unsafe rendering
+- Supports normal markdown images plus Obsidian-style `![[image.png]]` embeds that point at `/data/images`
+- Optional hard-break mode keeps single line breaks in formatted paragraphs
 - `POST /tools/mdpaste/` writes temporary paste JSON under `data/mdpaste`
-- accounts with `postingRestricted` and clients on the shared banned-IP list cannot create pastes; the editor controls are disabled and the JSON endpoint independently returns `403`
-- optional password mode encrypts the markdown with AES-256-GCM before storage
-- shared links render from `/tools/mdpaste/s/{pasteId}`
-- pastes expire after 30 days
+- Accounts with `postingRestricted` and clients on the shared banned-IP list cannot create pastes; the editor controls are disabled and the JSON endpoint independently returns `403`
+- Optional password mode encrypts the markdown with AES-256-GCM before storage
+- Shared and password-unlock links render through the standard site shell at `/tools/mdpaste/s/{pasteId}`
+- Shared paste pages omit the standard page-view footer and do not record or display view counts
+- Unlocked shared pastes include subtle download and raw/formatted toggle controls; download filenames prefer the front-matter article title, then the first heading, then a timestamped `mdpaste` fallback
+- Shared pastes suppress site notices and include a font control between download and formatting that toggles paste text between the active website font and the bundled Fira Sans family
+- Pastes expire after 30 days
+
+### Feed post formatting versions
+
+New top-level feed post files use `v2` as their first line, followed by the existing `@username`, timestamp, and body fields. A `v2` body uses a deliberately limited Markdown renderer supporting bold, italic, underline, strikethrough, highlight, links and uploaded media, blockquotes, inline/fenced code, tables, spoiler text, Font Awesome icons, the inline fridge.dev `!frdg` icon, and nested ordered/unordered lists. Lists are the deliberate syntax-only exception and have no toolbar button; other unsupported Markdown and arbitrary HTML render literally. The shared Markdown toolbar keeps media uploads, pasted-image handling, image cropping, and voice notes; voice recording sits in the scrolling formatting group, while fixed guide and preview buttons remain on the right. The guide opens `/formatting/markdown/feed` in a new tab. Files without the marker remain legacy BBCode posts with their existing renderer, styling, and editor so saving one cannot silently reinterpret its BBCode.
+
+### `/formatting/markdown` and `/formatting/markdown/feed`
+
+These centered, sidebar-free reference pages use the standard Markdown presentation and fixed top-right controls to switch between rendered output and raw source or toggle the content between the website font and Fira Sans. `/formatting/markdown` is the canonical site-wide reference backed by `formatting/markdown/formatting.md`. `/formatting/markdown/feed` renders its route-local source through the restricted v2 feed renderer, including literal examples of unsupported syntax so the boundary remains visible and testable.
 
 ### `/others/off-topic-archive`
 
-frontend archive viewer backed by `data/etc/off-topic-archive.json`.
+Frontend archive viewer backed by `data/etc/off-topic-archive.json`.
 
-### `/others/toast-discord-bot`
+### Toast Routes
 
-UI shell for toast bot status, controls, and stream playback.
-
-The bot also exposes localhost-only service endpoints on `127.0.0.1:8765`, including contact submission notifications to Discord channel `1503931489560301609`.
-It also scans `/feed` activity for linked Discord accounts and sends DMs for post mentions, reply mentions, and replies to a user's own feed posts.
-It also receives deploy-time patch notices, posts the fully formatted patch notice preview to approval channel `1526075637096255548`, and posts to update channel `1455194403642802309` with role `1408064850688475197` only after an admin approves with `✅`. Pending approvals survive bot restarts, and reactions on older uncached Toast approval messages are handled as well.
-Admins can also use `/shareupdate latest` or `/shareupdate <commit ID>` in Discord to manually post a patch notice for the deployed `HEAD` commit or a specific commit SHA.
-
-### `/others/toast-discord-bot/messages`
-
-- admin-only DM inbox/sender for toast with a thread inbox and full-page conversation view with a back button
-- renders through the normal site template and mobile/desktop theme selection instead of a standalone Discord-style shell
-- reads tracked DM history, resolves linked website usernames to Discord ids, and can send outbound DMs through the local bot service
-- inbound user DMs are logged and can receive Groq-powered Toast replies using the local `personality.json`; when users ask about fridge.dev, the bot can include small relevant snippets from the wiki and explain them in plain language
-- rapid inbound DMs from the same user are batched into one AI prompt; if Toast is still generating or pacing an unsent reply chunk when another DM arrives, it cancels the unfinished reply and regenerates from the queued messages
-- admins can toggle an "air them" state per thread; aired users are still logged, but Toast does not generate AI replies for them
-- if the Discord user is linked to a fridge.dev account, AI replies also receive compact context from that account's own recent feed posts and replies
-- image and GIF DMs are sent to Groq's configured vision model as Discord attachment URLs, capped at 5 images and 20 MB per image
-- AI replies are split into natural 2-4 sentence chunks and wait at least 5 seconds before each chunk is sent
-- a user can send exactly `CLEARMEMORY` in DM to make Toast react and ignore older DM history for future AI context
-- AI replies are also told about Toast's non-chat duties: radio playback, slash-command radio controls, account-linking support, and automated notification DMs
-- AI replies are given an exact slash-command allow-list so website paths like `/feed` are not described as Discord commands
-- guild messages and notification DMs do not trigger AI replies
+Toast status, controls, radio playback, the admin DM inbox, AI conversation behavior, and Discord integrations are documented on [Toast](Toast).
 
 ### `/others/fridge-builds-websites`
 
-wrapper/marketing page for custom website work. this exists in code even though the older docs mostly ignored it.
+Wrapper/marketing page for custom website work. This exists in code even though the older docs mostly ignored it.
 
 ## Formatting / Examples / Errors
 

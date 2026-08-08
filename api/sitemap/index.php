@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 // Generate sitemap.xml at the project root. Admin-only.
 $sessionBootstrapDir = __DIR__;
 while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessionBootstrapDir) !== $sessionBootstrapDir) {
@@ -91,8 +92,8 @@ if (is_dir($feedDir)) {
 // Journal posts
 $journalDir = $root . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
 if (is_dir($journalDir)) {
-    foreach (glob($journalDir . DIRECTORY_SEPARATOR . '*.txt') as $postFile) {
-        $slug = basename($postFile, '.txt');
+    foreach (fridg3_journal_post_files($journalDir) as $postFile) {
+        $slug = pathinfo($postFile, PATHINFO_FILENAME);
         $lastMod = @filemtime($postFile) ?: null;
         $addUrl('/journal/posts/' . rawurlencode($slug), $lastMod);
     }

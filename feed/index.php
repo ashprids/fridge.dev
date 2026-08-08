@@ -159,22 +159,17 @@ if (is_dir($postsDir)) {
     foreach ($files as $file) {
         $raw = @file_get_contents($file);
         if ($raw === false) continue;
-        $lines = preg_split("/(\r\n|\n|\r)/", $raw);
-        $usernameLine = isset($lines[0]) ? trim($lines[0]) : '';
-        $dateLine = isset($lines[1]) ? trim($lines[1]) : '';
-        $body = '';
-        if (count($lines) > 2) {
-            $body = implode("\n", array_slice($lines, 2));
-        }
-
-        // Normalize username (strip leading @ if present)
-        $username = ltrim($usernameLine, '@');
+        $parsedPost = fridg3_feed_parse_post($raw);
+        $username = $parsedPost['username'];
+        $dateLine = $parsedPost['date'];
+        $body = $parsedPost['body'];
 
         $postsData[] = [
             'file' => $file,
             'username' => $username,
             'date' => $dateLine,
             'body' => $body,
+            'format' => $parsedPost['format'],
         ];
     }
 
@@ -227,7 +222,7 @@ if (is_dir($postsDir)) {
         $ago = fridg3_feed_humanize_datetime($dateLine);
         $safeAgo = htmlspecialchars($ago, ENT_QUOTES, 'UTF-8');
         // Escape body so browser treats it as text; BBCode parser will transform later
-        $safeBody = htmlspecialchars($body, ENT_QUOTES, 'UTF-8');
+        $safeBody = fridg3_feed_render_post_body($body, (string)($p['format'] ?? 'legacy'));
 
         // Determine if current user can edit this post (owner or admin)
         $canEdit = false;
@@ -265,7 +260,7 @@ if (is_dir($postsDir)) {
             . '<span id="post-username">@' . $safeUser . '</span>'
             . '<span id="post-date-feed">' . $safeAgo . ' • ' . $replyMeta . ' • ' . $editIcon . '<span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="' . $bookmarkIconClass . ' fa-bookmark"></i></span></span>'
             . '</div>'
-            . '<span id="post-content">' . $safeBody . '</span>'
+            . (($p['format'] ?? 'legacy') === 'v2' ? $safeBody : '<span id="post-content">' . $safeBody . '</span>')
             . '</div>'
             . '</div>';
     }

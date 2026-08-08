@@ -75,6 +75,32 @@ if (!function_exists('fridg3_is_local_dev_server')) {
         if (preg_match('/^127(?:\.\d{1,3}){3}$/', $host)) {
             return true;
         }
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            $packed = ip2long($host);
+            if ($packed !== false) {
+                $ip = (int)sprintf('%u', $packed);
+                $isPrivateOrLinkLocal =
+                    ($ip >= 0x0A000000 && $ip <= 0x0AFFFFFF)
+                    || ($ip >= 0xAC100000 && $ip <= 0xAC1FFFFF)
+                    || ($ip >= 0xC0A80000 && $ip <= 0xC0A8FFFF)
+                    || ($ip >= 0xA9FE0000 && $ip <= 0xA9FEFFFF);
+                if ($isPrivateOrLinkLocal) {
+                    return true;
+                }
+            }
+        }
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            $packed = inet_pton($host);
+            if ($packed !== false) {
+                $first = ord($packed[0]);
+                $second = ord($packed[1]);
+                $isUniqueLocal = ($first & 0xFE) === 0xFC;
+                $isLinkLocal = $first === 0xFE && ($second & 0xC0) === 0x80;
+                if ($isUniqueLocal || $isLinkLocal) {
+                    return true;
+                }
+            }
+        }
         if (substr($host, -10) === '.localhost' || substr($host, -5) === '.test') {
             return true;
         }
@@ -666,14 +692,20 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_inject_shared_runtime_scripts($template) {
         $scripts = [
+            '/main.js' => '/main.js?v=20260808-markdown-editor-highlighting-1',
             '/js/settings.js' => '/js/settings.js?v=20260723-debug-logging-1',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260723-debug-logging-1',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260809-preserve-reply-markdown-1',
             '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
-            '/js/bbcode.js' => '/js/bbcode.js?v=20260723-debug-logging-1',
+            '/js/bbcode.js' => '/js/bbcode.js?v=20260808-journal-markdown-6',
         ];
 
         $missing = [];
         foreach ($scripts as $detectPath => $src) {
+            $template = preg_replace(
+                '#(<script\b[^>]*\bsrc=["\'])' . preg_quote($detectPath, '#') . '(?:\?[^"\']*)?(["\'][^>]*></script>)#i',
+                '$1' . $src . '$2',
+                $template
+            ) ?: $template;
             if (stripos($template, $detectPath) === false) {
                 $missing[] = '    <script src="' . $src . '"></script>';
             }
@@ -758,6 +790,19 @@ if (!function_exists('fridg3_inject_dev_mode_banner')) {
                 $template = preg_replace('/(<br><span id="maintenance-banner"[^>]*>.*?<\/span>)/is', '$1' . $banner, $template, 1) ?: $template;
             } else {
                 $template = preg_replace('/(<span id="title">.*?<\/span>)/is', '$1<br>' . $banner, $template, 1) ?: $template;
+            }
+
+            if (
+                strpos($template, 'id="mobile-collapsed-header"') !== false
+                && strpos($template, 'class="mobile-collapsed-dev-mode-banner"') === false
+            ) {
+                $collapsedBanner = '<span class="mobile-collapsed-dev-mode-banner" data-tooltip="developer mode"><i class="fa-solid fa-code"></i> <b>developer mode</b></span>';
+                $template = preg_replace(
+                    '/(<div class="mobile-collapsed-header"[^>]*>.*?)(<\/div>)/is',
+                    '$1' . $collapsedBanner . '$2',
+                    $template,
+                    1
+                ) ?: $template;
             }
         }
 

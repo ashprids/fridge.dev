@@ -39,7 +39,7 @@ function wiki_label_from_slug($slug) {
     $smallWords = ['and', 'or', 'the', 'a', 'an', 'to', 'of', 'in', 'for'];
     $words = array_map(function ($word, $index) use ($smallWords) {
         $upper = strtoupper($word);
-        if (in_array($upper, ['API', 'PHP', 'HTML', 'CSS', 'JS', 'JSON'], true)) {
+        if (in_array($upper, ['API', 'PHP', 'HTML', 'CSS', 'JS', 'JSON', 'IP'], true)) {
             return $upper;
         }
         $lower = strtolower($word);
@@ -137,11 +137,26 @@ function wiki_slug_to_url($slug) {
 function wiki_render_inline_markdown($text) {
     $escaped = wiki_escape($text);
 
-    $escaped = preg_replace_callback('/`([^`]+)`/', function ($matches) {
-        return '<code>' . $matches[1] . '</code>';
+    $protected = [];
+    $protect = static function (string $html) use (&$protected): string {
+        $token = '@@WIKI_INLINE_' . count($protected) . '@@';
+        $protected[$token] = $html;
+        return $token;
+    };
+
+    $escaped = preg_replace_callback('/`([^`]+)`/', function ($matches) use ($protect) {
+        return $protect('<code>' . $matches[1] . '</code>');
     }, $escaped);
 
-    $escaped = preg_replace_callback('/\[(.*?)\]\((.*?)\)/', function ($matches) {
+    $escaped = preg_replace_callback('/(?<!\S)!fa[ \t]+(solid|regular|brands)[ \t]+([a-z0-9][a-z0-9-]*)\b/i', function ($matches) use ($protect) {
+        return $protect('<i class="fa-' . strtolower($matches[1]) . ' fa-' . strtolower($matches[2]) . '"></i>');
+    }, $escaped);
+
+    $escaped = preg_replace_callback('/(?<!\S)!frdg\b/i', static function () use ($protect) {
+        return $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/favicon.svg" alt="fridge.dev">');
+    }, $escaped);
+
+    $escaped = preg_replace_callback('/\[(.*?)\]\((.*?)\)/', function ($matches) use ($protect) {
         $label = $matches[1];
         $target = html_entity_decode($matches[2], ENT_QUOTES, 'UTF-8');
         $target = trim($target);
@@ -155,10 +170,13 @@ function wiki_render_inline_markdown($text) {
 
         if ($isExternal || $isRootRelative) {
             $href = wiki_escape($target);
-            $rel = $isExternal ? ' rel="noopener noreferrer"' : '';
-            return '<a href="' . $href . '"' . $rel . '>' . $label . '</a>';
+            return $protect('<a href="' . $href . '" target="_blank" rel="noopener noreferrer">' . $label . '</a>');
         }
 
+        $fragment = '';
+        if (strpos($target, '#') !== false) {
+            [$target, $fragment] = array_pad(explode('#', $target, 2), 2, '');
+        }
         $target = preg_replace('#^\./#', '', $target);
         $target = preg_replace('/\.md$/i', '', $target);
         $target = basename((string)$target);
@@ -167,13 +185,33 @@ function wiki_render_inline_markdown($text) {
             return $label;
         }
 
-        return '<a href="' . wiki_escape(wiki_slug_to_url($target)) . '">' . $label . '</a>';
+        $href = wiki_slug_to_url($target);
+        if ($fragment !== '') {
+            $href .= '#' . rawurlencode($fragment);
+        }
+        return $protect('<a href="' . wiki_escape($href) . '" target="_blank" rel="noopener noreferrer">' . $label . '</a>');
     }, $escaped);
+
+    $escaped = preg_replace_callback('/&lt;(https?:\/\/[^&\s]+)&gt;/i', function ($matches) use ($protect) {
+        $href = html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+        return $protect('<a href="' . wiki_escape($href) . '" target="_blank" rel="noopener noreferrer">' . $matches[1] . '</a>');
+    }, $escaped);
+
+    $escaped = preg_replace_callback(
+        '/(?<![A-Za-z0-9_="\'])https?:\/\/[^\s<>()]*[A-Za-z0-9\/#=_-]/i',
+        function ($matches) use ($protect) {
+            $href = html_entity_decode($matches[0], ENT_QUOTES, 'UTF-8');
+            return $protect('<a href="' . wiki_escape($href) . '" target="_blank" rel="noopener noreferrer">' . $matches[0] . '</a>');
+        },
+        $escaped
+    );
 
     $escaped = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped);
     $escaped = preg_replace('/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/s', '<em>$1</em>', $escaped);
+    $escaped = preg_replace('/==([^=]+)==/', '<mark>$1</mark>', $escaped);
+    $escaped = preg_replace('/\|\|([^|]+)\|\|/', '<span class="spoiler">$1</span>', $escaped);
 
-    return $escaped;
+    return strtr($escaped, $protected);
 }
 
 function wiki_render_markdown($markdown) {
@@ -309,6 +347,15 @@ function wiki_render_markdown($markdown) {
             continue;
         }
 
+        if (($inUl || $inOl) && preg_match('/^\s{2,}(\S.*)$/', $line, $matches)) {
+            $lastIndex = count($html) - 1;
+            if ($lastIndex >= 0 && str_ends_with($html[$lastIndex], '</li>')) {
+                $continuation = '<br>' . wiki_render_inline_markdown(trim($matches[1])) . '</li>';
+                $html[$lastIndex] = substr($html[$lastIndex], 0, -5) . $continuation;
+                continue;
+            }
+        }
+
         $closeLists();
         $paragraphLines[] = trim($line);
     }
@@ -365,24 +412,63 @@ if (function_exists('apply_preferred_theme_stylesheet')) {
     $template = apply_preferred_theme_stylesheet($template, __DIR__);
 }
 
+$template = preg_replace(
+    '/<div id="content-footer">\s*<span id="content-footer-views"[^>]*>.*?<\/span>\s*<\/div>/is',
+    '',
+    $template,
+    1
+) ?: $template;
+
+// Keep the marker for developer-mode frontend behavior, but the wiki has its
+// own sidebar indicator and should not display the general developer banner.
+$template = preg_replace_callback('/<span id="dev-mode-banner"([^>]*)>/i', static function ($matches) {
+    $attributes = preg_replace('/\sstyle=("[^"]*"|\'[^\']*\')/i', '', (string)$matches[1]);
+    return '<span id="dev-mode-banner"' . $attributes . ' aria-hidden="true" style="display: none !important;">';
+}, $template, 1) ?: $template;
+$template = preg_replace_callback('/<span class="mobile-collapsed-dev-mode-banner"([^>]*)>/i', static function ($matches) {
+    $attributes = preg_replace('/\sstyle=("[^"]*"|\'[^\']*\')/i', '', (string)$matches[1]);
+    return '<span class="mobile-collapsed-dev-mode-banner"' . $attributes . ' aria-hidden="true" style="display: none !important;">';
+}, $template, 1) ?: $template;
+
+$wikiBanner = '<span id="wiki-mode-banner" data-tooltip="You are viewing the fridge.dev developer wiki." style="color: var(--links);"><i class="fa-solid fa-book-open"></i> <b>Developer Wiki</b></span>';
+if (strpos($template, 'id="dev-mode-banner"') !== false) {
+    $template = preg_replace('/(<span id="dev-mode-banner"[^>]*>.*?<\/span>)/is', '$1' . $wikiBanner, $template, 1) ?: $template;
+} elseif (strpos($template, 'id="maintenance-banner"') !== false) {
+    $template = preg_replace('/(<span id="maintenance-banner"[^>]*>.*?<\/span>)/is', '$1' . $wikiBanner, $template, 1) ?: $template;
+}
+
 $content_path = find_template_file('content.html');
 if (!$content_path) {
     die('content.html not found. report this issue to me@fridge.dev.');
 }
 
-$pageLinks = [];
+$desktopPageLinks = [];
+$mobilePageLinks = [];
 foreach ($pages as $page) {
     $isActive = $page['slug'] === $selectedSlug;
-    $pageLinks[] = '<li><a class="wiki-page-link' . ($isActive ? ' active' : '') . '" href="' . wiki_escape(wiki_slug_to_url($page['slug'])) . '">'
-        . wiki_escape($page['label'])
-        . '</a></li>';
+    $href = wiki_escape(wiki_slug_to_url($page['slug']));
+    $label = wiki_escape($page['label']);
+    $activeClass = $isActive ? ' active' : '';
+    $desktopPageLinks[] = '<a href="' . $href . '"><div id="tab" class="wiki-nav-button' . $activeClass . '">' . $label . '</div></a>';
+    $mobilePageLinks[] = '<a class="mobile-nav-link" href="' . $href . '"><div id="tab" class="mobile-nav-button wiki-nav-button' . $activeClass . '">' . $label . '</div></a>';
+}
+
+$desktopNavigationPattern = '#(<div id="header">.*?</div>\s*)(?:<a href="/feed">.*?<a href="/others"><div id="tab".*?</div></a>)(\s*\{user_greeting\})#s';
+$mobileNavigationPattern = '#<div class="mobile-nav-grid">.*?</div>\s*(\{user_greeting\})#s';
+
+if (strpos($template, 'class="mobile-nav-grid"') !== false) {
+    $mobileNavigation = '<div class="mobile-nav-grid">' . "\n        "
+        . implode("\n        ", $mobilePageLinks) . "\n    </div>\n\n    $1";
+    $template = preg_replace($mobileNavigationPattern, $mobileNavigation, $template, 1);
+} else {
+    $desktopNavigation = '$1' . implode("\n    ", $desktopPageLinks) . '$2';
+    $template = preg_replace($desktopNavigationPattern, $desktopNavigation, $template, 1);
 }
 
 $content = file_get_contents($content_path);
 $content = str_replace(
-    ['{wiki_page_list}', '{wiki_page_title}', '{wiki_page_name}', '{wiki_page_content}'],
+    ['{wiki_page_title}', '{wiki_page_name}', '{wiki_page_content}'],
     [
-        implode("\n", $pageLinks),
         wiki_escape($selectedPage['label'] ?? wiki_label_from_slug($selectedSlug)),
         wiki_escape($selectedPage['file'] ?? 'unknown.md'),
         $renderedMarkdown,

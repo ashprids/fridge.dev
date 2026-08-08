@@ -1,0 +1,26 @@
+<h1>edit journal post</h1>
+<h2>edit the article metadata and Markdown content</h2>
+<br>
+<form id="delete-journal-post-form" method="POST" action="/journal/edit/" style="display:none" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete journal post?" data-confirm-detail="this removes the journal post from the site." data-confirm-text="delete" data-cancel-text="cancel">
+    <input type="hidden" name="post" value="{post_id}">
+    <input type="hidden" name="delete" value="1">
+</form>
+<form id="create-post-form" method="POST" action="/journal/edit/" enctype="multipart/form-data">
+    <input type="hidden" name="post" value="{post_id}">
+    <input id="textbox" type="text" name="title" placeholder="title" value="{title_value}">
+    <br><br>
+    <textarea id="textbox" class="large" name="description" placeholder="description" style="height:54px">{description_value}</textarea>
+    <br><br>
+    <label class="journal-card-image-field">
+        <span>card image <small>(optional; otherwise the first post image is used)</small></span>
+        <input name="card_image" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+    </label>
+    <div class="journal-current-card-image-controls">{current_card_image}</div>
+    <br><br>
+    {markdown_editor}
+    <br>
+    <div class="edit-form-actions">
+        <button id="two-buttons" type="submit" form="delete-journal-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>
+        <button id="two-buttons" type="submit" data-post-submit-wait>save changes</button>
+    </div>
+</form>

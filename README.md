@@ -42,7 +42,7 @@ unzip one of the archives into the repo root so it creates:
 data/
 ```
 
-the developer copy is generated daily from production `/data`, scrubbed for private content, and kept as a rolling set of 10 archives. setup details live in [`.github/workflows/publish-dev-data-setup.md`](.github/workflows/publish-dev-data-setup.md).
+the developer copy is generated daily from production `/data`, scrubbed for private content, and kept as a rolling set of 10 archives. setup details live in [Developer Data](wiki/Developer-data.md).
 
 ## Useful Commands
 

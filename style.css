@@ -37,6 +37,10 @@
     --emoji-font: "Twemoji COLR", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
     --selection-bg: var(--links);
     --selection-fg: var(--bg);
+    --scrollbar-track: color-mix(in srgb, var(--bg) 94%, var(--fg) 6%);
+    --scrollbar-thumb: color-mix(in srgb, var(--border) 78%, var(--subtle) 22%);
+    --scrollbar-thumb-hover: color-mix(in srgb, var(--links) 72%, var(--fg) 28%);
+    --scrollbar-thumb-border: var(--bg);
 }
 
 ::selection {
@@ -462,6 +466,24 @@ body.blackprint-theme.mobile-template .toast-json-editor code {
 .spoiler:hover {
     color: var(--fg);
     background-color: transparent;
+}
+
+.mdpaste-markdown mark,
+.feed-markdown mark {
+    padding: 0 2px;
+    color: #fff7d6;
+    background-color: #76611f;
+}
+
+.markdown-frdg-icon {
+    display: inline-block;
+    width: 1.25em;
+    height: 1.25em;
+    object-fit: contain;
+    vertical-align: -0.225em;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
 }
 
 body {
@@ -1213,9 +1235,18 @@ body.mobile-template #title .title-letter {
     display: none;
 }
 
-#dev-mode-banner {
+#dev-mode-banner,
+#wiki-mode-banner {
     display: block;
     margin-top: 4px;
+}
+
+.mobile-collapsed-dev-mode-banner {
+    margin-left: auto;
+    color: #9fd6a3;
+    font-size: 11px;
+    line-height: 1.15;
+    white-space: nowrap;
 }
 
 #hard-ban-dev-banner {
@@ -1699,25 +1730,54 @@ button[data-tooltip] {
 /* Scrollbar theming */
 * {
     scrollbar-width: thin;
-    scrollbar-color: #a9a9a9 #0a0a0a;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar {
     width: 10px;
+    height: 10px;
 }
 
 *::-webkit-scrollbar-track {
-    background: #0a0a0a;
+    background: var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar-thumb {
-    background: #2c2c2c;
-    border: 1px solid #a9a9a9;
+    background: var(--scrollbar-thumb);
+    border: 2px solid var(--scrollbar-track);
     border-radius: 6px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-    background: #3a3a3a;
+    background: var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+}
+
+#sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+#sidebar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#sidebar::-webkit-scrollbar-track,
+#sidebar::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border: 2px solid var(--scrollbar-track);
+}
+
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
 }
 
 #footer-buttons {
@@ -3811,6 +3871,124 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .bbcode-dropdown option[value="h4"] {
     font-size: 16px;
     font-weight: bold;
+}
+
+.feed-markdown-editor,
+.feed-markdown-editor * {
+    border-radius: 0 !important;
+}
+
+.feed-markdown-toolbar {
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.feed-markdown-formatting,
+.feed-markdown-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.feed-markdown-formatting {
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.feed-markdown-formatting::-webkit-scrollbar { height: 3px; }
+.feed-markdown-formatting::-webkit-scrollbar-track { background: transparent; }
+.feed-markdown-formatting::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+.feed-markdown-formatting:hover::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb-hover); }
+.feed-markdown-formatting > * { flex: 0 0 auto; }
+.feed-markdown-formatting[hidden] { display: none; }
+.feed-markdown-actions { flex: 0 0 auto; margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border); }
+.feed-markdown-actions .bbcode-btn {
+    display: inline-flex;
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+.feed-markdown-editor .bbcode-btn { height: 32px; box-sizing: border-box; box-shadow: none !important; }
+.markdown-highlight-shell {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+.markdown-highlight-shell[hidden] { display: none !important; }
+.markdown-highlight-layer,
+.markdown-highlight-input {
+    position: absolute !important;
+    inset: 0;
+    width: 100% !important;
+    height: 100%;
+    margin: 0 !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    font: inherit !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    letter-spacing: normal !important;
+    tab-size: 4;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere;
+}
+.markdown-highlight-layer {
+    z-index: 0;
+    overflow: hidden;
+    border: 1px solid transparent !important;
+    color: var(--fg);
+    background: var(--bg);
+    pointer-events: none;
+}
+.markdown-highlight-input {
+    z-index: 1;
+    color: transparent !important;
+    caret-color: var(--fg);
+    background: transparent !important;
+    resize: vertical;
+}
+.markdown-highlight-input::placeholder { color: var(--subtle); opacity: 0.8; }
+.markdown-syntax-valid { color: var(--links); }
+.feed-markdown-editor #bbcode-textbox,
+.feed-markdown-preview { min-height: 240px; max-height: 85dvh; overflow: auto; padding: 12px; box-sizing: border-box; font-size: 14px; line-height: 1.5; box-shadow: none !important; }
+.feed-markdown-preview { border: 1px solid var(--border); }
+.feed-markdown { display: block; max-width: 100%; overflow-wrap: anywhere; }
+.feed-markdown > :first-child { margin-top: 0; }
+.feed-markdown img, .feed-markdown video, .feed-markdown table { max-width: 100%; }
+.feed-markdown table { width: 100%; border-collapse: collapse; }
+.feed-markdown th, .feed-markdown td { padding: 8px; border: 1px solid var(--border); }
+.feed-markdown th { background: color-mix(in srgb, var(--bg) 88%, var(--fg) 12%); }
+.feed-markdown blockquote { margin: 14px 0; padding: 12px 16px; border-left: 2px solid var(--links); background: color-mix(in srgb, var(--bg) 90%, var(--fg) 10%); }
+.feed-markdown :not(pre) > code {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    background-color: rgba(255, 255, 255, 0.06);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 0.95em;
+    line-height: 1.2;
+    vertical-align: baseline;
+}
+.feed-markdown pre {
+    max-width: 100%;
+    overflow-x: auto;
+    background-color: #080a0c;
+}
+.feed-markdown pre code,
+.feed-markdown pre code.hljs {
+    background-color: #080a0c !important;
 }
 
 #bbcode-textbox {
@@ -5912,324 +6090,6 @@ pre code.hljs {
 
 #search-button:active {
     background-color: var(--bg);
-}
-
-/* local developer wiki */
-body:has(#wiki-layout) #sidebar,
-body:has(#wiki-layout) #show-sidebar {
-    display: none !important;
-}
-
-body:has(#wiki-layout) #container {
-    width: 100vw;
-    height: 100dvh;
-    overflow-y: auto;
-}
-
-body:has(#wiki-layout) #content {
-    max-width: none;
-    width: auto;
-    min-height: 100%;
-    padding: 34px;
-}
-
-body:has(#wiki-layout) #content-layout {
-    width: min(825px, calc(100vw - 68px));
-    max-width: none;
-    min-height: calc(100dvh - 70px);
-    padding: 0;
-}
-
-body:has(#wiki-layout) #content-layout,
-body:has(#wiki-layout) #content-main {
-    min-height: calc(100dvh - 70px);
-}
-
-body:has(#wiki-layout) #content-footer {
-    display: none;
-}
-
-#wiki-layout {
-    --wiki-rail: 200px;
-    display: grid;
-    grid-template-columns: var(--wiki-rail) minmax(0, 1fr);
-    align-items: stretch;
-    min-height: calc(100dvh - 70px);
-    color: var(--fg);
-}
-
-#wiki-sidebar {
-    position: relative;
-    height: auto;
-    min-height: 0;
-    padding: 0;
-    overflow: visible;
-    box-sizing: border-box;
-    border-right: 2px solid var(--border);
-    background:
-        linear-gradient(180deg, rgba(34, 29, 42, 0.96), rgba(10, 18, 19, 0.98)),
-        var(--bg);
-    box-shadow: 10px 0 0 rgba(0, 0, 0, 0.24);
-}
-
-#wiki-sidebar h2 {
-    margin: 10px;
-    padding: 12px 0;
-    border-top: 4px double var(--border);
-    border-bottom: 4px double var(--border);
-    color: var(--subtle);
-    font-size: 13px;
-    line-height: 1.05;
-    text-align: center;
-    text-transform: lowercase;
-}
-
-#wiki-sidebar h2 #title {
-    display: block;
-    font-size: 24px;
-    letter-spacing: 0;
-}
-
-#wiki-sidebar h2 span:not(#title) {
-    display: block;
-    margin-top: 8px;
-    color: var(--subtle);
-    font-size: 12px;
-    font-weight: normal;
-}
-
-#wiki-page-list {
-    list-style: none;
-    margin: 0;
-    padding: 0 0 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    box-sizing: border-box;
-}
-
-#wiki-page-list li {
-    margin: 0 10px 8px 10px;
-}
-
-.wiki-page-link {
-    display: flex;
-    align-items: center;
-    min-height: 36px;
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 0;
-    background:
-        linear-gradient(90deg, rgba(119, 100, 144, 0.2), rgba(108, 170, 167, 0.12)),
-        rgba(15, 17, 19, 0.88);
-    text-decoration: none;
-    color: var(--fg);
-    line-height: 1.25;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.34);
-    text-transform: uppercase;
-    transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, color 150ms ease, transform 150ms ease;
-}
-
-.wiki-page-link::before {
-    content: ">>";
-    margin-right: 8px;
-    color: var(--links);
-    opacity: 1;
-}
-
-.wiki-page-link:hover,
-.wiki-page-link.active {
-    transform: translate(-2px, -2px);
-    background: linear-gradient(90deg, #776490, #6caaa7);
-    border-color: var(--border);
-    color: #101315;
-    box-shadow: 5px 5px 0 rgba(108, 170, 167, 0.28);
-}
-
-.wiki-page-link:hover::before,
-.wiki-page-link.active::before {
-    color: #101315;
-}
-
-#wiki-content {
-    min-width: 0;
-    padding: 24px 28px 34px;
-    box-sizing: border-box;
-}
-
-#wiki-content > h1 {
-    margin: 0;
-    color: var(--fg);
-    font-size: clamp(30px, 4vw, 44px);
-    line-height: 1;
-    letter-spacing: 0;
-    text-wrap: balance;
-}
-
-#wiki-meta {
-    display: inline-block;
-    margin: 8px 0 28px;
-    color: var(--subtle);
-    font-size: 12px;
-    text-transform: lowercase;
-}
-
-#wiki-rendered {
-    max-width: 76ch;
-    line-height: 1.65;
-    font-size: 15px;
-}
-
-#wiki-rendered h1,
-#wiki-rendered h2,
-#wiki-rendered h3,
-#wiki-rendered h4,
-#wiki-rendered h5,
-#wiki-rendered h6 {
-    margin: 32px 0 10px;
-    color: var(--fg);
-    line-height: 1.15;
-    letter-spacing: 0;
-    text-wrap: balance;
-}
-
-#wiki-rendered h1 {
-    padding-bottom: 9px;
-    border-bottom: 1px solid var(--border);
-    font-size: 28px;
-}
-
-#wiki-rendered h2 {
-    padding-top: 8px;
-    font-size: 24px;
-}
-
-#wiki-rendered h3 {
-    color: var(--links);
-    font-size: 19px;
-}
-
-#wiki-rendered p,
-#wiki-rendered ul,
-#wiki-rendered ol,
-#wiki-rendered pre,
-#wiki-rendered blockquote {
-    margin: 0 0 18px;
-}
-
-#wiki-rendered ul,
-#wiki-rendered ol {
-    padding-left: 26px;
-}
-
-#wiki-rendered li {
-    margin: 0 0 8px;
-    padding-left: 2px;
-}
-
-#wiki-rendered li::marker {
-    color: var(--links);
-}
-
-#wiki-rendered a {
-    color: var(--links);
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
-}
-
-#wiki-rendered code {
-    font-family: 'MainRegular', monospace;
-    padding: 2px 5px;
-    border: 1px solid var(--border);
-    border-radius: 0;
-    background: rgba(255, 255, 255, 0.07);
-    color: color-mix(in srgb, var(--fg) 88%, var(--links) 12%);
-    font-size: 0.95em;
-}
-
-#wiki-rendered pre {
-    overflow-x: auto;
-    padding: 14px;
-    border: 1px solid var(--border);
-    border-radius: 0;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
-        rgba(15, 17, 19, 0.78);
-    box-shadow: 4px 4px 0 rgba(236, 231, 220, 0.13);
-}
-
-#wiki-rendered pre code {
-    background: transparent;
-    border: 0;
-    padding: 0;
-    color: inherit;
-}
-
-#wiki-rendered blockquote {
-    padding: 10px 14px;
-    border-left: 3px solid var(--links);
-    background: rgba(255, 255, 255, 0.04);
-    color: color-mix(in srgb, var(--fg) 82%, var(--subtle) 18%);
-}
-
-#wiki-rendered hr {
-    border: 0;
-    border-top: 1px solid var(--border);
-    margin: 28px 0;
-}
-
-@media (max-width: 800px) {
-    body:has(#wiki-layout) #content {
-        padding: 14px;
-    }
-
-    body:has(#wiki-layout) #content-layout,
-    body:has(#wiki-layout) #content-main {
-        min-height: calc(100dvh - 28px);
-    }
-
-    body:has(#wiki-layout) #content-layout {
-        width: 100%;
-    }
-
-    #wiki-layout {
-        grid-template-columns: 1fr;
-        min-height: calc(100dvh - 28px);
-    }
-
-    #wiki-sidebar {
-        position: relative;
-        height: auto;
-        overflow-y: visible;
-        min-height: 0;
-        border-right: 0;
-        border-bottom: 2px solid var(--border);
-        box-shadow: 0 10px 0 rgba(236, 231, 220, 0.08);
-    }
-
-    #wiki-content {
-        padding: 18px 14px 28px;
-    }
-
-    #wiki-page-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        padding: 0 10px 18px;
-    }
-
-    #wiki-page-list li {
-        margin: 0;
-    }
-
-    .wiki-page-link {
-        min-height: 34px;
-        font-size: 12px;
-    }
-
-    #wiki-rendered {
-        max-width: none;
-        font-size: 14px;
-    }
 }
 
 .native-theme-select {

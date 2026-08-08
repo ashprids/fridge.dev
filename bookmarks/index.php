@@ -6,6 +6,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 
 $title = 'saves';
 $description = 'see all the stuff you\'ve saved.';
@@ -122,19 +124,20 @@ if (isset($_SESSION['user']) && !empty($_SESSION['user']['username'])) {
                     continue;
                 }
                 if ($isJournal) {
-                    $postFile = $rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal' . DIRECTORY_SEPARATOR . $basename . '.txt';
+                    $postFile = fridg3_journal_post_path($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal', $basename);
                 } else {
                     $postFile = $postsDir . DIRECTORY_SEPARATOR . $basename . '.txt';
                 }
-                if (!is_file($postFile)) continue;
+                if ($postFile === null || !is_file($postFile)) continue;
 
                 $raw = @file_get_contents($postFile);
                 if ($raw === false) continue;
                 if ($isJournal) {
-                    $lines = preg_split("/(\r\n|\n|\r)/", $raw);
-                    $dateLine = isset($lines[0]) ? trim($lines[0]) : '';
-                    $titleLine = isset($lines[1]) ? trim($lines[1]) : '';
-                    $descLine = isset($lines[2]) ? trim($lines[2]) : '';
+                    $journalPost = fridg3_journal_parse_post($raw);
+                    if ($journalPost === null) continue;
+                    $dateLine = $journalPost['date'];
+                    $titleLine = $journalPost['title'];
+                    $descLine = $journalPost['description'];
                     $safeTitle = htmlspecialchars($titleLine, ENT_QUOTES, 'UTF-8');
                     $safeDate = htmlspecialchars($dateLine, ENT_QUOTES, 'UTF-8');
                     $safeDesc = htmlspecialchars($descLine, ENT_QUOTES, 'UTF-8');
@@ -149,18 +152,14 @@ if (isset($_SESSION['user']) && !empty($_SESSION['user']['username'])) {
                         . '</div>'
                         . '</a><br>';
                 } else {
-                    $lines = preg_split("/(\r\n|\n|\r)/", $raw);
-                    $usernameLine = isset($lines[0]) ? trim($lines[0]) : '';
-                    $dateLine = isset($lines[1]) ? trim($lines[1]) : '';
-                    $body = '';
-                    if (count($lines) > 2) {
-                        $body = implode("\n", array_slice($lines, 2));
-                    }
-                    $postUsername = ltrim($usernameLine, '@');
+                    $parsedPost = fridg3_feed_parse_post($raw);
+                    $postUsername = $parsedPost['username'];
+                    $dateLine = $parsedPost['date'];
+                    $body = $parsedPost['body'];
                     $safeUserName = htmlspecialchars($postUsername, ENT_QUOTES, 'UTF-8');
                     $humanDate = $humanize($dateLine);
                     $safeDate = htmlspecialchars($humanDate, ENT_QUOTES, 'UTF-8');
-                    $safeBody = htmlspecialchars($body, ENT_QUOTES, 'UTF-8');
+                    $safeBody = fridg3_feed_render_post_body($body, $parsedPost['format']);
                     $postId = htmlspecialchars($basename, ENT_QUOTES, 'UTF-8');
                     $postLink = '/feed/posts/' . rawurlencode($basename);
                     $feedBookmarksHtml .= '<a href="' . $postLink . '" class="feed-post-link" style="text-decoration:none;color:inherit;">'
@@ -169,7 +168,7 @@ if (isset($_SESSION['user']) && !empty($_SESSION['user']['username'])) {
                         . '<span id="post-username">@' . $safeUserName . '</span>'
                         . '<span id="post-date-feed">' . $safeDate . ' • <span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="fa-solid fa-bookmark"></i></span></span>'
                         . '</div>'
-                        . '<span id="post-content">' . $safeBody . '</span>'
+                        . ($parsedPost['format'] === 'v2' ? $safeBody : '<span id="post-content">' . $safeBody . '</span>')
                         . '</div>'
                         . '</a><br>';
                 }

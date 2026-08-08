@@ -237,7 +237,7 @@ function sysinfo_collect_environment(): array
             'counts' => [
                 'accounts' => sysinfo_read_json_file($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json'),
                 'feed_posts' => sysinfo_glob_count($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed' . DIRECTORY_SEPARATOR . '*.txt'),
-                'journal_posts' => sysinfo_glob_count($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal' . DIRECTORY_SEPARATOR . '*.txt'),
+                'journal_posts' => sysinfo_glob_count($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal' . DIRECTORY_SEPARATOR . '*.txt') + sysinfo_glob_count($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal' . DIRECTORY_SEPARATOR . '*.md'),
                 'guestbook_entries' => sysinfo_glob_count($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'guestbook' . DIRECTORY_SEPARATOR . '*.txt'),
                 'chat_threads' => sysinfo_glob_count($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'chat' . DIRECTORY_SEPARATOR . '*.json'),
                 'images' => sysinfo_glob_count($rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . '*'),

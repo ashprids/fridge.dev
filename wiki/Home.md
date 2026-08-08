@@ -1,10 +1,10 @@
 # fridge.dev Developer Wiki
 
-this wiki serves to provide documentation to developers and AI agents developing the website.
+This wiki serves to provide documentation to developers and AI agents developing the website.
 
-these pages are mirrored on the GitHub repository's wiki (https://github.com/ashprids/fridge.dev/wiki) and the website itself (https://fridge.dev/wiki).
+These pages are mirrored on the GitHub repository's wiki (https://github.com/ashprids/fridge.dev/wiki) and the website itself (https://fridge.dev/wiki).
 
-when docs and code disagree, trust the code.
+When docs and code disagree, trust the code.
 
 ## Project Snapshot
 
@@ -12,15 +12,15 @@ when docs and code disagree, trust the code.
 
 Core traits:
 
-- most routes are directory-based and use `index.php` + `content.html`
-- rendering is mostly server-side
+- Most routes are directory-based and use `index.php` + `content.html`
+- Rendering is mostly server-side
 - `template.html` is the default shell
 - `template_mobile.html` is selected when mobile view is enabled
-- `main.js` adds SPA-ish navigation, settings, bookmarks, toast bot UI, page views, and other client behaviors
-- shared PHP helpers now live in `lib/render.php`, `lib/session.php`, and `lib/feed.php`
-- runtime content lives under `/data` and is intentionally excluded from deployment sync
+- `main.js` adds SPA-ish navigation, settings, bookmarks, page views, and other client behaviors; Toast's website integration is documented on [Toast](Toast)
+- Shared PHP helpers now live in `lib/render.php`, `lib/session.php`, and `lib/feed.php`
+- Runtime content lives under `/data` and is intentionally excluded from deployment sync
 
-## Source Of Truth
+## Source of Truth
 
 Useful files:
 
@@ -37,9 +37,9 @@ Useful files:
 
 If you need to change:
 
-- one page layout: edit that route’s `content.html`
-- one page’s server behavior: edit that route’s `index.php`
-- shared UI: edit `template.html`, `template_mobile.html`, `style.css`, or `main.js`
-- persistence or auth: edit the relevant PHP writer/reader and update the data contract
+- One page layout: edit that route’s `content.html`
+- One page’s server behavior: edit that route’s `index.php`
+- Shared UI: edit `template.html`, `template_mobile.html`, `style.css`, or `main.js`
+- Persistence or auth: edit the relevant PHP writer/reader and update the data contract
 
-For moderation terminology and enforcement boundaries, see [Account Restrictions and IP Bans](Account-Restrictions-and-IP-Bans).
+For moderation terminology and enforcement boundaries, see [Restrictions and Moderation](Restrictions-and-Moderation).

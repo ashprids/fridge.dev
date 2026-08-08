@@ -736,25 +736,54 @@ button[data-tooltip] {
 /* Scrollbar theming */
 * {
     scrollbar-width: thin;
-    scrollbar-color: #a9a9a9 #0a0a0a;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar {
     width: 10px;
+    height: 10px;
 }
 
 *::-webkit-scrollbar-track {
-    background: #0a0a0a;
+    background: var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar-thumb {
-    background: #2c2c2c;
-    border: 1px solid #a9a9a9;
+    background: var(--scrollbar-thumb);
+    border: 2px solid var(--scrollbar-track);
     border-radius: 6px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-    background: #3a3a3a;
+    background: var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+}
+
+#sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+#sidebar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#sidebar::-webkit-scrollbar-track,
+#sidebar::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border: 2px solid var(--scrollbar-track);
+}
+
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
 }
 
 #footer-buttons {

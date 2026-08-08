@@ -11,6 +11,34 @@ let activeBBCodeEditor = null;
 const VOICE_NOTE_MAX_MS = 120000;
 const MEDIA_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
 
+function submitSeparateMarkdownPreview(editor) {
+    const form = editor?.closest('form');
+    if (!form) return;
+    ['save_draft', 'open_preview'].forEach(name => {
+        let input = form.querySelector(`input[name="${name}"]`);
+        if (!input) {
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            form.appendChild(input);
+        }
+        input.value = '1';
+    });
+    if (typeof form.requestSubmit === 'function') form.requestSubmit();
+    else form.submit();
+}
+
+if (!window.fridg3SeparateMarkdownPreviewBound) {
+    window.fridg3SeparateMarkdownPreviewBound = true;
+    document.addEventListener('click', event => {
+        const button = event.target.closest('#bbcode-preview-toggle');
+        const editor = button?.closest('.bbcode-editor[data-separate-preview="true"]');
+        if (!button || !editor) return;
+        event.preventDefault();
+        submitSeparateMarkdownPreview(editor);
+    });
+}
+
 window.fridg3AppendBBCodeUploadFiles = function(formData, form) {
     if (!formData || !form || !form.querySelector('#bbcode-textbox')) return;
     if (mediaFileStore.files.length > 0) {
@@ -759,6 +787,65 @@ function openBBCodeCropper(index, onComplete) {
     });
 }
 
+function applyFeedMarkdownAction(action, textbox) {
+    const start = textbox.selectionStart;
+    const end = textbox.selectionEnd;
+    const selected = textbox.value.slice(start, end);
+    const replace = (text, offset, length) => {
+        textbox.setRangeText(text, textbox.selectionStart, textbox.selectionEnd, 'end');
+        textbox.setSelectionRange(start + offset, start + offset + length);
+        textbox.focus();
+    };
+    const wrappers = {
+        bold: ['**', '**', 'bold text'], italic: ['*', '*', 'italic text'],
+        underline: ['<u>', '</u>', 'underlined text'], strikethrough: ['~~', '~~', 'strikethrough text'],
+        highlight: ['==', '==', 'highlighted text'], code: ['`', '`', 'code'],
+        spoiler: ['||', '||', 'spoiler text']
+    };
+    if (wrappers[action]) {
+        const [before, after, placeholder] = wrappers[action];
+        const value = selected || placeholder;
+        replace(before + value + after, before.length, value.length);
+        return;
+    }
+    if (action === 'link') {
+        const value = selected || 'link text';
+        replace(`[${value}](https://example.com)`, 1, value.length);
+        return;
+    }
+    if (action === 'image') {
+        const value = selected || 'image description';
+        replace(`![${value}](https://example.com/image.png)`, 2, value.length);
+        return;
+    }
+    if (action === 'code-block') {
+        const value = selected || 'code';
+        replace(`\n\`\`\`\n${value}\n\`\`\`\n`, 5, value.length);
+        return;
+    }
+    if (action === 'table') {
+        const table = '| heading | heading |\n| --- | --- |\n| cell | cell |';
+        replace(table, 2, 7);
+        return;
+    }
+    if (action === 'horizontal-rule') {
+        replace('\n---\n', 5, 0);
+        return;
+    }
+    const heading = action.match(/^heading-([1-6])$/);
+    const prefixes = { quote: '> ', task: '- [ ] ' };
+    const prefix = heading ? '#'.repeat(Number(heading[1])) + ' ' : prefixes[action];
+    if (!prefix) return;
+    const lineStart = textbox.value.lastIndexOf('\n', start - 1) + 1;
+    const nextBreak = textbox.value.indexOf('\n', end);
+    const lineEnd = nextBreak === -1 ? textbox.value.length : nextBreak;
+    const replacement = textbox.value.slice(lineStart, lineEnd).split('\n').map(line => prefix + line).join('\n');
+    textbox.setSelectionRange(lineStart, lineEnd);
+    textbox.setRangeText(replacement, lineStart, lineEnd, 'end');
+    textbox.setSelectionRange(lineStart + prefix.length, lineStart + replacement.length);
+    textbox.focus();
+}
+
 function initBBCodeEditor() {
     const bbcodeTextbox = document.getElementById('bbcode-textbox');
     const bbcodeEditor = bbcodeTextbox ? bbcodeTextbox.closest('.bbcode-editor') : null;
@@ -767,10 +854,50 @@ function initBBCodeEditor() {
     const bbcodePreviewToggle = bbcodeScope.querySelector('#bbcode-preview-toggle');
     const bbcodeHeaderDropdown = bbcodeScope.querySelector('#bbcode-header-dropdown');
     const bbcodeButtons = bbcodeScope.querySelectorAll('.bbcode-btn');
+    const isMarkdownEditor = bbcodeEditor?.dataset.editorFormat === 'markdown';
     if (bbcodeTextbox) bbcodeDebugLog('BBCode editor initialized');
+    bbcodeScope.querySelector('#feed-markdown-guide')?.addEventListener('click', () => {
+        window.open(bbcodeEditor?.dataset.guideUrl || '/formatting/markdown/feed', '_blank', 'noopener,noreferrer');
+    });
 
-    const refreshPreview = () => {
+    const refreshPreview = async () => {
         if (!bbcodePreview || !isPreviewMode) return;
+        if (isMarkdownEditor) {
+            bbcodePreview.innerHTML = '<p>rendering preview...</p>';
+            try {
+                const response = await fetch(bbcodeEditor?.dataset.previewUrl || '/feed/create/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'preview', markdown: bbcodeTextbox.value })
+                });
+                const data = await response.json();
+                if (!response.ok || !data.ok) throw new Error(data.error || 'could not render preview');
+                let html = data.html;
+                html = html.replace(/\[img:(\d+)\](?:\[name:([^\]]*)\])?/gi, (_match, id, name) => {
+                    const image = bbcodeImages.get(Number(id));
+                    if (!image) return _match;
+                    return `<img id="post-image" data-bbcode-media-index="${Number(id)}" src="${image.data}" alt="${name || image.name || 'image'}">`;
+                });
+                html = html.replace(/\[(audio|video|media):(\d+)\](?:\[name:([^\]]*)\])?/gi, (_match, kind, id, name) => {
+                    const media = bbcodeMedia.get(Number(id));
+                    if (!media) return _match;
+                    const mediaKind = kind === 'media' ? media.kind : kind;
+                    return mediaKind === 'audio'
+                        ? renderChatStyleAudio(media.url, name || media.name || 'audio')
+                        : renderFeedVideo(media.url, name || media.name || 'video');
+                });
+                html = html.replace(/\[voice:(\d+)\](?:\[name:([^\]]*)\])?/gi, (_match, id, name) => {
+                    const voice = bbcodeVoiceNotes.get(Number(id));
+                    return voice ? renderChatStyleAudio(voice.url, name || voice.name || 'voice note') : _match;
+                });
+                bbcodePreview.innerHTML = html;
+                if (typeof window.fridg3RenderMdpasteEnhancements === 'function') await window.fridg3RenderMdpasteEnhancements(bbcodePreview);
+            } catch (error) {
+                bbcodePreview.textContent = error.message || 'could not render preview';
+            }
+            initInlineMediaPlayers(bbcodePreview);
+            return;
+        }
         bbcodePreview.innerHTML = parseBBCode(applyGuestPreviewFilter(bbcodeTextbox.value));
         initInlineMediaPlayers(bbcodePreview);
     };
@@ -823,6 +950,7 @@ function initBBCodeEditor() {
         bbcodeVoiceNotes.clear();
         while (mediaFileStore.items.length) mediaFileStore.items.remove(0);
         while (voiceFileStore.items.length) voiceFileStore.items.remove(0);
+        isPreviewMode = false;
         activeBBCodeEditor = bbcodeTextbox;
     }
 
@@ -864,8 +992,13 @@ function initBBCodeEditor() {
     bbcodeButtons.forEach(button => {
         button.addEventListener('click', function() {
             if (this.id === 'bbcode-preview-toggle' || this.id === 'journal-preview-button' || this.id === 'bbcode-image-btn' || this.id === 'bbcode-voice-btn' || this.id === 'bbcode-color-btn' || this.id === 'bbcode-tooltip-btn' || this.id === 'bbcode-link-btn' || this.id === 'bbcode-spoiler-btn') return;
+            if (isMarkdownEditor && this.dataset.markdownAction) {
+                applyFeedMarkdownAction(this.dataset.markdownAction, bbcodeTextbox);
+                return;
+            }
             
             const tag = this.getAttribute('data-tag');
+            if (!tag) return;
             const start = bbcodeTextbox.selectionStart;
             const end = bbcodeTextbox.selectionEnd;
             const selectedText = bbcodeTextbox.value.substring(start, end);
@@ -889,6 +1022,11 @@ function initBBCodeEditor() {
         bbcodeHeaderDropdown.addEventListener('change', function() {
             const tag = this.value;
             if (!tag) return;
+            if (isMarkdownEditor) {
+                applyFeedMarkdownAction(tag, bbcodeTextbox);
+                this.value = '';
+                return;
+            }
             
             const start = bbcodeTextbox.selectionStart;
             const end = bbcodeTextbox.selectionEnd;
@@ -1129,7 +1267,9 @@ function initBBCodeEditor() {
                     const kind = mediaKindForUrl(url);
                     const fileName = url.split('/').pop().split('?')[0] || kind;
                     const tag = kind === 'audio' ? 'audio' : (kind === 'video' ? 'video' : 'img');
-                    const newText = `[${tag}=${url}][name:${fileName}]`;
+                    const newText = isMarkdownEditor
+                        ? (kind === 'image' ? `![${fileName}](${url})` : `<${kind} src="${url}"></${kind}>`)
+                        : `[${tag}=${url}][name:${fileName}]`;
                     bbcodeTextbox.value = beforeText + newText + afterText;
                     bbcodeTextbox.focus();
                     bbcodeTextbox.setSelectionRange(start + newText.length, start + newText.length);
@@ -1251,6 +1391,9 @@ function initBBCodeEditor() {
     // Preview toggle
     if (bbcodePreviewToggle && bbcodePreview) {
         bbcodePreviewToggle.addEventListener('click', function(e) {
+            if (bbcodeEditor?.dataset.separatePreview === 'true') {
+                return;
+            }
             isPreviewMode = !isPreviewMode;
             
             if (isPreviewMode) {
@@ -1258,6 +1401,8 @@ function initBBCodeEditor() {
                 refreshPreview();
                 bbcodeTextbox.style.display = 'none';
                 bbcodePreview.style.display = 'block';
+                const markdownFormatting = bbcodeScope.querySelector('[data-markdown-formatting]');
+                if (isMarkdownEditor && markdownFormatting) markdownFormatting.hidden = true;
                 
                 // Highlight code blocks
                 if (typeof hljs !== 'undefined') {
@@ -1313,6 +1458,8 @@ function initBBCodeEditor() {
                 // Show editor
                 bbcodeTextbox.style.display = 'block';
                 bbcodePreview.style.display = 'none';
+                const markdownFormatting = bbcodeScope.querySelector('[data-markdown-formatting]');
+                if (isMarkdownEditor && markdownFormatting) markdownFormatting.hidden = false;
                 
                 // Enable toolbar buttons
                 bbcodeButtons.forEach(button => {

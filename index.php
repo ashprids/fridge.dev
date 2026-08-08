@@ -12,6 +12,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 
 if (!function_exists('find_template_file')) {
     function find_template_file($filename) {
@@ -133,19 +135,14 @@ if (is_dir($postsDir)) {
         if ($count >= 1) break;
         $raw = @file_get_contents($file);
         if ($raw === false) continue;
-        $lines = preg_split("/(\r\n|\n|\r)/", $raw);
-        $usernameLine = isset($lines[0]) ? trim($lines[0]) : '';
-        $dateLine = isset($lines[1]) ? trim($lines[1]) : '';
-        $body = '';
-        if (count($lines) > 2) {
-            $body = implode("\n", array_slice($lines, 2));
-        }
-
-        $username = ltrim($usernameLine, '@');
+        $parsedPost = fridg3_feed_parse_post($raw);
+        $username = $parsedPost['username'];
+        $dateLine = $parsedPost['date'];
+        $body = $parsedPost['body'];
         $safeUser = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
         $ago = $humanize($dateLine);
         $safeAgo = htmlspecialchars($ago, ENT_QUOTES, 'UTF-8');
-        $safeBody = htmlspecialchars($body, ENT_QUOTES, 'UTF-8');
+        $safeBody = fridg3_feed_render_post_body($body, $parsedPost['format']);
 
         $postId = urlencode(basename($file, '.txt'));
         $postIdRaw = basename($file, '.txt');
@@ -165,7 +162,7 @@ if (is_dir($postsDir)) {
             . '<span id="post-username">@' . $safeUser . '</span>'
             . '<span id="post-date-feed">' . $safeAgo . ' • ' . $editIcon . '<span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="' . $bookmarkIconClass . ' fa-bookmark"></i></span></span>'
             . '</div>'
-            . '<span id="post-content">' . $safeBody . '</span>'
+            . ($parsedPost['format'] === 'v2' ? $safeBody : '<span id="post-content">' . $safeBody . '</span>')
             . '</div>'
             . '</a>';
 
@@ -203,17 +200,18 @@ if (isset($_SESSION['user']) && !empty($_SESSION['user']['username'])) {
 }
 
 if (is_dir($journalDir)) {
-    $postFiles = glob($journalDir . DIRECTORY_SEPARATOR . '*.txt');
+    $postFiles = fridg3_journal_post_files($journalDir);
     $posts = [];
 
     foreach ($postFiles as $pf) {
-        $lines = @file($pf, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($lines === false || count($lines) < 3) {
+        $rawPost = @file_get_contents($pf);
+        $parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+        if ($parsedPost === null) {
             continue;
         }
-        $dateStr = trim($lines[0]);
-        $postTitle = $lines[1] ?? '';
-        $desc = $lines[2] ?? '';
+        $dateStr = trim($parsedPost['date']);
+        $postTitle = $parsedPost['title'];
+        $desc = $parsedPost['description'];
         $ts = strtotime($dateStr);
         if ($ts === false) {
             $ts = 0;
@@ -242,7 +240,7 @@ if (is_dir($journalDir)) {
         $post_date = htmlspecialchars($post['date'] ?? '', ENT_QUOTES, 'UTF-8');
         $post_title = htmlspecialchars($post['title'] ?? '', ENT_QUOTES, 'UTF-8');
         $post_description = htmlspecialchars($post['description'] ?? '', ENT_QUOTES, 'UTF-8');
-        $filename = basename($post['path'], '.txt');
+        $filename = pathinfo($post['path'], PATHINFO_FILENAME);
         $bookmarkId = 'journal:' . $filename;
         $isBookmarked = in_array($bookmarkId, $userBookmarks, true);
         $iconClass = $isBookmarked ? 'fa-solid' : 'fa-regular';

@@ -32,6 +32,18 @@ $title = 'create feed post';
 $description = 'create a new post for the feed.';
 $error = trim((string)($_GET['error'] ?? ''));
 
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && str_contains((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
+    $payload = json_decode((string)file_get_contents('php://input'), true);
+    if (is_array($payload) && ($payload['action'] ?? '') === 'preview') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'html' => fridg3_feed_render_post_body((string)($payload['markdown'] ?? ''), 'v2'),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 // Compress to JPEG under the provided byte limit; always flattens transparency to white
 function save_jpeg_under_limit(string $srcPath, string $mime, string $destPath, int $maxBytes = 1000000): bool {
     if (!function_exists('imagecreatetruecolor')) {
@@ -127,8 +139,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Build post file content
     $safeContent = $content; // store raw; renderer can sanitize/format later
-    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap);
-    $safeContent = fridg3_feed_replace_voice_placeholders($safeContent, $voiceMap);
+    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap, true);
+    $safeContent = fridg3_feed_replace_voice_placeholders($safeContent, $voiceMap, true);
     if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $safeContent) === 1) {
         fridg3_feed_delete_media_files_from_content($safeContent);
         header('Location: /feed/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
@@ -141,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /feed/create?error=' . rawurlencode('voice note failed. keep it under 2 minutes and try again.'));
         exit;
     }
-    $text = '@' . $username . PHP_EOL . $displayDateTime . PHP_EOL . $safeContent . PHP_EOL;
+    $text = 'v2' . PHP_EOL . '@' . $username . PHP_EOL . $displayDateTime . PHP_EOL . $safeContent . PHP_EOL;
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $timestampFilename . '.txt';
     $postSaved = file_put_contents($postFile, $text) !== false;
     fridg3_debug_submission_log('[SUBMISSION] feed post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . (count($imageMap) + count($voiceMap)));
@@ -251,6 +263,16 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+$markdownEditor = (string)file_get_contents(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'markdown-editor.html');
+$markdownEditor = str_replace(
+    ['{voice_controls}', '{voice_inputs}'],
+    [
+        '<button type="button" id="bbcode-voice-btn" class="bbcode-btn bbcode-voice-btn" data-tooltip="record voice note"><i class="fa-solid fa-microphone"></i></button>',
+        '<input id="bbcode-voice-input" name="voice_notes[]" type="file" accept="audio/*" multiple hidden><div class="bbcode-voice-recorder" hidden></div>',
+    ],
+    $markdownEditor
+);
+$content = str_replace('{markdown_editor}', $markdownEditor, $content);
 if ($error !== '') {
     $content = '<div id="error">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</div><br>' . $content;
 }

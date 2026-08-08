@@ -1183,9 +1183,7 @@ function startGradientRotation(el, durationMs) {
 
 
 function initTooltips() {
-    if (isMobileTemplateActive()) {
-        clearTooltips();
-    }
+    clearTooltips();
     document.querySelectorAll('[data-tooltip]').forEach(element => {
         // Remove previous listeners to avoid duplicates
         element.removeEventListener('mouseenter', element._tooltipMouseEnter);
@@ -1194,6 +1192,7 @@ function initTooltips() {
         // Define handlers
         element._tooltipMouseEnter = function(e) {
             if (isMobileTemplateActive()) return;
+            clearTooltips();
             let rawText = this.getAttribute('data-tooltip') || '';
             rawText = rawText.replace(/\\n/g, '<br>');
             const tooltip = document.createElement('div');
@@ -1222,10 +1221,7 @@ function initTooltips() {
             this.addEventListener('mousemove', updateTooltipPosition);
         };
         element._tooltipMouseLeave = function() {
-            if (activeTooltip && activeTooltip.element) {
-                activeTooltip.element.remove();
-                activeTooltip = null;
-            }
+            clearTooltips();
             this.removeEventListener('mousemove', element._tooltipMouseMove);
         };
         element.addEventListener('mouseenter', element._tooltipMouseEnter);

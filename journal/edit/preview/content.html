@@ -8,7 +8,7 @@
             <a id="journal-preview-back" href="{back_href}">back to editor</a>
         </div>
     </header>
-    <section id="journal-article-content">
+	<section id="journal-article-content" class="{content_class}">
         {content}
     </section>
 </article>
@@ -64,7 +64,7 @@
         text-underline-offset: 2px;
     }
 
-    #journal-article-content {
+	#journal-article-content:not(.journal-markdown-preview) {
         font-size: 15px;
         line-height: 1.7;
     }
@@ -77,46 +77,46 @@
         margin-bottom: 0;
     }
 
-    #journal-article-content p,
-    #journal-article-content ul,
-    #journal-article-content ol,
-    #journal-article-content pre,
-    #journal-article-content blockquote {
+	#journal-article-content:not(.journal-markdown-preview) p,
+	#journal-article-content:not(.journal-markdown-preview) ul,
+	#journal-article-content:not(.journal-markdown-preview) ol,
+	#journal-article-content:not(.journal-markdown-preview) pre,
+	#journal-article-content:not(.journal-markdown-preview) blockquote {
         margin-top: 12px;
         margin-bottom: 12px;
     }
 
-    #journal-article-content li {
+	#journal-article-content:not(.journal-markdown-preview) li {
         margin-bottom: 6px;
     }
 
-    #journal-article-content blockquote {
+	#journal-article-content:not(.journal-markdown-preview) blockquote {
         margin-left: 0;
         padding-left: 12px;
         border-left: 2px solid var(--border);
         color: var(--subtle);
     }
 
-    #journal-article-content h2,
-    #journal-article-content h3,
-    #journal-article-content h4,
-    #journal-article-content h5 {
+	#journal-article-content:not(.journal-markdown-preview) h2,
+	#journal-article-content:not(.journal-markdown-preview) h3,
+	#journal-article-content:not(.journal-markdown-preview) h4,
+	#journal-article-content:not(.journal-markdown-preview) h5 {
         line-height: 1.35;
         margin-top: 24px;
         margin-bottom: 10px;
     }
 
-    #journal-article-content a {
+	#journal-article-content:not(.journal-markdown-preview) a {
         text-decoration: underline;
         text-underline-offset: 2px;
     }
 
-    #journal-article-content img {
+	#journal-article-content:not(.journal-markdown-preview) img {
         max-width: 100%;
         height: auto;
     }
 
-    #journal-article-content hr {
+	#journal-article-content:not(.journal-markdown-preview) hr {
         margin: 20px 0;
     }
 </style>

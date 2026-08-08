@@ -8,6 +8,7 @@ require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'video-embeds.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
 
 if (isset($_SESSION['user']) && isset($_SESSION['user']['username'])) {
     $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
@@ -44,7 +45,8 @@ if ($post === '') {
     header('Location: /journal');
     exit;
 }
-$post_file = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal' . DIRECTORY_SEPARATOR . $post . '.txt';
+$journal_dir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
+$post_file = fridg3_journal_post_path($journal_dir, $post);
 
 $title = 'Post not found';
 $subtitle = '';
@@ -52,7 +54,7 @@ $date = '';
 $content_html = '';
 $description = '';
 
-if ($post && file_exists($post_file)) {
+if ($post && $post_file !== null && file_exists($post_file)) {
     $rawPost = @file_get_contents($post_file);
     $parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
     if ($parsedPost !== null) {
@@ -60,8 +62,9 @@ if ($post && file_exists($post_file)) {
         $title = htmlspecialchars($parsedPost['title'], ENT_QUOTES, 'UTF-8');
         $subtitle = htmlspecialchars($parsedPost['description'], ENT_QUOTES, 'UTF-8');
         $description = $subtitle;
-        // Render post content as HTML (trusted input)
-        $content_html = fridg3_embed_plain_video_links_in_html($parsedPost['body']);
+        $content_html = $parsedPost['format'] === 'v2'
+            ? mdp_render_markdown($parsedPost['markdown'])
+            : fridg3_embed_plain_video_links_in_html($parsedPost['body']);
     }
 }
 
@@ -109,17 +112,45 @@ if (!$content_path) {
 }
 
 
-$content = file_get_contents($content_path);
-$content = str_replace('{title}', $title, $content);
-$content = str_replace('{subtitle}', $subtitle, $content);
-$content = str_replace('{date}', $date, $content);
 $editButton = '';
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 if ($isAdmin && $post !== '') {
-    $editButton = '<a id="journal-article-edit" href="/journal/edit?post=' . urlencode($post) . '" data-tooltip="edit post"><i class="fa-solid fa-pencil"></i></a>';
+    $editButton = '<a id="journal-article-edit" class="journal-mdpaste-edit" href="/journal/edit?post=' . urlencode($post) . '" data-tooltip="edit post" aria-label="edit post"><i class="fa-solid fa-pencil"></i></a>';
 }
-$content = str_replace('{edit_button}', $editButton, $content);
-$content = str_replace('{content}', $content_html, $content);
+$isV2 = isset($parsedPost) && is_array($parsedPost) && $parsedPost['format'] === 'v2';
+$journalViewerStyles = '<style>'
+    . '.journal-mdpaste-edit{display:inline-grid;place-items:center;width:26px;height:26px;padding:0;color:var(--subtle)!important;background:transparent!important;border:0!important;font-size:12px;text-decoration:none;box-shadow:none!important}'
+    . '.journal-mdpaste-edit:hover,.journal-mdpaste-edit:focus-visible{color:var(--fg)!important;background:rgba(255,255,255,.06)!important;outline:none}'
+    . '.journal-mdpaste-post .mdpaste-article-header,.journal-mdpaste-post #journal-article-header{padding-right:var(--journal-action-clearance,30px);box-sizing:border-box}'
+    . '</style>';
+$sharedContent = (string)file_get_contents(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 's' . DIRECTORY_SEPARATOR . 'content.html');
+if ($isV2) {
+    $payload = json_encode(['markdown' => $parsedPost['markdown'], 'filename' => mdp_download_filename($parsedPost['markdown']), 'preserveLayout' => true], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?: '{}';
+    $actions = '<div class="mdpaste-paste-actions">'
+        . $editButton
+        . '<button type="button" id="mdpaste-download" data-tooltip="download file" aria-label="download file"><i class="fa-solid fa-download"></i></button>'
+        . '<button type="button" id="mdpaste-font-toggle" data-tooltip="toggle serif font" aria-label="toggle serif font" aria-pressed="false"><i class="fa-solid fa-font"></i></button>'
+        . '<button type="button" id="mdpaste-format-toggle" data-tooltip="toggle formatting" aria-label="toggle formatting" aria-pressed="false"><i class="fa-solid fa-code"></i></button>'
+        . '</div>';
+    $v2Clearance = $editButton !== '' ? 116 : 86;
+    $paste = $journalViewerStyles . '<div class="journal-mdpaste-post" style="--journal-action-clearance:' . $v2Clearance . 'px">' . $actions
+        . '<article class="mdpaste-markdown" id="mdpaste-formatted">' . $content_html . '</article>'
+        . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code>' . mdp_h($parsedPost['markdown']) . '</code></pre>'
+        . '<script id="mdpaste-source-data" type="application/json">' . $payload . '</script></div>';
+    $content = str_replace('{paste_content}', $paste, $sharedContent);
+} else {
+    $legacyArticle = file_get_contents($content_path);
+    $legacyArticle = str_replace(['{title}', '{subtitle}', '{date}', '{edit_button}', '{content}'], [$title, $subtitle, $date, '', $content_html], $legacyArticle);
+    $legacyPayload = json_encode(['markdown' => '', 'filename' => '', 'preserveLayout' => true], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?: '{}';
+    $legacyActions = '<div class="mdpaste-paste-actions">'
+        . $editButton
+        . '<button type="button" id="mdpaste-font-toggle" data-tooltip="toggle serif font" aria-label="toggle serif font" aria-pressed="false"><i class="fa-solid fa-font"></i></button>'
+        . '</div>';
+    $legacyClearance = $editButton !== '' ? 58 : 30;
+    $legacyPaste = $journalViewerStyles . '<div class="journal-mdpaste-post" style="--journal-action-clearance:' . $legacyClearance . 'px">' . $legacyActions . $legacyArticle
+        . '<script id="mdpaste-source-data" type="application/json">' . $legacyPayload . '</script></div>';
+    $content = str_replace('{paste_content}', $legacyPaste, $sharedContent);
+}
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

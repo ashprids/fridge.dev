@@ -595,6 +595,6 @@ if (!function_exists('fridg3_toast_maybe_auto_reply_to_feed')) {
             return false;
         }
 
-        return fridg3_feed_save_reply($postId, 'toast', $reply);
+        return fridg3_feed_save_reply($postId, 'toast', $reply, '', 'v2');
     }
 }

@@ -126,6 +126,9 @@ if (!$content_path) {
 }
 
 function journal_first_image_src(string $body): string {
+    if (preg_match('/!\[[^\]]*\]\(([^)\s]+)(?:\s+["\'][^"\']*["\'])?\)/', $body, $markdownImage)) {
+        return fridg3_journal_valid_image_src(html_entity_decode($markdownImage[1], ENT_QUOTES, 'UTF-8'));
+    }
     if (!preg_match(
         '~<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))~i',
         $body,
@@ -175,7 +178,7 @@ if (isset($_SESSION['user']) && !empty($_SESSION['user']['username'])) {
 $post_items = '';
 $paginationHtml = '';
 if (is_dir($posts_dir)) {
-    $post_files = glob($posts_dir . DIRECTORY_SEPARATOR . '*.txt');
+    $post_files = fridg3_journal_post_files($posts_dir);
     $posts = [];
 
     // Load basic metadata (date, title, description) for each post
@@ -243,7 +246,7 @@ if (is_dir($posts_dir)) {
                 . htmlspecialchars($post['firstImageSrc'], ENT_QUOTES, 'UTF-8')
                 . '" alt="" aria-hidden="true" loading="lazy">';
         }
-        $filename = basename($post['path'], '.txt');
+        $filename = pathinfo($post['path'], PATHINFO_FILENAME);
         $safeFilename = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
         $bookmarkId = 'journal:' . $filename;
         $isBookmarked = in_array($bookmarkId, $userBookmarks, true);

@@ -396,6 +396,28 @@ if (!function_exists('fridg3_feed_reply_fallback_id')) {
     }
 }
 
+if (!function_exists('fridg3_feed_reply_format')) {
+    function fridg3_feed_reply_format(array $reply): string
+    {
+        if (($reply['format'] ?? '') === 'v2') return 'v2';
+        // Reply ids begin with their creation timestamp. This fallback covers a
+        // cached/older writer that accepted a Markdown-editor submission before
+        // it began persisting the explicit format field.
+        $id = (string)($reply['id'] ?? '');
+        if (preg_match('/^(\d{14})_/', $id, $match) === 1 && strcmp($match[1], '20260809000000') >= 0) {
+            return 'v2';
+        }
+        $body = (string)($reply['body'] ?? '');
+        if (preg_match('/\[(?:b|i|u|s|h[3-5]|spoiler|color(?::[^\]]+)?|code(?:=[^\]]+)?|list|tooltip(?:=[^\]]+)?|link=[^\]]+|img=[^\]]+|audio=[^\]]+|video=[^\]]+)\]/i', $body) === 1) {
+            return 'legacy';
+        }
+        // Plain legacy replies render identically through the restricted
+        // Markdown renderer, while this also catches Markdown submissions from
+        // writers that omitted both the format field and timestamped id.
+        return 'v2';
+    }
+}
+
 if (!function_exists('fridg3_feed_write_replies')) {
     function fridg3_feed_write_replies(string $postId, array $replies): bool
     {
@@ -605,6 +627,17 @@ if (!function_exists('fridg3_feed_delete_voice_files_from_content')) {
                 }
             }
         }
+        if (preg_match_all('/<(audio|video)\b[^>]*\bsrc=["\']([^"\']+)["\']/i', $content, $htmlMatches, PREG_SET_ORDER)) {
+            foreach ($htmlMatches as $match) {
+                $type = strtolower((string)$match[1]);
+                $urlPath = (string)(parse_url(html_entity_decode((string)$match[2], ENT_QUOTES, 'UTF-8'), PHP_URL_PATH) ?? '');
+                $prefix = $type === 'video' ? '/data/video/' : '/data/audio/';
+                if (!str_starts_with($urlPath, $prefix)) continue;
+                $relative = ltrim(substr($urlPath, strlen('/data/')), '/');
+                $path = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+                if (is_file($path)) @unlink($path);
+            }
+        }
     }
 }
 
@@ -676,6 +709,8 @@ if (!function_exists('fridg3_feed_load_replies')) {
             $normalizedReply['username'] = $username;
             $normalizedReply['date'] = $date;
             $normalizedReply['body'] = $body;
+            if (fridg3_feed_reply_format($reply) === 'v2') $normalizedReply['format'] = 'v2';
+            else unset($normalizedReply['format']);
             if (isset($reply['parentId']) && is_string($reply['parentId'])) {
                 $parentId = trim($reply['parentId']);
                 if ($parentId !== '' && $parentId !== $normalizedReply['id']) {
@@ -891,7 +926,7 @@ if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
 }
 
 if (!function_exists('fridg3_feed_save_reply')) {
-    function fridg3_feed_save_reply(string $postId, string $username, string $body, string $parentId = ''): bool
+    function fridg3_feed_save_reply(string $postId, string $username, string $body, string $parentId = '', string $format = 'legacy'): bool
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         $safeUsername = preg_replace('/[^a-zA-Z0-9_\-]/', '', ltrim($username, '@'));
@@ -914,6 +949,7 @@ if (!function_exists('fridg3_feed_save_reply')) {
             'date' => date('Y-m-d H:i:s'),
             'body' => $trimmedBody,
         ];
+        if ($format === 'v2') $newReply['format'] = 'v2';
         if ($parentId !== '' && fridg3_feed_reply_exists($existingReplies, $parentId)) {
             $newReply['parentId'] = $parentId;
         }
@@ -929,7 +965,7 @@ if (!function_exists('fridg3_feed_save_reply')) {
 }
 
 if (!function_exists('fridg3_feed_save_guest_reply')) {
-    function fridg3_feed_save_guest_reply(string $postId, string $displayName, string $ip, string $body, string $parentId = '', string $guestBrowserId = ''): bool
+    function fridg3_feed_save_guest_reply(string $postId, string $displayName, string $ip, string $body, string $parentId = '', string $guestBrowserId = '', string $format = 'legacy'): bool
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         $safeIp = trim($ip);
@@ -958,6 +994,7 @@ if (!function_exists('fridg3_feed_save_guest_reply')) {
             'isGuest' => true,
             'ip' => $safeIp,
         ];
+        if ($format === 'v2') $newReply['format'] = 'v2';
         if ($parentId !== '' && fridg3_feed_reply_exists($existingReplies, $parentId)) {
             $newReply['parentId'] = $parentId;
         }
@@ -972,7 +1009,7 @@ if (!function_exists('fridg3_feed_save_guest_reply')) {
 }
 
 if (!function_exists('fridg3_feed_update_reply')) {
-    function fridg3_feed_update_reply(string $postId, string $replyId, string $body): bool
+    function fridg3_feed_update_reply(string $postId, string $replyId, string $body, ?string $format = null): bool
     {
         $trimmedBody = trim($body);
         if ($trimmedBody === '') {
@@ -985,6 +1022,8 @@ if (!function_exists('fridg3_feed_update_reply')) {
                 continue;
             }
             $replies[$index]['body'] = $trimmedBody;
+            if ($format === 'v2') $replies[$index]['format'] = 'v2';
+            elseif ($format === 'legacy') unset($replies[$index]['format']);
             return fridg3_feed_write_replies($postId, $replies);
         }
 
@@ -1150,18 +1189,21 @@ if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
 }
 
 if (!function_exists('fridg3_feed_replace_voice_placeholders')) {
-    function fridg3_feed_replace_voice_placeholders(string $content, array $voiceMap): string
+    function fridg3_feed_replace_voice_placeholders(string $content, array $voiceMap, bool $markdown = false): string
     {
         if (empty($voiceMap)) {
             return $content;
         }
 
-        return (string)preg_replace_callback('/\[voice:(\d+)\](?:\[name:([^\]]*)\])?/i', function($m) use ($voiceMap) {
+        return (string)preg_replace_callback('/\[voice:(\d+)\](?:\[name:([^\]]*)\])?/i', function($m) use ($voiceMap, $markdown) {
             $idx = (int)$m[1];
             if (!isset($voiceMap[$idx])) {
                 return $m[0];
             }
             $name = isset($m[2]) && strlen(trim($m[2])) ? trim($m[2]) : ($voiceMap[$idx]['name'] ?? 'voice-note.m4a');
+            if ($markdown) {
+                return '<audio src="' . htmlspecialchars((string)$voiceMap[$idx]['url'], ENT_QUOTES, 'UTF-8') . '"></audio>';
+            }
             return '[audio=' . $voiceMap[$idx]['url'] . '][name:' . $name . ']';
         }, $content);
     }
@@ -1483,9 +1525,9 @@ if (!function_exists('fridg3_feed_process_uploaded_media')) {
 }
 
 if (!function_exists('fridg3_feed_replace_media_placeholders')) {
-    function fridg3_feed_replace_media_placeholders(string $content, array $mediaMap): string
+    function fridg3_feed_replace_media_placeholders(string $content, array $mediaMap, bool $markdown = false): string
     {
-        return (string)preg_replace_callback('/\[(media|img|audio|video):(\d+)\](?:\[name:([^\]]*)\])?/i', static function (array $match) use ($mediaMap): string {
+        return (string)preg_replace_callback('/\[(media|img|audio|video):(\d+)\](?:\[name:([^\]]*)\])?/i', static function (array $match) use ($mediaMap, $markdown): string {
             $index = (int)$match[2];
             if (!isset($mediaMap[$index])) {
                 return $match[0];
@@ -1499,8 +1541,188 @@ if (!function_exists('fridg3_feed_replace_media_placeholders')) {
             }
             $name = trim((string)($match[3] ?? '')) ?: (string)($media['name'] ?? $type);
             $name = str_replace([']', "\r", "\n"], '', $name);
+            if ($markdown) {
+                $url = (string)$media['url'];
+                if ($type === 'image') return '![' . str_replace(['[', ']'], '', $name) . '](' . $url . ')';
+                return '<' . $type . ' src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '"></' . $type . '>';
+            }
             return '[' . $tag . '=' . $media['url'] . '][name:' . $name . ']';
         }, $content);
+    }
+}
+
+if (!function_exists('fridg3_feed_parse_post')) {
+    function fridg3_feed_parse_post(string $raw): array
+    {
+        $lines = preg_split('/\R/', $raw) ?: [];
+        $isV2 = trim((string)($lines[0] ?? '')) === 'v2';
+        $offset = $isV2 ? 1 : 0;
+        return [
+            'format' => $isV2 ? 'v2' : 'legacy',
+            'username' => ltrim(trim((string)($lines[$offset] ?? '')), '@'),
+            'date' => trim((string)($lines[$offset + 1] ?? '')),
+            'body' => implode("\n", array_slice($lines, $offset + 2)),
+        ];
+    }
+}
+
+if (!function_exists('fridg3_feed_markdown_inline')) {
+    function fridg3_feed_markdown_inline(string $text): string
+    {
+        $tokens = [];
+        $protect = static function (string $html) use (&$tokens): string {
+            $key = '@@FEEDMD' . count($tokens) . '@@';
+            $tokens[$key] = $html;
+            return $key;
+        };
+        $text = preg_replace_callback('/(`+)(.+?)\1/', static fn(array $m): string => $protect('<code>' . htmlspecialchars($m[2], ENT_QUOTES, 'UTF-8') . '</code>'), $text) ?? $text;
+        $text = preg_replace_callback('/<\/?u\s*>/i', static fn(array $m): string => $protect(str_starts_with($m[0], '</') ? '</u>' : '<u>'), $text) ?? $text;
+        $html = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+        $html = preg_replace_callback('/(?<!\S)!fa[ \t]+(solid|regular|brands)[ \t]+([a-z0-9][a-z0-9-]*)\b/i', static function (array $m) use ($protect): string {
+            return $protect('<i class="fa-' . strtolower($m[1]) . ' fa-' . strtolower($m[2]) . '"></i>');
+        }, $html) ?? $html;
+        $html = preg_replace_callback('/(?<!\S)!frdg\b/i', static fn(): string => $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/favicon.svg" alt="fridge.dev">'), $html) ?? $html;
+        $html = preg_replace_callback('/\[tooltip=&quot;([^&]*)&quot;\](.*?)\[\/tooltip\]/i', static function (array $m) use ($protect): string {
+            $tooltip = htmlspecialchars(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+            return $protect('<span data-tooltip="' . $tooltip . '">' . $m[2] . '</span>');
+        }, $html) ?? $html;
+        $html = preg_replace_callback('/!\[([^\]]*)\]\(([^)\s]+)\)/', static function (array $m) use ($protect): string {
+            $url = mdp_safe_url(html_entity_decode($m[2], ENT_QUOTES, 'UTF-8'));
+            return $url === null ? $m[0] : $protect('<img src="' . mdp_h($url) . '" alt="' . $m[1] . '">');
+        }, $html) ?? $html;
+        $html = preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', static function (array $m) use ($protect): string {
+            $url = mdp_safe_url(html_entity_decode($m[2], ENT_QUOTES, 'UTF-8'));
+            if ($url === null) return $m[0];
+            $external = preg_match('#^https?://#i', $url) ? ' target="_blank" rel="noopener noreferrer"' : '';
+            return $protect('<a href="' . mdp_h($url) . '"' . $external . '>' . $m[1] . '</a>');
+        }, $html) ?? $html;
+        // Protect simple bold spans first so their closing delimiters cannot be
+        // mistaken for the opening of a later nested-emphasis span.
+        $html = preg_replace_callback('/\*\*([^*\n]+)\*\*/', static function (array $m) use ($protect): string {
+            return $protect('<strong>' . $m[1] . '</strong>');
+        }, $html) ?? $html;
+        $html = preg_replace_callback('/\*\*([^*\n]*)\*([^*\n]+)\*([^*\n]*)\*\*/', static function (array $m) use ($protect): string {
+            return $protect('<strong>' . $m[1] . '<em>' . $m[2] . '</em>' . $m[3] . '</strong>');
+        }, $html) ?? $html;
+        $html = preg_replace('/(?<!\*)\*([^*]+)\*(?!\*)/', '<em>$1</em>', $html) ?? $html;
+        $html = preg_replace('/~~([^~]+)~~/', '<del>$1</del>', $html) ?? $html;
+        $html = preg_replace('/==([^=]+)==/', '<mark>$1</mark>', $html) ?? $html;
+        $html = preg_replace('/\|\|([^|]+)\|\|/', '<span class="spoiler">$1</span>', $html) ?? $html;
+        for ($pass = 0; $pass < 4 && str_contains($html, '@@FEEDMD'); $pass++) $html = strtr($html, $tokens);
+        return $html;
+    }
+}
+
+if (!function_exists('fridg3_feed_render_v2_markdown')) {
+    function fridg3_feed_markdown_split_table_row(string $row): array
+    {
+        $escapedPipe = "\x1FFEEDPIPE\x1F";
+        $spoilers = [];
+        $row = trim($row);
+        if (str_starts_with($row, '|')) $row = substr($row, 1);
+        if (str_ends_with($row, '|')) $row = substr($row, 0, -1);
+        $row = str_replace('\\|', $escapedPipe, $row);
+        $row = preg_replace_callback('/\|\|[^|\r\n]+\|\|/', static function (array $match) use (&$spoilers): string {
+            $key = "\x1FFEEDSPOILER" . count($spoilers) . "\x1F";
+            $spoilers[$key] = $match[0];
+            return $key;
+        }, $row) ?? $row;
+        return array_map(static function (string $cell) use ($escapedPipe, $spoilers): string {
+            return strtr(str_replace($escapedPipe, '|', trim($cell)), $spoilers);
+        }, explode('|', $row));
+    }
+
+    function fridg3_feed_render_v2_list(array $lines, int &$index, int $baseIndent): string
+    {
+        preg_match('/^(\s*)([-+*]|(\d+)\.)\s+(.+)$/', $lines[$index] ?? '', $first);
+        $ordered = isset($first[3]) && $first[3] !== '';
+        $tag = $ordered ? 'ol' : 'ul';
+        $start = $ordered && (int)$first[3] !== 1 ? ' start="' . (int)$first[3] . '"' : '';
+        $class = $ordered && $baseIndent > 0 ? ' class="mdpaste-roman-list"' : '';
+        $html = '<' . $tag . $start . $class . '>';
+        $count = count($lines);
+        while ($index < $count && preg_match('/^(\s*)([-+*]|(\d+)\.)\s+(.+)$/', $lines[$index], $item)) {
+            $indent = strlen(str_replace("\t", '    ', $item[1]));
+            $itemOrdered = isset($item[3]) && $item[3] !== '';
+            if ($indent !== $baseIndent || $itemOrdered !== $ordered) break;
+            $html .= '<li>' . fridg3_feed_markdown_inline($item[4]);
+            $index++;
+            while ($index < $count && preg_match('/^(\s*)([-+*]|\d+\.)\s+(.+)$/', $lines[$index], $child)) {
+                $childIndent = strlen(str_replace("\t", '    ', $child[1]));
+                if ($childIndent <= $baseIndent) break;
+                $html .= fridg3_feed_render_v2_list($lines, $index, $childIndent);
+            }
+            $html .= '</li>';
+        }
+        return $html . '</' . $tag . '>';
+    }
+
+    function fridg3_feed_render_v2_markdown(string $body): string
+    {
+        $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $body));
+        $html = [];
+        $count = count($lines);
+        for ($i = 0; $i < $count;) {
+            $line = $lines[$i];
+            $trimmed = trim($line);
+            if ($trimmed === '') { $i++; continue; }
+            if ($trimmed === '```') {
+                $code = [];
+                for ($i++; $i < $count && trim($lines[$i]) !== '```'; $i++) $code[] = $lines[$i];
+                if ($i < $count) $i++;
+                $html[] = '<pre><code>' . htmlspecialchars(implode("\n", $code), ENT_QUOTES, 'UTF-8') . '</code></pre>';
+                continue;
+            }
+            if (preg_match('/^<(audio|video)\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*><\/\1>$/i', $trimmed, $media)) {
+                $url = mdp_safe_url(html_entity_decode($media[2], ENT_QUOTES, 'UTF-8'));
+                if ($url !== null) {
+                    $html[] = strtolower($media[1]) === 'audio'
+                        ? fridg3_feed_render_audio_attachment($url, basename((string)parse_url($url, PHP_URL_PATH)))
+                        : fridg3_feed_render_video_attachment($url, basename((string)parse_url($url, PHP_URL_PATH)));
+                    $i++;
+                    continue;
+                }
+            }
+            if ($i + 1 < $count && str_contains($line, '|') && preg_match('/^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$/', $lines[$i + 1])) {
+                $headers = fridg3_feed_markdown_split_table_row($line);
+                $i += 2;
+                $rows = [];
+                while ($i < $count && trim($lines[$i]) !== '' && str_contains($lines[$i], '|')) $rows[] = fridg3_feed_markdown_split_table_row($lines[$i++]);
+                $table = '<div class="mdpaste-table-scroll"><table><thead><tr>';
+                foreach ($headers as $cell) $table .= '<th>' . fridg3_feed_markdown_inline($cell) . '</th>';
+                $table .= '</tr></thead><tbody>';
+                foreach ($rows as $row) { $table .= '<tr>'; foreach ($headers as $index => $_) $table .= '<td>' . fridg3_feed_markdown_inline((string)($row[$index] ?? '')) . '</td>'; $table .= '</tr>'; }
+                $html[] = $table . '</tbody></table></div>';
+                continue;
+            }
+            if (str_starts_with($trimmed, '>')) {
+                $quote = [];
+                while ($i < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$i], $match)) { $quote[] = fridg3_feed_markdown_inline($match[1]); $i++; }
+                $html[] = '<blockquote>' . implode('<br>', $quote) . '</blockquote>';
+                continue;
+            }
+            if (preg_match('/^(\s*)([-+*]|\d+\.)\s+(.+)$/', $line, $list)) {
+                $indent = strlen(str_replace("\t", '    ', $list[1]));
+                $html[] = fridg3_feed_render_v2_list($lines, $i, $indent);
+                continue;
+            }
+            $paragraph = [];
+            while ($i < $count && trim($lines[$i]) !== '') {
+                if ($paragraph !== [] && (str_starts_with(trim($lines[$i]), '>') || str_starts_with(trim($lines[$i]), '```') || preg_match('/^\s*(?:[-+*]|\d+\.)\s+/', $lines[$i]))) break;
+                $paragraph[] = fridg3_feed_markdown_inline($lines[$i++]);
+            }
+            $html[] = '<p>' . implode('<br>', $paragraph) . '</p>';
+        }
+        return $html === [] ? '<p>nothing here.</p>' : implode("\n", $html);
+    }
+}
+
+if (!function_exists('fridg3_feed_render_post_body')) {
+    function fridg3_feed_render_post_body(string $body, string $format): string
+    {
+        if ($format !== 'v2') return htmlspecialchars($body, ENT_QUOTES, 'UTF-8');
+        require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
+        return '<div class="feed-markdown mdpaste-markdown" data-feed-format="v2">' . fridg3_feed_render_v2_markdown($body) . '</div>';
     }
 }
 

@@ -64,7 +64,7 @@ The workflow expects the remote name to be exactly:
 gdrive
 ```
 
-## How To Generate `rclone.conf`
+## How to Generate `rclone.conf`
 
 On your own machine:
 

@@ -88,6 +88,16 @@ function initSidebarAndBBCode() {
 
         const targets = document.querySelectorAll('#post-content, .post-content');
         targets.forEach(el => {
+            const markdownContent = el.matches('[data-feed-format="v2"]')
+                ? el
+                : el.querySelector('[data-feed-format="v2"]');
+            if (markdownContent) {
+                initInlineMediaPlayers(markdownContent);
+                if (typeof hljs !== 'undefined') {
+                    markdownContent.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+                }
+                return;
+            }
             const raw = el.textContent || '';
             const html = parseBBCode(raw);
             el.innerHTML = html;

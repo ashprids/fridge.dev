@@ -15,6 +15,27 @@ if (!function_exists('fridg3_journal_valid_image_src')) {
 if (!function_exists('fridg3_journal_parse_post')) {
     function fridg3_journal_parse_post(string $raw): ?array
     {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $raw);
+        if (str_starts_with($normalized, "v2\n")) {
+            $markdown = substr($normalized, 3);
+            if (!preg_match('/\A---\n(.*?)\n---(?:\n|$)/s', $markdown, $front)) {
+                return null;
+            }
+            $metadata = [];
+            foreach (explode("\n", $front[1]) as $line) {
+                if (!preg_match('/^([A-Za-z0-9_-]+):\s*(.*)$/', $line, $field)) continue;
+                $metadata[strtolower($field[1])] = trim($field[2], " \t\"'");
+            }
+            return [
+                'format' => 'v2',
+                'date' => (string)($metadata['date'] ?? ''),
+                'title' => (string)($metadata['title'] ?? ''),
+                'description' => (string)($metadata['description'] ?? $metadata['author'] ?? ''),
+                'cardImage' => fridg3_journal_valid_image_src((string)($metadata['card_image'] ?? '')),
+                'body' => substr($markdown, strlen($front[0])),
+                'markdown' => $markdown,
+            ];
+        }
         $lines = preg_split('/\R/', $raw);
         if (!is_array($lines) || count($lines) < 3) {
             return null;
@@ -28,12 +49,58 @@ if (!function_exists('fridg3_journal_parse_post')) {
         }
 
         return [
+            'format' => 'legacy',
             'date' => (string)($lines[0] ?? ''),
             'title' => (string)($lines[1] ?? ''),
             'description' => (string)($lines[2] ?? ''),
             'cardImage' => $cardImage,
             'body' => implode(PHP_EOL, array_slice($lines, $bodyOffset)),
+            'markdown' => '',
         ];
+    }
+}
+
+if (!function_exists('fridg3_journal_yaml_value')) {
+    function fridg3_journal_yaml_value(string $value): string
+    {
+        return '"' . str_replace(["\\", '"', "\r", "\n"], ["\\\\", '\\"', '', ' '], trim($value)) . '"';
+    }
+}
+
+if (!function_exists('fridg3_journal_build_v2_post')) {
+    function fridg3_journal_build_v2_post(string $date, string $title, string $description, string $body, string $cardImage = ''): string
+    {
+        $metadata = [
+            '---',
+            'title: ' . fridg3_journal_yaml_value($title),
+            'description: ' . fridg3_journal_yaml_value($description),
+            'date: ' . $date,
+        ];
+        if ($cardImage !== '') $metadata[] = 'card_image: ' . fridg3_journal_yaml_value($cardImage);
+        $metadata[] = '---';
+        return "v2\n" . implode("\n", $metadata) . "\n\n" . trim($body) . "\n";
+    }
+}
+
+if (!function_exists('fridg3_journal_post_files')) {
+    function fridg3_journal_post_files(string $directory): array
+    {
+        $posts = [];
+        foreach (array_merge(glob($directory . DIRECTORY_SEPARATOR . '*.txt') ?: [], glob($directory . DIRECTORY_SEPARATOR . '*.md') ?: []) as $path) {
+            $posts[pathinfo($path, PATHINFO_FILENAME)] = $path;
+        }
+        return array_values($posts);
+    }
+}
+
+if (!function_exists('fridg3_journal_post_path')) {
+    function fridg3_journal_post_path(string $directory, string $postId): ?string
+    {
+        foreach (['md', 'txt'] as $extension) {
+            $path = $directory . DIRECTORY_SEPARATOR . $postId . '.' . $extension;
+            if (is_file($path)) return $path;
+        }
+        return null;
     }
 }
 

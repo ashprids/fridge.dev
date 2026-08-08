@@ -26,6 +26,35 @@ function find_template_file($filename) {
     return null;
 }
 
+function fridg3_feed_reply_markdown_editor(string $value, bool $allowUploads): string {
+    $editorPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'markdown-editor.html';
+    $editor = (string)@file_get_contents($editorPath);
+    $voiceControls = $allowUploads
+        ? '<button type="button" id="bbcode-voice-btn" class="bbcode-btn bbcode-voice-btn" data-tooltip="record voice note"><i class="fa-solid fa-microphone"></i></button>'
+        : '';
+    $voiceInputs = $allowUploads
+        ? '<input id="bbcode-voice-input" name="voice_notes[]" type="file" accept="audio/*" multiple hidden><div class="bbcode-voice-recorder" hidden></div>'
+        : '';
+    $editor = str_replace(['{voice_controls}', '{voice_inputs}'], [$voiceControls, $voiceInputs], $editor);
+    $previewPath = (string)(parse_url((string)($_SERVER['REQUEST_URI'] ?? '/feed/posts/'), PHP_URL_PATH) ?: '/feed/posts/');
+    $editor = str_replace('data-editor-format="markdown"', 'data-editor-format="markdown" data-preview-url="' . htmlspecialchars($previewPath, ENT_QUOTES, 'UTF-8') . '"', $editor);
+    if (!$allowUploads) {
+        $editor = preg_replace('/\s*<button type="button" id="bbcode-image-btn".*?<\/button>/s', '', $editor, 1) ?: $editor;
+        $editor = preg_replace('/\s*<input id="bbcode-image-input"[^>]*>/s', '', $editor, 1) ?: $editor;
+        $filterJson = json_encode(fridg3_feed_filter_terms(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+        $filterScript = '<script type="application/json" data-feed-guest-filter-terms>' . (is_string($filterJson) ? $filterJson : '[]') . '</script>';
+        $editor = preg_replace_callback(
+            '/(<div class="bbcode-editor feed-markdown-editor"[^>]*>)/',
+            static fn(array $match): string => $match[1] . $filterScript,
+            $editor,
+            1
+        ) ?: $editor;
+    }
+    $textarea = '<textarea id="bbcode-textbox" class="feed-reply-textbox" name="reply_content" placeholder="write a reply..." maxlength="4000">'
+        . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '</textarea>';
+    return str_replace('<textarea id="bbcode-textbox" name="content"></textarea>', $textarea, $editor);
+}
+
 $title = 'feed post';
 $description = 'view a single feed post.';
 $replyError = '';
@@ -79,17 +108,11 @@ if ($raw === false) {
     exit;
 }
 
-// Parse the post
-$lines = preg_split("/(\r\n|\n|\r)/", $raw);
-$usernameLine = isset($lines[0]) ? trim($lines[0]) : '';
-$dateLine = isset($lines[1]) ? trim($lines[1]) : '';
-$body = '';
-if (count($lines) > 2) {
-    $body = implode("\n", array_slice($lines, 2));
-}
-
-// Normalize username
-$username = ltrim($usernameLine, '@');
+$parsedPost = fridg3_feed_parse_post($raw);
+$postFormat = $parsedPost['format'];
+$username = $parsedPost['username'];
+$dateLine = $parsedPost['date'];
+$body = $parsedPost['body'];
 
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -99,6 +122,20 @@ $clientIp = fridg3_feed_client_ip();
 $isLoggedIn = isset($_SESSION['user']) && isset($_SESSION['user']['username']);
 $postingRestricted = $isLoggedIn && fridg3_current_user_posting_restricted();
 $isClientIpBanned = fridg3_feed_is_ip_banned($clientIp);
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && str_contains((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
+    $previewPayload = json_decode((string)file_get_contents('php://input'), true);
+    if (is_array($previewPayload) && ($previewPayload['action'] ?? '') === 'preview') {
+        $previewMarkdown = (string)($previewPayload['markdown'] ?? '');
+        if (!$isLoggedIn) $previewMarkdown = fridg3_feed_apply_guest_filter($previewMarkdown, true);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'html' => fridg3_feed_render_post_body($previewMarkdown, 'v2'),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $submittedToken = (string)($_POST['csrf_token'] ?? '');
@@ -110,20 +147,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $guestDisplayName = trim((string)($_POST['guest_username'] ?? ''));
     $guestDisplayNameForSave = $guestDisplayName;
     $replyBodyForSave = $replyBody;
+    $submittedReplyFormat = strtolower(trim((string)($_POST['reply_format'] ?? 'v2'))) === 'legacy' ? 'legacy' : 'v2';
+    $replyUsesMarkdown = $submittedReplyFormat === 'v2';
     $imageMap = [];
     $voiceMap = [];
     if ($isLoggedIn && !$postingRestricted && isset($_FILES['images']) && is_array($_FILES['images'])) {
         $imageMap = fridg3_feed_process_uploaded_media($_FILES['images']);
-        $replyBody = fridg3_feed_replace_media_placeholders($replyBody, $imageMap);
+        $replyBody = fridg3_feed_replace_media_placeholders($replyBody, $imageMap, $replyUsesMarkdown);
         if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $replyBody) === 1) {
             fridg3_feed_delete_media_files_from_content($replyBody);
             $replyBody = '';
             $replyError = 'media upload failed. files must be supported and no larger than 8 MB.';
         }
     }
-    if ($isLoggedIn && !$postingRestricted && $replyAction === 'create' && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])) {
+    if ($isLoggedIn && !$postingRestricted && in_array($replyAction, ['create', 'update'], true) && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])) {
         $voiceMap = fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes']);
-        $replyBody = fridg3_feed_replace_voice_placeholders($replyBody, $voiceMap);
+        $replyBody = fridg3_feed_replace_voice_placeholders($replyBody, $voiceMap, $replyUsesMarkdown);
         if (preg_match('/\[voice:\d+\]/i', $replyBody) === 1) {
             foreach ($voiceMap as $voice) {
                 fridg3_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
@@ -221,7 +260,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $replyEditError = 'reply cannot be empty.';
         } elseif (strlen($replyBody) > 4000) {
             $replyEditError = 'reply is too long.';
-        } elseif ($replyId === '' || !fridg3_feed_update_reply((string)$postIdNoExt, $replyId, $replyBody)) {
+        } elseif ($replyId === '' || !fridg3_feed_update_reply((string)$postIdNoExt, $replyId, $replyBody, $submittedReplyFormat)) {
             $replyEditError = 'failed to update reply.';
         } else {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -234,9 +273,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $replyError = 'reply is too long.';
     } elseif ($parentReplyId !== '' && $parentReply === null) {
         $replyError = 'could not find the comment you are replying to.';
-    } elseif ($isLoggedIn && !fridg3_feed_save_reply($postIdNoExt ?? '', (string)$_SESSION['user']['username'], $replyBody, $parentReplyId)) {
+    } elseif ($isLoggedIn && !fridg3_feed_save_reply($postIdNoExt ?? '', (string)$_SESSION['user']['username'], $replyBody, $parentReplyId, 'v2')) {
         $replyError = 'failed to save reply.';
-    } elseif (!$isLoggedIn && !fridg3_feed_save_guest_reply($postIdNoExt ?? '', $guestDisplayNameForSave, $clientIp, $replyBodyForSave, $parentReplyId, $guestBrowserId)) {
+    } elseif (!$isLoggedIn && !fridg3_feed_save_guest_reply($postIdNoExt ?? '', $guestDisplayNameForSave, $clientIp, $replyBodyForSave, $parentReplyId, $guestBrowserId, 'v2')) {
         $replyError = 'failed to save reply.';
     } else {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -278,7 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $safeUser = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
 $humanizedDate = fridg3_feed_humanize_datetime($dateLine);
 $safeDate = htmlspecialchars($humanizedDate, ENT_QUOTES, 'UTF-8');
-$safeBody = htmlspecialchars($body, ENT_QUOTES, 'UTF-8');
+$safeBody = fridg3_feed_render_post_body($body, $postFormat);
 $replySuccess = isset($_GET['reply_posted']) && $_GET['reply_posted'] === '1';
 $replyUpdated = isset($_GET['reply_updated']) && $_GET['reply_updated'] === '1';
 $replyDeleted = isset($_GET['reply_deleted']) && $_GET['reply_deleted'] === '1';
@@ -287,10 +326,6 @@ $ipPurged = isset($_GET['ip_purged']) ? max(0, (int)$_GET['ip_purged']) : null;
 $ipPurgeFailed = isset($_GET['ip_purge_failed']) ? max(0, (int)$_GET['ip_purge_failed']) : 0;
 $replyFormValue = isset($_POST['reply_content']) ? htmlspecialchars((string)$_POST['reply_content'], ENT_QUOTES, 'UTF-8') : '';
 $guestUsernameValue = isset($_POST['guest_username']) ? htmlspecialchars((string)$_POST['guest_username'], ENT_QUOTES, 'UTF-8') : '';
-$guestFilterTermsJson = json_encode(fridg3_feed_filter_terms(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-if (!is_string($guestFilterTermsJson)) {
-    $guestFilterTermsJson = '[]';
-}
 $replies = fridg3_feed_load_replies((string)$postIdNoExt);
 $replyParentId = trim((string)($_POST['parent_reply_id'] ?? $_GET['reply_to'] ?? ''));
 $repliesById = [];
@@ -311,12 +346,16 @@ if ($replyEditTargetId !== '' && isset($_POST['reply_action']) && (string)$_POST
 
 // Extract first image from body for og:image metadata
 $imageUrl = null;
-if (preg_match('/\[img=([^\]\s]+)\]/', $body, $matches)) {
+if ($postFormat === 'v2' && preg_match('/!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/', $body, $matches)) {
+    $imageUrl = $matches[1];
+} elseif (preg_match('/\[img=([^\]\s]+)\]/', $body, $matches)) {
     $imageUrl = $matches[1];
 }
 
 // Remove BBCode from description
 $plainBody = $body;
+$plainBody = preg_replace('/!\[([^\]]*)\]\([^)]+\)/', '$1', $plainBody);
+$plainBody = preg_replace('/[`*_~=#>|-]+/', ' ', $plainBody);
 $plainBody = preg_replace('/\[img[^\]]*\](?:\[name:[^\]]*\])?/i', '', $plainBody); // Remove images
 $plainBody = preg_replace('/\[[^\]]*\][^\[]*\[\/[^\]]*\]/s', '', $plainBody); // Remove other BBCode tags
 $plainBody = preg_replace('/\[([a-z]+)[^\]]*\]/i', '', $plainBody); // Remove remaining opening tags
@@ -411,6 +450,9 @@ $postMeta .= $bookmarkIcon;
 
 // Replace placeholders in content
 $content = str_replace('{username}', $safeUser, $content);
+$content = $postFormat === 'v2'
+    ? str_replace('<span id="post-content">{content}</span>', '{content}', $content)
+    : $content;
 $content = str_replace('{content}', $safeBody, $content);
 $content = str_replace('{post_meta}', $postMeta, $content);
 $content = str_replace('{reply_form_value}', $replyFormValue, $content);
@@ -456,53 +498,16 @@ if ($replyParentId !== '' && isset($repliesById[$replyParentId])) {
 } else {
     $replyTargetHtml = '<div class="feed-reply-target" data-feed-reply-target hidden></div>';
 }
-$replyToolbarHtml = '<div class="bbcode-toolbar">'
-    . '<button type="button" class="bbcode-btn" data-tag="b" data-tooltip="bold"><i class="fa-solid fa-bold"></i></button>'
-    . '<button type="button" class="bbcode-btn" data-tag="i" data-tooltip="italic"><i class="fa-solid fa-italic"></i></button>'
-    . '<button type="button" class="bbcode-btn" data-tag="u" data-tooltip="underline"><i class="fa-solid fa-underline"></i></button>'
-    . '<button type="button" class="bbcode-btn" data-tag="s" data-tooltip="strikethrough"><i class="fa-solid fa-strikethrough"></i></button>'
-    . '<button type="button" id="bbcode-spoiler-btn" class="bbcode-btn" data-tooltip="spoiler"><i class="fa-solid fa-eye-slash"></i></button>'
-    . '<button type="button" id="bbcode-color-btn" class="bbcode-btn" data-tooltip="color"><i class="fa-solid fa-palette"></i></button>'
-    . '<input id="bbcode-color-input" type="color" style="display: none;">'
-    . '<label for="bbcode-image-input">'
-    . '<button type="button" id="bbcode-image-btn" class="bbcode-btn" data-tooltip="attach media"><i class="fa-solid fa-photo-film"></i></button>'
-    . '</label>'
-    . ($isLoggedIn
-        ? '<input id="bbcode-image-input" name="images[]" type="file" accept="image/*,audio/*,video/*" multiple style="display: none;">'
-        : '<input id="bbcode-image-input" type="file" accept="image/*,audio/*,video/*" multiple disabled style="display: none;">')
-    . ($isLoggedIn
-        ? '<button type="button" id="bbcode-voice-btn" class="bbcode-btn bbcode-voice-btn" data-tooltip="record voice note"><i class="fa-solid fa-microphone"></i></button>'
-            . '<input id="bbcode-voice-input" name="voice_notes[]" type="file" accept="audio/*" multiple style="display: none;">'
-        : '')
-    . '<button type="button" class="bbcode-btn" data-tag="code=python" data-tooltip="code block"><i class="fa-solid fa-code"></i></button>'
-    . '<button type="button" id="bbcode-list-btn" class="bbcode-btn" data-tag="list" data-tooltip="list"><i class="fa-solid fa-list-ul"></i></button>'
-    . ($isLoggedIn ? '<button type="button" id="bbcode-tooltip-btn" class="bbcode-btn" data-tooltip="tooltip"><i class="fa-solid fa-comment-dots"></i></button>' : '')
-    . '<button type="button" id="bbcode-link-btn" class="bbcode-btn" data-tooltip="link"><i class="fa-solid fa-link"></i></button>'
-    . ($isLoggedIn
-        ? '<select id="bbcode-header-dropdown" class="bbcode-dropdown" data-tooltip="heading">'
-            . '<option value="">headings</option>'
-            . '<option value="h3">heading</option>'
-            . '<option value="h4">sub-heading</option>'
-            . '<option value="h5">caption</option>'
-            . '</select>'
-        : '')
-    . '<button type="button" id="bbcode-preview-toggle" class="bbcode-btn" data-tooltip="toggle preview"><i class="fa-solid fa-eye"></i></button>'
-    . '</div>';
 if (!$isClientIpBanned || $isLoggedIn) {
     $replyFormHtml = '<form id="feed-reply-form" method="POST" enctype="multipart/form-data" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '">'
         . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
+        . '<input type="hidden" name="reply_format" value="v2">'
         . '<input type="hidden" name="parent_reply_id" value="' . htmlspecialchars($replyParentId, ENT_QUOTES, 'UTF-8') . '" data-feed-reply-parent-input>'
         . (!$isLoggedIn ? '<input type="hidden" name="guest_browser_id" value="" data-feed-guest-browser-id>' : '')
         . $replyTargetHtml
         . (!$isLoggedIn ? '<input id="textbox" class="feed-guest-username" name="guest_username" type="text" maxlength="50" placeholder="name (optional)" value="' . $guestUsernameValue . '">' : '')
         . (!$isLoggedIn ? '<br><br>' : '')
-        . '<div class="bbcode-editor">'
-        . (!$isLoggedIn ? '<script type="application/json" data-feed-guest-filter-terms>' . $guestFilterTermsJson . '</script>' : '')
-        . $replyToolbarHtml
-        . ($isLoggedIn ? '<div class="bbcode-voice-recorder" hidden></div>' : '')
-        . '<textarea id="bbcode-textbox" class="feed-reply-textbox" name="reply_content" placeholder="write a reply..." maxlength="4000">{reply_form_value}</textarea>'
-        . '<div id="bbcode-preview" style="display: none;"></div>'
-        . '</div>'
+        . fridg3_feed_reply_markdown_editor('{reply_form_value}', $isLoggedIn)
         . '<button id="form-button" type="submit">reply</button>'
         . '</form>';
     if ($postingRestricted) {
@@ -562,7 +567,10 @@ $renderReply = function (array $reply, int $depth = 0) use (
 ): string {
     $replyUser = htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8');
     $replyDate = htmlspecialchars(fridg3_feed_humanize_datetime((string)$reply['date']), ENT_QUOTES, 'UTF-8');
-    $replyBody = htmlspecialchars((string)$reply['body'], ENT_QUOTES, 'UTF-8');
+    $replyFormat = fridg3_feed_reply_format($reply);
+    $replyBody = $replyFormat === 'v2'
+        ? fridg3_feed_render_post_body((string)$reply['body'], 'v2')
+        : htmlspecialchars((string)$reply['body'], ENT_QUOTES, 'UTF-8');
     $replyId = (string)($reply['id'] ?? '');
     $isGuestReply = ($reply['isGuest'] ?? false) === true;
     $replyIp = (string)($reply['ip'] ?? '');
@@ -613,6 +621,7 @@ $renderReply = function (array $reply, int $depth = 0) use (
         }
         $replyEditFormHtml .= '<form method="post" enctype="multipart/form-data" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '">'
             . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
+            . '<input type="hidden" name="reply_format" value="' . $replyFormat . '">'
             . '<input type="hidden" name="reply_action" value="update">'
             . '<input type="hidden" name="reply_id" value="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '">'
             . '<div class="bbcode-editor">'
@@ -650,6 +659,15 @@ $renderReply = function (array $reply, int $depth = 0) use (
             . '<button id="form-button" type="submit">save reply</button>'
             . '</form>'
             . '</div>';
+        if ($replyFormat === 'v2') {
+            $markdownEditEditor = fridg3_feed_reply_markdown_editor($currentEditValue, $isLoggedIn);
+            $replyEditFormHtml = preg_replace(
+                '/<div class="bbcode-editor">.*?(?=<button id="form-button" type="submit">save reply<\/button>)/s',
+                $markdownEditEditor,
+                $replyEditFormHtml,
+                1
+            ) ?: $replyEditFormHtml;
+        }
         if ($postingRestricted) {
             $replyEditFormHtml = '<div class="feed-reply-box feed-reply-edit-box">'
                 . fridg3_posting_restriction_notice()

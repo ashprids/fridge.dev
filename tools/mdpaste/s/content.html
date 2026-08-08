@@ -1,31 +1,331 @@
-<!doctype html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>mdpaste | fridge.dev</title>
-	<meta
-		name="description"
-		content="a markdown file has been shared with you! view it here."
-	>
-	<meta name="robots" content="noindex,nofollow">
-	<link rel="stylesheet" href="/tools/mdpaste/style.css">
+<style>
+    @font-face {
+        font-family: "MdpasteFiraSans";
+        src: url("/resources/FiraSans-Regular.otf") format("opentype");
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+    }
 
-    <!-- favicons + app formatting -->
-    <link rel="icon" type="image/png" href="/resources/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/resources/favicon.svg" />
-    <link rel="shortcut icon" href="/resources/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/resources/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="fridge.dev" />
-    <link rel="manifest" href="/resources/site.webmanifest" />
-</head>
+    @font-face {
+        font-family: "MdpasteFiraSans";
+        src: url("/resources/FiraSans-Italic.otf") format("opentype");
+        font-style: italic;
+        font-weight: 400;
+        font-display: swap;
+    }
 
-<body>
-	<main class="page">
-		<section class="card" aria-labelledby="page-title">
-		{content}
-		</section>
-	</main>
-	<script src="/tools/mdpaste/main.js?v=20260723-debug-logging-1" defer></script>
-</body>
-</html>
+    @font-face {
+        font-family: "MdpasteFiraSans";
+        src: url("/resources/FiraSans-Bold.otf") format("opentype");
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+    }
+
+    @font-face {
+        font-family: "MdpasteFiraSans";
+        src: url("/resources/FiraSans-BoldItalic.otf") format("opentype");
+        font-style: italic;
+        font-weight: 700;
+        font-display: swap;
+    }
+
+    body.mdpaste-shared-page #sidebar,
+    body.mdpaste-shared-page #show-sidebar,
+    body.mdpaste-shared-page #site-notice-banner-region {
+        display: none !important;
+    }
+
+    body.mdpaste-shared-page #page-wrapper,
+    body.mdpaste-shared-page #container {
+        justify-content: center;
+    }
+
+    body.mdpaste-shared-page #content {
+        flex: 0 1 620px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .mdpaste-view {
+        display: grid;
+        gap: 14px;
+        position: relative;
+    }
+
+    .mdpaste-view.mdpaste-fira-font,
+    .mdpaste-view.mdpaste-fira-font *:not(i):not(svg):not(path) {
+        font-family: "MdpasteFiraSans", sans-serif !important;
+    }
+
+    .mdpaste-view.mdpaste-fira-font .mdpaste-math,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-math *:not(i):not(svg):not(path),
+    .mdpaste-view.mdpaste-fira-font .mdpaste-math mjx-container,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-math mjx-container * {
+        font-family: "STIX Two Math", "Cambria Math", "Times New Roman", serif !important;
+    }
+
+    .mdpaste-view.mdpaste-fira-font code,
+    .mdpaste-view.mdpaste-fira-font code *:not(i):not(svg):not(path),
+    .mdpaste-view.mdpaste-fira-font .mdpaste-markdown code,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-markdown code *:not(i):not(svg):not(path),
+    .mdpaste-view.mdpaste-fira-font .mdpaste-raw-markdown code,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-raw-markdown code *:not(i):not(svg):not(path),
+    .mdpaste-view.mdpaste-fira-font pre,
+    .mdpaste-view.mdpaste-fira-font kbd,
+    .mdpaste-view.mdpaste-fira-font samp,
+    .mdpaste-view.mdpaste-fira-font var,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-markdown kbd,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-markdown samp,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-markdown var,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-code-figure figcaption,
+    .mdpaste-view.mdpaste-fira-font .mdpaste-code-figure figcaption *:not(i):not(svg):not(path) {
+        font-family: "MainRegular", var(--emoji-font), monospace !important;
+    }
+
+    .mdpaste-view-header,
+    .mdpaste-view-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 12px;
+    }
+
+    .mdpaste-paste-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        position: absolute;
+        z-index: 2;
+        top: 0;
+        right: 0;
+    }
+
+    .mdpaste-paste-actions button {
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: 0 !important;
+        background: transparent !important;
+        color: var(--subtle) !important;
+        box-shadow: none !important;
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .mdpaste-paste-actions button:hover,
+    .mdpaste-paste-actions button:focus-visible,
+    .mdpaste-paste-actions button[aria-pressed="true"] {
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: var(--fg) !important;
+        outline: none;
+    }
+
+    .mdpaste-raw-markdown {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        max-height: none;
+        overflow: visible;
+        margin: 0;
+        padding: 0;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.025);
+        box-sizing: border-box;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .mdpaste-raw-markdown[hidden],
+    .mdpaste-markdown[hidden] {
+        display: none;
+    }
+
+    .mdpaste-raw-markdown code {
+        display: block;
+        padding: 12px;
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .mdpaste-view-meta {
+        justify-content: flex-start;
+        color: var(--subtle);
+        font-size: 13px;
+    }
+
+    .mdpaste-view-action {
+        display: inline-block;
+        padding: 8px 16px;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        background: var(--bg);
+        color: var(--fg);
+        text-decoration: none;
+    }
+
+    .mdpaste-view-action:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .mdpaste-unlock-form {
+        display: grid;
+        gap: 10px;
+        max-width: 520px;
+    }
+
+    .mdpaste-markdown {
+        overflow-wrap: anywhere;
+    }
+
+    .mdpaste-markdown > :first-child {
+        margin-top: 0;
+    }
+
+    .mdpaste-markdown h1,
+    .mdpaste-markdown h2,
+    .mdpaste-markdown h3,
+    .mdpaste-markdown h4,
+    .mdpaste-markdown h5,
+    .mdpaste-markdown h6 {
+        margin: 1em 0 0.5em;
+        color: var(--fg);
+        font-family: inherit;
+        font-weight: bold;
+        line-height: 1.2;
+    }
+
+    .mdpaste-markdown h1 { font-size: 2em; }
+    .mdpaste-markdown h2 { font-size: 1.5em; }
+    .mdpaste-markdown h3 { font-size: 1.17em; }
+    .mdpaste-markdown h4 { font-size: 1em; }
+    .mdpaste-markdown h5 { font-size: 0.83em; }
+    .mdpaste-markdown h6 { font-size: 0.67em; }
+
+    .mdpaste-markdown code {
+        display: inline-block;
+        padding: 1px 6px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        font-family: inherit;
+        line-height: 1.2;
+        vertical-align: baseline;
+    }
+
+    .mdpaste-markdown pre {
+        max-width: 100%;
+        overflow-x: auto;
+        margin: 14px 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+        line-height: 1.45;
+        box-sizing: border-box;
+    }
+
+    .mdpaste-markdown pre code,
+    .mdpaste-markdown pre code.hljs {
+        display: block;
+        padding: 12px !important;
+        border: 0;
+        background: transparent;
+    }
+
+    .mdpaste-markdown blockquote {
+        max-width: 100%;
+        margin: 14px 0;
+        padding: 12px 16px;
+        border-left: 2px solid var(--links);
+        background: rgba(255, 255, 255, 0.08);
+        box-sizing: border-box;
+    }
+
+    .mdpaste-markdown blockquote blockquote { margin: 12px 0 0; background: rgba(255, 255, 255, 0.1); }
+    .mdpaste-markdown blockquote > :first-child,
+    .mdpaste-markdown .mdpaste-alert > :first-child { margin-top: 0; }
+    .mdpaste-markdown blockquote > :last-child,
+    .mdpaste-markdown .mdpaste-alert > :last-child { margin-bottom: 0; }
+    .mdpaste-markdown .mdpaste-roman-list { list-style-type: lower-roman; }
+    .mdpaste-markdown li > ul,
+    .mdpaste-markdown li > ol { margin: 6px 0; }
+    .mdpaste-markdown hr { width: 100%; max-width: 100%; box-sizing: border-box; }
+
+    .mdpaste-markdown img {
+        max-width: 100%;
+        height: auto;
+        border: 0;
+        outline: 0;
+        box-shadow: none;
+    }
+
+    .mdpaste-markdown table {
+        width: 100%;
+        max-width: 100%;
+        border-collapse: collapse;
+    }
+
+    .mdpaste-markdown th,
+    .mdpaste-markdown td {
+        padding: 8px;
+        border: 1px solid var(--border);
+        text-align: left;
+    }
+
+    .mdpaste-markdown th { background: rgba(255, 255, 255, 0.09); }
+    .mdpaste-markdown kbd { display: inline-block; padding: 1px 6px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.06); font-family: inherit; line-height: 1.2; }
+    .mdpaste-markdown .checkbox { width: 12px !important; height: 12px !important; margin: 0 6px 0 0 !important; vertical-align: -1px; }
+    .mdpaste-indented-code { width: 100% !important; margin-left: 0 !important; }
+    .mdpaste-indented-code code { padding-left: 36px !important; }
+    .mdpaste-code-figure { max-width: 100%; margin: 14px 0; }
+    .mdpaste-code-figure figcaption { display: flex; gap: 10px; padding: 5px 8px; color: var(--subtle); font-size: 12px; border-bottom: 1px solid var(--border); }
+    .mdpaste-code-figure pre { margin-top: 0; }
+    .mdpaste-markdown details { max-width: 100%; margin: 14px 0; }
+    .mdpaste-markdown summary { cursor: pointer; }
+    .mdpaste-details-content { padding-top: 8px; }
+    .mdpaste-article-header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .mdpaste-markdown .mdpaste-article-title { margin: 0 !important; font-family: "MainBold", var(--emoji-font), monospace; font-size: 24px !important; line-height: 1.25 !important; }
+    .mdpaste-article-subtitle { margin: 0; font-family: "MainItalic", monospace; font-size: 14px; line-height: 1.5; color: var(--subtle); }
+    .mdpaste-article-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .mdpaste-article-date { font-family: "MainItalic", monospace; font-size: 12px; color: var(--subtle); }
+    .mdpaste-article-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .mdpaste-article-tags span { padding: 2px 7px; border: 1px solid var(--border); color: var(--subtle); font-size: 12px; }
+
+    .mdpaste-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; }
+    .mdpaste-alert { max-width: 100%; margin: 14px 0; padding: 12px 16px; border-left: 3px solid var(--links); background: rgba(255, 255, 255, 0.06); box-sizing: border-box; }
+    .mdpaste-alert-title { display: block; margin-bottom: 6px; }
+    .mdpaste-alert-warning,
+    .mdpaste-alert-caution { border-left-color: #d69b68; }
+    .mdpaste-alert-tip { border-left-color: #79b98b; }
+    .mdpaste-math { font-family: "STIX Two Math", "Cambria Math", "Times New Roman", serif; }
+    .mdpaste-math-display { max-width: 100%; overflow-x: auto; margin: 14px 0; padding: 8px 0; text-align: center; white-space: pre; box-sizing: border-box; }
+    .mdpaste-footnotes { margin-top: 28px; font-size: 0.88em; color: var(--subtle); }
+    .mdpaste-footnotes { opacity: 0.72; }
+    .mdpaste-footnotes hr { width: 100%; margin-left: 0; }
+    .mdpaste-footnotes li { padding-left: 4px; margin-bottom: 12px; }
+    .mdpaste-footnotes li p { display: inline; margin: 0; }
+    .mdpaste-footnote-backref { display: inline-block; margin-left: 8px; vertical-align: baseline; }
+    .mdpaste-markdown .feed-audio-note,
+    .mdpaste-markdown .feed-video-attachment { max-width: 100%; }
+    .mdpaste-mermaid { max-width: 100%; overflow-x: auto; text-align: center; }
+    .mdpaste-mermaid svg { max-width: 100%; height: auto; font-family: "MainRegular", var(--emoji-font), monospace !important; }
+    .mdpaste-mermaid text,
+    .mdpaste-mermaid .label,
+    .mdpaste-mermaid .nodeLabel { font-family: "MainRegular", var(--emoji-font), monospace !important; }
+    .mdpaste-markdown abbr { color: var(--links); text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: help; }
+</style>
+
+<div class="mdpaste-view">
+    {paste_content}
+</div>
+
+<script src="/tools/mdpaste/render.js?v=20260808-rich-rendering-7"></script>

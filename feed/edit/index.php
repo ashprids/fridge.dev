@@ -40,13 +40,11 @@ if (!file_exists($postPath)) {
 
 // Load post and verify permissions
 $raw = file_get_contents($postPath);
-$lines = preg_split("/(\r\n|\n|\r)/", $raw);
-$postUsername = isset($lines[0]) ? ltrim(trim($lines[0]), '@') : '';
-$postDate = isset($lines[1]) ? trim($lines[1]) : '';
-$postBody = '';
-if (count($lines) > 2) {
-    $postBody = implode("\n", array_slice($lines, 2));
-}
+$parsedPost = fridg3_feed_parse_post((string)$raw);
+$postFormat = $parsedPost['format'];
+$postUsername = $parsedPost['username'];
+$postDate = $parsedPost['date'];
+$postBody = $parsedPost['body'];
 
 // Check if user can edit (owner or admin)
 $currentUser = $_SESSION['user']['username'] ?? '';
@@ -71,6 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Parse post content for images in /data/images and delete them
         $imagesDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images';
         preg_match_all('/\[img=\/data\/images\/([^\]]+)\]/i', $postBody, $matches);
+        preg_match_all('/!\[[^\]]*\]\(\/data\/images\/([^\s)]+)(?:\s+[^)]*)?\)/i', $postBody, $markdownMatches);
+        if (!empty($markdownMatches[1])) {
+            $matches[1] = array_merge($matches[1] ?? [], $markdownMatches[1]);
+        }
         if (!empty($matches[1])) {
             foreach ($matches[1] as $imageFile) {
                 $imagePath = $imagesDir . DIRECTORY_SEPARATOR . basename($imageFile);
@@ -95,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mediaMap = isset($_FILES['images']) && is_array($_FILES['images'])
         ? fridg3_feed_process_uploaded_media($_FILES['images'])
         : [];
-    $newContent = fridg3_feed_replace_media_placeholders($newContent, $mediaMap);
+    $newContent = fridg3_feed_replace_media_placeholders($newContent, $mediaMap, $postFormat === 'v2');
     if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $newContent) === 1) {
         fridg3_feed_delete_media_files_from_content($newContent);
         header('Location: /feed/edit?post=' . rawurlencode(pathinfo(basename($postId), PATHINFO_FILENAME)) . '&error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
@@ -103,7 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Update the post file (keep original username and date)
-    $text = '@' . $postUsername . PHP_EOL . $postDate . PHP_EOL . $newContent . PHP_EOL;
+    $prefix = $postFormat === 'v2' ? 'v2' . PHP_EOL : '';
+    $text = $prefix . '@' . $postUsername . PHP_EOL . $postDate . PHP_EOL . $newContent . PHP_EOL;
     file_put_contents($postPath, $text);
 
     // Redirect back to feed
@@ -155,6 +158,16 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+if ($postFormat === 'v2') {
+    $markdownEditor = (string)file_get_contents(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'markdown-editor.html');
+    $markdownEditor = str_replace(['{voice_controls}', '{voice_inputs}'], ['', ''], $markdownEditor);
+    $content = preg_replace(
+        '/<div class="bbcode-editor">.*?<div class="edit-form-actions">/s',
+        $markdownEditor . '<div class="edit-form-actions">',
+        $content,
+        1
+    ) ?: $content;
+}
 
 // Inject post content into the textarea
 $escapedBody = htmlspecialchars($postBody, ENT_QUOTES, 'UTF-8');

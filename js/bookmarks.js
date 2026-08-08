@@ -443,9 +443,13 @@ function enhanceBookmarksPage() {
                     header.appendChild(userSpan);
                     header.appendChild(dateSpan);
 
-                    const bodySpan = document.createElement('span');
-                    bodySpan.id = 'post-content';
-                    bodySpan.textContent = data.body || '';
+                    const bodySpan = document.createElement(data.format === 'v2' ? 'div' : 'span');
+                    if (data.format === 'v2') {
+                        bodySpan.innerHTML = data.rendered_html || '';
+                    } else {
+                        bodySpan.id = 'post-content';
+                        bodySpan.textContent = data.body || '';
+                    }
 
                     post.appendChild(header);
                     post.appendChild(bodySpan);
@@ -458,9 +462,10 @@ function enhanceBookmarksPage() {
 
                     // Apply BBCode formatting to this post body
                     try {
-                        const raw = bodySpan.textContent || '';
-                        const html = parseBBCode(raw);
-                        bodySpan.innerHTML = html;
+                        if (data.format !== 'v2') {
+                            const raw = bodySpan.textContent || '';
+                            bodySpan.innerHTML = parseBBCode(raw);
+                        }
                         initInlineMediaPlayers(bodySpan);
 
                         if (typeof hljs !== 'undefined') {
