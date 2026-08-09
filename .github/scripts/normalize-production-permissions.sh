@@ -53,13 +53,32 @@ while IFS= read -r -d '' path; do
     setfacl -m u::rw-,g::r--,g:"$shared_group":r--,m::r--,o::--- "$path"
 done < <(find "$TARGET" -path "$data_dir" -prune -o -type f -user "$deploy_user" -print0)
 
-# Runtime data is shared read/write between http and deploy. Existing files are
-# normalized and default ACLs make newly-created paths inherit the same access.
-sudo -n -u "$runtime_user" find "$data_dir" -type d -exec chmod 2770 {} +
-sudo -n -u "$runtime_user" find "$data_dir" -type f -exec chmod 0660 {} +
-sudo -n -u "$runtime_user" setfacl -R -m u::rwX,g::rwX,g:"$shared_group":rwX,m::rwX,o::--- "$data_dir"
-sudo -n -u "$runtime_user" find "$data_dir" -type d -exec \
+# Runtime data is shared read/write between http and deploy. Normalize paths as
+# their actual owner so a file intentionally added by deploy does not make the
+# next deployment fail. Default ACLs keep future paths accessible to both.
+find "$data_dir" -user "$deploy_user" -exec chgrp "$shared_group" {} +
+find "$data_dir" -type d -user "$deploy_user" -exec chmod 2770 {} +
+find "$data_dir" -type f -user "$deploy_user" -exec chmod 0660 {} +
+find "$data_dir" -user "$deploy_user" -exec \
+    setfacl -m u::rwX,g::rwX,g:"$shared_group":rwX,m::rwX,o::--- {} +
+find "$data_dir" -type d -user "$deploy_user" -exec \
     setfacl -d -m u::rwx,g::rwx,g:"$shared_group":rwx,m::rwx,o::--- {} +
+
+sudo -n -u "$runtime_user" find "$data_dir" -user "$runtime_user" -exec chgrp "$shared_group" {} +
+sudo -n -u "$runtime_user" find "$data_dir" -type d -user "$runtime_user" -exec chmod 2770 {} +
+sudo -n -u "$runtime_user" find "$data_dir" -type f -user "$runtime_user" -exec chmod 0660 {} +
+sudo -n -u "$runtime_user" find "$data_dir" -user "$runtime_user" -exec \
+    setfacl -m u::rwX,g::rwX,g:"$shared_group":rwX,m::rwX,o::--- {} +
+sudo -n -u "$runtime_user" find "$data_dir" -type d -user "$runtime_user" -exec \
+    setfacl -d -m u::rwx,g::rwx,g:"$shared_group":rwx,m::rwx,o::--- {} +
+
+unexpected_owner="$(find "$data_dir" ! -user "$deploy_user" ! -user "$runtime_user" -print -quit)"
+if [[ -n "$unexpected_owner" ]]; then
+    echo "unexpected owner beneath data: $unexpected_owner" >&2
+    stat -c '%U:%G %a %n' "$unexpected_owner" >&2 || true
+    echo "repair that path as root, then rerun the deployment" >&2
+    exit 1
+fi
 
 # sitemap.xml is runtime-generated but sits outside data.
 if [[ -e "$TARGET/sitemap.xml" ]]; then

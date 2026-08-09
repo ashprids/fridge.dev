@@ -3964,8 +3964,18 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .feed-markdown-editor #bbcode-textbox,
 .feed-markdown-preview { min-height: 240px; max-height: 85dvh; overflow: auto; padding: 12px; box-sizing: border-box; font-size: 14px; line-height: 1.5; box-shadow: none !important; }
 .feed-markdown-preview { border: 1px solid var(--border); }
-.feed-markdown { display: block; max-width: 100%; overflow-wrap: anywhere; }
+.feed-markdown {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
 .feed-markdown > :first-child { margin-top: 0; }
+.feed-markdown > :last-child { margin-bottom: 0; }
 .feed-markdown img, .feed-markdown video, .feed-markdown table { max-width: 100%; }
 .feed-markdown table { width: 100%; border-collapse: collapse; }
 .feed-markdown th, .feed-markdown td { padding: 8px; border: 1px solid var(--border); }
@@ -8027,6 +8037,17 @@ body.mobile-template #search-box,
 body.mobile-template #bbcode-textbox,
 body.mobile-template .bbcode-dropdown {
     font-size: 16px !important;
+}
+
+/* iOS Safari renders form controls at 16px to avoid focus zoom. Keep the
+   highlighted mirror on exactly the same metrics as the real textarea so its
+   visible glyphs, selection positions, and caret remain aligned. */
+body.mobile-template .markdown-highlight-layer,
+body.mobile-template .markdown-highlight-input {
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body.blackprint-theme .radio,
