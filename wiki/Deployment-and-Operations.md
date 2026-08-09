@@ -61,6 +61,8 @@ The deployment workflow runs `.github/scripts/normalize-production-permissions.s
 - Access for other users is removed from normalized paths
 - Production must have the Arch Linux `acl` package installed so `setfacl` is available
 
+The normalizer repairs the runtime-generated hard-ban index as `http` before its general scan. This allows `deploy` to traverse owner-only index directories left by an interrupted or older index build.
+
 `data` and `sitemap.xml` remain runtime-owned (`http:http`). The `deploy` user must belong to the `http` group, giving both users the access they need without making private runtime data public.
 - Toast's production ownership requirements are documented on [Toast](Toast#local-service-and-production-operation)
 

@@ -53,6 +53,18 @@ while IFS= read -r -d '' path; do
     setfacl -m u::rw-,g::r--,g:"$shared_group":r--,m::r--,o::--- "$path"
 done < <(find "$TARGET" -path "$data_dir" -prune -o -type f -user "$deploy_user" -print0)
 
+# The generated hard-ban index can contain owner-only directories from an
+# interrupted build. Repair it as http before deploy tries to traverse data.
+hard_ban_index="$data_dir/etc/banlists/index"
+if sudo -n -u "$runtime_user" test -d "$hard_ban_index"; then
+    sudo -n -u "$runtime_user" find "$hard_ban_index" -type d -exec chmod 2770 {} +
+    sudo -n -u "$runtime_user" find "$hard_ban_index" -type f -exec chmod 0660 {} +
+    sudo -n -u "$runtime_user" setfacl -R \
+        -m u::rwX,g::rwX,g:"$shared_group":rwX,m::rwX,o::--- "$hard_ban_index"
+    sudo -n -u "$runtime_user" find "$hard_ban_index" -type d -exec \
+        setfacl -d -m u::rwx,g::rwx,g:"$shared_group":rwx,m::rwx,o::--- {} +
+fi
+
 # Runtime data is shared read/write between http and deploy. Normalize paths as
 # their actual owner so a file intentionally added by deploy does not make the
 # next deployment fail. Default ACLs keep future paths accessible to both.
