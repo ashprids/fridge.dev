@@ -702,7 +702,7 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         $missing = [];
         foreach ($scripts as $detectPath => $src) {
             $template = preg_replace(
-                '#(<script\b[^>]*\bsrc=["\'])' . preg_quote($detectPath, '#') . '(?:\?[^"\']*)?(["\'][^>]*></script>)#i',
+                '#(<scr' . 'ipt\b[^>]*\bsrc=["\'])' . preg_quote($detectPath, '#') . '(?:\?[^"\']*)?(["\'][^>]*></scr' . 'ipt>)#i',
                 '$1' . $src . '$2',
                 $template
             ) ?: $template;

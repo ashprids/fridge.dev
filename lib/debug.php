@@ -256,12 +256,13 @@ if (!function_exists('fridg3_write_access_log')) {
 
         $logPath = fridg3_access_log_path();
         $directory = dirname($logPath);
-        if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) return;
+        if (!is_dir($directory) && !@mkdir($directory, 0750, true) && !is_dir($directory)) return;
         $lock = @fopen($logPath . '.lock', 'c');
         if ($lock === false || !flock($lock, LOCK_EX)) {
             if ($lock !== false) fclose($lock);
             return;
         }
+        @chmod($logPath . '.lock', 0640);
         $entries = fridg3_read_access_logs();
         $decodedRecord = json_decode($record, true);
         if (is_array($decodedRecord)) $entries[] = $decodedRecord;
@@ -270,8 +271,8 @@ if (!function_exists('fridg3_write_access_log')) {
         if ($json !== false) {
             $temporary = $logPath . '.tmp.' . getmypid();
             if (@file_put_contents($temporary, $json . "\n") !== false) {
-                @chmod($temporary, 0600);
-                @rename($temporary, $logPath);
+                @chmod($temporary, 0640);
+                if (@rename($temporary, $logPath)) @chmod($logPath, 0640);
             }
         }
         flock($lock, LOCK_UN);

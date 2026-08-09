@@ -215,6 +215,32 @@ function sanitizeGuestbookEntries(string $root): void
     }
 }
 
+function assertPathAbsent(string $root, string $relativePath): void
+{
+    $path = pathFor($root, $relativePath);
+    if (file_exists($path) || is_link($path)) {
+        throw new RuntimeException("private path remains after sanitizing: {$relativePath}");
+    }
+}
+
+function assertDirectoryContainsOnly(string $root, string $relativePath, array $allowedNames): void
+{
+    $path = pathFor($root, $relativePath);
+    ensureDirectory($path);
+    $allowed = array_fill_keys($allowedNames, true);
+
+    foreach (new DirectoryIterator($path) as $item) {
+        if ($item->isDot()) {
+            continue;
+        }
+        if (!isset($allowed[$item->getFilename()])) {
+            throw new RuntimeException(
+                "unexpected private data remains after sanitizing: {$relativePath}/{$item->getFilename()}"
+            );
+        }
+    }
+}
+
 /*
  * Edit this block when new sensitive /data paths need scrubbing.
  * Keep the output useful for local dev, but never ship secrets,
@@ -226,6 +252,8 @@ writeJson($root, 'accounts/accounts.json', [
 
 writeJson($root, 'accounts/login_attempts.json', new stdClass());
 writeJson($root, 'etc/page_views.json', ['pages' => new stdClass(), 'updated_at' => null]);
+removePath($root, 'etc/access.json');
+removePath($root, 'etc/access.json.lock');
 $hardBanPath = pathFor($root, 'etc/hard-banned-ips.txt');
 ensureDirectory(dirname($hardBanPath));
 if (file_put_contents($hardBanPath, '', LOCK_EX) === false) {
@@ -257,6 +285,7 @@ writeJson($root, 'guestbook/ip_index.json', new stdClass());
 sanitizeGuestbookEntries($root);
 writeJson($root, 'feed/banned_ips.json', []);
 sanitizeFeedReplies($root);
+clearDirectory($root, 'contact');
 writeJson($root, 'contact/rate_limits.json', new stdClass());
 writeJson($root, 'etc/toast-dm-history.json', new stdClass());
 writeJson($root, 'etc/toast-feed-notify-state.json', [
@@ -286,3 +315,8 @@ file_put_contents(
     "USER:admin\nDevelopment placeholder draft\nThis draft exists so local journal draft views have harmless sample content.\nFORMAT:html\n<p>This is placeholder development content.</p>\n",
     LOCK_EX
 );
+
+// Fail closed if a privacy rule above is accidentally weakened later.
+assertPathAbsent($root, 'etc/access.json');
+assertPathAbsent($root, 'etc/access.json.lock');
+assertDirectoryContainsOnly($root, 'contact', ['rate_limits.json']);

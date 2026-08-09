@@ -149,13 +149,14 @@ sudo -u deploy find /var/www/fridge.dev/data \
   \( -type f ! -readable -o -type d \( ! -readable -o ! -executable \) \) -print
 ```
 
-The usual repair is to keep `/data` owned by the runtime user/group and make it group-readable to `deploy`:
+The usual one-time ownership repair is to keep `/data` owned by the runtime user/group. Install the `acl` package, make `deploy` a member of `http`, and rerun a deployment; the deployment workflow then applies the current modes and inherited ACLs automatically:
 
 ```sh
 sudo usermod -aG http deploy
 sudo chown -R http:http /var/www/fridge.dev/data
-sudo find /var/www/fridge.dev/data -type d -exec chmod 750 {} +
-sudo find /var/www/fridge.dev/data -type f -exec chmod 640 {} +
+sudo pacman -S acl
 ```
 
 After changing `deploy` group membership, start a new SSH session before rerunning the workflow.
+
+Every deployment normalizes existing `data` files to shared group read/write access and installs setgid/default ACL inheritance for newly-created paths. The backup and developer-data workflows also ask the `http` runtime user to restore missing group read/traverse bits before copying, which remains a compatibility repair for files created before the deployment normalizer was installed. The rebuildable hard-ban index remains excluded from archive copies.

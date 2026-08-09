@@ -18,6 +18,8 @@ Each run:
 
 Before creating a workspace, the workflow removes any stale `/home/deploy/dev-data.*` workspaces left by an earlier failed or cancelled run. Runs are serialized, so this cleanup cannot remove files from another active developer-data run. If the initial production-data copy fails, that run also removes its newly-created workspace immediately.
 
+Every production deployment normalizes the site permissions before Nginx is reloaded. Runtime data receives group read/write access, setgid directories, and default ACLs for the `http` group, so files added beneath `data` inherit access for both the `http` runtime user and the `deploy` user. The developer-data workflow retains its pre-copy repair for servers that have not yet received that deployment step.
+
 ## Required GitHub Secrets
 
 The workflow reuses `DEPLOY_KEY` and `RCLONE_CONFIG` from the private backup workflow. Their SSH requirements, exact `gdrive` remote name, configuration shape, and setup procedure are documented once on [Backup Data](Backup-data#required-github-secrets).
@@ -64,13 +66,15 @@ The sanitizer currently changes:
 - `data/guestbook/*.txt`: removes `IP:` metadata while retaining public messages
 - `data/feed/replies/*.json`: blanks guest IPs and removes guest browser notification tokens
 - `data/feed/banned_ips.json`: clears the shared posting IP ban list
+- `data/contact/*.json`: removes private contact submissions
 - `data/contact/rate_limits.json`: clears IP rate-limit state
 - `data/upload/rooms.json`: clears temporary room tokens and public keys
 - `data/mdpaste/`: clears encrypted paste records
 - `data/chat/`: clears encrypted chat conversations, attachments, presence state, and local chat keys
 - `data/journal/drafts`: removes drafts and adds a harmless placeholder draft
+- `data/etc/access.json` and `data/etc/access.json.lock`: removes private access-log data and its lock file
 
-The archive command excludes these operational identity files entirely, after sanitization as defense in depth:
+The sanitizer finishes with privacy assertions that require access logs to be absent and the contact directory to contain only the empty rate-limit state. The archive command also excludes these operational identity files as defense in depth:
 
 - `data/etc/hard-banned-ips.txt`
 - `data/etc/hard-ban-identities.json`

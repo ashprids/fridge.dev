@@ -83,10 +83,15 @@ function contact_write_json_file(string $path, array $data): bool {
 
     $tempPath = tempnam($directory, 'contact_');
     if ($tempPath === false) {
-        return @file_put_contents($path, $encoded, LOCK_EX) !== false;
+        $written = @file_put_contents($path, $encoded, LOCK_EX) !== false;
+        if ($written) @chmod($path, 0640);
+        return $written;
     }
 
-    $ok = @file_put_contents($tempPath, $encoded, LOCK_EX) !== false && @rename($tempPath, $path);
+    $ok = @file_put_contents($tempPath, $encoded, LOCK_EX) !== false;
+    if ($ok) @chmod($tempPath, 0640);
+    $ok = $ok && @rename($tempPath, $path);
+    if ($ok) @chmod($path, 0640);
     if (!$ok) {
         @unlink($tempPath);
     }

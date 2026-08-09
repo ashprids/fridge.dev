@@ -87,7 +87,7 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
     $logPath = fridg3_access_log_path();
     $directory = dirname($logPath);
-    if (!is_dir($directory) && !@mkdir($directory, 0700, true) && !is_dir($directory)) {
+    if (!is_dir($directory) && !@mkdir($directory, 0750, true) && !is_dir($directory)) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => 'clear_failed']);
         exit;
@@ -99,11 +99,13 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         echo json_encode(['ok' => false, 'error' => 'clear_failed']);
         exit;
     }
+    @chmod($logPath . '.lock', 0640);
     $temporary = $logPath . '.tmp.' . getmypid();
     $cleared = @file_put_contents($temporary, "[]\n") !== false;
     if ($cleared) {
-        @chmod($temporary, 0600);
+        @chmod($temporary, 0640);
         $cleared = @rename($temporary, $logPath);
+        if ($cleared) @chmod($logPath, 0640);
     }
     if (!$cleared && is_file($temporary)) @unlink($temporary);
     flock($lock, LOCK_UN);

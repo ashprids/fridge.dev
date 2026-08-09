@@ -63,6 +63,13 @@ jobs:
               [ -d data ] || { echo "data directory not found at $TARGET/data" >&2; exit 1; }
               [ -w "$REMOTE_WORK_DIR" ] || { echo "remote work directory is not writable: $REMOTE_WORK_DIR" >&2; exit 1; }
 
+              # Repair files created by older PHP writers with owner-only modes.
+              # deploy belongs to the http group and needs read/traverse access
+              # for rsync; the rebuildable hard-ban index remains excluded.
+              sudo -n -u http find data \
+                -path 'data/etc/banlists/index' -prune -o \
+                -exec chmod g+rX {} + 2>/dev/null || true
+
               # A failed or cancelled earlier run can leave its workspace behind.
               # Runs are serialized above, so this cannot remove an active run's files.
               while IFS= read -r -d '' stale_work_dir; do

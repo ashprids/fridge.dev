@@ -50,6 +50,13 @@ jobs:
               [ -d data ] || { echo "data directory not found at $TARGET/data" >&2; exit 1; }
               [ -w "$REMOTE_BACKUP_DIR" ] || { echo "remote backup directory is not writable: $REMOTE_BACKUP_DIR" >&2; exit 1; }
 
+              # PHP-FPM owns runtime data as http:http. Repair group-read/traverse
+              # bits before checking so files left at 0600 by older writers do
+              # not block deploy, which is a member of the http group.
+              sudo -n -u http find data \
+                -path 'data/etc/banlists/index' -prune -o \
+                -exec chmod g+rX {} + 2>/dev/null || true
+
               unreadable_paths="$(
                 find data \
                   -path 'data/etc/banlists/index' -prune -o \

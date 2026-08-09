@@ -53,12 +53,15 @@ That means production runtime data is expected to already exist on the server.
 
 ## Server Permissions
 
-From `README.md`:
+The deployment workflow runs `.github/scripts/normalize-production-permissions.sh` after every `rsync` and before reloading Nginx:
 
-- Project files should belong to `deploy:http`
-- Directories should be `755`
-- Files should be `644`
-- `/data` and `sitemap.xml` need `http:http` ownership for webserver writes
+- Application files owned by `deploy` are assigned to the `http` group; directories and default ACLs give `http` read/traverse access while keeping write access with `deploy`
+- `data` files use mode `0660`, directories use mode `2770`, and default ACLs grant the `http` group read/write access so newly-created runtime paths inherit usable permissions automatically
+- `sitemap.xml` receives the same shared runtime write access
+- Access for other users is removed from normalized paths
+- Production must have the Arch Linux `acl` package installed so `setfacl` is available
+
+`data` and `sitemap.xml` remain runtime-owned (`http:http`). The `deploy` user must belong to the `http` group, giving both users the access they need without making private runtime data public.
 - Toast's production ownership requirements are documented on [Toast](Toast#local-service-and-production-operation)
 
 The deploy user needs the passwordless sudo allowances described on [Toast](Toast#local-service-and-production-operation), alongside the Nginx allowances below:

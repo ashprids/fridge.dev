@@ -62,6 +62,11 @@ jobs:
             --exclude ".gitignore" \
             "$DEPLOY_DIR"/ "$REMOTE":"$TARGET"/
 
+      - name: normalize production permissions
+        run: |
+          set -euo pipefail
+          ssh "$REMOTE" TARGET="$TARGET" bash -s < .github/scripts/normalize-production-permissions.sh
+
       - name: validate and reload nginx
         run: |
           ssh "$REMOTE" TARGET="$TARGET" bash -s <<'EOF'
