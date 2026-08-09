@@ -28,6 +28,11 @@ sudo -n -u "$runtime_user" true || {
     exit 1
 }
 
+# SSH sessions begin in /home/deploy, which is intentionally inaccessible to
+# http. Move to the shared site before any sudo -u http command so find and
+# setfacl do not fail while trying to preserve that private working directory.
+cd "$TARGET"
+
 # Deployed application files are owned by deploy and readable by http. Setgid
 # and default ACLs keep that relationship for files introduced by later rsyncs.
 while IFS= read -r -d '' path; do
