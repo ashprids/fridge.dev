@@ -6,6 +6,8 @@ fridg3_start_session();
 require_once dirname(__DIR__, 2) . '/account/admin/helpers.php';
 require_once dirname(__DIR__, 2) . '/lib/render.php';
 require_once dirname(__DIR__, 2) . '/lib/site-notices.php';
+require_once dirname(__DIR__, 2) . '/lib/feed.php';
+require_once dirname(__DIR__, 2) . '/lib/targeted-notifications.php';
 account_admin_require_admin();
 
 if (empty($_SESSION['site_notices_csrf']) || !is_string($_SESSION['site_notices_csrf'])) {
@@ -13,7 +15,9 @@ if (empty($_SESSION['site_notices_csrf']) || !is_string($_SESSION['site_notices_
 }
 $csrf = (string)$_SESSION['site_notices_csrf'];
 $notice = '';
+$targetedResponse = null;
 $notices = fridg3_site_notices_load(__DIR__);
+$targetedNotifications = fridg3_targeted_notifications_load();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = (string)($_POST['csrf_token'] ?? '');
@@ -27,6 +31,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
     if (!hash_equals($csrf, $token)) {
         $notice = '<div id="error">invalid request token. refresh and try again.</div><br>';
+        if ($action === 'targeted_save') $targetedResponse = ['ok' => false, 'message' => 'invalid request token. refresh and try again.'];
+    } elseif ($action === 'targeted_save') {
+        $targetMode = (string)($_POST['target_mode'] ?? 'users');
+        $rawTargets = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_POST['target'] ?? ''))))));
+        $message = fridg3_site_notices_text($_POST['target_message'] ?? '', 2000);
+        $titleValue = fridg3_site_notices_text($_POST['target_title'] ?? '', 120);
+        $urlValue = fridg3_site_notices_url($_POST['target_url'] ?? '');
+        $accountNames = [];
+        foreach ((array)(fridg3_feed_load_accounts()['accounts'] ?? []) as $account) {
+            $accountNames[strtolower((string)($account['username'] ?? ''))] = true;
+        }
+        $targets = [];
+        if ($targetMode === 'all_users') $targets[] = ['targetType' => 'audience', 'target' => 'users'];
+        elseif ($targetMode === 'all_guests') $targets[] = ['targetType' => 'audience', 'target' => 'guests'];
+        elseif ($targetMode === 'users') {
+            foreach ($rawTargets as $rawTarget) {
+                $username = strtolower(ltrim($rawTarget, '@'));
+                if (!isset($accountNames[$username])) { $targets = []; break; }
+                $targets[] = ['targetType' => 'user', 'target' => $username];
+            }
+        } elseif ($targetMode === 'ips') {
+            foreach ($rawTargets as $ip) {
+                if (!filter_var($ip, FILTER_VALIDATE_IP)) { $targets = []; break; }
+                $targets[] = ['targetType' => 'ip', 'target' => $ip];
+            }
+        }
+        if ($message === '' || $targets === []) {
+            $notice = '<div id="error">choose an audience and provide valid comma-separated recipients where required.</div><br>';
+            $targetedResponse = ['ok' => false, 'message' => 'choose an audience and provide valid comma-separated recipients where required.'];
+        } else {
+            foreach ($targets as $targetRecord) $targetedNotifications[] = ['id' => bin2hex(random_bytes(12)), 'targetType' => $targetRecord['targetType'], 'target' => $targetRecord['target'], 'title' => $titleValue ?: 'notification', 'message' => $message, 'url' => $urlValue ?: '/notifications', 'date' => date('Y-m-d H:i:s')];
+            $saved = fridg3_targeted_notifications_save($targetedNotifications);
+            $notice = $saved ? '<div id="result">targeted notification sent.</div><br>' : '<div id="error">could not save targeted notification.</div><br>';
+            $targetedResponse = ['ok' => $saved, 'message' => $saved ? 'targeted notification sent.' : 'could not save targeted notification.'];
+        }
     } elseif (!in_array($scope, ['global', 'page'], true)
         || ($scope === 'global' && !in_array($audience, ['users', 'guests'], true))
         || ($scope === 'page' && $pageAudiences === [])
@@ -80,6 +119,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+if ($targetedResponse !== null && strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest') {
+    header('Content-Type: application/json; charset=UTF-8');
+    http_response_code($targetedResponse['ok'] ? 200 : 422);
+    echo json_encode($targetedResponse, JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 function notices_h($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 
 function notices_fields(string $prefix, string $type, ?array $current): string
@@ -121,13 +167,27 @@ function notices_page_form(?array $current, string $csrf, int $index): string
     return $html;
 }
 
+function notices_targeted_section(string $csrf): string
+{
+    return '<details class="site-notices-pages"><summary>send inbox notification</summary>'
+        . '<div class="site-notices-editor-card"><form id="targeted-notification-form" method="post" action="/settings/notices/" data-no-spa="1">'
+        . '<input type="hidden" name="csrf_token" value="' . notices_h($csrf) . '"><input type="hidden" name="action" value="targeted_save">'
+        . '<label for="targeted-mode">audience</label><select id="targeted-mode" name="target_mode"><option value="users">specific logged-in users</option><option value="ips">specific IP addresses</option><option value="all_users">all logged-in users</option><option value="all_guests">all guests</option></select>'
+        . '<label for="targeted-target">recipients <small>(comma-separated for specific users or IPs)</small></label><input id="targeted-target" name="target" placeholder="@fridge, @freezer">'
+        . '<label for="targeted-title">title</label><input id="targeted-title" name="target_title" maxlength="120" placeholder="sent you a notification">'
+        . '<label for="targeted-message">message</label><textarea id="targeted-message" name="target_message" required maxlength="2000"></textarea>'
+        . '<label for="targeted-url">site URL <small>(optional)</small></label><input id="targeted-url" name="target_url" placeholder="/feed/posts/example">'
+        . '<div class="site-notices-editor-actions"><button id="form-button" type="submit">send notification</button></div></form></div></details>';
+}
+
 $content = '<style>.site-notices-editor{display:grid;gap:16px;max-width:820px}.site-notices-audience,.site-notices-pages{border:1px solid var(--border);padding:0 14px}.site-notices-audience>summary,.site-notices-pages>summary,.site-notices-editor-card>summary{cursor:pointer;padding:14px 4px;font-weight:bold}.site-notices-editor-card{border-top:1px solid var(--border)}.site-notices-editor-card form{padding:0 4px 16px}.site-notices-editor-card label{display:block;margin:12px 0 6px}.site-notices-editor-card input:not(.checkbox),.site-notices-editor-card textarea,.site-notices-editor-card select{box-sizing:border-box;width:100%;padding:8px;background:var(--bg);color:var(--fg);border:1px solid var(--border);font:inherit}.site-notices-editor-card textarea{min-height:110px;resize:vertical}.site-notices-editor-card .checkbox-label{display:flex;gap:8px;align-items:center}.site-notices-audience-choices{margin:14px 0 0;padding:8px 12px 12px;border:1px solid var(--border)}.site-notices-audience-choices .checkbox-label{margin:8px 0 0}.site-notices-editor-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.site-notices-editor-help{color:var(--subtle);font-size:.9em}.site-notice-active{color:var(--links);font-size:.8em;font-weight:normal}</style>'
     . '<h1>site notices</h1><h2>messages for visitors</h2>' . $notice
     . '<p>global notices appear throughout the site. Page notices override the matching global banner or popup on one exact page. All editor sections start collapsed.</p><div class="site-notices-editor">'
     . '<details class="site-notices-audience"><summary>logged-in users</summary>' . notices_global_form('users', 'banner', $notices['users']['banner'], $csrf) . notices_global_form('users', 'popup', $notices['users']['popup'], $csrf) . '</details>'
     . '<details class="site-notices-audience"><summary>guests</summary>' . notices_global_form('guests', 'banner', $notices['guests']['banner'], $csrf) . notices_global_form('guests', 'popup', $notices['guests']['popup'], $csrf) . '</details>'
+    . notices_targeted_section($csrf)
     . '<details class="site-notices-pages"><summary>specific pages (' . count($notices['pages'] ?? []) . ')</summary>' . notices_page_form(null, $csrf, 0);
 foreach (($notices['pages'] ?? []) as $index => $page) $content .= notices_page_form($page, $csrf, $index + 1);
-$content .= '</details></div><script>(function(){document.querySelectorAll("[data-page-notice-type]").forEach(function(select){var sync=function(){var form=select.closest("form");if(!form)return;form.querySelectorAll("[data-notice-options]").forEach(function(box){box.hidden=box.getAttribute("data-notice-options")!==select.value;});};select.addEventListener("change",sync);sync();});})();</script>';
+$content .= '</details></div><script>(function(){document.querySelectorAll("[data-page-notice-type]").forEach(function(select){var sync=function(){var form=select.closest("form");if(!form)return;form.querySelectorAll("[data-notice-options]").forEach(function(box){box.hidden=box.getAttribute("data-notice-options")!==select.value;});};select.addEventListener("change",sync);sync();});var form=document.getElementById("targeted-notification-form");if(!form||form.dataset.asyncBound==="1")return;form.dataset.asyncBound="1";form.addEventListener("submit",function(event){event.preventDefault();if(!form.reportValidity())return;var button=form.querySelector("button[type=submit]");if(button)button.disabled=true;fetch(form.action,{method:"POST",body:new FormData(form),credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest"}}).then(function(response){return response.json().catch(function(){throw new Error("the server returned an invalid response.");}).then(function(data){if(!response.ok||!data.ok)throw new Error(data.message||"could not send targeted notification.");return data;});}).then(function(data){if(typeof window.showSiteNotice==="function")window.showSiteNotice("notification sent",data.message||"targeted notification sent.");}).catch(function(error){if(typeof window.showSiteNotice==="function")window.showSiteNotice("notification not sent",error.message||"could not send targeted notification.");}).finally(function(){if(button)button.disabled=false;});});})();</script>';
 
 account_admin_render_page('site notices', 'create global and page-specific visitor notices.', $content);

@@ -108,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $prefix = $postFormat === 'v2' ? 'v2' . PHP_EOL : '';
     $text = $prefix . '@' . $postUsername . PHP_EOL . $postDate . PHP_EOL . $newContent . PHP_EOL;
     file_put_contents($postPath, $text);
+    fridg3_notification_revision_touch();
 
     // Redirect back to feed
     header('Location: /feed');

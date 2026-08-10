@@ -132,6 +132,8 @@ A bare URL is linked too: https://example.com/docs.
 
 Use `inline code` without changing the surrounding font. Double delimiters allow a backtick: ``Use `code` here.``
 
+On Feed posts and replies, valid registered account mentions such as @fridge are rendered automatically as inline code, show a registered-account tooltip when hovered in published content or the editor preview, receive username suggestions while being typed, and use the site's purple in the editor once complete.
+
 ```javascript title="example.js" {2-3}
 const greeting = "hello";
 console.log(greeting);

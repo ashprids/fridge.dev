@@ -294,6 +294,21 @@ echo "highlighted code block";
             <span class="guestbook-page-btn current" aria-current="page">1</span>
             <a class="guestbook-page-btn" href="/formatting">2</a>
         </div>
+
+        <h4>notification card</h4>
+        <button class="notifications-mark-all" type="button">mark all read</button>
+        <div class="notifications-list">
+            <a class="notification-card notification-card-unread" href="/notifications">
+                <strong>@sample_user replied to your feed comment</strong>
+                <div class="notification-card-body"><div class="feed-markdown mdpaste-markdown" data-feed-format="v2"><p>a short <strong>formatted</strong> preview of the notification appears here.</p></div></div>
+                <time class="notification-card-date">2026-08-10 12:00:00</time>
+            </a>
+            <a class="notification-card" href="/notifications">
+                <strong><em class="notification-actor notification-actor-guest">Guest Name</em> replied to your feed post</strong>
+                <div class="notification-card-body"><div class="feed-markdown mdpaste-markdown" data-feed-format="v2"><p>read notifications remain available with a muted appearance.</p></div></div>
+                <time class="notification-card-date">2026-08-09 12:00:00</time>
+            </a>
+        </div>
     </section>
 
     <section class="formatting-section">

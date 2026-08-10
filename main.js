@@ -1332,6 +1332,21 @@ async function fetchAdminStatus() {
    ASCII widgets and responsive sizing
    ========================================================================== */
 
+// Measure the usable inline content box rather than including panel padding.
+function getElementContentWidth(element) {
+    if (!element) return 0;
+    const width = element.clientWidth || element.offsetWidth || 0;
+    if (!width || typeof window.getComputedStyle !== 'function') return width;
+    try {
+        const style = window.getComputedStyle(element);
+        const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+        const paddingRight = Number.parseFloat(style.paddingRight) || 0;
+        return Math.max(0, width - paddingLeft - paddingRight);
+    } catch (_) {
+        return width;
+    }
+}
+
 // Dynamically scale #ascii font size to fit container
 function autoScaleAsciiFont() {
     const asciiBlocks = document.querySelectorAll('#ascii');
@@ -1339,7 +1354,7 @@ function autoScaleAsciiFont() {
     asciiBlocks.forEach(ascii => {
         const parent = ascii.parentElement;
         if (!parent) return;
-        const containerWidth = parent.offsetWidth;
+        const containerWidth = getElementContentWidth(parent);
         const defaultFontSize = 12;
         const minFontSize = 9.5;
         // Always reset to default before measuring
@@ -1357,50 +1372,10 @@ function autoScaleAsciiFont() {
         }
     });
 
-    // Offer switching to the mobile host instead of showing the old
-    // "screen too small" bubble on cramped screens.
+    // Mobile host selection is handled immediately during bootstrap. Keep the
+    // legacy cramped-screen hint suppressed rather than prompting again.
     let tooltip = document.getElementById('ascii-scale-tooltip');
-    const TOOLTIP_KEY = 'mobileSitePromptDismissed';
-    if (isMobileTemplateActive()) {
-        if (tooltip) {
-            tooltip.style.display = 'none';
-            tooltip.style.opacity = '0';
-            if (tooltip.fadeTimeout) clearTimeout(tooltip.fadeTimeout);
-        }
-        return;
-    }
-    if (localStorage.getItem(TOOLTIP_KEY) === '1') {
-        if (tooltip) { tooltip.style.display = 'none'; tooltip.style.opacity = '0'; }
-        return;
-    }
-    if (scaled && isMobileDevice()) {
-        localStorage.setItem(TOOLTIP_KEY, '1');
-        showSitePopup({
-            title: 'screen feels cramped',
-            detail: 'switch to the mobile site?',
-            okText: 'switch',
-            cancelText: 'stay here'
-        }).then(function(shouldSwitch) {
-            if (!shouldSwitch) return;
-            try {
-                setMobileViewCookie(true);
-                if (isDeveloperModeActive()) {
-                    window.location.reload();
-                    return;
-                }
-                const targetUrl = new URL(window.location.href);
-                targetUrl.hostname = 'm.fridge.dev';
-                hostRedirectInProgress = true;
-                hideSpaLoading();
-                window.setTimeout(() => {
-                    window.location.href = targetUrl.toString();
-                }, 0);
-                return;
-            } catch (_) {
-                /* no-op */
-            }
-        });
-    } else if (tooltip) {
+    if (tooltip) {
         tooltip.style.display = 'none';
         tooltip.style.opacity = '0';
         if (tooltip.fadeTimeout) clearTimeout(tooltip.fadeTimeout);
@@ -1408,7 +1383,6 @@ function autoScaleAsciiFont() {
 }
 
 window.addEventListener('DOMContentLoaded', autoScaleAsciiFont);
-window.addEventListener('resize', autoScaleAsciiFont);
 window.addEventListener('DOMContentLoaded', initAsciiTime);
 window.addEventListener('resize', initAsciiTime);
 window.addEventListener('DOMContentLoaded', initAsciiUsage);
@@ -1577,6 +1551,9 @@ function initHourlyBeep() {
     audio.preload = 'auto';
 
     const playBeep = () => {
+        try {
+            if (localStorage.getItem('hourlyBeepEnabled') === 'false') return;
+        } catch (_) { /* enabled by default */ }
         try { audio.currentTime = 0; } catch (_) { /* no-op */ }
         audio.play().catch(() => {});
     };
@@ -1826,7 +1803,6 @@ function scaleAsciiBlocks() {
 }
 
 window.addEventListener('DOMContentLoaded', scaleAsciiBlocks);
-window.addEventListener('resize', scaleAsciiBlocks);
 // If SPA navigation or content loads, re-run scaling
 function rerunAsciiScalingAfterContent() {
     setTimeout(scaleAsciiBlocks, 0);
@@ -1889,17 +1865,43 @@ function isDeveloperModeActive() {
     return !!document.getElementById('dev-mode-banner');
 }
 
+function readMobileRoutingPreference() {
+    try {
+        const entry = document.cookie.split('; ').find(part => part.startsWith('mobile_friendly_view='));
+        if (!entry) return null;
+        const value = decodeURIComponent(entry.slice(entry.indexOf('=') + 1)).trim().toLowerCase();
+        return ['1', 'true', 'yes', 'y', 'on', 'enabled'].includes(value);
+    } catch (_) {
+        return null;
+    }
+}
+
+function setMobileRoutingPreference(enabled) {
+    try {
+        const host = (window.location.hostname || '').toLowerCase();
+        const sharedDomain = host === 'fridge.dev' || host === 'm.fridge.dev' || host.endsWith('.fridge.dev');
+        const domain = sharedDomain ? '; Domain=.fridge.dev' : '';
+        const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `mobile_friendly_view=${enabled ? '1' : '0'}; Max-Age=31536000; Path=/; SameSite=Lax${domain}${secure}`;
+    } catch (_) { /* ignore */ }
+}
+
 function redirectMobileVisitorsToMobileHost() {
     try {
         const currentUrl = new URL(window.location.href);
         const host = (currentUrl.hostname || '').toLowerCase();
         const mobile = isMobileDevice();
-        syncMobileViewCookieWithCurrentHost();
-        const mobileViewPreference = readMobileViewCookie();
+        const mobileViewPreference = readMobileRoutingPreference();
 
-        // Developer mode uses the mobile-view cookie and the current host. Local
-        // development servers cannot serve the production m.fridge.dev host.
-        if (isDeveloperModeActive()) return;
+        // Development hosts cannot serve m.fridge.dev. Detected phones instead
+        // enable the same layout cookie and reload once on the current host.
+        if (isDeveloperModeActive()) {
+            if (mobile && (mobileViewPreference !== true || !isMobileTemplateActive())) {
+                setMobileRoutingPreference(true);
+                window.location.reload();
+            }
+            return;
+        }
 
         if (host === 'fridge.dev' && mobile && mobileViewPreference !== false) {
             currentUrl.hostname = 'm.fridge.dev';
@@ -1961,7 +1963,7 @@ function fitAsciiTextElement(el, options = {}) {
 
         const maxFontSize = options.maxFontSize ?? 12;
         const minFontSize = options.minFontSize ?? 4;
-        const availableWidth = container.clientWidth || container.offsetWidth || 0;
+        const availableWidth = getElementContentWidth(container);
         if (!availableWidth) return;
 
         el.style.fontSize = maxFontSize + 'px';
@@ -2008,15 +2010,47 @@ function fitMobileAsciiLayout() {
     } catch (_) { /* no-op */ }
 }
 
+let mobileAsciiFitFrame = 0;
+let mobileAsciiResizeObserver = null;
+let lastMobileAsciiContentWidth = -1;
+
+function scheduleMobileAsciiFit(force = false) {
+    if (mobileAsciiFitFrame) window.cancelAnimationFrame(mobileAsciiFitFrame);
+    mobileAsciiFitFrame = window.requestAnimationFrame(() => {
+        mobileAsciiFitFrame = 0;
+        const contentWidth = getElementContentWidth(document.getElementById('content-main'));
+        if (!force && contentWidth > 0 && Math.abs(contentWidth - lastMobileAsciiContentWidth) < 1) return;
+        if (contentWidth > 0) lastMobileAsciiContentWidth = contentWidth;
+        autoScaleAsciiFont();
+        fitMobileAsciiLayout();
+        scaleAsciiBlocks();
+    });
+}
+
+function initMobileAsciiFitObserver() {
+    scheduleMobileAsciiFit(true);
+    window.setTimeout(() => scheduleMobileAsciiFit(true), 100);
+    window.setTimeout(() => scheduleMobileAsciiFit(true), 350);
+
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => scheduleMobileAsciiFit(true)).catch(() => {});
+    }
+
+    if (typeof ResizeObserver === 'function') {
+        if (mobileAsciiResizeObserver) mobileAsciiResizeObserver.disconnect();
+        const contentMain = document.getElementById('content-main');
+        if (contentMain) {
+            mobileAsciiResizeObserver = new ResizeObserver(() => scheduleMobileAsciiFit(false));
+            mobileAsciiResizeObserver.observe(contentMain);
+        }
+    }
+}
+
 window.addEventListener('resize', applyResponsiveScale);
 window.addEventListener('DOMContentLoaded', applyResponsiveScale);
-window.addEventListener('resize', fitMobileAsciiLayout);
-window.addEventListener('DOMContentLoaded', function() {
-    setTimeout(fitMobileAsciiLayout, 0);
-});
-window.addEventListener('load', function() {
-    setTimeout(fitMobileAsciiLayout, 0);
-});
+window.addEventListener('resize', () => scheduleMobileAsciiFit(false));
+window.addEventListener('DOMContentLoaded', initMobileAsciiFitObserver);
+window.addEventListener('load', () => scheduleMobileAsciiFit(true));
 
 /* ==========================================================================
    SPA navigation and page lifecycle
@@ -2382,7 +2416,7 @@ function loadPageIntoContent(url, addToHistory = true) {
         const contentEl = document.getElementById('content');
         if (!contentEl || !window.fetch || !window.DOMParser) {
             window.location.href = url;
-            return;
+            return Promise.resolve(false);
         }
 
         closeMobileMenu();
@@ -2392,7 +2426,7 @@ function loadPageIntoContent(url, addToHistory = true) {
 
         showSpaLoading();
 
-        fetch(url, {
+        return fetch(url, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-Fridg3-Page-Navigation': '1',
@@ -2408,7 +2442,7 @@ function loadPageIntoContent(url, addToHistory = true) {
                 const newContent = doc.getElementById('content');
                 if (!newContent) {
                     window.location.href = url;
-                    return;
+                    return false;
                 }
 
                 syncSpaPageAssets(doc);
@@ -2453,6 +2487,7 @@ function loadPageIntoContent(url, addToHistory = true) {
 
                 syncAccountFooterButton();
                 syncActiveChatSidebarButton();
+                syncNotificationsSidebarButton({ visitedUrl: url });
                 initSiteNotices(doc);
                 initMissingDevDataPopup(doc);
 
@@ -2484,6 +2519,7 @@ function loadPageIntoContent(url, addToHistory = true) {
                 autoScaleAsciiFont();
                 rerunAsciiScalingAfterContent();
                 refreshAsciiLayoutAfterFontLoad();
+                scheduleMobileAsciiFit(true);
                 initTooltips();
                 updateContentFooterSpacing();
                 initContentPagination(contentEl);
@@ -2505,10 +2541,12 @@ function loadPageIntoContent(url, addToHistory = true) {
                     });
                 }
                 window.fridg3DebugClientLog(`SPA navigation completed: ${debugPath}`);
+                return true;
             })
             .catch((error) => {
                 window.fridg3DebugClientLog(`SPA navigation failed (${debugPath}): ${error.message || 'unknown error'}; using full navigation`);
                 window.location.href = url;
+                return false;
             })
             .finally(() => {
                 hideSpaLoading();
@@ -2517,6 +2555,7 @@ function loadPageIntoContent(url, addToHistory = true) {
         window.fridg3DebugClientLog(`SPA navigation setup failed: ${error.message || 'unknown error'}`);
         hideSpaLoading();
         window.location.href = url;
+        return Promise.resolve(false);
     }
 }
 
@@ -2919,6 +2958,7 @@ function bindSpaForm(form) {
 
                 syncAccountFooterButton();
                 syncActiveChatSidebarButton();
+                syncNotificationsSidebarButton({ visitedUrl: finalUrl });
                 initSiteNotices(doc);
                 initMissingDevDataPopup(doc);
 
@@ -2946,6 +2986,7 @@ function bindSpaForm(form) {
                 initSettingsPage();
                 syncOnekoPreference();
                 rerunAsciiScalingAfterContent();
+                scheduleMobileAsciiFit(true);
                 initTooltips();
                 fitMobileAsciiLayout();
 
@@ -3161,7 +3202,10 @@ function markdownSyntaxHighlightHtml(value, fullMarkdown) {
         html += '<span class="markdown-syntax-valid">' + escape(value.slice(start, end)) + '</span>';
         cursor = end;
     });
-    return html + escape(value.slice(cursor)) + '\n';
+    const highlighted = html + escape(value.slice(cursor)) + '\n';
+    return highlighted.replace(/@([a-zA-Z0-9_-]{1,32})\b/g, (mention, username) =>
+        feedMentionUsernameSet.has(username.toLowerCase()) ? `<span class="markdown-valid-mention">${mention}</span>` : mention
+    );
 }
 
 function initMarkdownSyntaxHighlighting(root = document) {
@@ -3202,6 +3246,93 @@ function initMarkdownSyntaxHighlighting(root = document) {
         syncSize();
         update();
     });
+    initFeedMentionAutocomplete(scope);
+}
+
+let feedMentionUsernamesPromise = null;
+let feedMentionUsernamesFetchedAt = 0;
+let feedMentionUsernameSet = new Set();
+function feedMentionUsernames(force = false) {
+    if (force || !feedMentionUsernamesPromise || Date.now() - feedMentionUsernamesFetchedAt > 2000) {
+        feedMentionUsernamesFetchedAt = Date.now();
+        feedMentionUsernamesPromise = fetch('/api/feed-usernames', { credentials: 'same-origin', cache: 'no-store' })
+        .then(response => response.ok ? response.json() : { usernames: [] })
+        .then(data => {
+            const usernames = Array.isArray(data.usernames) ? data.usernames.map(String) : [];
+            feedMentionUsernameSet = new Set(usernames.map(username => username.toLowerCase()));
+            document.querySelectorAll('.markdown-highlight-input').forEach(textarea => textarea._refreshMarkdownHighlight?.());
+            return usernames;
+        }).catch(() => []);
+    }
+    return feedMentionUsernamesPromise;
+}
+
+function feedMentionCaretPosition(textarea) {
+    const style = window.getComputedStyle(textarea);
+    const mirror = document.createElement('div');
+    mirror.style.cssText = `position:fixed;left:-9999px;top:0;visibility:hidden;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box;width:${textarea.clientWidth}px;padding:${style.padding};border:${style.border};font:${style.font};line-height:${style.lineHeight};letter-spacing:${style.letterSpacing};tab-size:${style.tabSize};`;
+    mirror.textContent = textarea.value.slice(0, textarea.selectionStart || 0);
+    const marker = document.createElement('span');
+    marker.textContent = '\u200b';
+    mirror.append(marker);
+    document.body.append(mirror);
+    const position = { left: marker.offsetLeft - textarea.scrollLeft, top: marker.offsetTop - textarea.scrollTop, lineHeight: Number.parseFloat(style.lineHeight) || 21 };
+    mirror.remove();
+    return position;
+}
+
+function initFeedMentionAutocomplete(root = document) {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('.feed-markdown-editor textarea').forEach(textarea => {
+        if (textarea.dataset.mentionAutocompleteBound === '1') return;
+        textarea.dataset.mentionAutocompleteBound = '1';
+        const shell = textarea.closest('.markdown-highlight-shell') || textarea.parentElement;
+        if (!shell) return;
+        shell.style.position = 'relative';
+        const menu = document.createElement('div');
+        menu.className = 'feed-mention-suggestions'; menu.hidden = true; shell.append(menu);
+        let matches = [], selected = 0, replaceStart = 0;
+        const choose = index => {
+            if (!matches[index]) return;
+            textarea.setRangeText(`@${matches[index]} `, replaceStart, textarea.selectionStart || 0, 'end');
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            menu.hidden = true; textarea.focus();
+        };
+        const render = () => {
+            menu.replaceChildren(...matches.map((username, index) => {
+                const button = document.createElement('button');
+                button.type = 'button'; button.className = `feed-mention-suggestion${index === selected ? ' selected' : ''}`; button.textContent = `@${username}`;
+                button.addEventListener('mousedown', event => { event.preventDefault(); choose(index); });
+                return button;
+            }));
+            menu.hidden = matches.length === 0;
+            if (!menu.hidden) {
+                const caret = feedMentionCaretPosition(textarea);
+                const textareaRect = textarea.getBoundingClientRect();
+                const shellRect = shell.getBoundingClientRect();
+                const left = Math.max(4, Math.min(textarea.offsetLeft + caret.left, shell.clientWidth - menu.offsetWidth - 4));
+                const belowViewport = textareaRect.top + caret.top + caret.lineHeight + menu.offsetHeight + 6;
+                menu.style.left = `${left}px`;
+                menu.style.top = `${textarea.offsetTop + caret.top + (belowViewport <= window.innerHeight ? caret.lineHeight + 3 : -menu.offsetHeight - 3)}px`;
+            }
+        };
+        const update = async () => {
+            const cursor = textarea.selectionStart || 0;
+            const mention = textarea.value.slice(0, cursor).match(/(?:^|\s)@([a-zA-Z0-9_-]{1,32})$/);
+            if (!mention) { matches = []; render(); return; }
+            const query = mention[1].toLowerCase(); replaceStart = cursor - query.length - 1;
+            matches = (await feedMentionUsernames()).filter(name => name.toLowerCase().startsWith(query)).slice(0, 6); selected = 0; render();
+        };
+        textarea.addEventListener('input', update); textarea.addEventListener('click', update);
+        textarea.addEventListener('focus', () => { feedMentionUsernames(true); });
+        textarea.addEventListener('keydown', event => {
+            if (menu.hidden || !matches.length) return;
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); selected = (selected + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length; render(); }
+            else if (event.key === 'Enter' || event.key === 'Tab') { event.preventDefault(); choose(selected); }
+            else if (event.key === 'Escape') menu.hidden = true;
+        });
+        textarea.addEventListener('blur', () => window.setTimeout(() => { menu.hidden = true; }, 120));
+    });
 }
 
 window.initMarkdownSyntaxHighlighting = initMarkdownSyntaxHighlighting;
@@ -3215,6 +3346,48 @@ function setupSpaForms() {
         initLoginPage();
         initMarkdownSyntaxHighlighting(document);
 
+        document.querySelectorAll('form').forEach(form => {
+            if (form.dataset.searchWaitBound === '1') return;
+            const isSearchForm = form.id === 'search'
+                || form.id === 'littlehelps-search'
+                || form.getAttribute('role') === 'search'
+                || !!form.querySelector('input[type="search"], input[name="q"]');
+            if (!isSearchForm) return;
+
+            form.dataset.searchWaitBound = '1';
+            form.addEventListener('submit', event => {
+                if (event.defaultPrevented || !form.checkValidity()) return;
+                const method = (form.getAttribute('method') || 'GET').toUpperCase();
+                let destination;
+                try {
+                    destination = new URL(form.getAttribute('action') || window.location.href, window.location.href);
+                } catch (_) {
+                    return;
+                }
+                if (method !== 'GET' || destination.origin !== window.location.origin || typeof loadPageIntoContent !== 'function') return;
+
+                event.preventDefault();
+                showSitePopup({
+                    title: 'searching',
+                    detail: 'loading search results, please wait...',
+                    noButtons: true
+                });
+                const waitPopup = document.querySelector('.site-popup-overlay:last-of-type');
+                const query = new URLSearchParams();
+                new FormData(form).forEach((value, key) => query.append(key, String(value)));
+                if (event.submitter && event.submitter.name) {
+                    query.append(event.submitter.name, event.submitter.value || '');
+                }
+                destination.search = query.toString();
+
+                loadPageIntoContent(destination.pathname + destination.search + destination.hash, true).then(completed => {
+                    if (!completed || !waitPopup) return;
+                    waitPopup.classList.add('is-closing');
+                    window.setTimeout(() => waitPopup.remove(), 160);
+                });
+            });
+        });
+
         const loginForm = document.getElementById('login-form');
         // Login should perform a full POST + redirect so that
         // session cookies and redirects behave exactly as the
@@ -3226,20 +3399,15 @@ function setupSpaForms() {
         if (createPostForm) {
             const rawPath = (window.location && window.location.pathname) ? window.location.pathname : '/';
             const path = rawPath.replace(/\/+$/, '') || '/';
-            if (path === '/feed/create' || path === '/feed/create/index.php') {
-                bindFeedNotificationSubmitPrompt(createPostForm, 'post');
-            }
             bindSpaForm(createPostForm);
         }
 
         const feedReplyForm = document.getElementById('feed-reply-form');
         if (feedReplyForm) {
-            bindFeedNotificationSubmitPrompt(feedReplyForm, 'comment');
             bindSpaForm(feedReplyForm);
         }
         fillGuestBrowserIdInputs();
         initFeedReplyTargets();
-        startFeedNotificationPolling();
     } catch (_) { /* no-op */ }
 }
 

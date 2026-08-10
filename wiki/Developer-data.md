@@ -64,7 +64,7 @@ The sanitizer currently changes:
 - `data/etc/webhooks.json`: clears all scalar values
 - `data/guestbook/ip_index.json`: clears contents
 - `data/guestbook/*.txt`: removes `IP:` metadata while retaining public messages
-- `data/feed/replies/*.json`: blanks guest IPs and removes guest browser notification tokens
+- `data/feed/replies/*.json`: blanks guest IPs and removes guest browser-local inbox identities
 - `data/feed/banned_ips.json`: clears the shared posting IP ban list
 - `data/contact/*.json`: removes private contact submissions
 - `data/contact/rate_limits.json`: clears IP rate-limit state

@@ -1,5 +1,4 @@
 <?php
-require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 $sessionBootstrapDir = __DIR__;
 while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessionBootstrapDir) !== $sessionBootstrapDir) {
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
@@ -7,10 +6,26 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'targeted-notifications.php';
+
+function feed_notifications_iso_date(string $value): string {
+    $value = trim($value);
+    if ($value === '') return '';
+    try {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/', $value) === 1) {
+            $date = new DateTimeImmutable($value, new DateTimeZone(date_default_timezone_get()));
+            return $date->format(DATE_ATOM);
+        }
+        return (new DateTimeImmutable($value))->format(DATE_ATOM);
+    } catch (Throwable $error) {
+        return $value;
+    }
+}
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+$requestMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+if (!in_array($requestMethod, ['GET', 'POST'], true)) {
     http_response_code(405);
     echo json_encode(['ok' => false, 'error' => 'method_not_allowed']);
     exit;
@@ -50,9 +65,11 @@ function feed_notifications_load_posts(): array {
             continue;
         }
         $lines = preg_split("/(\r\n|\n|\r)/", $raw);
-        $username = isset($lines[0]) ? ltrim(trim((string)$lines[0]), '@') : '';
-        $date = isset($lines[1]) ? trim((string)$lines[1]) : '';
-        $body = count($lines) > 2 ? implode("\n", array_slice($lines, 2)) : '';
+        $isV2 = isset($lines[0]) && trim((string)$lines[0]) === 'v2';
+        $headerOffset = $isV2 ? 1 : 0;
+        $username = isset($lines[$headerOffset]) ? ltrim(trim((string)$lines[$headerOffset]), '@') : '';
+        $date = isset($lines[$headerOffset + 1]) ? trim((string)$lines[$headerOffset + 1]) : '';
+        $body = count($lines) > $headerOffset + 2 ? implode("\n", array_slice($lines, $headerOffset + 2)) : '';
         $postId = pathinfo((string)$path, PATHINFO_FILENAME);
         if ($postId === '' || $username === '' || $date === '') {
             continue;
@@ -62,33 +79,7 @@ function feed_notifications_load_posts(): array {
             'username' => $username,
             'date' => $date,
             'body' => $body,
-        ];
-    }
-
-    return $posts;
-}
-
-function feed_notifications_load_journal_posts(): array {
-    $journalDir = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
-    $posts = [];
-    $files = fridg3_journal_post_files($journalDir);
-
-    foreach ($files as $path) {
-        $raw = @file_get_contents($path);
-        $parsed = $raw !== false ? fridg3_journal_parse_post($raw) : null;
-        if ($parsed === null) continue;
-        $postId = pathinfo((string)$path, PATHINFO_FILENAME);
-        $date = trim($parsed['date']);
-        $title = trim($parsed['title']);
-        $description = trim($parsed['description']);
-        if ($postId === '' || $date === '' || $title === '') {
-            continue;
-        }
-        $posts[$postId] = [
-            'id' => $postId,
-            'date' => $date,
-            'title' => $title,
-            'description' => $description,
+            'format' => $isV2 ? 'v2' : 'legacy',
         ];
     }
 
@@ -104,7 +95,6 @@ function feed_notifications_accounts_index(): array {
         }
         $index[$username] = [
             'username' => (string)$account['username'],
-            'browserNotificationsEnabled' => !empty($account['browserNotificationsEnabled']),
         ];
     }
     return $index;
@@ -127,95 +117,120 @@ function feed_notifications_mentions(string $body, array $accountsIndex): array 
     return $mentions;
 }
 
-function feed_notifications_event(string $key, string $type, string $title, string $body, string $url, string $date): array {
+function feed_notifications_event(string $key, string $type, string $actor, bool $actorIsGuest, string $action, string $body, string $format, string $url, string $date): array {
+    $actorLabel = $actorIsGuest ? $actor : '@' . ltrim($actor, '@');
+    $bodyHtml = fridg3_feed_render_post_body($body, $format === 'v2' ? 'v2' : 'legacy');
+    $plainBodySource = preg_replace('/<[^>]+>/', ' ', $bodyHtml);
     return [
         'key' => $key,
         'type' => $type,
-        'title' => $title,
-        'body' => feed_notifications_plain_text($body),
+        'title' => $actorLabel . ' ' . $action,
+        'actor' => $actor,
+        'actorIsGuest' => $actorIsGuest,
+        'action' => $action,
+        'body' => feed_notifications_plain_text(is_string($plainBodySource) ? $plainBodySource : strip_tags($bodyHtml)),
+        'bodyHtml' => $bodyHtml,
         'url' => $url,
-        'date' => $date,
+        'date' => feed_notifications_iso_date($date),
     ];
 }
 
-function feed_notifications_seen_state_path(): string {
-    return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'feed-browser-notify-state.json';
+function feed_notifications_inbox_state_path(): string {
+    return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'notification-inbox-state.json';
 }
 
-function feed_notifications_normalize_seen_state($decoded): array {
-    if (!is_array($decoded)) {
-        return ['users' => []];
-    }
-    if (!isset($decoded['users']) || !is_array($decoded['users'])) {
-        $decoded['users'] = [];
-    }
+function feed_notifications_inbox_identity(string $usernameKey, string $guestBrowserId, string $clientIp = ''): string {
+    if ($usernameKey !== '') return 'account:' . $usernameKey;
+    if ($guestBrowserId !== '') return 'guest:' . $guestBrowserId;
+    if (filter_var($clientIp, FILTER_VALIDATE_IP)) return 'ip:' . $clientIp;
+    return '';
+}
+
+function feed_notifications_load_inbox_state(): array {
+    $path = feed_notifications_inbox_state_path();
+    if (!is_file($path)) return ['identities' => []];
+    $decoded = json_decode((string)@file_get_contents($path), true);
+    if (!is_array($decoded)) return ['identities' => []];
+    if (!isset($decoded['identities']) || !is_array($decoded['identities'])) $decoded['identities'] = [];
     return $decoded;
 }
 
-function feed_notifications_load_seen_state(string $path): array {
-    if (!is_file($path)) {
-        return ['users' => []];
-    }
-    $decoded = json_decode((string)@file_get_contents($path), true);
-    return feed_notifications_normalize_seen_state($decoded);
-}
-
-function feed_notifications_save_seen_state(string $path, array $state): bool {
+function feed_notifications_save_inbox_state(array $state): bool {
+    $path = feed_notifications_inbox_state_path();
     $dir = dirname($path);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
+    if (!is_dir($dir)) @mkdir($dir, 0775, true);
     $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    return $encoded !== false && @file_put_contents($path, $encoded, LOCK_EX) !== false;
+    $saved = $encoded !== false && @file_put_contents($path, $encoded, LOCK_EX) !== false;
+    if ($saved) fridg3_notification_revision_touch();
+    return $saved;
 }
 
-function feed_notifications_filter_seen_for_user(string $usernameKey, array $events, bool $baselineOnly = false): array {
-    if ($usernameKey === '') {
-        return $events;
-    }
-
-    $statePath = feed_notifications_seen_state_path();
-    $state = feed_notifications_load_seen_state($statePath);
-    $users = is_array($state['users'] ?? null) ? $state['users'] : [];
-    $userState = is_array($users[$usernameKey] ?? null) ? $users[$usernameKey] : [];
-    $seenKeys = is_array($userState['seenKeys'] ?? null)
-        ? array_values(array_filter(array_map('strval', $userState['seenKeys'])))
-        : [];
-    $seen = array_fill_keys($seenKeys, true);
-    $hadUserState = isset($users[$usernameKey]) && is_array($users[$usernameKey]);
-    $currentKeys = [];
-    $unseenEvents = [];
-
-    foreach ($events as $event) {
-        $key = isset($event['key']) ? (string)$event['key'] : '';
-        if ($key === '') {
-            continue;
+function feed_notifications_inbox_result(string $identity, array $events): array {
+    $state = feed_notifications_load_inbox_state();
+    if (!isset($state['identities'][$identity]) || !is_array($state['identities'][$identity])) {
+        $initialKeys = [];
+        foreach ($events as $event) {
+            if ((string)($event['type'] ?? '') === 'targeted') continue;
+            $key = trim((string)($event['key'] ?? ''));
+            if ($key !== '') $initialKeys[] = $key;
         }
-        $currentKeys[] = $key;
-        if (!$hadUserState || $baselineOnly || isset($seen[$key])) {
-            continue;
-        }
-        $unseenEvents[] = $event;
+        $state['identities'][$identity] = [
+            'readKeys' => array_slice(array_values(array_unique($initialKeys)), -4000),
+            'dismissedKeys' => [],
+            'updatedAt' => gmdate('c'),
+        ];
+        feed_notifications_save_inbox_state($state);
     }
-
-    foreach ($currentKeys as $key) {
-        $seen[$key] = true;
+    $identityState = is_array($state['identities'][$identity] ?? null) ? $state['identities'][$identity] : [];
+    $readKeys = array_fill_keys(array_values(array_filter(array_map('strval', (array)($identityState['readKeys'] ?? [])))), true);
+    $dismissedKeys = array_fill_keys(array_values(array_filter(array_map('strval', (array)($identityState['dismissedKeys'] ?? [])))), true);
+    $result = [];
+    foreach (array_reverse($events) as $event) {
+        $key = (string)($event['key'] ?? '');
+        if ($key === '' || isset($dismissedKeys[$key])) continue;
+        $event['unread'] = !isset($readKeys[$key]);
+        $result[] = $event;
+        if (count($result) >= 200) break;
     }
+    return $result;
+}
 
-    $users[$usernameKey] = [
-        'seenKeys' => array_slice(array_keys($seen), -2000),
+function feed_notifications_mark_inbox_read(string $identity, array $keys): bool {
+    $state = feed_notifications_load_inbox_state();
+    $identityState = is_array($state['identities'][$identity] ?? null) ? $state['identities'][$identity] : [];
+    $read = array_fill_keys(array_values(array_filter(array_map('strval', (array)($identityState['readKeys'] ?? [])))), true);
+    foreach ($keys as $key) {
+        $key = trim((string)$key);
+        if ($key !== '' && strlen($key) <= 300) $read[$key] = true;
+    }
+    $state['identities'][$identity] = [
+        'readKeys' => array_slice(array_keys($read), -4000),
+        'dismissedKeys' => array_slice(array_values(array_filter(array_map('strval', (array)($identityState['dismissedKeys'] ?? [])))), -4000),
         'updatedAt' => gmdate('c'),
     ];
-    $state['users'] = $users;
-    feed_notifications_save_seen_state($statePath, $state);
+    return feed_notifications_save_inbox_state($state);
+}
 
-    return $baselineOnly || !$hadUserState ? [] : $unseenEvents;
+function feed_notifications_dismiss_inbox(string $identity, array $keys): bool {
+    $state = feed_notifications_load_inbox_state();
+    $identityState = is_array($state['identities'][$identity] ?? null) ? $state['identities'][$identity] : [];
+    $dismissed = array_fill_keys(array_values(array_filter(array_map('strval', (array)($identityState['dismissedKeys'] ?? [])))), true);
+    foreach ($keys as $key) {
+        $key = trim((string)$key);
+        if ($key !== '' && strlen($key) <= 300) $dismissed[$key] = true;
+    }
+    $state['identities'][$identity] = [
+        'readKeys' => array_slice(array_values(array_filter(array_map('strval', (array)($identityState['readKeys'] ?? [])))), -4000),
+        'dismissedKeys' => array_slice(array_keys($dismissed), -4000),
+        'updatedAt' => gmdate('c'),
+    ];
+    return feed_notifications_save_inbox_state($state);
 }
 
 $currentUsername = isset($_SESSION['user']['username']) ? ltrim((string)$_SESSION['user']['username'], '@') : '';
 $currentUsernameKey = strtolower($currentUsername);
-$guestBrowserId = fridg3_feed_normalize_guest_browser_id((string)($_GET['guestBrowserId'] ?? ''));
-$baselineOnly = isset($_GET['baseline']) && in_array(strtolower((string)$_GET['baseline']), ['1', 'true', 'yes'], true);
+$guestBrowserId = fridg3_feed_normalize_guest_browser_id((string)($_GET['guestBrowserId'] ?? $_POST['guestBrowserId'] ?? ''));
+$currentClientIp = fridg3_feed_client_ip();
 
 $posts = feed_notifications_load_posts();
 $accountsIndex = feed_notifications_accounts_index();
@@ -234,9 +249,12 @@ foreach ($posts as $postId => $post) {
             $events[] = feed_notifications_event(
                 'post:' . $postId . ':' . $currentUsernameKey,
                 'feed',
-                '@' . $post['username'] . ' mentioned you in a feed post',
+                (string)$post['username'],
+                false,
+                'mentioned you in a feed post',
                 (string)$post['body'],
-                $postUrl,
+                (string)$post['format'],
+                $postUrl . '#post',
                 (string)$post['date']
             );
         }
@@ -259,6 +277,9 @@ foreach ($posts as $postId => $post) {
         $replyUrl = $postUrl . '#reply-' . rawurlencode($replyId);
         $replyAuthor = (string)($reply['username'] ?? '');
         $replyAuthorKey = strtolower($replyAuthor);
+        $parentId = (string)($reply['parentId'] ?? '');
+        $parentReply = $parentId !== '' && isset($repliesById[$parentId]) ? $repliesById[$parentId] : null;
+        $parentAuthorKey = is_array($parentReply) ? strtolower((string)($parentReply['username'] ?? '')) : '';
 
         if ($currentUsernameKey !== '') {
             foreach (feed_notifications_mentions((string)($reply['body'] ?? ''), $accountsIndex) as $target) {
@@ -269,19 +290,37 @@ foreach ($posts as $postId => $post) {
                 $events[] = feed_notifications_event(
                     'reply:' . $postId . ':' . $replyId . ':' . $currentUsernameKey,
                     'feed',
-                    '@' . $replyAuthor . ' mentioned you in a feed reply',
+                    $replyAuthor,
+                    !empty($reply['isGuest']),
+                    'mentioned you in a feed reply',
                     (string)($reply['body'] ?? ''),
+                    (string)($reply['format'] ?? 'legacy'),
                     $replyUrl,
                     (string)($reply['date'] ?? '')
                 );
             }
 
-            if ($postAuthorKey === $currentUsernameKey && $replyAuthorKey !== $currentUsernameKey) {
+            if ($parentAuthorKey === $currentUsernameKey && $replyAuthorKey !== $currentUsernameKey) {
+                $events[] = feed_notifications_event(
+                    'comment-reply:' . $postId . ':' . $replyId . ':' . $currentUsernameKey,
+                    'feed',
+                    $replyAuthor,
+                    !empty($reply['isGuest']),
+                    'replied to your feed comment',
+                    (string)($reply['body'] ?? ''),
+                    (string)($reply['format'] ?? 'legacy'),
+                    $replyUrl,
+                    (string)($reply['date'] ?? '')
+                );
+            } elseif ($postAuthorKey === $currentUsernameKey && $replyAuthorKey !== $currentUsernameKey) {
                 $events[] = feed_notifications_event(
                     'post-reply:' . $postId . ':' . $replyId,
                     'feed',
-                    '@' . $replyAuthor . ' replied to your feed post',
+                    $replyAuthor,
+                    !empty($reply['isGuest']),
+                    'replied to your feed post',
                     (string)($reply['body'] ?? ''),
+                    (string)($reply['format'] ?? 'legacy'),
                     $replyUrl,
                     (string)($reply['date'] ?? '')
                 );
@@ -289,16 +328,17 @@ foreach ($posts as $postId => $post) {
         }
 
         if ($guestBrowserId !== '') {
-            $parentId = (string)($reply['parentId'] ?? '');
-            $parentReply = $parentId !== '' && isset($repliesById[$parentId]) ? $repliesById[$parentId] : null;
             $parentGuestBrowserId = is_array($parentReply) ? fridg3_feed_normalize_guest_browser_id((string)($parentReply['guestBrowserId'] ?? '')) : '';
             $replyGuestBrowserId = fridg3_feed_normalize_guest_browser_id((string)($reply['guestBrowserId'] ?? ''));
             if ($parentGuestBrowserId === $guestBrowserId && $replyGuestBrowserId !== $guestBrowserId) {
                 $events[] = feed_notifications_event(
                     'guest-comment-reply:' . $postId . ':' . $replyId . ':' . $guestBrowserId,
                     'feed',
-                    $replyAuthor . ' replied to your feed comment',
+                    $replyAuthor,
+                    !empty($reply['isGuest']),
+                    'replied to your feed comment',
                     (string)($reply['body'] ?? ''),
+                    (string)($reply['format'] ?? 'legacy'),
                     $replyUrl,
                     (string)($reply['date'] ?? '')
                 );
@@ -307,24 +347,98 @@ foreach ($posts as $postId => $post) {
     }
 }
 
-foreach (feed_notifications_load_journal_posts() as $postId => $post) {
-    $events[] = feed_notifications_event(
-        'journal:' . $postId,
-        'journal',
-        'New journal post: ' . (string)$post['title'],
-        (string)($post['description'] ?? ''),
-        '/journal/posts/' . rawurlencode((string)$postId),
-        (string)$post['date']
-    );
-}
-
 usort($events, static function (array $a, array $b): int {
     return strcmp((string)($a['date'] ?? ''), (string)($b['date'] ?? ''));
 });
 
-if ($currentUsernameKey !== '') {
-    $events = feed_notifications_filter_seen_for_user($currentUsernameKey, $events, $baselineOnly);
+if ($currentUsernameKey === '') {
+    $events = array_values(array_filter($events, static fn(array $event): bool => str_starts_with((string)($event['key'] ?? ''), 'guest-comment-reply:')));
 }
 
-echo json_encode(['ok' => true, 'events' => $events], JSON_UNESCAPED_SLASHES);
+foreach (fridg3_targeted_notifications_load() as $targeted) {
+    $targetType = (string)($targeted['targetType'] ?? '');
+    $target = strtolower((string)($targeted['target'] ?? ''));
+    if (!(($targetType === 'user' && $currentUsernameKey !== '' && $target === $currentUsernameKey)
+        || ($targetType === 'ip' && $target === strtolower($currentClientIp))
+        || ($targetType === 'audience' && $target === 'users' && $currentUsernameKey !== '')
+        || ($targetType === 'audience' && $target === 'guests' && $currentUsernameKey === ''))) continue;
+    $message = (string)($targeted['message'] ?? '');
+    $messageHtml = fridg3_feed_render_post_body($message, 'v2');
+    $events[] = [
+        'key' => 'targeted:' . (string)($targeted['id'] ?? ''), 'type' => 'targeted',
+        'title' => (string)($targeted['title'] ?? 'notification'), 'actor' => '', 'actorIsGuest' => false, 'action' => '',
+        'body' => feed_notifications_plain_text(strip_tags($messageHtml)), 'bodyHtml' => $messageHtml,
+        'url' => (string)($targeted['url'] ?? '/notifications'), 'date' => feed_notifications_iso_date((string)($targeted['date'] ?? '')),
+    ];
+}
+
+$inboxRequested = (string)($_GET['view'] ?? $_POST['view'] ?? '') === 'inbox';
+if ($inboxRequested) {
+    $identity = feed_notifications_inbox_identity($currentUsernameKey, $guestBrowserId, $currentClientIp);
+    if ($identity === '') {
+        echo json_encode(['ok' => true, 'events' => [], 'unreadCount' => 0, 'loggedIn' => false]);
+        exit;
+    }
+    if ($currentUsernameKey !== '' && empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    if ($requestMethod === 'POST') {
+        if ($currentUsernameKey !== '') {
+            $submittedCsrf = (string)($_POST['csrf_token'] ?? '');
+            $sessionCsrf = (string)($_SESSION['csrf_token'] ?? '');
+            if ($sessionCsrf === '' || !hash_equals($sessionCsrf, $submittedCsrf)) {
+                http_response_code(403);
+                echo json_encode(['ok' => false, 'error' => 'invalid_csrf']);
+                exit;
+            }
+        } elseif (strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) !== 'xmlhttprequest') {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'invalid_request']);
+            exit;
+        }
+        $markAll = isset($_POST['markAll']) && in_array(strtolower((string)$_POST['markAll']), ['1', 'true', 'yes'], true);
+        $dismissAll = isset($_POST['dismissAll']) && in_array(strtolower((string)$_POST['dismissAll']), ['1', 'true', 'yes'], true);
+        $dismiss = isset($_POST['dismiss']) && in_array(strtolower((string)$_POST['dismiss']), ['1', 'true', 'yes'], true);
+        $keys = ($markAll || $dismissAll) ? array_column($events, 'key') : ($_POST['keys'] ?? []);
+        if (is_string($keys)) {
+            $decodedKeys = json_decode($keys, true);
+            $keys = is_array($decodedKeys) ? $decodedKeys : [];
+        }
+        $saved = is_array($keys) && (($dismiss || $dismissAll)
+            ? feed_notifications_dismiss_inbox($identity, $keys)
+            : feed_notifications_mark_inbox_read($identity, $keys));
+        if (!$saved) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'state_write_failed']);
+            exit;
+        }
+    }
+
+    $allInboxEvents = feed_notifications_inbox_result($identity, $events);
+    $unreadCount = count(array_filter($allInboxEvents, static fn(array $event): bool => !empty($event['unread'])));
+    $perPage = 10;
+    $totalEvents = count($allInboxEvents);
+    $totalPages = max(1, (int)ceil($totalEvents / $perPage));
+    $requestedPage = max(1, (int)($_GET['page'] ?? $_POST['page'] ?? 1));
+    $currentPage = min($requestedPage, $totalPages);
+    $inboxEvents = array_slice($allInboxEvents, ($currentPage - 1) * $perPage, $perPage);
+    echo json_encode([
+        'ok' => true,
+        'events' => $inboxEvents,
+        'unreadCount' => $unreadCount,
+        'loggedIn' => $currentUsernameKey !== '',
+        'csrfToken' => $currentUsernameKey !== '' ? (string)($_SESSION['csrf_token'] ?? '') : '',
+        'pagination' => [
+            'page' => $currentPage,
+            'perPage' => $perPage,
+            'totalEvents' => $totalEvents,
+            'totalPages' => $totalPages,
+        ],
+    ], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+http_response_code(400);
+echo json_encode(['ok' => false, 'error' => 'inbox_view_required']);
 exit;

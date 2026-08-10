@@ -339,6 +339,8 @@ if ($replyParentId !== '' && !isset($repliesById[$replyParentId])) {
     $replyParentId = '';
 }
 $canModerateReplies = fridg3_feed_current_user_can_moderate_replies($username);
+$postIpRecords = fridg3_feed_load_post_ips();
+$postAuthorIp = (string)($postIpRecords[(string)$postIdNoExt]['ip'] ?? '');
 $editReplyBodyValue = '';
 if ($replyEditTargetId !== '' && isset($_POST['reply_action']) && (string)$_POST['reply_action'] === 'update') {
     $editReplyBodyValue = (string)($_POST['reply_content'] ?? '');
@@ -450,6 +452,10 @@ $postMeta .= $bookmarkIcon;
 
 // Replace placeholders in content
 $content = str_replace('{username}', $safeUser, $content);
+$postUserIpAttribute = !empty($_SESSION['user']['isAdmin'])
+    ? ' data-context-tooltip="' . (filter_var($postAuthorIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($postAuthorIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
+    : '';
+$content = str_replace('<span id="post-username">@' . $safeUser . '</span>', '<span id="post-username"' . $postUserIpAttribute . '>@' . $safeUser . '</span>', $content);
 $content = $postFormat === 'v2'
     ? str_replace('<span id="post-content">{content}</span>', '{content}', $content)
     : $content;
@@ -674,16 +680,12 @@ $renderReply = function (array $reply, int $depth = 0) use (
                 . fridg3_disable_composer_controls(substr($replyEditFormHtml, strlen('<div class="feed-reply-box feed-reply-edit-box">')));
         }
     }
+    $guestIpAttribute = !empty($_SESSION['user']['isAdmin'])
+        ? ' data-context-tooltip="' . (filter_var($replyIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($replyIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
+        : '';
     $replyUserHtml = $isGuestReply
-        ? '<em>' . $replyUser . '</em>'
-        : '@' . $replyUser;
-    if ($canModerateReplies && $isGuestReply && $replyIp !== '') {
-        $replyUserHtml .= ' <span class="feed-reply-ip" style="color: var(--subtle);">(' . htmlspecialchars($replyIp, ENT_QUOTES, 'UTF-8') . ')</span>';
-        $replyIpBanned = fridg3_feed_is_ip_banned($replyIp);
-        if ($replyIpBanned) {
-            $replyUserHtml .= ' <span class="feed-reply-ip" style="color: var(--subtle);">(banned)</span>';
-        }
-    }
+        ? '<em' . $guestIpAttribute . '>' . $replyUser . '</em>'
+        : '<span' . $guestIpAttribute . '>@' . $replyUser . '</span>';
     $parentReferenceHtml = '';
     $parentId = (string)($reply['parentId'] ?? '');
     if ($parentId !== '' && isset($visibleRepliesById[$parentId])) {

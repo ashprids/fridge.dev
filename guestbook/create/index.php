@@ -9,6 +9,7 @@ fridg3_start_session();
 fridg3_refresh_current_user_posting_restriction();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'targeted-notifications.php';
 
 $title = 'post to guestbook';
 $description = 'send a message to the guestbook.';
@@ -117,6 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 fridg3_debug_submission_log('[SUBMISSION] guestbook entry save succeeded attachments=0');
                 $ip_index[$client_ip] = $filename;
                 @file_put_contents($ip_index_path, json_encode($ip_index, JSON_PRETTY_PRINT), LOCK_EX);
+                if (!fridg3_targeted_notifications_notify_admins('new guestbook entry', $name . ' added a new guestbook entry.', '/guestbook', date('Y-m-d H:i:s'), 'guestbook-' . pathinfo($filename, PATHINFO_FILENAME))) {
+                    error_log('guestbook entry ' . $filename . ' admin inbox notification failed');
+                }
                 header('Location: /guestbook');
                 exit;
             }

@@ -4,6 +4,7 @@ const hideSidebarBtn = document.getElementById('hide-sidebar');
 const showSidebarBtn = document.getElementById('show-sidebar');
 const sidebar = document.getElementById('sidebar');
 const mobileCollapsedHeader = document.getElementById('mobile-collapsed-header');
+const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
 const SIDEBAR_KEY = 'sidebarVisible';
 
 function setSidebarVisible(visible, persist = true) {
@@ -11,11 +12,16 @@ function setSidebarVisible(visible, persist = true) {
         sidebar.style.display = 'flex';
     }
     document.body.classList.toggle('sidebar-is-hidden', !visible);
+    document.documentElement.classList.toggle('mobile-menu-is-open', isMobileTemplateActive() && visible);
+    if (mobileMenuBackdrop) mobileMenuBackdrop.setAttribute('aria-hidden', visible ? 'false' : 'true');
     if (showSidebarBtn) {
-        showSidebarBtn.style.display = visible ? 'none' : 'inline-block';
+        const mobileToggle = isMobileTemplateActive();
+        showSidebarBtn.style.display = mobileToggle ? 'inline-flex' : (visible ? 'none' : 'inline-block');
+        showSidebarBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
+        showSidebarBtn.setAttribute('aria-label', visible ? 'hide menu' : 'show menu');
     }
     updateMobileCollapsedHeader(!visible);
-    if (persist) {
+    if (persist && !isMobileTemplateActive()) {
         try {
             localStorage.setItem(SIDEBAR_KEY, visible ? 'true' : 'false');
         } catch (_) { /* no-op */ }
@@ -37,18 +43,20 @@ function closeMobileMenu() {
 
 // Load sidebar state, apply glow/gradient, and BBCode formatting
 function initSidebarAndBBCode() {
-    const isSidebarVisible = localStorage.getItem(SIDEBAR_KEY);
-    const defaultSidebarVisible = isMobileTemplateActive() ? 'false' : 'true';
-    if (isSidebarVisible === null) {
-        // Mobile template starts closed by default; desktop starts open.
-        localStorage.setItem(SIDEBAR_KEY, defaultSidebarVisible);
-        if (defaultSidebarVisible === 'false' && sidebar && showSidebarBtn) {
-            setSidebarVisible(false, false);
-        }
-    } else if (isSidebarVisible === 'false') {
+    if (isMobileTemplateActive()) {
+        // Mobile menus are deliberately closed on every fresh page load.
         setSidebarVisible(false, false);
     } else {
-        setSidebarVisible(true, false);
+        const isSidebarVisible = localStorage.getItem(SIDEBAR_KEY);
+        const defaultSidebarVisible = 'true';
+        if (isSidebarVisible === null) {
+            localStorage.setItem(SIDEBAR_KEY, defaultSidebarVisible);
+            setSidebarVisible(true, false);
+        } else if (isSidebarVisible === 'false') {
+            setSidebarVisible(false, false);
+        } else {
+            setSidebarVisible(true, false);
+        }
     }
     sidebarDebugLog('sidebar and shared content initialized');
 
@@ -169,11 +177,15 @@ function initMiniPlayer() {
         const muteBtn = document.getElementById('mini-player-mute');
         const titleContainerEl = document.getElementById('mini-player-title');
         const titleEl = document.getElementById('mini-player-title-inner');
+        const artistEl = document.getElementById('mini-player-artist');
         const tracklistEl = document.getElementById('mini-player-tracks');
         const downloadBtn = document.getElementById('mini-player-download');
+        const closeBtn = document.getElementById('mini-player-close');
         const artEl = document.getElementById('mini-player-art');
         const seekEl = document.getElementById('mini-player-seek');
         const volumeEl = document.getElementById('mini-player-volume');
+        const volumeWrapperEl = document.getElementById('mini-player-volume-wrapper');
+        const playerRowEl = document.getElementById('mini-player-row');
 
         const setLiveMode = (isLive) => {
             if (!miniPlayerEl) return;
@@ -211,6 +223,10 @@ function initMiniPlayer() {
         let isSeeking = false;
         let lastVolume = 1;
         let lastTrackLabel = '';
+        let lastTrackArtist = '';
+        let playbackVolume = DEFAULT_VOLUME;
+        let volumeFadeFrame = null;
+        let fadeOutActive = false;
 
         setLiveMode(false);
 
@@ -221,7 +237,7 @@ function initMiniPlayer() {
         const initialArt = body.getAttribute('data-mini-player-art');
         if (initialSrc) audio.src = initialSrc;
         if (initialTitle) {
-            setNowPlayingTitle(initialTitle);
+            setNowPlayingTitle(initialTitle, body.getAttribute('data-mini-player-artist') || '');
         }
         if (artEl && initialArt) artEl.src = initialArt;
 
@@ -245,7 +261,7 @@ function initMiniPlayer() {
                         audio.muted = saved.muted;
                     }
                     if (saved.title && titleEl) {
-                        setNowPlayingTitle(saved.title);
+                        setNowPlayingTitle(saved.title, saved.artist || '');
                     }
                     if (saved.art && artEl) {
                         artEl.src = saved.art;
@@ -253,6 +269,8 @@ function initMiniPlayer() {
                 }
             }
         } catch (_) { /* no-op */ }
+
+        playbackVolume = audio.volume;
 
         const setPlayIcon = (isPlaying) => {
             const icon = playBtn.querySelector('i');
@@ -264,6 +282,63 @@ function initMiniPlayer() {
                 icon.classList.remove('fa-pause');
                 icon.classList.add('fa-play');
             }
+        };
+
+        const cancelVolumeFade = () => {
+            if (volumeFadeFrame !== null) {
+                window.cancelAnimationFrame(volumeFadeFrame);
+                volumeFadeFrame = null;
+            }
+        };
+
+        const rampAudioVolume = (from, to, duration, complete) => {
+            cancelVolumeFade();
+            const startedAt = performance.now();
+            const tick = now => {
+                const progress = Math.min(1, (now - startedAt) / duration);
+                audio.volume = Math.max(0, Math.min(1, from + ((to - from) * progress)));
+                if (progress < 1) {
+                    volumeFadeFrame = window.requestAnimationFrame(tick);
+                    return;
+                }
+                volumeFadeFrame = null;
+                if (complete) complete();
+            };
+            volumeFadeFrame = window.requestAnimationFrame(tick);
+        };
+
+        const fadeInPlayback = () => {
+            const resumeDuringFadeOut = fadeOutActive;
+            fadeOutActive = false;
+            const startVolume = resumeDuringFadeOut ? audio.volume : 0;
+            cancelVolumeFade();
+            audio.volume = startVolume;
+            return audio.play().then(() => {
+                setPlayIcon(true);
+                updatePlayingClass();
+                rampAudioVolume(startVolume, playbackVolume, 180, () => {
+                    audio.volume = playbackVolume;
+                    savePlayerState();
+                });
+            }).catch(() => {
+                audio.volume = playbackVolume;
+                setPlayIcon(false);
+                updatePlayingClass();
+            });
+        };
+
+        const fadeOutPlayback = () => {
+            fadeOutActive = true;
+            const startVolume = audio.volume;
+            rampAudioVolume(startVolume, 0, 180, () => {
+                if (!fadeOutActive) return;
+                fadeOutActive = false;
+                audio.pause();
+                audio.volume = playbackVolume;
+                setPlayIcon(false);
+                updatePlayingClass();
+                savePlayerState();
+            });
         };
 
         const clearActiveTracks = () => {
@@ -278,9 +353,10 @@ function initMiniPlayer() {
                     src: audio.src,
                     currentTime: audio.currentTime || 0,
                     paused: audio.paused,
-                    volume: audio.volume,
+                    volume: playbackVolume,
                     muted: audio.muted,
                     title: titleEl ? titleEl.textContent : '',
+                    artist: artistEl ? artistEl.textContent.trim() : '',
                     art: artEl ? artEl.src : ''
                 };
                 window.localStorage.setItem(PLAYER_STATE_KEY, JSON.stringify(state));
@@ -318,10 +394,20 @@ function initMiniPlayer() {
             }
         }
 
-        function setNowPlayingTitle(label) {
+        function setNowPlayingTitle(label, artist = '') {
             if (!titleEl) return;
+            if (!artist && typeof label === 'string' && label.includes(' - ')) {
+                const parts = label.split(' - ');
+                artist = parts.pop() || '';
+                label = parts.join(' - ');
+            }
             titleEl.textContent = label;
             lastTrackLabel = label || '';
+            lastTrackArtist = artist || '';
+            if (artistEl) {
+                artistEl.textContent = lastTrackArtist || '\u00a0';
+                artistEl.hidden = !lastTrackArtist;
+            }
             // wait a frame so layout is updated
             requestAnimationFrame(updateTitleScroll);
         }
@@ -356,8 +442,8 @@ function initMiniPlayer() {
         const bindMediaSessionActions = () => {
             if (!('mediaSession' in navigator)) return;
             try {
-                navigator.mediaSession.setActionHandler('play', () => audio.play().catch(() => {}));
-                navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+                navigator.mediaSession.setActionHandler('play', fadeInPlayback);
+                navigator.mediaSession.setActionHandler('pause', fadeOutPlayback);
                 navigator.mediaSession.setActionHandler('previoustrack', () => {/* not implemented */});
                 navigator.mediaSession.setActionHandler('nexttrack', () => {
                     // trigger autoplay chain if available
@@ -419,7 +505,6 @@ function initMiniPlayer() {
         const autoplayTrack = (track) => {
             if (!track || !track.src) return;
             const labelName = track.name || 'Untitled';
-            const labelArtist = track.albumArtist ? ' - ' + track.albumArtist : '';
 
             trackLibrary.autoPlayedIds.add(track.id);
 
@@ -430,7 +515,7 @@ function initMiniPlayer() {
             if (artEl && track.albumArt) {
                 artEl.src = track.albumArt;
             }
-            setNowPlayingTitle(labelName + labelArtist);
+            setNowPlayingTitle(labelName, track.albumArtist || '');
             setMediaSessionMetadata({
                 name: track.name,
                 albumArtist: track.albumArtist,
@@ -453,7 +538,6 @@ function initMiniPlayer() {
 
             const meta = albumMeta || {};
             const name = track.name || `Track ${idx + 1}`;
-            const artistLabel = meta.albumArtist ? ' - ' + meta.albumArtist : '';
 
             audio.src = src;
             audio.play().catch(() => {});
@@ -468,7 +552,7 @@ function initMiniPlayer() {
             if (artEl) {
                 artEl.src = meta.albumArt || '';
             }
-            setNowPlayingTitle(name + artistLabel);
+            setNowPlayingTitle(name, meta.albumArtist || '');
             setMediaSessionMetadata({
                 name,
                 albumArtist: meta.albumArtist || '',
@@ -613,7 +697,7 @@ function initMiniPlayer() {
                     if (!audio || !audio.src) return;
                     const src = audio.src;
                     // Derive a safe filename from the last track label
-                    let baseName = lastTrackLabel || 'track';
+                    let baseName = [lastTrackLabel, lastTrackArtist].filter(Boolean).join(' - ') || 'track';
                     // Strip any leading "now playing:" prefix
                     baseName = baseName.replace(/^now playing:\s*/i, '');
                     // Replace problematic filename characters
@@ -638,18 +722,42 @@ function initMiniPlayer() {
             });
         }
 
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                cancelVolumeFade();
+                fadeOutActive = false;
+                audio.volume = playbackVolume;
+                audio.pause();
+                audio.removeAttribute('src');
+                audio.load();
+                audio.removeAttribute('data-toast-live');
+                window.__toastStreamCandidates = [];
+                setPlayIcon(false);
+                setLiveMode(false);
+                clearActiveTracks();
+                if (tracklistEl) {
+                    tracklistEl.innerHTML = '';
+                    tracklistEl.style.display = 'none';
+                }
+                if (artEl) artEl.removeAttribute('src');
+                setNowPlayingTitle('nothing selected', '');
+                if (seekEl) seekEl.value = '0';
+                miniPlayerEl?.classList.add('mini-inactive');
+                try {
+                    window.localStorage.removeItem(PLAYER_STATE_KEY);
+                    if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
+                } catch (_) { /* no-op */ }
+                sidebarDebugLog('mini player closed');
+            });
+        }
+
         playBtn.addEventListener('click', () => {
             if (!audio.src) return;
-            if (audio.paused) {
-                audio.play().catch(() => {});
-                setPlayIcon(true);
-                savePlayerState();
+            if (audio.paused || fadeOutActive) {
+                fadeInPlayback();
             } else {
-                audio.pause();
-                setPlayIcon(false);
-                savePlayerState();
+                fadeOutPlayback();
             }
-            updatePlayingClass();
         });
 
         muteBtn.addEventListener('click', () => {
@@ -721,6 +829,7 @@ function initMiniPlayer() {
                 if (isNaN(vol)) vol = 1;
                 vol = Math.max(0, Math.min(vol, 1));
                 audio.volume = vol;
+                playbackVolume = vol;
                 if (vol === 0) {
                     audio.muted = true;
                 } else {
@@ -739,6 +848,19 @@ function initMiniPlayer() {
                 }
                 savePlayerState();
             });
+        }
+
+        if (volumeWrapperEl && playerRowEl) {
+            const openVolume = () => playerRowEl.classList.add('mini-player-volume-expanded');
+            const closeVolume = () => {
+                if (!volumeWrapperEl.matches(':hover') && !volumeWrapperEl.contains(document.activeElement)) {
+                    playerRowEl.classList.remove('mini-player-volume-expanded');
+                }
+            };
+            volumeWrapperEl.addEventListener('mouseenter', openVolume);
+            volumeWrapperEl.addEventListener('mouseleave', closeVolume);
+            volumeWrapperEl.addEventListener('focusin', openVolume);
+            volumeWrapperEl.addEventListener('focusout', () => window.setTimeout(closeVolume, 0));
         }
 
         // Album grid integration: clicking entries controls the mini player.
@@ -815,8 +937,7 @@ function initMiniPlayer() {
                             tracklistEl.innerHTML = '';
                             tracklistEl.style.display = 'none';
                         }
-                        const artistLabelSingle = albumArtist ? ' - ' + albumArtist : '';
-                        setNowPlayingTitle(name + artistLabelSingle);
+                        setNowPlayingTitle(name, albumArtist);
                         setMediaSessionMetadata({
                             name,
                             albumArtist,
@@ -873,6 +994,7 @@ function initMiniPlayer() {
                     audio.src = state.src;
                     if (typeof state.volume === 'number' && volumeEl) {
                         audio.volume = Math.max(0, Math.min(1, state.volume));
+                        playbackVolume = audio.volume;
                         volumeEl.value = String(audio.volume);
                     }
                     audio.muted = !!state.muted;
@@ -892,7 +1014,7 @@ function initMiniPlayer() {
                         artEl.src = state.art;
                     }
                     if (state.title) {
-                        setNowPlayingTitle(state.title);
+                        setNowPlayingTitle(state.title, state.artist || '');
                     }
                     if (typeof state.currentTime === 'number' && state.currentTime > 0) {
                         audio.addEventListener('loadedmetadata', function restoreTimeOnce() {
@@ -993,6 +1115,374 @@ function syncActiveChatSidebarButton() {
 }
 
 window.addEventListener('DOMContentLoaded', syncActiveChatSidebarButton);
+
+let notificationRevisionPollTimer = null;
+let notificationRevisionKnown = null;
+let notificationRevisionRequestActive = false;
+let notificationStreamRefreshTimer = null;
+let notificationInboxKnownKeys = null;
+let siteNotificationToastActive = false;
+let initialUnreadSummaryShown = false;
+const siteNotificationToastQueue = [];
+let siteNotificationAudio = null;
+let siteNotificationAudioUnlocked = false;
+let siteNotificationSoundPending = false;
+const SITE_NOTIFICATION_VOLUME = 0.3;
+
+function getSiteNotificationAudio() {
+    if (!siteNotificationAudio) {
+        siteNotificationAudio = new Audio('/resources/notification.mp3');
+        siteNotificationAudio.preload = 'auto';
+        siteNotificationAudio.volume = SITE_NOTIFICATION_VOLUME;
+    }
+    return siteNotificationAudio;
+}
+
+function unlockSiteNotificationAudio() {
+    if (siteNotificationAudioUnlocked) return;
+    const audio = getSiteNotificationAudio();
+    const previousVolume = audio.volume;
+    audio.volume = 0;
+    const playPromise = audio.play();
+    if (!playPromise || typeof playPromise.then !== 'function') return;
+    playPromise.then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = previousVolume;
+        siteNotificationAudioUnlocked = true;
+        if (siteNotificationSoundPending) playSiteNotificationSound();
+    }).catch(() => {
+        audio.volume = previousVolume;
+    });
+}
+
+function playSiteNotificationSound() {
+    const audio = getSiteNotificationAudio();
+    try { audio.currentTime = 0; } catch (_) { /* ignore */ }
+    audio.volume = SITE_NOTIFICATION_VOLUME;
+    const playPromise = audio.play();
+    if (!playPromise || typeof playPromise.then !== 'function') {
+        siteNotificationSoundPending = false;
+        return;
+    }
+    playPromise.then(() => {
+        siteNotificationAudioUnlocked = true;
+        siteNotificationSoundPending = false;
+    }).catch(() => {
+        siteNotificationSoundPending = true;
+    });
+}
+
+document.addEventListener('pointerdown', unlockSiteNotificationAudio, { passive: true });
+document.addEventListener('keydown', unlockSiteNotificationAudio);
+window.addEventListener('fridg3:new-notifications', playSiteNotificationSound);
+
+async function markSiteNotificationsRead(keys, csrfToken = '') {
+    const notificationKeys = Array.from(new Set((Array.isArray(keys) ? keys : []).map(String).filter(Boolean)));
+    if (!notificationKeys.length) return;
+    const params = new URLSearchParams({ view: 'inbox', keys: JSON.stringify(notificationKeys) });
+    if (csrfToken) params.set('csrf_token', csrfToken);
+    if (!document.getElementById('user-greeting') && typeof getFeedGuestBrowserId === 'function') {
+        const guestBrowserId = getFeedGuestBrowserId();
+        if (guestBrowserId) params.set('guestBrowserId', guestBrowserId);
+    }
+    await fetch('/api/feed-notifications', {
+        method: 'POST',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: params.toString()
+    });
+}
+
+function showNextSiteNotificationToast() {
+    if (siteNotificationToastActive || siteNotificationToastQueue.length === 0) return;
+    siteNotificationToastActive = true;
+    const event = siteNotificationToastQueue.shift();
+    const toast = document.createElement('a');
+    toast.className = 'site-notification-toast';
+    toast.href = '/notifications';
+    toast.setAttribute('role', 'status');
+
+    const title = document.createElement('strong');
+    const compactPreview = (value, limit) => {
+        const text = String(value || '').replace(/\s+/g, ' ').trim();
+        return text.length > limit ? `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…` : text;
+    };
+    title.textContent = compactPreview(event.title || 'new notification', 100);
+    const body = document.createElement('span');
+    body.textContent = compactPreview(event.body || '', 180);
+    toast.append(title, body);
+    document.body.append(toast);
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let swipeDistanceX = 0;
+    let swipeDistance = 0;
+    let swipePointerId = null;
+    let suppressToastClick = false;
+
+    toast.addEventListener('pointerdown', pointerEvent => {
+        if (pointerEvent.pointerType !== 'touch' || !pointerEvent.isPrimary) return;
+        swipeStartX = pointerEvent.clientX;
+        swipeStartY = pointerEvent.clientY;
+        swipeDistanceX = 0;
+        swipeDistance = 0;
+        swipePointerId = pointerEvent.pointerId;
+        suppressToastClick = false;
+        toast.style.transform = 'translate(-50%, 0)';
+        toast.style.opacity = '1';
+        toast.classList.add('is-swiping');
+        toast.setPointerCapture?.(pointerEvent.pointerId);
+    });
+    toast.addEventListener('pointermove', pointerEvent => {
+        if (pointerEvent.pointerId !== swipePointerId) return;
+        pointerEvent.preventDefault();
+        swipeDistanceX = pointerEvent.clientX - swipeStartX;
+        swipeDistance = Math.min(0, pointerEvent.clientY - swipeStartY);
+        if (swipeDistance < -6 || Math.abs(swipeDistanceX) > 6) suppressToastClick = true;
+        toast.style.transform = `translate(calc(-50% + ${swipeDistanceX}px), ${swipeDistance}px)`;
+        toast.style.opacity = String(Math.max(0.15, 1 - (Math.max(Math.abs(swipeDistanceX), Math.abs(swipeDistance)) / 110)));
+    });
+    const finishToastSwipe = pointerEvent => {
+        if (pointerEvent.pointerId !== swipePointerId) return;
+        toast.releasePointerCapture?.(pointerEvent.pointerId);
+        swipePointerId = null;
+        if (swipeDistance <= -32 || Math.abs(swipeDistanceX) >= 55) {
+            suppressToastClick = true;
+            finish();
+            return;
+        }
+        toast.classList.add('is-swipe-resetting');
+        toast.style.transform = 'translate(-50%, 0)';
+        toast.style.opacity = '1';
+        window.setTimeout(() => toast.classList.remove('is-swipe-resetting'), 150);
+    };
+    toast.addEventListener('pointerup', finishToastSwipe);
+    toast.addEventListener('pointercancel', finishToastSwipe);
+    toast.addEventListener('click', clickEvent => {
+        clickEvent.preventDefault();
+        if (suppressToastClick) {
+            suppressToastClick = false;
+            return;
+        }
+        finish();
+        if (typeof loadPageIntoContent === 'function') loadPageIntoContent('/notifications', true);
+        else window.location.assign('/notifications');
+    });
+
+    let finished = false;
+    let dismissTimer = null;
+    let visibleCountdownStartedAt = 0;
+    let visibleCountdownRemaining = 6200;
+    const syncToastVisibilityCountdown = () => {
+        if (finished) return;
+        if (document.hidden) {
+            toast.style.animationPlayState = 'paused';
+            if (dismissTimer) {
+                window.clearTimeout(dismissTimer);
+                dismissTimer = null;
+                visibleCountdownRemaining = Math.max(0, visibleCountdownRemaining - (performance.now() - visibleCountdownStartedAt));
+            }
+            return;
+        }
+        toast.style.animationPlayState = 'running';
+        if (dismissTimer) return;
+        visibleCountdownStartedAt = performance.now();
+        dismissTimer = window.setTimeout(finish, visibleCountdownRemaining);
+    };
+    const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (dismissTimer) window.clearTimeout(dismissTimer);
+        document.removeEventListener('visibilitychange', syncToastVisibilityCountdown);
+        toast.remove();
+        siteNotificationToastActive = false;
+        showNextSiteNotificationToast();
+    };
+    toast.addEventListener('animationend', finish, { once: true });
+    document.addEventListener('visibilitychange', syncToastVisibilityCountdown);
+    syncToastVisibilityCountdown();
+}
+
+function notificationKeysForVisitedPage(events, visitedUrl) {
+    let visitedPath = '';
+    try { visitedPath = new URL(visitedUrl || window.location.href, window.location.href).pathname.replace(/\/+$/, ''); } catch (_) { return []; }
+    if (!visitedPath.startsWith('/feed/posts/')) return [];
+    return (Array.isArray(events) ? events : []).filter(event => {
+        if (!event || !event.unread || !event.key || !event.url) return false;
+        try { return new URL(event.url, window.location.href).pathname.replace(/\/+$/, '') === visitedPath; } catch (_) { return false; }
+    }).map(event => String(event.key));
+}
+
+function observeNewInboxNotifications(events) {
+    const currentEvents = Array.isArray(events) ? events : [];
+    const currentKeys = currentEvents.map(event => String(event && event.key || '')).filter(Boolean);
+    if (notificationInboxKnownKeys === null) {
+        notificationInboxKnownKeys = new Set(currentKeys);
+        return false;
+    }
+
+    const newEvents = currentEvents.filter(event => {
+        const key = String(event && event.key || '');
+        return key && event.unread && !notificationInboxKnownKeys.has(key);
+    });
+    currentKeys.forEach(key => notificationInboxKnownKeys.add(key));
+    if (notificationInboxKnownKeys.size > 500) {
+        notificationInboxKnownKeys = new Set(Array.from(notificationInboxKnownKeys).slice(-500));
+    }
+    if (!newEvents.length) return false;
+    newEvents.slice().reverse().forEach(event => siteNotificationToastQueue.push(event));
+    showNextSiteNotificationToast();
+    return true;
+}
+
+function notificationInboxUrl() {
+    const params = new URLSearchParams({ view: 'inbox' });
+    if (!document.getElementById('user-greeting') && typeof getFeedGuestBrowserId === 'function') {
+        const guestBrowserId = getFeedGuestBrowserId();
+        if (guestBrowserId) params.set('guestBrowserId', guestBrowserId);
+    }
+    return `/api/feed-notifications?${params.toString()}`;
+}
+
+function applyNotificationTitleCount(unreadCount) {
+    const cleanTitle = document.title.replace(/^\(\d+\)\s*/, '');
+    document.title = unreadCount > 0 ? `(${unreadCount}) ${cleanTitle}` : cleanTitle;
+}
+
+function updateMobileMenuNotificationBadge(unreadCount) {
+    const menuButton = document.getElementById('show-sidebar');
+    if (!menuButton || !document.body.classList.contains('mobile-template')) return;
+    const count = Math.max(0, Number.parseInt(unreadCount, 10) || 0);
+    let badge = menuButton.querySelector('.mobile-menu-notification-badge');
+    if (count === 0) {
+        badge?.remove();
+        return;
+    }
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'mobile-menu-notification-badge';
+        badge.setAttribute('aria-hidden', 'true');
+        menuButton.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? '99+' : String(count);
+}
+
+function syncNotificationsSidebarButton(options = {}) {
+    try {
+        const sidebarEl = document.getElementById('sidebar');
+        if (!sidebarEl || !window.fetch) return;
+        fetch(notificationInboxUrl(), {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(response => {
+                if (!response.ok) throw new Error('notifications unavailable');
+                return response.json();
+            })
+            .then(data => {
+                let unreadCount = Math.max(0, Number.parseInt(data.unreadCount, 10) || 0);
+                const loggedIn = data.loggedIn === true;
+                const current = document.getElementById('sidebar-notifications');
+                const inboxEvents = Array.isArray(data.events)
+                    ? data.events.map(event => ({ ...event, csrfToken: data.csrfToken || '' }))
+                    : [];
+                const visitedKeys = notificationKeysForVisitedPage(inboxEvents, options.visitedUrl);
+                if (visitedKeys.length) {
+                    const visitedKeySet = new Set(visitedKeys);
+                    inboxEvents.forEach(event => {
+                        if (visitedKeySet.has(String(event.key || ''))) event.unread = false;
+                    });
+                    unreadCount = Math.max(0, unreadCount - visitedKeySet.size);
+                    markSiteNotificationsRead(visitedKeys, data.csrfToken || '').catch(() => {});
+                }
+                const hasNewNotifications = observeNewInboxNotifications(inboxEvents);
+                if (hasNewNotifications) window.dispatchEvent(new CustomEvent('fridg3:new-notifications'));
+                if (options.initialPageLoad === true && !initialUnreadSummaryShown && unreadCount > 0) {
+                    initialUnreadSummaryShown = true;
+                    siteNotificationToastQueue.push({
+                        title: 'you have unread notifications',
+                        body: `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`,
+                        url: '/notifications'
+                    });
+                    showNextSiteNotificationToast();
+                }
+                applyNotificationTitleCount(unreadCount);
+                updateMobileMenuNotificationBadge(unreadCount);
+                if (!loggedIn && unreadCount === 0) {
+                    if (current) current.remove();
+                    return;
+                }
+
+                const link = current || document.createElement('a');
+                link.id = 'sidebar-notifications';
+                link.href = '/notifications';
+                link.setAttribute('data-tooltip', 'open your notifications');
+                link.setAttribute('aria-label', `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`);
+                link.classList.toggle('sidebar-notifications-unread', unreadCount > 0);
+                link.innerHTML = `<i class="fa-solid fa-bell"></i><span class="sidebar-notification-label">notifications</span><strong class="sidebar-notification-count">${unreadCount}</strong>`;
+                const footer = document.getElementById('sidebar-footer');
+                if (footer && (link.parentNode !== sidebarEl || link.nextElementSibling !== footer)) {
+                    sidebarEl.insertBefore(link, footer);
+                } else if (!current && !footer) {
+                    sidebarEl.append(link);
+                }
+                if (hasNewNotifications) {
+                    link.classList.remove('sidebar-notifications-new');
+                    void link.offsetWidth;
+                    link.classList.add('sidebar-notifications-new');
+                    window.setTimeout(() => link.classList.remove('sidebar-notifications-new'), 2200);
+                }
+            })
+            .catch(() => {
+                const current = document.getElementById('sidebar-notifications');
+                if (current && !document.getElementById('user-greeting')) current.remove();
+            });
+    } catch (_) { /* no-op */ }
+}
+
+window.syncNotificationsSidebarButton = syncNotificationsSidebarButton;
+async function checkNotificationRevision() {
+    if (notificationRevisionRequestActive || !window.fetch) return;
+    notificationRevisionRequestActive = true;
+    try {
+        const response = await fetch('/api/notification-revision', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const revision = String(data && data.revision || '0');
+        if (notificationRevisionKnown === null) {
+            notificationRevisionKnown = revision;
+            return;
+        }
+        if (revision === notificationRevisionKnown) return;
+        notificationRevisionKnown = revision;
+        window.clearTimeout(notificationStreamRefreshTimer);
+        notificationStreamRefreshTimer = window.setTimeout(() => syncNotificationsSidebarButton(), 80);
+    } catch (_) { /* retry on the next lightweight check */ }
+    finally { notificationRevisionRequestActive = false; }
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    await checkNotificationRevision();
+    syncNotificationsSidebarButton({ initialPageLoad: true });
+    if (notificationRevisionPollTimer === null) {
+        notificationRevisionPollTimer = window.setInterval(checkNotificationRevision, 10000);
+    }
+});
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        checkNotificationRevision();
+        if (siteNotificationSoundPending) playSiteNotificationSound();
+    }
+});
 
 // Footer active state based on current path
 function initFooterActiveState() {
@@ -1098,6 +1588,11 @@ async function playToastStreamInMiniPlayer() {
         if (titleEl) {
             titleEl.textContent = streamName;
         }
+        const artistEl = document.getElementById('mini-player-artist');
+        if (artistEl) {
+            artistEl.textContent = 'toast radio';
+            artistEl.hidden = false;
+        }
 
         const artEl = document.getElementById('mini-player-art');
         const streamArt = 'https://images-ext-1.discordapp.net/external/S3f2i3R92rowfL9Uq5RmPFJtaqtluL-J7lVley9Ps7I/%3Fsize%3D4096/https/cdn.discordapp.com/avatars/1408177993284587794/2fd48df24ed679f3450b2532fce3f80b.png';
@@ -1139,6 +1634,7 @@ async function playToastStreamInMiniPlayer() {
                 volume: audio.volume,
                 muted: audio.muted,
                 title: titleEl ? titleEl.textContent : '',
+                artist: artistEl ? artistEl.textContent : '',
                 art: streamArt
             };
             window.localStorage.setItem('miniPlayerStateV1', JSON.stringify(state));
@@ -1153,7 +1649,10 @@ function setToastLiveControls(isLive) {
     const miniPlayerEl = document.getElementById('mini-player');
     const seekEl = document.getElementById('mini-player-seek');
     const downloadBtn = document.getElementById('mini-player-download');
-    if (miniPlayerEl) miniPlayerEl.classList.toggle('live-stream', !!isLive);
+    if (miniPlayerEl) {
+        miniPlayerEl.classList.toggle('live-stream', !!isLive);
+        if (isLive) miniPlayerEl.classList.remove('mini-inactive');
+    }
     if (seekEl) seekEl.style.display = isLive ? 'none' : '';
     if (downloadBtn) downloadBtn.style.display = isLive ? 'none' : '';
 }
@@ -1340,8 +1839,24 @@ if (hideSidebarBtn) {
 }
 
 if (showSidebarBtn) {
-    showSidebarBtn.addEventListener('click', function() {
+    const toggleSidebarFromMenuButton = function() {
+        if (isMobileTemplateActive()) {
+            setSidebarVisible(document.body.classList.contains('sidebar-is-hidden'));
+            return;
+        }
         setSidebarVisible(true);
+    };
+    showSidebarBtn.addEventListener('click', toggleSidebarFromMenuButton);
+    showSidebarBtn.addEventListener('keydown', function(event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleSidebarFromMenuButton();
+    });
+}
+
+if (mobileMenuBackdrop) {
+    mobileMenuBackdrop.addEventListener('click', function() {
+        setSidebarVisible(false);
     });
 }
 

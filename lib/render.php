@@ -692,11 +692,11 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/main.js' => '/main.js?v=20260808-markdown-editor-highlighting-1',
-            '/js/settings.js' => '/js/settings.js?v=20260723-debug-logging-1',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260809-preserve-reply-markdown-1',
+            '/main.js' => '/main.js?v=20260810-mobile-ascii-stable-sizing-1',
+            '/js/settings.js' => '/js/settings.js?v=20260810-mobile-routing-hourly-beep-1',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260810-notification-volume-30-1',
             '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
-            '/js/bbcode.js' => '/js/bbcode.js?v=20260808-journal-markdown-6',
+            '/js/bbcode.js' => '/js/bbcode.js?v=20260810-preview-mention-tooltips-1',
         ];
 
         $missing = [];

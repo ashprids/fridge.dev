@@ -18,7 +18,8 @@
 4. If auth/admin behavior changes, enforce it in PHP, not just JS
 5. If the feature adds routes, APIs, uploads, or private `/data` files, check `.nginx/fridge.dev` before assuming PHP can see or protect it
 6. If the feature adds or changes reusable UI, add a representative sample to `/formatting`
-7. Test the target page and at least one unrelated page that shares the shell
+7. If any Markdown formatting changes, update the reference pages at `/formatting/markdown` and `/formatting/markdown/feed` to match
+8. Test the target page and at least one unrelated page that shares the shell
 
 ## Linting
 

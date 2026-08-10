@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preload" href="/resources/IBM_VGA.woff" as="font" type="font/woff" crossorigin>
     <link rel="preload" href="/resources/IosevkaFixedSS03-Regular.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="/style.css?v=markdown-post-spacing-20260809-1">
+    <link rel="stylesheet" href="/style.css?v=mobile-menu-notification-badge-20260810-1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
 
@@ -37,57 +37,71 @@
         }
 
         #show-sidebar {
-            position: static;
-            top: 10px;
-            left: 10px;
-            padding: 7px 9px;
+            position: fixed !important;
+            top: 10px !important;
+            right: 8px !important;
+            left: auto !important;
+            padding: 14px !important;
             font-size: 15px;
             border: 1px solid var(--border);
             border-radius: 0px;
             background: rgba(0, 0, 0, 0.88);
             backdrop-filter: blur(10px);
-            margin: 10px 14px 0 14px;
-            z-index: auto;
+            margin: 0 !important;
+            z-index: 10020 !important;
         }
 
-        .mobile-collapsed-header {
-            display: none;
-            align-items: center;
-            gap: 10px;
-            margin: 10px 14px 0 14px;
+        body.mobile-template #show-sidebar.mobile-menu-toggle {
+            width: auto !important;
+            min-width: 0 !important;
+            height: auto !important;
+            padding: 10px !important;
+            border-width: 1px !important;
+            box-shadow: none !important;
         }
 
-        .mobile-collapsed-header #show-sidebar {
-            margin: 0;
-            flex: 0 0 auto;
+        #mobile-menu-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 10010;
+            background: rgba(0, 0, 0, 0.68);
+            opacity: 1;
+            transition: opacity 0.16s ease;
         }
 
-        .mobile-collapsed-brand {
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-            height: 34px;
+        body.mobile-template.sidebar-is-hidden #mobile-menu-backdrop {
+            opacity: 0;
+            pointer-events: none;
         }
 
-        .mobile-collapsed-brand .mobile-collapsed-subtitle {
-            font-family: "MainItalic", monospace;
-            font-size: 10px;
-            line-height: 1.2;
-            color: var(--subtle);
+        body.mobile-template #sidebar {
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            z-index: 10015 !important;
+            width: calc(100% - 16px) !important;
+            max-width: none !important;
+            max-height: calc(100dvh - 20px) !important;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            transform: translate(-50%, -50%) !important;
+            box-shadow: none !important;
         }
 
-        .mobile-collapsed-brand .mobile-collapsed-title {
-            font-family: "MainBoldItalic", monospace;
-            display: block;
-            height: 34px;
-            font-size: 32px !important;
-            line-height: 34px !important;
-            text-transform: lowercase !important;
-            background-image: linear-gradient(0deg, #977eb6, #86d3cf);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            white-space: nowrap;
+        body.mobile-template:not(.sidebar-is-hidden) {
+            overflow: hidden !important;
+        }
+
+        body.mobile-template.sidebar-is-hidden #sidebar {
+            max-height: calc(100dvh - 20px) !important;
+            transform: translate(-50%, -50%) scale(0.96) !important;
+        }
+
+        body.mobile-template #sidebar a,
+        body.mobile-template #sidebar #tab,
+        body.mobile-template #sidebar #footer-button,
+        body.mobile-template #sidebar button {
+            box-shadow: none !important;
         }
 
         #sidebar {
@@ -206,13 +220,13 @@
         }
 
         #mini-player-controls {
-            min-width: 24px;
-            padding-top: 1px;
+            min-width: 14px;
+            padding: 0;
         }
 
         #mini-player-volume-wrapper:hover #mini-player-volume,
         #mini-player-volume {
-            width: 56px;
+            width: 34px;
             opacity: 1;
         }
 
@@ -325,24 +339,208 @@
                 border-radius: 0px;
             }
         }
+
+        html.mobile-menu-is-open,
+        html.mobile-menu-is-open body.mobile-template {
+            width: 100% !important;
+            height: 100dvh !important;
+            overflow: hidden !important;
+            overscroll-behavior: none;
+        }
+
+        body.mobile-template #sidebar {
+            border: 1px solid var(--border) !important;
+            box-sizing: border-box !important;
+            opacity: 1 !important;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1) !important;
+            transition: opacity 0.18s ease, transform 0.2s ease, visibility 0s linear 0s !important;
+        }
+
+        body.mobile-template.sidebar-is-hidden #sidebar {
+            border: 1px solid var(--border) !important;
+            max-height: calc(100dvh - 20px) !important;
+            opacity: 0 !important;
+            visibility: hidden;
+            transform: translate(-50%, -50%) scale(0.96) !important;
+            pointer-events: none;
+            transition: opacity 0.16s ease, transform 0.18s ease, visibility 0s linear 0.18s !important;
+        }
+
+        html.access-reduced-motion #mobile-menu-backdrop,
+        html.access-reduced-motion body.mobile-template #sidebar {
+            transition: none !important;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #mobile-menu-backdrop,
+            body.mobile-template #sidebar {
+                transition: none !important;
+            }
+        }
+
+        /* Compact mobile player: artwork left, readable metadata and controls right. */
+        body.mobile-template #sidebar #mini-player {
+            margin: 10px 8px 0 !important;
+            padding: 10px !important;
+            width: auto !important;
+            overflow: hidden !important;
+            border: 1px solid var(--border) !important;
+            background: color-mix(in srgb, var(--bg) 92%, var(--links) 8%) !important;
+            box-shadow: none !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-main {
+            position: relative;
+            display: grid !important;
+            grid-template-columns: 64px minmax(0, 1fr) !important;
+            align-items: center !important;
+            gap: 10px !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-art-wrapper {
+            width: 64px !important;
+            height: 64px !important;
+            margin: 0 !important;
+            align-self: center !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-art {
+            border-color: var(--border) !important;
+            box-sizing: border-box;
+        }
+
+        body.mobile-template #sidebar #mini-player-download {
+            inset: auto 2px 2px auto !important;
+            width: 22px;
+            height: 22px;
+            border: 0 !important;
+            box-sizing: border-box;
+            background: transparent !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            font-size: 10px !important;
+            text-shadow: 0 1px 2px var(--bg), 0 0 3px var(--bg);
+        }
+
+        body.mobile-template #sidebar #mini-player-meta {
+            min-width: 0 !important;
+            gap: 3px !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-title {
+            padding-right: 24px !important;
+            line-height: 1.2;
+        }
+
+        body.mobile-template #sidebar #mini-player-title-inner {
+            max-width: 100%;
+            color: var(--fg) !important;
+            font-family: "MainBold", var(--emoji-font), monospace !important;
+            font-size: 12px !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-artist {
+            color: var(--subtle) !important;
+            font-size: 10px !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-row {
+            display: grid !important;
+            grid-template-columns: 24px minmax(0, 1fr) !important;
+            align-items: center !important;
+            gap: 8px !important;
+            margin-top: 5px;
+        }
+
+        body.mobile-template #sidebar #mini-player-play,
+        body.mobile-template #sidebar #mini-player-mute {
+            width: 24px !important;
+            min-width: 24px !important;
+            height: 24px !important;
+            border: 0 !important;
+            box-sizing: border-box;
+            background: transparent !important;
+            color: var(--fg) !important;
+            font-size: 15px !important;
+            line-height: 1 !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-seek,
+        body.mobile-template #sidebar #mini-player-volume {
+            position: static !important;
+            display: block !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            height: 4px !important;
+            margin: 0 !important;
+            opacity: 1 !important;
+            align-self: center !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-volume-wrapper {
+            display: none !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-row.mini-player-volume-expanded #mini-player-volume-wrapper {
+            display: none !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-row.mini-player-volume-expanded #mini-player-seek {
+            display: block !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-volume {
+            grid-column: 3;
+            order: initial !important;
+            animation: none !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-mute {
+            grid-column: 4;
+            animation: none !important;
+            font-size: 14px !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-controls {
+            position: absolute !important;
+            top: -2px !important;
+            right: -2px !important;
+            min-width: 0 !important;
+            padding: 0 !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-close {
+            width: 20px !important;
+            min-width: 20px !important;
+            height: 20px !important;
+            min-height: 20px !important;
+            border: 1px solid var(--border) !important;
+            background: var(--bg) !important;
+            color: var(--subtle) !important;
+        }
+
+        body.mobile-template #sidebar #mini-player-tracks {
+            margin: 10px 8px 0 !important;
+            padding: 8px !important;
+            width: auto !important;
+            max-height: 112px !important;
+            border: 1px solid var(--border) !important;
+            box-shadow: none !important;
+        }
     </style>
 </head>
-<body class="mobile-template">
+<body class="mobile-template sidebar-is-hidden">
 
-<div class="mobile-collapsed-header" id="mobile-collapsed-header" style="display:none">
-    <span id="show-sidebar" data-tooltip="show menu" style="display:none"><i class="fa-solid fa-bars"></i></span>
-    <span class="mobile-collapsed-brand">
-        <span class="mobile-collapsed-title">fridge<span style="font-family: 'IBM_VGA'; font-size: 14px">.dev</span></span>
-    </span>
-</div>
+<div id="mobile-menu-backdrop" aria-hidden="true"></div>
+<span id="show-sidebar" class="mobile-menu-toggle" data-tooltip="toggle menu" role="button" tabindex="0" aria-controls="sidebar" aria-expanded="false" aria-label="show menu" style="display:none"><i class="fa-solid fa-bars"></i></span>
 
 <div id="page-wrapper">
 
 <div id="sidebar">
 
     <div id="header">
-        <span id="title">fridge</span>
-        <span id="hide-sidebar" data-tooltip="hide menu"><i class="fa-solid fa-xmark"></i></span>
+        <span id="title" aria-label="fridge"><span class="title-letter" aria-hidden="true">f</span><span class="title-letter" aria-hidden="true">r</span><span class="title-letter" aria-hidden="true">i</span><span class="title-letter" aria-hidden="true">d</span><span class="title-letter" aria-hidden="true">g</span><span class="title-letter" aria-hidden="true">e</span></span>
         <br><span id="maintenance-banner" style="color: #c88420; display: none;"><i class="fa-solid fa-hand"></i> <b>maintenance mode</b></span>
     </div>
 
@@ -355,17 +553,19 @@
                 <span id="mini-player-download" data-tooltip="download track"><i class="fa-solid fa-download"></i></span>
             </div>
             <div id="mini-player-meta">
-                <div id="mini-player-title"><span id="mini-player-title-inner">now playing: nothing</span></div>
+                <div id="mini-player-title"><span id="mini-player-title-inner">nothing selected</span></div>
+                <div id="mini-player-artist">&nbsp;</div>
                 <div id="mini-player-row">
                     <span id="mini-player-play" data-tooltip="play / pause"><i class="fa-solid fa-play"></i></span>
                     <input id="mini-player-seek" type="range" min="0" max="0" value="0" step="0.1">
+                    <span id="mini-player-volume-wrapper">
+                        <span id="mini-player-mute" data-tooltip="mute / unmute"><i class="fa-solid fa-volume-high"></i></span>
+                        <input id="mini-player-volume" type="range" min="0" max="1" step="0.01" value="1">
+                    </span>
                 </div>
             </div>
             <div id="mini-player-controls">
-                <span id="mini-player-volume-wrapper">
-                    <span id="mini-player-mute" data-tooltip="mute / unmute"><i class="fa-solid fa-volume-high"></i></span>
-                    <input id="mini-player-volume" type="range" min="0" max="1" step="0.01" value="1">
-                </span>
+                <button id="mini-player-close" type="button" data-tooltip="close player" aria-label="close music player"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
         <audio id="mini-player-audio" preload="none"></audio>
@@ -424,11 +624,11 @@
 </div>
 </div>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script defer src="/main.js?v=20260808-markdown-editor-highlighting-1"></script>
-<script defer src="/js/settings.js?v=mobile-20260723-bootstrap-debug-1"></script>
-<script defer src="/js/sidebar-player.js?v=20260809-preserve-reply-markdown-1"></script>
+<script defer src="/main.js?v=20260810-mobile-ascii-stable-sizing-1"></script>
+<script defer src="/js/settings.js?v=20260810-mobile-routing-hourly-beep-1"></script>
+<script defer src="/js/sidebar-player.js?v=20260810-notification-volume-30-1"></script>
 <script defer src="/js/bookmarks.js?v=mobile-20260723-debug-logging-1"></script>
-<script defer src="/js/bbcode.js?v=mobile-20260808-feed-markdown-2"></script>
+<script defer src="/js/bbcode.js?v=20260810-preview-mention-tooltips-1"></script>
 </div>
 </div>
 </body>

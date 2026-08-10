@@ -342,7 +342,7 @@ body:not(.mobile-template) #user-greeting {
     box-shadow: none;
 }
 
-body:not(.mobile-template) #sidebar > a:not(#sidebar-active-chat) {
+body:not(.mobile-template) #sidebar > a:not(#sidebar-active-chat):not(#sidebar-notifications) {
     align-self: stretch;
 }
 

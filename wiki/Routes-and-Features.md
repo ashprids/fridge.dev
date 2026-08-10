@@ -13,7 +13,6 @@ Homepage with dynamic latest feed, latest journal, and music cards.
 - Create visibility depends on admin or `allowedPages` containing `feed`
 - Create composer supports recorded voice notes; accepted recordings request browser noise suppression, echo cancellation, and auto gain when available, are previewed before posting, capped at 2 minutes, transcoded to compressed `.m4a`, stored under `data/audio/voice/`, and played with inline controls that include a `1x`/`1.5x`/`2x` speed toggle
 - The attach-media control keeps the existing URL-or-upload flow and accepts images, audio, and video; uploaded audio uses the voice-note player, while uploaded video uses a compact native player; file-extension detection covers mobile file providers that omit the browser MIME type, while the server still verifies the media container before saving it
-- The first time a browser submits a new feed post, an in-site popup asks whether to enable browser notifications for replies
 - Deleting a feed post removes voice note files referenced by the post body and its replies
 - Writes derived `index.toml`
 - `@mentions` in BBCode are highlighted client-side for notification-aware feed posts
@@ -35,13 +34,12 @@ Related:
 - Single-post thread view for a feed item
 - New replies use the same restricted Markdown editor, toolbar, syntax highlighting, preview renderer, media uploads, and recorded voice notes as new feed posts; `format: "v2"` distinguishes them from existing legacy BBCode replies, whose rendering and edit controls remain unchanged
 - Guests can reply to the post or to an individual comment without creating feed posts; they receive the same Markdown editor shell and guide but no upload or voice controls, are identified by plaintext IP, may enter an optional display name that falls back to italic `Anonymous`, cannot use a registered account username as that display name, and can still link media manually; guest display names and reply bodies are filtered through `/feed/filters/*.txt`, matching body text is replaced with `★` plus the tooltip `this phrase was automatically filtered.`, and Markdown previews apply the same filtering
-- The first time a browser submits a comment, an in-site popup asks whether to enable browser notifications for replies to comments
 - Guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text cannot be edited by guests after posting
 - Reply edit/delete is allowed for the reply author, same-IP guest replies, admins, the original post owner, or accounts with `allowedPages` containing `comments`
 - Replies persist under `data/feed/replies/{postId}.json`; comment replies stay in the same flat list with optional `parentId` metadata and render directly beneath their parent comment
-- Guest replies can store a same-browser notification token so logged-out visitors can receive browser notifications when someone replies to their comments
+- Guest replies store a browser-local inbox identity so logged-out visitors can receive in-site notifications when someone replies to their comments
 - Deleting a reply removes voice note files referenced by that reply
-- Admin IP moderation actions appear beside guest reply edit/delete icons; admins can ban an IP or purge guest replies by exact plaintext IP without deleting the feed post or changing the IP ban list
+- Admin IP moderation actions appear beside guest reply edit/delete icons; admins can ban an IP or purge guest replies by exact plaintext IP without deleting the feed post or changing the IP ban list. IPs are not printed beside names; admins can right-click every relevant guest or registered feed author name to reveal the exact IP recorded for that submission. Content without historical IP metadata shows `No IP associated` instead of omitting the context tooltip or substituting another address
 - Toast's automatic thread replies are documented on [Toast](Toast#automatic-feed-replies)
 
 ### `/journal`
@@ -68,8 +66,9 @@ Related:
 - List entries from `data/guestbook/*.txt`
 - One-post-per-IP gate via `data/guestbook/ip_index.json`
 - New entries store an `IP:` metadata line; IPs in the shared feed ban list cannot submit guestbook posts
+- Every successfully stored entry creates an unread in-site notification for each admin account, linking to `/guestbook`
 - Owner/admin edit and delete flow
-- Admins can ban an entry IP or password-confirm a purge of both feed replies and guestbook posts associated with that IP
+- Admins can ban an entry IP or password-confirm a purge of both feed replies and guestbook posts associated with that IP. Entry IPs are attached only for admins and appear in an in-site tooltip when the guest name is right-clicked
 
 Related:
 
@@ -101,6 +100,26 @@ Related:
 - Client-side localStorage enhancement for anonymous users
 - Supports feed and journal bookmark ids; legacy `newsletter:*` ids are ignored
 
+### `/notifications`
+
+- Lists notifications for the current account or guest browser newest first, with at most 10 items per page; the first inbox check establishes existing events as a read baseline so deployment does not surface historical events as new
+- Logged-in users receive feed mentions and replies to their feed posts or comments; logged-out visitors receive only replies to feed comments created with the same browser-local inbox identity. Journal posts do not create notifications
+- Valid registered `@username` mentions in feed Markdown render automatically as inline code, show a `registered fridge.dev account` in-site tooltip on hover in both published content and the asynchronous editor preview, and use the site purple in the live syntax-highlight layer once complete. Feed post and reply Markdown editors refresh the public username list on focus, query it while typing a mention, and show up to six compact prefix matches at the caret—below the typed text when space permits or above it otherwise—with mouse, arrow-key, Enter, and Tab selection; the suggestion box is fully removed when no prefix remains
+- Opening the page does not mark notifications read. Clicking one records it as read, then performs a full navigation to its feed post or anchored reply; unread cards remain prominent while old cards are greyed out but clickable
+- A full-width `mark all read` action clears every relevant unread event across all pages in one request; it remains visible but greyed out and disabled when the inbox has no unread notifications
+- Each notification card has an X that persistently removes that event from the inbox without reloading the list. Cards can also be swiped or pointer-dragged horizontally in either direction to remove them, while vertical touch movement remains available for page scrolling. Card text is non-selectable and the list clips horizontal drag overflow so gestures neither select content nor widen the page. A matching `clear all` bulk action sits beside `mark all read`, asks for confirmation in an in-site popup, and dismisses every notification for the current account or guest browser. Both bulk controls remain visible and grey out when they have nothing to do
+- Notification cards prefix registered usernames with `@` and render guest display names in italics; pages with notifications omit a redundant total-count sentence above the cards
+- Notification timestamps read `just now`, then use whole minutes, hours, or days through seven days old; older items show their calendar date. The API emits ISO 8601 timestamps with the server timezone offset so relative ages remain correct in other timezones. Hovering or focusing the time uses the shared in-site tooltip to reveal the exact local date and time
+- Notification-card bodies use the matching restricted feed Markdown or legacy BBCode renderer, but cap very long previews at 8.5rem with a bottom fade; the complete notification card remains clickable. Temporary top-of-screen notifications strip all formatting syntax into plain text, hard-limit their title and body preview lengths, and show at most two body lines
+- The shared sidebar checks one tiny notification revision value every 10 seconds while the tab is visible and fetches the inbox only after that value changes; returning to a hidden tab triggers an immediate check. This avoids holding PHP-FPM workers open and keeps full inbox generation out of the steady-state path. It always shows the notification-count shortcut for logged-in users and shows it to guests only while they have unread notifications. It is always moved immediately above the sidebar footer, uses the compact bell/label/count layout, inherits the normal theme link margins for button-width alignment, and uses the standard sidebar border colour without a glow. A new event briefly animates its background colour
+- The redesigned sidebar music player and its track panel suppress theme box shadows, show song and artist on separate lines, keep volume controls compact, expose paused-track downloads, and provide a small close button that stops/unloads playback and hides the player until another selection; the footer is also shadow-free. Mobile uses a large 64px artwork-and-metadata grid with an unboxed play control, full-width seek bar, accessible download, and boxed close control; volume controls are intentionally omitted from the mobile layout. Explicit 8px margins keep the player-to-notification and notification-to-footer gaps equal, and the notification count uses a compact 16px single-digit circle that expands only for wider counts
+- Newly observed events drop down from the top centre as a phone-style in-site notification, remain visible for five seconds, and slide back up. Every dropdown SPA-navigates to `/notifications` when clicked; on touch devices, the dropdown captures the gesture so the page does not scroll, and dragging it upward by at least 32 pixels or horizontally by at least 55 pixels dismisses it immediately without triggering navigation
+- Direct page loads and browser refreshes show one square-cornered top-centre summary when unread notifications already exist; SPA navigation never produces this summary. The sidebar notification row is also square-cornered, keeps an extra 8px gap above it after the greeting/player area, uses an accented background while unread items exist, capitalizes its label in both layouts, and is slightly taller than the standard desktop navigation rows without changing its horizontal width
+- Visiting a feed-post page marks all notifications targeting that post as read, both on a direct request and after SPA navigation
+- Unread counts prefix the browser tab title and remain synchronized across direct loads and SPA navigation
+- Inbox read and dismissal state is stored in `data/etc/notification-inbox-state.json`; the site does not use the browser Notification API
+- The normal page-view counter footer is omitted from `/notifications`
+
 ### `/tools/upload`
 
 - Displayed as `serverless upload`; the route remains stable for existing transfer links
@@ -122,16 +141,16 @@ Related:
 - Persistence handled by `/api/settings`
 - Changing a settings control marks the page dirty; link navigation to another page uses an in-site confirmation popup whose primary action saves before continuing, while saving and refreshing the current page never prompt
 - Successful saves briefly change the main button label to `saved!`; theme or mobile-view changes then reload automatically using the newly persisted preference
-- Includes accessibility toggles for mobile view and reduced motion, notification toggles for feed events and new journal posts, plus theme selection, a text glow toggle, optional cursor cat, and an in-site title-animation picker with live previews, always-playing mode, and default-on character desync
-- Title animation controls and previews are disabled with an explanatory message whenever reduced motion or mobile view is active; mobile view also disables the title gradient
-- Browser notifications use the Notification API while the site is open; logged-in users can receive feed mention/reply events, guests can receive replies to comments made from the same browser, and both can receive new journal post alerts; Discord parity is documented on [Toast](Toast#notifications-and-website-integration)
+- Includes accessibility toggles for mobile view and reduced motion, plus theme selection, a text glow toggle, optional cursor cat, and an in-site title-animation picker with live previews, always-playing mode, and default-on character desync. The debug-mode checkbox is omitted on mobile layouts
+- Title animation controls, previews, and sidebar-title motion work on desktop and mobile; Reduce Motion remains the only setting that disables them
+- Feed mention and reply alerts are delivered through the in-site inbox only; Discord notification parity is documented on [Toast](Toast#notifications-and-website-integration)
 - Developer mode can bootstrap a blank-password `admin` / `Administrator` account when no admin accounts exist, and can download the latest sanitized developer data zip, delete local `data/`, and install the new copy
 - Shows a Discord linking action for logged-in users and disables it once `discordUserId` is already linked
 - Toast-only settings behavior is documented on [Toast](Toast#personality-sources)
-- Admins can open a dedicated system diagnostics subsection in `/settings` to jump into `/settings/sysinfo`
+- The complete admin-settings area is a collapsed-by-default disclosure. Its `site management` group contains sitemap regeneration, system information, and notice management
 - Admins can open `/settings/guests`, labeled as manage guests, to review guest feed replies and IP-backed guestbook posts grouped by IP, search by IP or username, individually delete either content type, ban or unban IPs across both posting surfaces, or purge all guest content from an IP after password confirmation
 - Admins can open `/settings/banned-ips` to edit the separate hard-ban IP list; valid IPv4 and IPv6 addresses may be separated by spaces or newlines, and Nginx redirects matching clients away from all pages and static files to `/error/blacklisted`; access-log moderation controls are documented on [Debug Mode](Debug-Mode#access-tab), while the enforcement model is documented on [Restrictions and Moderation](Restrictions-and-Moderation)
-- Admins can open `/settings/notices` to independently create or clear banner and one-time popup notices for logged-in users and guests, globally or for one exact page path; page-notice audience checkboxes allow logged-in users, guests, or both, page notices override the matching global notice type on that page, banners may be dismissible, popups can include a site-relative custom-link button, and every editor section is collapsible and closed by default
+- Admins can open `/settings/notices` to independently create or clear banner and one-time popup notices for logged-in users and guests, globally or for one exact page path; page-notice audience checkboxes allow logged-in users, guests, or both, page notices override the matching global notice type on that page, banners may be dismissible, popups can include a site-relative custom-link button, and every editor section is collapsible and closed by default. The same page has a send-only notification form for comma-separated registered users, comma-separated exact IPs, all logged-in users, or all guests, with a title, message, and optional site-relative destination; it submits asynchronously, preserves the completed form fields, and confirms success or failure through an in-site popup. Previously issued notifications are not listed there
 - `/error/blacklisted` returns the stripped Blackprint denial page only to an actively hard-banned IP or associated browser identity; other direct visitors receive a server-side redirect to `/`
 - Admins can open `/settings/sysinfo` to see live system diagnostics, PHP/runtime details, storage usage, website state, and key content counts in a dashboard-style view
 
@@ -204,6 +223,7 @@ Not covered in the older references, but very real.
 - Includes `comments` and `chat` as grantable `allowedPages` permissions
 - Includes a `restricted from posting` checkbox backed by `postingRestricted`; restricted accounts retain their page permissions and deletion/moderation access, but cannot create or edit posts, replies, chat messages, or guestbook entries
 - Password resets now preserve the account and flip `mustResetPassword` back on
+- Lists the account's deduplicated, read-only IP history recorded from successful logins and new registered feed posts/replies; saving other account fields preserves this history
 
 Helpers live in `account/admin/helpers.php`.
 
@@ -255,6 +275,7 @@ One-to-one conversation view.
 - Public contact form with name, email, message, and server-side anti-spam checks
 - Replies are sent manually from `me@fridge.dev`
 - Accepted submissions are stored under `data/contact/*.json`
+- Every accepted submission adds an unread in-site notification for each admin account, linking directly to `/contact?dashboard=1`
 - The contact notification integration is documented on [Toast](Toast#notifications-and-website-integration)
 
 ### `/contact?dashboard=1`

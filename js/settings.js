@@ -29,12 +29,8 @@ const THEME_COLOR_DEFAULTS = {
 const MOBILE_VIEW_COOKIE = 'mobile_friendly_view';
 const MOBILE_VIEW_DOMAIN = '.fridge.dev';
 const ONEKO_ENABLED_KEY = 'onekoEnabled';
-const BROWSER_NOTIFICATIONS_ENABLED_KEY = 'browserNotificationsEnabled';
-const JOURNAL_BROWSER_NOTIFICATIONS_ENABLED_KEY = 'journalBrowserNotificationsEnabled';
-const FEED_NOTIFICATION_SEEN_KEY = 'feedNotificationSeenKeys';
+const HOURLY_BEEP_ENABLED_KEY = 'hourlyBeepEnabled';
 const FEED_GUEST_BROWSER_ID_KEY = 'feedGuestBrowserId';
-const FEED_NOTIFICATION_PROMPT_SEEN_KEY = 'feedNotificationPromptSeen';
-const FEED_NOTIFICATION_POLL_MS = 30000;
 const ACCESSIBILITY_PREFS_KEY = 'accessibilityPrefs';
 const ACCESSIBILITY_DEFAULTS = {
     reduceMotion: false,
@@ -52,7 +48,6 @@ const ONEKO_FRAME_MS = 100;
 const ONEKO_SLEEP_AFTER_MS = 15000;
 const ONEKO_SLEEP_FRAME_TICKS = 4;
 let onekoController = null;
-let feedNotificationPollTimer = null;
 
 function normalizeTitleAnimation(value) {
     if (value === 'pinball') return TITLE_ANIMATION_DEFAULT;
@@ -105,7 +100,9 @@ function clearTitleLetterSettling(title) {
 function trackTitleLetterFrames(title) {
     if (!title || title._titleTrackingTimer) return;
     const tick = () => {
-        const active = title.matches(':hover') || title.classList.contains('title-animation-always');
+        const active = title.matches(':hover')
+            || title.classList.contains('title-animation-always')
+            || title.classList.contains('title-animation-touch-active');
         if (!active) {
             title._titleTrackingTimer = null;
             return;
@@ -147,7 +144,6 @@ function stopSlotMachineRoll(container, restore = true) {
 function runSlotMachineRoll(container) {
     if (
         !container
-        || document.body.classList.contains('mobile-template')
         || container.dataset.titleAnimation !== 'slot-machine'
         || container._slotMachineRunning
     ) return;
@@ -334,17 +330,9 @@ function settleTitleLetters(title, releaseAnimationState) {
 
 function applyTitleAnimationPrefs(prefs) {
     const normalized = saveLocalTitleAnimationPrefs(prefs || readLocalTitleAnimationPrefs());
+    const alwaysPlaying = normalized.always || document.body.classList.contains('mobile-template');
     const title = document.getElementById('title');
     if (title) {
-        const mobileView = document.body.classList.contains('mobile-template');
-        if (mobileView) {
-            stopSlotMachineRoll(title);
-            clearTitleLetterSettling(title);
-            title.dataset.titleAnimation = normalized.animation;
-            title.classList.remove('title-animation-always');
-            title.classList.toggle('title-animation-desync', normalized.desync);
-            return normalized;
-        }
         const wasAlwaysPlaying = title.classList.contains('title-animation-always');
         const previousAnimation = title.dataset.titleAnimation;
         const switchingWhileActive = !!previousAnimation
@@ -364,22 +352,22 @@ function applyTitleAnimationPrefs(prefs) {
             title._titleAnimationSwitchTimeout = window.setTimeout(() => {
                 title.dataset.titleAnimation = normalized.animation;
                 title._titleAnimationSwitchTimeout = null;
-                if (normalized.animation === 'slot-machine' && (normalized.always || title.matches(':hover'))) {
+                if (normalized.animation === 'slot-machine' && (alwaysPlaying || title.matches(':hover'))) {
                     runSlotMachineRoll(title);
                 }
-                if (normalized.always || title.matches(':hover')) trackTitleLetterFrames(title);
+                if (alwaysPlaying || title.matches(':hover')) trackTitleLetterFrames(title);
             }, 440);
         } else {
             title.dataset.titleAnimation = normalized.animation;
         }
-        if (wasAlwaysPlaying && !normalized.always && !title.matches(':hover')) {
+        if (wasAlwaysPlaying && !alwaysPlaying && !title.matches(':hover')) {
             settleTitleLetters(title, () => title.classList.remove('title-animation-always'));
         } else {
-            title.classList.toggle('title-animation-always', normalized.always);
+            title.classList.toggle('title-animation-always', alwaysPlaying);
         }
         title.classList.toggle('title-animation-desync', normalized.desync);
-        if (normalized.always) trackTitleLetterFrames(title);
-        if (!switchingWhileActive && normalized.animation === 'slot-machine' && (normalized.always || title.matches(':hover'))) {
+        if (alwaysPlaying) trackTitleLetterFrames(title);
+        if (!switchingWhileActive && normalized.animation === 'slot-machine' && (alwaysPlaying || title.matches(':hover'))) {
             runSlotMachineRoll(title);
         }
         if (title.dataset.titleSettleBound !== '1') {
@@ -394,6 +382,24 @@ function applyTitleAnimationPrefs(prefs) {
                     stopSlotMachineRoll(title);
                     settleTitleLetters(title);
                 }
+            });
+            title.addEventListener('pointerdown', event => {
+                if (event.pointerType !== 'touch') return;
+                const reduceMotion = document.documentElement.classList.contains('access-reduced-motion')
+                    || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+                if (reduceMotion) return;
+                window.clearTimeout(title._titleTouchAnimationTimeout);
+                clearTitleLetterSettling(title);
+                title.classList.add('title-animation-touch-active');
+                trackTitleLetterFrames(title);
+                runSlotMachineRoll(title);
+                title._titleTouchAnimationTimeout = window.setTimeout(() => {
+                    title.classList.remove('title-animation-touch-active');
+                    if (!title.classList.contains('title-animation-always')) {
+                        stopSlotMachineRoll(title);
+                        settleTitleLetters(title);
+                    }
+                }, 2400);
             });
         }
     }
@@ -541,63 +547,23 @@ function readLocalOnekoEnabled() {
     }
 }
 
+function readLocalHourlyBeepEnabled() {
+    try {
+        return localStorage.getItem(HOURLY_BEEP_ENABLED_KEY) !== 'false';
+    } catch (_) {
+        return true;
+    }
+}
+
+function setLocalHourlyBeepEnabled(enabled) {
+    try {
+        localStorage.setItem(HOURLY_BEEP_ENABLED_KEY, enabled ? 'true' : 'false');
+    } catch (_) { /* ignore */ }
+}
+
 function saveLocalOnekoEnabled(enabled) {
     try {
         localStorage.setItem(ONEKO_ENABLED_KEY, enabled ? '1' : '0');
-    } catch (_) { /* ignore */ }
-}
-
-function readLocalBrowserNotificationsEnabled() {
-    try {
-        const value = localStorage.getItem(BROWSER_NOTIFICATIONS_ENABLED_KEY);
-        if (value === null) return false;
-        return ['1', 'true', 'yes', 'y', 'on', 'enabled'].includes(String(value).trim().toLowerCase());
-    } catch (_) {
-        return false;
-    }
-}
-
-function saveLocalBrowserNotificationsEnabled(enabled) {
-    try {
-        localStorage.setItem(BROWSER_NOTIFICATIONS_ENABLED_KEY, enabled ? '1' : '0');
-    } catch (_) { /* ignore */ }
-}
-
-function readLocalJournalBrowserNotificationsEnabled() {
-    try {
-        const value = localStorage.getItem(JOURNAL_BROWSER_NOTIFICATIONS_ENABLED_KEY);
-        if (value === null) return false;
-        return ['1', 'true', 'yes', 'y', 'on', 'enabled'].includes(String(value).trim().toLowerCase());
-    } catch (_) {
-        return false;
-    }
-}
-
-function saveLocalJournalBrowserNotificationsEnabled(enabled) {
-    try {
-        localStorage.setItem(JOURNAL_BROWSER_NOTIFICATIONS_ENABLED_KEY, enabled ? '1' : '0');
-    } catch (_) { /* ignore */ }
-}
-
-function hasAnyBrowserNotificationChannelEnabled() {
-    return readLocalBrowserNotificationsEnabled() || readLocalJournalBrowserNotificationsEnabled();
-}
-
-function readFeedNotificationPromptSeen(kind) {
-    try {
-        const parsed = JSON.parse(localStorage.getItem(FEED_NOTIFICATION_PROMPT_SEEN_KEY) || '{}');
-        return !!(parsed && parsed[kind]);
-    } catch (_) {
-        return false;
-    }
-}
-
-function saveFeedNotificationPromptSeen(kind) {
-    try {
-        const parsed = JSON.parse(localStorage.getItem(FEED_NOTIFICATION_PROMPT_SEEN_KEY) || '{}');
-        const next = parsed && typeof parsed === 'object' ? parsed : {};
-        next[kind] = true;
-        localStorage.setItem(FEED_NOTIFICATION_PROMPT_SEEN_KEY, JSON.stringify(next));
     } catch (_) { /* ignore */ }
 }
 
@@ -621,130 +587,6 @@ function getFeedGuestBrowserId() {
     }
 }
 
-function readFeedNotificationSeenKeys() {
-    try {
-        const parsed = JSON.parse(localStorage.getItem(FEED_NOTIFICATION_SEEN_KEY) || '[]');
-        return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
-    } catch (_) {
-        return new Set();
-    }
-}
-
-function saveFeedNotificationSeenKeys(keys) {
-    try {
-        localStorage.setItem(FEED_NOTIFICATION_SEEN_KEY, JSON.stringify(Array.from(keys).slice(-1000)));
-    } catch (_) { /* ignore */ }
-}
-
-async function fetchFeedNotificationEvents(options = {}) {
-    if (!window.fetch) return [];
-    const params = new URLSearchParams();
-    if (options.baseline === true) {
-        params.append('baseline', '1');
-    }
-    if (!document.getElementById('user-greeting')) {
-        const guestBrowserId = getFeedGuestBrowserId();
-        if (guestBrowserId) params.append('guestBrowserId', guestBrowserId);
-    }
-    const url = params.toString() ? `/api/feed-notifications?${params.toString()}` : '/api/feed-notifications';
-    const res = await fetch(url, {
-        method: 'GET',
-        cache: 'no-store',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    });
-    if (!res.ok) {
-        settingsDebugLog(`notification poll failed with HTTP ${res.status}`);
-        return [];
-    }
-    const data = await res.json().catch(() => null);
-    return data && data.ok && Array.isArray(data.events) ? data.events : [];
-}
-
-async function baselineFeedNotifications() {
-    const events = await fetchFeedNotificationEvents({ baseline: true });
-    const seen = readFeedNotificationSeenKeys();
-    events.forEach(event => {
-        if (event && event.key) seen.add(String(event.key));
-    });
-    saveFeedNotificationSeenKeys(seen);
-}
-
-function showFeedBrowserNotification(event) {
-    if (!event || !event.key || !('Notification' in window) || Notification.permission !== 'granted') return;
-    try {
-        const notification = new Notification(event.title || 'fridge.dev', {
-            body: event.body || '',
-            tag: event.key,
-        });
-        notification.onclick = () => {
-            window.focus();
-            if (event.url) window.location.href = event.url;
-            notification.close();
-        };
-    } catch (_) { /* ignore */ }
-}
-
-async function pollFeedNotifications() {
-    if (!hasAnyBrowserNotificationChannelEnabled()) return;
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const events = await fetchFeedNotificationEvents();
-    const seen = readFeedNotificationSeenKeys();
-    let changed = false;
-    events.forEach(event => {
-        const key = event && event.key ? String(event.key) : '';
-        const type = event && event.type ? String(event.type) : 'feed';
-        if (type === 'journal' && !readLocalJournalBrowserNotificationsEnabled()) return;
-        if (type !== 'journal' && !readLocalBrowserNotificationsEnabled()) return;
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        changed = true;
-        showFeedBrowserNotification(event);
-    });
-    if (changed) {
-        saveFeedNotificationSeenKeys(seen);
-        settingsDebugLog('new browser notification events delivered');
-    }
-}
-
-function startFeedNotificationPolling() {
-    if (feedNotificationPollTimer !== null) {
-        window.clearInterval(feedNotificationPollTimer);
-        feedNotificationPollTimer = null;
-    }
-    if (!hasAnyBrowserNotificationChannelEnabled()) return;
-    pollFeedNotifications();
-    feedNotificationPollTimer = window.setInterval(pollFeedNotifications, FEED_NOTIFICATION_POLL_MS);
-    settingsDebugLog('browser notification polling started');
-}
-
-async function setBrowserNotificationsEnabled(enabled, opts = {}) {
-    if (!enabled) {
-        if (feedNotificationPollTimer !== null) {
-            window.clearInterval(feedNotificationPollTimer);
-            feedNotificationPollTimer = null;
-        }
-        return false;
-    }
-    if (!('Notification' in window)) {
-        if (opts.report !== false) await showSiteNotice('browser notifications unavailable', 'this browser does not support notifications.');
-        return false;
-    }
-    let permission = Notification.permission;
-    if (permission === 'default') {
-        permission = await Notification.requestPermission();
-    }
-    if (permission !== 'granted') {
-        settingsDebugLog(`browser notification permission ${permission}`);
-        if (opts.report !== false) await showSiteNotice('browser notifications blocked', 'enable notifications in your browser to use this.');
-        return false;
-    }
-    if (opts.baseline !== false) {
-        await baselineFeedNotifications();
-    }
-    startFeedNotificationPolling();
-    return true;
-}
-
 function fillGuestBrowserIdInputs() {
     if (document.getElementById('user-greeting')) return;
     const inputs = document.querySelectorAll('[data-feed-guest-browser-id]');
@@ -752,75 +594,6 @@ function fillGuestBrowserIdInputs() {
     const guestBrowserId = getFeedGuestBrowserId();
     inputs.forEach(input => {
         input.value = guestBrowserId;
-    });
-}
-
-function shouldPromptForFeedNotifications(kind) {
-    if (readLocalBrowserNotificationsEnabled()) return false;
-    return !readFeedNotificationPromptSeen(kind);
-
-}
-
-function saveBrowserNotificationsAccountPreference(feedEnabled, journalEnabled = null) {
-    if (!document.getElementById('user-greeting') || !window.fetch) {
-        return Promise.resolve(false);
-    }
-    const params = new URLSearchParams();
-    params.append('browserNotificationsEnabled', feedEnabled ? 'on' : 'off');
-    if (journalEnabled !== null) {
-        params.append('journalBrowserNotificationsEnabled', journalEnabled ? 'on' : 'off');
-    }
-    return fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: params.toString(),
-    }).then(response => response.ok).catch(() => false);
-}
-
-function bindFeedNotificationSubmitPrompt(form, kind) {
-    if (!form || form.dataset.notificationPromptBound === '1') return;
-    form.dataset.notificationPromptBound = '1';
-
-    form.addEventListener('submit', function(event) {
-        if (event.defaultPrevented || form.dataset.notificationPromptReady === '1') return;
-        if (!shouldPromptForFeedNotifications(kind)) return;
-        const textBox = form.querySelector('textarea[name="content"], textarea[name="reply_content"]');
-        if (textBox && !String(textBox.value || '').trim()) return;
-
-        event.preventDefault();
-        event.stopImmediatePropagation();
-
-        const submitter = event.submitter || null;
-        const isPost = kind === 'post';
-        showSitePopup({
-            title: 'notify you of replies?',
-            detail: isPost
-                ? 'fridge.dev can send browser notifications when people reply to your feed post.'
-                : 'fridge.dev can send browser notifications when people reply to your comment.',
-            okText: 'notify me',
-            cancelText: 'not now',
-        }).then(async (accepted) => {
-            saveFeedNotificationPromptSeen(kind);
-            if (accepted) {
-                const enabled = await setBrowserNotificationsEnabled(true, { baseline: true });
-                if (enabled) {
-                    saveLocalBrowserNotificationsEnabled(true);
-                    await saveBrowserNotificationsAccountPreference(true);
-                }
-            }
-            form.dataset.notificationPromptReady = '1';
-            if (form.requestSubmit) {
-                form.requestSubmit(submitter);
-            } else {
-                form.submit();
-            }
-            window.setTimeout(() => {
-                delete form.dataset.notificationPromptReady;
-            }, 0);
-        });
     });
 }
 
@@ -1021,21 +794,12 @@ function syncOnekoPreference() {
         if (typeof data.settings.onekoEnabled === 'boolean') {
             setOnekoEnabled(data.settings.onekoEnabled);
         }
-        if (typeof data.settings.browserNotificationsEnabled === 'boolean') {
-            saveLocalBrowserNotificationsEnabled(data.settings.browserNotificationsEnabled);
-        }
-        if (typeof data.settings.journalBrowserNotificationsEnabled === 'boolean') {
-            saveLocalJournalBrowserNotificationsEnabled(data.settings.journalBrowserNotificationsEnabled);
-        }
         if (typeof data.settings.titleAnimation === 'string' || typeof data.settings.titleAnimationAlways === 'boolean' || typeof data.settings.titleAnimationDesync === 'boolean') {
             applyTitleAnimationPrefs({
                 animation: data.settings.titleAnimation,
                 always: data.settings.titleAnimationAlways === true,
                 desync: data.settings.titleAnimationDesync !== false,
             });
-        }
-        if (hasAnyBrowserNotificationChannelEnabled()) {
-            startFeedNotificationPolling();
         }
         const accessibilityPrefs = {};
         ['reduceMotion', 'debugMode'].forEach(key => {
@@ -1227,6 +991,34 @@ function initTooltips() {
         element.addEventListener('mouseenter', element._tooltipMouseEnter);
         element.addEventListener('mouseleave', element._tooltipMouseLeave);
     });
+    initContextTooltips();
+}
+
+function initContextTooltips() {
+    document.querySelectorAll('[data-context-tooltip]').forEach(element => {
+        element.removeEventListener('contextmenu', element._contextTooltipHandler);
+        element._contextTooltipHandler = function(event) {
+            event.preventDefault();
+            clearTooltips();
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.textContent = this.getAttribute('data-context-tooltip') || '';
+            document.body.appendChild(tooltip);
+            activeTooltip = { element: tooltip, trigger: this };
+
+            const rect = tooltip.getBoundingClientRect();
+            const offset = 10;
+            tooltip.style.left = `${Math.max(4, Math.min(event.clientX + offset, window.innerWidth - rect.width - 4))}px`;
+            tooltip.style.top = `${Math.max(4, Math.min(event.clientY + offset, window.innerHeight - rect.height - 4))}px`;
+        };
+        element.addEventListener('contextmenu', element._contextTooltipHandler);
+    });
+
+    if (!document.documentElement.dataset.contextTooltipDismissBound) {
+        document.documentElement.dataset.contextTooltipDismissBound = '1';
+        document.addEventListener('click', clearTooltips);
+        window.addEventListener('scroll', clearTooltips, { passive: true });
+    }
 }
 
 window.addEventListener('DOMContentLoaded', initTooltips);
@@ -1258,9 +1050,8 @@ function initSettingsPage() {
         const mobileViewToggle = document.getElementById('mobile-friendly-toggle');
         const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
         const debugModeToggle = document.getElementById('debug-mode-toggle');
-        const feedNotificationsToggle = document.getElementById('feed-notifications-toggle');
-        const journalNotificationsToggle = document.getElementById('journal-notifications-toggle');
         const onekoToggle = document.getElementById('oneko-toggle');
+        const hourlyBeepToggle = document.getElementById('hourly-beep-toggle');
         const sitemapBtn = document.querySelector('[data-action="generate-sitemap"]');
         const devDataBootstrapBtn = document.querySelector('[data-action="dev-data-bootstrap"]');
         const toastPersonalityTextarea = document.getElementById('toast-personality-json');
@@ -1360,16 +1151,6 @@ function initSettingsPage() {
         const setOnekoToggle = (enabled) => {
             if (!onekoToggle) return;
             onekoToggle.checked = enabled === true;
-        };
-
-        const setFeedNotificationsToggle = (enabled) => {
-            if (!feedNotificationsToggle) return;
-            feedNotificationsToggle.checked = enabled === true;
-        };
-
-        const setJournalNotificationsToggle = (enabled) => {
-            if (!journalNotificationsToggle) return;
-            journalNotificationsToggle.checked = enabled === true;
         };
 
         const setTitleAnimationControls = (prefs) => {
@@ -1502,16 +1283,13 @@ function initSettingsPage() {
         };
 
         const syncTitleAnimationAvailability = (reduceMotion) => {
-            const mobileView = document.body.classList.contains('mobile-template');
-            const disabled = reduceMotion === true || mobileView;
+            const disabled = reduceMotion === true;
             if (titleAnimationSection) {
                 titleAnimationSection.classList.toggle('is-disabled', disabled);
                 titleAnimationSection.setAttribute('aria-disabled', disabled ? 'true' : 'false');
             }
             if (titleAnimationDisabledMessage) {
-                titleAnimationDisabledMessage.textContent = mobileView
-                    ? 'you cannot configure this feature while using mobile view.'
-                    : 'you cannot configure this feature while reduce motion is enabled.';
+                titleAnimationDisabledMessage.textContent = 'you cannot configure this feature while reduce motion is enabled.';
                 titleAnimationDisabledMessage.hidden = !disabled;
             }
             [titleAnimationSelect, titleAnimationAlwaysToggle, titleAnimationDesyncToggle].forEach(control => {
@@ -1544,7 +1322,8 @@ function initSettingsPage() {
                     || (window.matchMedia && window.matchMedia('(max-width: 700px)').matches);
                 debugModeToggle.checked = normalized.debugMode;
                 debugModeToggle.disabled = mobile;
-                debugModeToggle.closest('.checkbox-label')?.classList.toggle('is-disabled', mobile);
+                const debugSetting = debugModeToggle.closest('#debug-mode-setting, .checkbox-group');
+                if (debugSetting) debugSetting.hidden = mobile;
             }
             syncTitleAnimationAvailability(normalized.reduceMotion);
         };
@@ -2147,8 +1926,7 @@ function initSettingsPage() {
         let lastSavedMobileViewEnabled = readMobileViewCookie();
         setAccessibilityToggles(readLocalAccessibilityPrefs());
         setOnekoToggle(readLocalOnekoEnabled());
-        setFeedNotificationsToggle(readLocalBrowserNotificationsEnabled());
-        setJournalNotificationsToggle(readLocalJournalBrowserNotificationsEnabled());
+        if (hourlyBeepToggle) hourlyBeepToggle.checked = readLocalHourlyBeepEnabled();
         setTitleAnimationControls(readLocalTitleAnimationPrefs());
 
         if (window.fetch) {
@@ -2213,17 +1991,6 @@ function initSettingsPage() {
                 if (typeof data.settings.onekoEnabled === 'boolean') {
                     setOnekoToggle(data.settings.onekoEnabled);
                     setOnekoEnabled(data.settings.onekoEnabled);
-                }
-                if (typeof data.settings.browserNotificationsEnabled === 'boolean') {
-                    setFeedNotificationsToggle(data.settings.browserNotificationsEnabled);
-                    saveLocalBrowserNotificationsEnabled(data.settings.browserNotificationsEnabled);
-                }
-                if (typeof data.settings.journalBrowserNotificationsEnabled === 'boolean') {
-                    setJournalNotificationsToggle(data.settings.journalBrowserNotificationsEnabled);
-                    saveLocalJournalBrowserNotificationsEnabled(data.settings.journalBrowserNotificationsEnabled);
-                }
-                if (hasAnyBrowserNotificationChannelEnabled()) {
-                    startFeedNotificationPolling();
                 }
                 if (typeof data.settings.glowIntensity === 'string') {
                     const serverGlowIntensity = data.settings.glowIntensity === 'none' ? 'none' : 'medium';
@@ -2305,7 +2072,7 @@ function initSettingsPage() {
         document.addEventListener('change', event => {
             const control = event.target;
             if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)) return;
-            if (!control.closest('#appearance-settings, #accessibility-settings, #notification-settings, #admin-settings')) return;
+            if (!control.closest('#appearance-settings, #accessibility-settings, #admin-settings')) return;
             markSettingsDirty();
         });
 
@@ -2379,20 +2146,7 @@ function initSettingsPage() {
             }
             const onekoEnabled = !!(onekoToggle && onekoToggle.checked);
             setOnekoEnabled(onekoEnabled);
-            const feedNotificationsEnabled = !!(feedNotificationsToggle && feedNotificationsToggle.checked);
-            const journalNotificationsEnabled = !!(journalNotificationsToggle && journalNotificationsToggle.checked);
-            const anyNotificationsEnabled = feedNotificationsEnabled || journalNotificationsEnabled;
-            const browserNotificationsReady = await setBrowserNotificationsEnabled(anyNotificationsEnabled);
-            const savedFeedNotificationsEnabled = browserNotificationsReady && feedNotificationsEnabled;
-            const savedJournalNotificationsEnabled = browserNotificationsReady && journalNotificationsEnabled;
-            saveLocalBrowserNotificationsEnabled(savedFeedNotificationsEnabled);
-            saveLocalJournalBrowserNotificationsEnabled(savedJournalNotificationsEnabled);
-            setFeedNotificationsToggle(savedFeedNotificationsEnabled);
-            setJournalNotificationsToggle(savedJournalNotificationsEnabled);
-            if (browserNotificationsReady && (savedFeedNotificationsEnabled || savedJournalNotificationsEnabled)) {
-                startFeedNotificationPolling();
-            }
-
+            setLocalHourlyBeepEnabled(!hourlyBeepToggle || hourlyBeepToggle.checked);
             if (isLoggedIn && window.fetch) {
                 const params = new URLSearchParams();
                 params.append('glowIntensity', selected);
@@ -2400,8 +2154,6 @@ function initSettingsPage() {
                 params.append('reduceMotion', accessibilityPrefs.reduceMotion ? 'on' : 'off');
                 params.append('debugMode', accessibilityPrefs.debugMode ? 'on' : 'off');
                 params.append('onekoEnabled', onekoEnabled ? 'on' : 'off');
-                params.append('browserNotificationsEnabled', savedFeedNotificationsEnabled ? 'on' : 'off');
-                params.append('journalBrowserNotificationsEnabled', savedJournalNotificationsEnabled ? 'on' : 'off');
                 params.append('titleAnimation', titleAnimationPrefs.animation);
                 params.append('titleAnimationAlways', titleAnimationPrefs.always ? 'on' : 'off');
                 params.append('titleAnimationDesync', titleAnimationPrefs.desync ? 'on' : 'off');
@@ -2448,6 +2200,12 @@ function initSettingsPage() {
             }
 
             lastSavedMobileViewEnabled = mobileViewEnabled;
+            if (!mobileViewEnabled && getCurrentHostName() === 'm.fridge.dev' && isMobileDevice()) {
+                const desktopUrl = new URL(window.location.href);
+                desktopUrl.hostname = 'fridge.dev';
+                window.location.replace(desktopUrl.toString());
+                return;
+            }
             await finishSettingsSave(shouldReloadForMobileView || themeChanged);
         });
 

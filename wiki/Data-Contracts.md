@@ -43,8 +43,6 @@ Expected top-level shape:
       "titleAnimation": "wobble",
       "titleAnimationAlways": false,
       "titleAnimationDesync": true,
-      "browserNotificationsEnabled": true,
-      "journalBrowserNotificationsEnabled": true,
       "colors": {
         "bg": "#RRGGBB",
         "fg": "#RRGGBB",
@@ -67,7 +65,7 @@ Notes:
 - Text glow is stored in `glowIntensity`; the settings UI writes `none` for off and `medium` for on, while legacy `low`/`high` values are treated as enabled medium glow when saved again
 - Title motion is stored in `titleAnimation` (`wobble`, `bounce`, `rubberhose`, `bubble`, `slot-machine`, `moonwalk`, or `heartbeat`), `titleAnimationAlways` (boolean), and `titleAnimationDesync` (boolean, default `true`); removed `pinball` values migrate to `wobble`; legacy `orbit`, `domino`, and `lava-lamp` values migrate to `bubble`; removed `tidal-wave`, `accordion`, and `typewriter` values migrate to `slot-machine`, while `helicopter`, `haunted`, and `juggle` migrate to `moonwalk`; guests keep the same values in local storage
 - Accessibility toggles are stored as account booleans such as `reduceMotion`; logged-out browsers keep the same preferences in localStorage
-- `browserNotificationsEnabled` stores the account-backed preference for browser feed notifications; `journalBrowserNotificationsEnabled` stores the account-backed preference for new journal post browser notifications; logged-in notification dedupe state is stored in `data/etc/feed-browser-notify-state.json`, while logged-out browsers keep the same preferences and dedupe state in localStorage
+- Legacy `browserNotificationsEnabled` and `journalBrowserNotificationsEnabled` keys may remain in older account records as unknown preserved fields, but the application no longer reads, writes, or exposes them and does not use the browser Notification API
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes
 - `postingRestricted` is an admin-managed account boolean; when enabled, server handlers reject new or edited feed posts, journal posts/drafts, feed replies, chat conversations/messages, guestbook entries, contact submissions, mdpaste creation, and upload room/signaling use, while matching composer notices keep text fields, formatting controls, uploads, and submit controls disabled
 - `discordUserId` links a site account to a Discord member for bot DMs and notifications
@@ -182,7 +180,7 @@ Per-post replies live in `{postId}.json` files shaped roughly like:
       "parentId": "optional parent reply id for comment replies",
       "isGuest": true,
       "ip": "203.0.113.10",
-      "guestBrowserId": "optional same-browser notification token"
+      "guestBrowserId": "optional browser-local in-site inbox identity"
     }
   ]
 }
@@ -193,7 +191,7 @@ Notes:
 - Reply ids are generated on write; older data may be normalized into `legacy_*` ids at read time
 - New account and guest replies store `format: "v2"` and use the restricted feed Markdown renderer. For compatibility with stale cached writers, missing markers fall back to the rollout timestamp and then body inspection: recognized legacy BBCode stays legacy, while plain or Markdown bodies use the restricted Markdown renderer; plain older replies remain visually unchanged
 - Replies to individual comments are stored in the same flat array with optional `parentId`; older top-level replies simply omit it
-- Guest replies may include `guestBrowserId`, a random browser-local token used only so guests can receive browser notifications when someone replies to their comments from another browser/account
+- Guest replies may include `guestBrowserId`, a random browser-local identity used only so guests can receive in-site inbox notifications when someone replies to their comments from another browser/account
 - V2 reply bodies store uploaded images as Markdown and uploaded audio/video or voice notes as the renderer's supported safe media HTML; legacy replies retain their existing media BBCode
 - Guest replies include `isGuest: true` plus a plaintext `ip`; guest display names are stored in `username`, default to `Anonymous`, cannot match a registered account username case-insensitively, and are filtered with guest reply bodies through `/feed/filters/*.txt` before storage; matching body text becomes tooltip-wrapped `★` text explaining `this phrase was automatically filtered.`; guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text are locked from later guest edits; admin moderation can purge all guest replies with a matching IP without changing the IP ban list
 - Toast-authored reply storage and automatic reply behavior are documented on [Toast](Toast#automatic-feed-replies)
@@ -217,6 +215,10 @@ Global object containing `strictIdentityEnforcement` and `enforcementEnabled` bo
 ### `data/etc/site-notices.json`
 
 Global visitor notices managed through the admin-only `/settings/notices` page. It has independent `users` and `guests` blocks, each with an optional `banner` and `popup`, plus a `pages` array for exact-path notices. Page records include `path`, an `audiences` array containing `users`, `guests`, or both, and `type` alongside the corresponding banner or popup fields; legacy page records with one string `audience` are normalized into the array. A matching page notice overrides the global notice of the same type for each selected audience on that path. Banner records contain a revision `id`, plaintext `message`, and `dismissible` flag. Popup records contain a revision `id`, plaintext `title` and `message`, plus optional `buttonLabel` and site-relative `buttonUrl`. A new save receives a new revision ID, so browser-local banner dismissal and popup acknowledgement apply only to that saved revision.
+
+### `data/etc/targeted-notifications.json`
+
+Admin-issued persistent inbox notifications for a registered username, exact IP, all logged-in users, or all guests. Multiple selected users/IPs are stored as individual records. Each record contains an immutable ID, target type/value, title, message, site-relative URL, and creation date. Read and dismissal state remains per inbox identity in `notification-inbox-state.json`.
 
 ### `data/etc/banlists/**/*.txt`
 
@@ -262,6 +264,7 @@ Entry format:
 Plus:
 
 - `ip_index.json` for one-post-per-IP ownership tracking
+- Successful entry creation adds one targeted in-site notification per admin account to `data/etc/targeted-notifications.json`
 - Nginx blocks direct client access to `/data/guestbook` and its descendants; entries are exposed only through the PHP guestbook and admin moderation views
 
 ## `data/images/`
@@ -315,6 +318,7 @@ The `/music/upload` admin page writes audio files to `data/audio/`, cover art to
 
 - Private contact submissions as `{YYYYMMDDHHMMSS}_{random}.json`
 - Each submission stores `id`, `createdAt`, hashed IP, user agent, name, email, message, notification channel id, and optional `notifyError`
+- Successful submissions also append one targeted in-site notification per admin account to `data/etc/targeted-notifications.json`
 - `rate_limits.json` stores hashed client IP keys mapped to recent submission timestamps for throttling
 - Nginx blocks direct web access to this directory; submissions are only shown through the admin-only `/contact?dashboard=1` route
 
@@ -349,10 +353,16 @@ Used key:
 
 Toast configuration, personality, AI behavior, notification state, approvals, DM history, and internal service endpoints are documented on [Toast](Toast#configuration-and-data).
 
-### `feed-browser-notify-state.json`
+### `notification-inbox-state.json`
 
-- Internal browser-notification dedupe state for logged-in users
-- Stores per-account `seenKeys` for feed mention/reply and journal notification events so a fresh browser login does not replay all historical matching events
+- Stores in-site notification read and dismissal state
+- `identities` keys are prefixed with `account:` for lowercase usernames or `guest:` for browser-local guest inbox identities
+- Each identity retains up to 4,000 `readKeys` and `dismissedKeys` plus an `updatedAt` timestamp; feed notification content is derived from feed and reply records rather than duplicated in this file
+
+### `notification-revision.txt`
+
+- Opaque revision value updated after notification-producing feed/targeted writes and inbox read/dismissal changes
+- The lightweight revision endpoint reads this single small file so browsers do not repeatedly rebuild or poll their full inboxes
 
 ### `off-topic-archive.json`
 

@@ -15,7 +15,7 @@ All API routes live under `/api/*` and are handled by PHP.
 
 - Requires logged-in user
 - Returns current settings from `data/accounts/accounts.json`
-- Currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `reduceMotion`, `titleAnimation`, `titleAnimationAlways`, `titleAnimationDesync`, `browserNotificationsEnabled`, and `journalBrowserNotificationsEnabled`; `colors` is honored by `classic` for the full palette and by `ambercrt`/`CRT` for the single `links` phosphor color
+- Currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `reduceMotion`, `titleAnimation`, `titleAnimationAlways`, and `titleAnimationDesync`; `colors` is honored by `classic` for the full palette and by `ambercrt`/`CRT` for the single `links` phosphor color
 - Toast-only settings fields are documented on [Toast](Toast#personality-sources)
 
 `POST`
@@ -26,8 +26,6 @@ All API routes live under `/api/*` and are handled by PHP.
 - Can set the reduced-motion accessibility boolean
 - Can set the validated title animation id plus the always-playing and character-desync booleans
 - Can set `onekoEnabled` for the optional cursor-following cat
-- Can set `browserNotificationsEnabled` for account-backed browser feed notification polling
-- Can set `journalBrowserNotificationsEnabled` for account-backed new journal post browser notifications
 - Syncs the `theme_pref` cookie so anonymous and first-load rendering can pick the active theme
 - Validates color fields as `#RRGGBB`; the settings UI sends the full palette for `classic` and only `links` for `CRT`
 - Admin users can also toggle maintenance mode through the settings flow
@@ -97,13 +95,26 @@ Route-local JSON endpoints for the `/tools/upload` peer-to-peer transfer page, d
 
 ### `/api/feed-notifications`
 
-`GET`, optionally with `guestBrowserId={32 hex chars}` for logged-out browsers.
+`GET ?view=inbox`, optionally with `guestBrowserId={32 hex chars}` for logged-out browsers.
 
-- Returns current browser notification candidates for feed and journal events
+- Returns the current in-site inbox; requests without `view=inbox` are rejected because browser Notification API delivery is not supported
 - Account notification event parity with Discord is documented on [Toast](Toast#notifications-and-website-integration)
 - Guest events cover replies to guest comments created by the same browser token
-- Journal events cover new published journal posts for both guests and logged-in users
-- Clients keep seen notification keys in localStorage, filter event `type`, and use this endpoint for browser Notification API polling
+- `GET ?view=inbox&page=N` returns the notification-page view with 10 events per page, total/page metadata, read flags, the overall unread count, and the active account CSRF token needed when a global notification toast is clicked
+- Inbox events include `actor`, `actorIsGuest`, and `action` fields so clients can distinguish `@registered` account names from italic guest display names without parsing presentation text
+- Each event exposes a plain-text `body` with Markdown/BBCode syntax removed for temporary alerts and a server-sanitized `bodyHtml` rendered with the content's original feed format for `/notifications`
+- `POST view=inbox` accepts JSON-encoded `keys` to mark clicked notifications read, or `markAll=1` to mark every currently relevant inbox event read across all pages; account requests require the session CSRF token, while guests are scoped by their browser token
+- The same inbox POST accepts `dismiss=1` with `keys` to persistently remove selected notifications, or `dismissAll=1` to remove every current event for that account or guest-browser identity
+
+### `/api/notification-revision`
+
+- Returns one opaque notification revision value without starting a session or generating inbox content
+- Visible tabs check it every 10 seconds and request `/api/feed-notifications?view=inbox` only when it changes; hidden tabs stop checking and perform one immediate check when shown again
+- This short request releases PHP-FPM immediately instead of reserving one worker per visitor with a long-lived stream
+
+### `/api/feed-usernames`
+
+`GET` returns the sorted public registered-username list used by Feed mention autocomplete. It exposes usernames only and no private account fields.
 
 ### Toast Feed Generation
 

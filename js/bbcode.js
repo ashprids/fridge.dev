@@ -892,6 +892,7 @@ function initBBCodeEditor() {
                 });
                 bbcodePreview.innerHTML = html;
                 if (typeof window.fridg3RenderMdpasteEnhancements === 'function') await window.fridg3RenderMdpasteEnhancements(bbcodePreview);
+                if (typeof window.initTooltips === 'function') window.initTooltips();
             } catch (error) {
                 bbcodePreview.textContent = error.message || 'could not render preview';
             }
@@ -899,6 +900,7 @@ function initBBCodeEditor() {
             return;
         }
         bbcodePreview.innerHTML = parseBBCode(applyGuestPreviewFilter(bbcodeTextbox.value));
+        if (typeof window.initTooltips === 'function') window.initTooltips();
         initInlineMediaPlayers(bbcodePreview);
     };
 
@@ -1410,40 +1412,6 @@ function initBBCodeEditor() {
                         hljs.highlightElement(block);
                     });
                 }
-                
-                // Attach tooltip listeners for newly rendered preview content
-                bbcodePreview.querySelectorAll('[data-tooltip]').forEach(element => {
-                    element.addEventListener('mouseenter', function(e) {
-                        const rawText = this.getAttribute('data-tooltip') || '';
-                        const text = rawText.replace(/\\n/g, '<br>');
-                        const tooltip = document.createElement('div');
-                        tooltip.className = 'tooltip';
-                        tooltip.innerHTML = text;
-                        document.body.appendChild(tooltip);
-                        
-                        const updateTooltipPosition = (event) => {
-                            const rect = tooltip.getBoundingClientRect();
-                            const tooltipWidth = rect.width;
-                            const tooltipHeight = rect.height;
-                            const offset = 10;
-                            let x = event.clientX + offset;
-                            let y = event.clientY + offset;
-                            if (x + tooltipWidth > window.innerWidth) {
-                                x = event.clientX - tooltipWidth - offset;
-                            }
-                            if (y + tooltipHeight > window.innerHeight) {
-                                y = event.clientY - tooltipHeight - offset;
-                            }
-                            tooltip.style.left = x + 'px';
-                            tooltip.style.top = y + 'px';
-                        };
-                        updateTooltipPosition(e);
-                        this.addEventListener('mousemove', updateTooltipPosition);
-                        this.addEventListener('mouseleave', () => {
-                            tooltip.remove();
-                        });
-                    });
-                });
                 
                 // Disable toolbar buttons
                 bbcodeButtons.forEach(button => {

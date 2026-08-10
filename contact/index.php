@@ -10,6 +10,7 @@ fridg3_start_session();
 
 $rootDir = dirname(__DIR__);
 require_once $rootDir . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+require_once $rootDir . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'targeted-notifications.php';
 
 $title = 'contact';
 $description = 'send a message to fridge.dev.';
@@ -300,6 +301,15 @@ function contact_notify_toast(array $submission): ?string {
     return $error;
 }
 
+function contact_notify_admin_accounts(array $submission): bool {
+    $submissionId = (string)($submission['id'] ?? bin2hex(random_bytes(8)));
+    $senderName = trim((string)($submission['name'] ?? '')) ?: 'unknown sender';
+    $senderEmail = trim((string)($submission['email'] ?? ''));
+    $message = $senderName . ($senderEmail !== '' ? ' (' . $senderEmail . ')' : '') . ' submitted a new contact form message.';
+    $createdDate = date('Y-m-d H:i:s', (int)($submission['createdAt'] ?? time()));
+    return fridg3_targeted_notifications_notify_admins('new contact submission', $message, '/contact?dashboard=1', $createdDate, 'contact-' . $submissionId);
+}
+
 contact_refresh_current_user_permissions();
 fridg3_refresh_current_user_posting_restriction();
 $csrfToken = contact_create_csrf_token();
@@ -441,6 +451,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!contact_write_json_file(contact_submission_path($contactDataDir, $id), $submission)) {
                 $errors[] = 'failed to save contact submission. please try again later.';
             } else {
+                if (!contact_notify_admin_accounts($submission)) {
+                    error_log('contact submission ' . $id . ' admin inbox notification failed');
+                }
                 $notifyError = contact_notify_toast($submission);
                 if ($notifyError !== null) {
                     $submission['notifyError'] = $notifyError;

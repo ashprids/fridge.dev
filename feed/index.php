@@ -110,6 +110,8 @@ $postsDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATO
 $postsHtml = '';
 $paginationHtml = '';
 $postsData = [];
+$feedPostIps = fridg3_feed_load_post_ips();
+$viewerIsAdmin = !empty($_SESSION['user']['isAdmin']);
 
 // Load existing bookmarks for the logged-in user so we can
 // render bookmark icons in the correct filled/empty state.
@@ -250,6 +252,10 @@ if (is_dir($postsDir)) {
         }
 
         $postLink = '/feed/posts/' . $postId;
+        $postIp = (string)($feedPostIps[$postIdRaw]['ip'] ?? '');
+        $postUserIpAttribute = $viewerIsAdmin
+            ? ' data-context-tooltip="' . (filter_var($postIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($postIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
+            : '';
 
         // Wrap each post in an anchor so SPA navigation can intercept
         // the click; avoid inline JS redirects so the mini player
@@ -257,7 +263,7 @@ if (is_dir($postsDir)) {
         $postsHtml .= '<div class="feed-post-link" data-post-href="' . $postLink . '" role="link" tabindex="0" style="text-decoration:none;color:inherit;">'
             . '<div id="post" style="cursor: pointer;">'
             . '<div id="post-header">'
-            . '<span id="post-username">@' . $safeUser . '</span>'
+            . '<span id="post-username"' . $postUserIpAttribute . '>@' . $safeUser . '</span>'
             . '<span id="post-date-feed">' . $safeAgo . ' • ' . $replyMeta . ' • ' . $editIcon . '<span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="' . $bookmarkIconClass . ' fa-bookmark"></i></span></span>'
             . '</div>'
             . (($p['format'] ?? 'legacy') === 'v2' ? $safeBody : '<span id="post-content">' . $safeBody . '</span>')

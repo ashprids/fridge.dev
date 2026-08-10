@@ -59,6 +59,8 @@ Use `!frdg` to display the fridge.dev site icon inline: !frdg
 
 Use `const message = "hello";` within a sentence. Formatting such as `**bold**` remains literal inside code.
 
+Registered account mentions such as @fridge are automatically displayed as inline code and show a `registered fridge.dev account` tooltip when hovered in published content or the editor preview. While composing a Feed post or reply, typing a partial mention such as `@fr` opens matching username suggestions, and a complete valid mention is highlighted in the site's purple.
+
 ## Fenced code blocks
 
 ```

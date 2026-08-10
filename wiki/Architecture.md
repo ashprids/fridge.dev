@@ -41,7 +41,7 @@ Mobile mode is enabled when any of these are true:
 
 The `mobile_friendly_view` preference is browser-only and is not stored in account JSON.
 
-Production may switch between `fridge.dev` and `m.fridge.dev` to match the active layout. Developer mode never performs that host redirect: enabling mobile view sets the same cookie and reloads the current local URL, allowing `template_mobile.html` to render on the development host.
+Production automatically sends detected phones from `fridge.dev` to the equivalent path on `m.fridge.dev` without first showing a prompt, unless `mobile_friendly_view` was explicitly disabled in settings. Detected desktop devices visiting `m.fridge.dev` are returned to the equivalent `fridge.dev` URL. The Force Mobile View setting itself never sends a desktop browser to `m.fridge.dev`: it sets the cookie and reloads the current host so `template_mobile.html` renders in place. Unchecking it on a phone already using `m.fridge.dev` records the opt-out and returns to `fridge.dev`. Developer mode never performs host redirects; detected phones automatically enable `mobile_friendly_view` and reload once on the current development host instead.
 
 Developer mode is detected for `localhost`, loopback addresses, `.localhost` and `.test` hostnames, RFC1918 private IPv4 addresses (`10/8`, `172.16/12`, and `192.168/16`), IPv4 link-local addresses (`169.254/16`), and IPv6 unique-local or link-local addresses. This allows another device on the same LAN to use the development features when opening a server such as `http://192.168.1.20:8000`.
 
@@ -77,6 +77,8 @@ Main stores:
 - `data/contact/*.json`
 - `data/guestbook/*.txt`
 - `data/etc/*.json`
+
+Feed notification content is derived from feed and reply records, while admin-issued and contact-submission alerts are stored in `data/etc/targeted-notifications.json`. Per-identity inbox read and dismissal keys are persisted in `data/etc/notification-inbox-state.json`; there is no browser Notification API delivery pipeline.
 
 ## Important Couplings
 

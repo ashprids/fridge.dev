@@ -8,8 +8,9 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 </pre>
 <br><br>
 {dev_admin_bootstrap}
-<span id="admin-settings">
-<h3>admin settings</h3><br>
+<details id="admin-settings" class="settings-admin-panel" style="display:none">
+<summary>admin settings</summary>
+<div class="settings-admin-panel-content">
 <h4 data-tooltip="redirect all non-admin users to /error/wip/">maintenance mode</h4>
 <div class="radio-group" id="maintenance-mode-group">
     <label class="radio-label">
@@ -36,13 +37,9 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
     </label>
 </div>
 <br>
-<h4>sitemap.xml</h4>
+<h4>site management</h4>
 <button id="form-button" type="button" data-tooltip="regenerate the sitemap.xml file" data-action="generate-sitemap">regenerate sitemap</button>
-<br>
-<h4>system diagnostics</h4>
 <button id="form-button" type="button" data-tooltip="admin-only system and website diagnostics" onclick="window.location='/settings/sysinfo'">open system info</button>
-<br>
-<h4>site notices</h4>
 <button id="form-button" type="button" data-tooltip="create banners and one-time popups for users and guests" onclick="window.location='/settings/notices'">manage notices</button>
 <br>
 <h4>chat</h4>
@@ -54,7 +51,8 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <button id="form-button" type="button" data-tooltip="review feed and guestbook posts and manage guest IP moderation" onclick="window.location='/settings/guests'">manage guests</button>
 <button id="form-button" type="button" data-tooltip="manage IPs blocked from the entire website" onclick="window.location='/settings/banned-ips'">manage hard-banned IPs</button>
 <br><br><hr><br>
-</span>
+</div>
+</details>
 <span id="toast-settings">
 <h3>toast settings</h3>
 <h4>personality (json)</h4>
@@ -88,26 +86,10 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
         <span data-tooltip="reduce animations, transitions, and scrolling motion">reduce motion</span>
     </label>
 </div>
-<div class="checkbox-group">
+<div class="checkbox-group" id="debug-mode-setting">
     <label class="checkbox-label">
         <input type="checkbox" class="checkbox" id="debug-mode-toggle">
         <span data-tooltip="show the client and server debug logs (desktop only)">debug mode</span>
-    </label>
-</div>
-<br><br><hr><br>
-</span>
-<span id="notification-settings">
-<h3>notifications</h3>
-<div class="checkbox-group">
-    <label class="checkbox-label">
-        <input type="checkbox" class="checkbox" id="feed-notifications-toggle">
-        <span data-tooltip="feed mentions, feed replies, and replies to your guest comments">feed notifications</span>
-    </label>
-</div>
-<div class="checkbox-group">
-    <label class="checkbox-label">
-        <input type="checkbox" class="checkbox" id="journal-notifications-toggle">
-        <span data-tooltip="new journal posts while fridge.dev is open">journal notifications</span>
     </label>
 </div>
 <br><br><hr><br>
@@ -137,7 +119,7 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
             <input type="checkbox" class="checkbox" id="title-animation-desync-toggle" checked>
             <span data-tooltip="start each letter at a different point in the animation">desync characters</span>
         </label>
-        <label class="checkbox-label">
+        <label class="checkbox-label" id="title-animation-always-setting">
             <input type="checkbox" class="checkbox" id="title-animation-always-toggle">
             <span data-tooltip="play the selected title animation without requiring hover">always playing</span>
         </label>
@@ -182,6 +164,12 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
     <label class="checkbox-label">
         <input type="checkbox" class="checkbox" id="oneko-toggle">
         <span data-tooltip="summon a small cat to follow your pointer around">oneko</span>
+    </label>
+</div>
+<div class="checkbox-group">
+    <label class="checkbox-label">
+        <input type="checkbox" class="checkbox" id="hourly-beep-toggle" checked>
+        <span data-tooltip="makes the website play a watch beep sound every hour">beep beep!</span>
     </label>
 </div>
 <br><br><hr><br>

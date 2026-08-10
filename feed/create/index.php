@@ -156,6 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $text = 'v2' . PHP_EOL . '@' . $username . PHP_EOL . $displayDateTime . PHP_EOL . $safeContent . PHP_EOL;
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $timestampFilename . '.txt';
     $postSaved = file_put_contents($postFile, $text) !== false;
+    if ($postSaved) fridg3_notification_revision_touch();
+    if ($postSaved) fridg3_feed_record_post_ip($timestampFilename, (string)$username, fridg3_feed_client_ip());
     fridg3_debug_submission_log('[SUBMISSION] feed post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . (count($imageMap) + count($voiceMap)));
 
     $shouldQueueToastAutoReply = (

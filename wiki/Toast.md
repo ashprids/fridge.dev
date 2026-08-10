@@ -136,7 +136,7 @@ Sending exactly `CLEARMEMORY` creates a memory boundary. Toast reacts to it, and
 
 ## Notifications and Website Integration
 
-Toast scans feed activity for accounts with linked Discord IDs and sends deduplicated DMs for post mentions, reply mentions, and replies to the account's own posts. Dedupe state is stored in `data/etc/toast-feed-notify-state.json`. Browser notifications use a separate website pipeline but intentionally mirror these event categories.
+Toast scans feed activity for accounts with linked Discord IDs and sends deduplicated DMs for post mentions, reply mentions, and replies to the account's own posts. Dedupe state is stored in `data/etc/toast-feed-notify-state.json`. The website independently mirrors these event categories through its in-site inbox; it does not use the browser Notification API.
 
 Account creation can ask Toast to DM invite credentials. Discord account linking asks the local service to verify that the Discord user is in the server and then assign the `registered` role. A bot-service failure does not roll back an already-created website account; the UI reports the concrete integration error.
 

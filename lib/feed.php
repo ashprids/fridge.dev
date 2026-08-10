@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/notification-revision.php';
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
 
@@ -42,6 +43,36 @@ if (!function_exists('fridg3_feed_banned_ips_path')) {
     {
         return fridg3_feed_posts_dir() . DIRECTORY_SEPARATOR . 'banned_ips.json';
     }
+}
+
+function fridg3_feed_post_ips_path(): string { return fridg3_feed_posts_dir() . DIRECTORY_SEPARATOR . 'post_ips.json'; }
+function fridg3_feed_load_post_ips(): array {
+    $decoded = is_file(fridg3_feed_post_ips_path()) ? json_decode((string)@file_get_contents(fridg3_feed_post_ips_path()), true) : [];
+    return is_array($decoded) ? $decoded : [];
+}
+function fridg3_feed_record_account_ip(string $username, string $ip): void {
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) return;
+    $path = fridg3_feed_accounts_path();
+    $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
+    if (!is_array($data) || !is_array($data['accounts'] ?? null)) return;
+    foreach ($data['accounts'] as &$account) {
+        if (!is_array($account) || strcasecmp((string)($account['username'] ?? ''), ltrim($username, '@')) !== 0) continue;
+        $ips = array_values(array_filter(array_map('strval', (array)($account['ips'] ?? [])), static fn(string $known): bool => filter_var($known, FILTER_VALIDATE_IP) !== false));
+        if (!in_array($ip, $ips, true)) $ips[] = $ip;
+        $account['ips'] = $ips;
+        break;
+    }
+    unset($account);
+    $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($encoded !== false) @file_put_contents($path, $encoded, LOCK_EX);
+}
+function fridg3_feed_record_post_ip(string $postId, string $username, string $ip): void {
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) return;
+    $records = fridg3_feed_load_post_ips();
+    $records[preg_replace('/[^a-zA-Z0-9_-]/', '', basename($postId))] = ['username' => ltrim($username, '@'), 'ip' => $ip];
+    $encoded = json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($encoded !== false) @file_put_contents(fridg3_feed_post_ips_path(), $encoded, LOCK_EX);
+    fridg3_feed_record_account_ip($username, $ip);
 }
 
 if (!function_exists('fridg3_feed_filters_dir')) {
@@ -437,7 +468,9 @@ if (!function_exists('fridg3_feed_write_replies')) {
         }
 
         $replyFile = $repliesDir . DIRECTORY_SEPARATOR . $safePostId . '.json';
-        return @file_put_contents($replyFile, $payload, LOCK_EX) !== false;
+        $saved = @file_put_contents($replyFile, $payload, LOCK_EX) !== false;
+        if ($saved) fridg3_notification_revision_touch();
+        return $saved;
     }
 }
 
@@ -948,7 +981,9 @@ if (!function_exists('fridg3_feed_save_reply')) {
             'username' => $safeUsername,
             'date' => date('Y-m-d H:i:s'),
             'body' => $trimmedBody,
+            'ip' => fridg3_feed_client_ip(),
         ];
+        fridg3_feed_record_account_ip($safeUsername, (string)$newReply['ip']);
         if ($format === 'v2') $newReply['format'] = 'v2';
         if ($parentId !== '' && fridg3_feed_reply_exists($existingReplies, $parentId)) {
             $newReply['parentId'] = $parentId;
@@ -960,7 +995,9 @@ if (!function_exists('fridg3_feed_save_reply')) {
             return false;
         }
 
-        return @file_put_contents($replyFile, $payload, LOCK_EX) !== false;
+        $saved = @file_put_contents($replyFile, $payload, LOCK_EX) !== false;
+        if ($saved) fridg3_notification_revision_touch();
+        return $saved;
     }
 }
 
@@ -1578,6 +1615,15 @@ if (!function_exists('fridg3_feed_markdown_inline')) {
         $text = preg_replace_callback('/(`+)(.+?)\1/', static fn(array $m): string => $protect('<code>' . htmlspecialchars($m[2], ENT_QUOTES, 'UTF-8') . '</code>'), $text) ?? $text;
         $text = preg_replace_callback('/<\/?u\s*>/i', static fn(array $m): string => $protect(str_starts_with($m[0], '</') ? '</u>' : '<u>'), $text) ?? $text;
         $html = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+        $accountNames = [];
+        foreach ((array)(fridg3_feed_load_accounts()['accounts'] ?? []) as $account) {
+            $username = trim((string)($account['username'] ?? ''));
+            if ($username !== '') $accountNames[strtolower($username)] = $username;
+        }
+        $html = preg_replace_callback('/(?<![a-zA-Z0-9_])@([a-zA-Z0-9_-]{1,32})\b/', static function (array $match) use ($protect, $accountNames): string {
+            $key = strtolower((string)$match[1]);
+            return isset($accountNames[$key]) ? $protect('<code class="feed-account-mention" data-tooltip="registered fridge.dev account">@' . htmlspecialchars($accountNames[$key], ENT_QUOTES, 'UTF-8') . '</code>') : $match[0];
+        }, $html) ?? $html;
         $html = preg_replace_callback('/(?<!\S)!fa[ \t]+(solid|regular|brands)[ \t]+([a-z0-9][a-z0-9-]*)\b/i', static function (array $m) use ($protect): string {
             return $protect('<i class="fa-' . strtolower($m[1]) . ' fa-' . strtolower($m[2]) . '"></i>');
         }, $html) ?? $html;

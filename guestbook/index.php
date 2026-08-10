@@ -195,6 +195,9 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
         $safeTimestamp = htmlspecialchars($timestampLine !== '' ? $timestampLine : 'unknown time', ENT_QUOTES, 'UTF-8');
         $safeName = htmlspecialchars($nameLine !== '' ? $nameLine : 'Anonymous', ENT_QUOTES, 'UTF-8');
         $safeMessage = nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'));
+        $guestNameIpAttribute = $isAdmin
+            ? ' data-context-tooltip="' . (filter_var($entryIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($entryIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
+            : '';
 
         $relative = guestbook_relative_time($timestampLine);
         $displayTime = $relative !== '' ? $relative : $safeTimestamp;
@@ -238,7 +241,7 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
 
         $html .= '<div id="post">'
             . '<div id="post-header">'
-            . '<span id="post-username">' . $safeName . '</span>'
+            . '<span id="post-username"' . $guestNameIpAttribute . '>' . $safeName . '</span>'
             . $rightSide
             . '</div>'
             . '<span id="post-content">' . $safeMessage . '</span>'

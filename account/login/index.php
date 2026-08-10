@@ -6,6 +6,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
 require_once $sessionBootstrapDir . '/lib/session.php';
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 
 $title = 'login';
 $description = 'log into your fridge.dev account.';
@@ -163,6 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                                 // Rotate CSRF token after a successful login
                                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                                fridg3_feed_record_account_ip((string)$account['username'], fridg3_feed_client_ip());
                                 
                                 $login_success = true;
                                 session_write_close();
