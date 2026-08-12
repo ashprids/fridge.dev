@@ -1,0 +1,4 @@
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart toast-discord-bot.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status toast-discord-bot.service --no-pager
+deploy ALL=(root) NOPASSWD: /usr/bin/journalctl -u toast-discord-bot.service --no-pager -n 100

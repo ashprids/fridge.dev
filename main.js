@@ -211,7 +211,7 @@ function fridg3PersistDebugHistory() {
     if (fridg3DebugPersistTimer) window.clearTimeout(fridg3DebugPersistTimer);
     fridg3DebugPersistTimer = null;
     try {
-        sessionStorage.setItem('fridg3DebugClientHistory', JSON.stringify(fridg3DebugLogs.client));
+        sessionStorage.setItem('fridg3DebugClientHistory', JSON.stringify(fridg3DebugLogs.client.filter(entry => !entry.transient)));
         if (fridg3ServerDebugAuthorized) {
             sessionStorage.setItem('fridg3DebugServerHistory', JSON.stringify(fridg3DebugLogs.server));
         }
@@ -263,7 +263,7 @@ function fridg3RestoreServerDebugHistory() {
     }
 }
 
-function fridg3DebugAppend(channel, value, processLog = false) {
+function fridg3DebugAppend(channel, value, processLog = false, transient = false) {
     if (!fridg3DebugEnabled) return;
     const target = channel === 'server' ? 'server' : 'client';
     const now = new Date();
@@ -278,6 +278,7 @@ function fridg3DebugAppend(channel, value, processLog = false) {
         timestamp,
         message,
         processLog,
+        transient,
         channel: target,
         category: /^\[PHP\]\s+(?:loaded\s+|.*\brequest (?:initialized|completed)(?:\b|$))/i.test(message)
             ? 'loaded'
@@ -752,6 +753,7 @@ function fridg3SetDebugMode(enabled) {
 }
 
 window.fridg3DebugClientLog = value => fridg3DebugAppend('client', value);
+window.fridg3DebugClientTransientLog = value => fridg3DebugAppend('client', value, false, true);
 window.fridg3DebugServerLog = value => fridg3DebugAppend('server', value);
 window.fridg3DebugProcessLog = value => fridg3DebugAppend('server', value, true);
 window.fridg3SetDebugMode = fridg3SetDebugMode;
@@ -2159,7 +2161,7 @@ function syncSpaPageAssets(doc) {
 
 const SPA_SHARED_SCRIPT_PATHS = new Set([
     '/main.js',
-    '/js/settings.js',
+    '/js/fruity-dance.js',
     '/js/sidebar-player.js',
     '/js/bookmarks.js',
     '/js/bbcode.js',
@@ -2514,6 +2516,9 @@ function loadPageIntoContent(url, addToHistory = true) {
                     window.fridg3InitOffTopicArchive();
                 }
                 initSettingsPage();
+                if (typeof window.fridg3InitFruityDanceSettings === 'function') {
+                    window.fridg3InitFruityDanceSettings();
+                }
                 syncOnekoPreference();
                 initAsciiTime();
                 autoScaleAsciiFont();
@@ -2984,6 +2989,9 @@ function bindSpaForm(form) {
                     window.fridg3InitOffTopicArchive();
                 }
                 initSettingsPage();
+                if (typeof window.fridg3InitFruityDanceSettings === 'function') {
+                    window.fridg3InitFruityDanceSettings();
+                }
                 syncOnekoPreference();
                 rerunAsciiScalingAfterContent();
                 scheduleMobileAsciiFit(true);

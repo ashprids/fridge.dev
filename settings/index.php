@@ -7,6 +7,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
+require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'fruity-dance.php';
 
 $title = 'settings';
 $description = 'customize your preferences.';
@@ -149,6 +150,15 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+$fruityDanceOptions = '';
+foreach (fridg3_fruity_dance_spritesheets(dirname(__DIR__)) as $sheet) {
+    $fruityDanceOptions .= '<option value="' . htmlspecialchars($sheet['filename'], ENT_QUOTES, 'UTF-8') . '" data-url="'
+        . htmlspecialchars($sheet['url'], ENT_QUOTES, 'UTF-8') . '" data-description="'
+        . htmlspecialchars($sheet['description'], ENT_QUOTES, 'UTF-8') . '" data-animations="'
+        . htmlspecialchars(json_encode($sheet['animations'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($sheet['label'], ENT_QUOTES, 'UTF-8') . '</option>';
+}
+$fruityDanceOptions .= '<option value="__custom__" data-url="/resources/images/fruity-dance/_custom.png" data-description="use an image stored in this browser">custom spritesheet</option>';
+$content = str_replace('{fruity_dance_spritesheet_options}', $fruityDanceOptions, $content);
 
 $isLoggedIn = isset($_SESSION['user']) && isset($_SESSION['user']['username']);
 $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
@@ -174,6 +184,7 @@ if ($isLoggedIn) {
 if (!$isLoggedIn) {
     // Hide user-only controls when not logged in
     $content = str_replace('<span id="user-settings">', '<span id="user-settings" style="display:none">', $content);
+    $content = str_replace('<div class="checkbox-group" id="discord-notifications-setting">', '<div class="checkbox-group" id="discord-notifications-setting" style="display:none">', $content);
 }
 if ($isToast) {
     $content = str_replace('<span id="user-settings">', '<span id="user-settings" style="display:none">', $content);
@@ -191,6 +202,25 @@ if ($hasLinkedDiscord) {
     $activeDiscordButton = '<button id="form-button" type="button" data-tooltip="save your discord user ID to your account for notifications" onclick="window.location=\'/account/link-discord\'">link discord account</button>';
     $disabledDiscordButton = '<button id="form-button" type="button" class="form-button-disabled" data-tooltip="your discord account is already linked" disabled aria-disabled="true">link discord account</button>';
     $content = str_replace($activeDiscordButton, $disabledDiscordButton, $content);
+} elseif ($isLoggedIn) {
+    $content = str_replace(
+        '<div class="checkbox-group" id="discord-notifications-setting">',
+        '<div class="checkbox-group" id="discord-notifications-setting" style="opacity:.5">',
+        $content
+    );
+    $content = str_replace(
+        '<input type="checkbox" class="checkbox" id="discord-notifications-toggle" checked>',
+        '<input type="checkbox" class="checkbox" id="discord-notifications-toggle" checked disabled aria-disabled="true">',
+        $content
+    );
+    $content = str_replace(
+        'data-tooltip="have Toast send feed mentions and reply notifications through Discord">discord notifications via Toast</span>',
+        'data-tooltip="link a Discord account before enabling Toast notifications">discord notifications via Toast</span>',
+        $content
+    );
+}
+if ($template_name === 'template_mobile.html') {
+    $content = str_replace('<div class="checkbox-group" id="notification-sounds-setting">', '<div class="checkbox-group" id="notification-sounds-setting" style="display:none">', $content);
 }
 $hasAdminAccountForBootstrap = settings_has_admin_account($accountsDataForBootstrap);
 $devAdminBootstrap = '';

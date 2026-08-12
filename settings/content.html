@@ -1,3 +1,8 @@
+<style>
+#fruity-dance-settings { max-width: 520px; padding: 0 0 4px 26px; }
+#fruity-dance-settings .dropdown { width: 100%; }
+#fruity-dance-settings output { color: var(--subtle); }
+</style>
 <pre id="ascii" style="color:#bc7c55;font-size:12px">
    ___     ___    _  _      ___    ___     ___  
   / __|   / _ \  | \| |    | __|  |_ _|   / __| 
@@ -70,6 +75,28 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <h3>account</h3>    
 <button id="form-button" type="button" data-tooltip="will prompt you to log in if you aren't already" onclick="window.location='/account/change-password'">change password</button>
 <button id="form-button" type="button" data-tooltip="save your discord user ID to your account for notifications" onclick="window.location='/account/link-discord'">link discord account</button>
+<br><br><hr><br>
+</span>
+<span id="notification-settings">
+<h3>notifications</h3>
+<div class="checkbox-group" id="discord-notifications-setting">
+    <label class="checkbox-label">
+        <input type="checkbox" class="checkbox" id="discord-notifications-toggle" checked>
+        <span data-tooltip="have Toast send feed mentions and reply notifications through Discord">discord notifications via Toast</span>
+    </label>
+</div>
+<div class="checkbox-group" id="notification-sounds-setting">
+    <label class="checkbox-label">
+        <input type="checkbox" class="checkbox" id="notification-sounds-toggle" checked>
+        <span data-tooltip="play a sound when a new in-site notification arrives">notification sounds</span>
+    </label>
+</div>
+<div class="checkbox-group">
+    <label class="checkbox-label">
+        <input type="checkbox" class="checkbox" id="hourly-beep-toggle" checked>
+        <span data-tooltip="makes the website play a watch beep sound every hour">beep beep!</span>
+    </label>
+</div>
 <br><br><hr><br>
 </span>
 <span id="accessibility-settings">
@@ -168,9 +195,44 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 </div>
 <div class="checkbox-group">
     <label class="checkbox-label">
-        <input type="checkbox" class="checkbox" id="hourly-beep-toggle" checked>
-        <span data-tooltip="makes the website play a watch beep sound every hour">beep beep!</span>
+        <input type="checkbox" class="checkbox" id="fruity-dance-toggle">
+        <span data-tooltip="summon FL Chan using the Fruity Dance sprite animation">fruity dance</span>
     </label>
+</div>
+<div id="fruity-dance-settings" hidden>
+    <br>
+    <h4>fruity dance</h4>
+    <label for="fruity-dance-spritesheet">spritesheet</label><br>
+    <select class="dropdown" id="fruity-dance-spritesheet">
+        {fruity_dance_spritesheet_options}
+    </select>
+    <div id="fruity-dance-custom-upload" hidden>
+        <button type="button" id="fruity-dance-upload-button">upload image</button>
+        <button type="button" id="fruity-dance-remove-button" hidden>remove</button>
+        <input type="file" id="fruity-dance-upload-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <input type="file" id="fruity-dance-meta-input" accept=".txt,text/plain" hidden>
+        <span id="fruity-dance-upload-status">no custom image selected</span>
+    </div>
+    <br><br>
+    <label for="fruity-dance-loop">animation loop</label><br>
+    <select class="dropdown" id="fruity-dance-loop">
+        <option value="0">waiting</option>
+        <option value="1">stepping</option>
+        <option value="2">jumping</option>
+        <option value="3">zombie</option>
+        <option value="4">waving</option>
+        <option value="5">hula</option>
+        <option value="6">windmill</option>
+        <option value="7">zitabata</option>
+        <option value="8">dervish</option>
+        <option value="9">held</option>
+    </select>
+    <br><br>
+    <label for="fruity-dance-speed">speed: <output id="fruity-dance-speed-value">100%</output></label><br>
+    <input type="range" id="fruity-dance-speed" min="25" max="200" step="5" value="100">
+    <br><br>
+    <label for="fruity-dance-reflection">reflection: <output id="fruity-dance-reflection-value">30%</output></label><br>
+    <input type="range" id="fruity-dance-reflection" min="0" max="100" step="5" value="30">
 </div>
 <br><br><hr><br>
 </span>

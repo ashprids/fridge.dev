@@ -30,6 +30,7 @@ const MOBILE_VIEW_COOKIE = 'mobile_friendly_view';
 const MOBILE_VIEW_DOMAIN = '.fridge.dev';
 const ONEKO_ENABLED_KEY = 'onekoEnabled';
 const HOURLY_BEEP_ENABLED_KEY = 'hourlyBeepEnabled';
+const NOTIFICATION_SOUNDS_ENABLED_KEY = 'notificationSoundsEnabled';
 const FEED_GUEST_BROWSER_ID_KEY = 'feedGuestBrowserId';
 const ACCESSIBILITY_PREFS_KEY = 'accessibilityPrefs';
 const ACCESSIBILITY_DEFAULTS = {
@@ -561,6 +562,20 @@ function setLocalHourlyBeepEnabled(enabled) {
     } catch (_) { /* ignore */ }
 }
 
+function readLocalNotificationSoundsEnabled() {
+    try {
+        return localStorage.getItem(NOTIFICATION_SOUNDS_ENABLED_KEY) !== 'false';
+    } catch (_) {
+        return true;
+    }
+}
+
+function setLocalNotificationSoundsEnabled(enabled) {
+    try {
+        localStorage.setItem(NOTIFICATION_SOUNDS_ENABLED_KEY, enabled ? 'true' : 'false');
+    } catch (_) { /* ignore */ }
+}
+
 function saveLocalOnekoEnabled(enabled) {
     try {
         localStorage.setItem(ONEKO_ENABLED_KEY, enabled ? '1' : '0');
@@ -626,6 +641,7 @@ function applyAccessibilityPrefs(prefs, opts = {}) {
     root.classList.toggle('access-reduced-motion', normalized.reduceMotion);
     root.classList.remove('access-high-contrast');
     if (typeof window.fridg3SetDebugMode === 'function') window.fridg3SetDebugMode(normalized.debugMode);
+    window.dispatchEvent(new CustomEvent('fridg3:accessibility-change', { detail: normalized }));
     settingsDebugLog(`accessibility preferences applied (reduced motion ${normalized.reduceMotion ? 'on' : 'off'}, debug ${normalized.debugMode ? 'on' : 'off'})`);
     if (opts.persistLocal !== false) {
         saveLocalAccessibilityPrefs(normalized);
@@ -1052,6 +1068,8 @@ function initSettingsPage() {
         const debugModeToggle = document.getElementById('debug-mode-toggle');
         const onekoToggle = document.getElementById('oneko-toggle');
         const hourlyBeepToggle = document.getElementById('hourly-beep-toggle');
+        const notificationSoundsToggle = document.getElementById('notification-sounds-toggle');
+        const discordNotificationsToggle = document.getElementById('discord-notifications-toggle');
         const sitemapBtn = document.querySelector('[data-action="generate-sitemap"]');
         const devDataBootstrapBtn = document.querySelector('[data-action="dev-data-bootstrap"]');
         const toastPersonalityTextarea = document.getElementById('toast-personality-json');
@@ -1927,6 +1945,7 @@ function initSettingsPage() {
         setAccessibilityToggles(readLocalAccessibilityPrefs());
         setOnekoToggle(readLocalOnekoEnabled());
         if (hourlyBeepToggle) hourlyBeepToggle.checked = readLocalHourlyBeepEnabled();
+        if (notificationSoundsToggle) notificationSoundsToggle.checked = readLocalNotificationSoundsEnabled();
         setTitleAnimationControls(readLocalTitleAnimationPrefs());
 
         if (window.fetch) {
@@ -1991,6 +2010,9 @@ function initSettingsPage() {
                 if (typeof data.settings.onekoEnabled === 'boolean') {
                     setOnekoToggle(data.settings.onekoEnabled);
                     setOnekoEnabled(data.settings.onekoEnabled);
+                }
+                if (discordNotificationsToggle && typeof data.settings.discordNotificationsEnabled === 'boolean') {
+                    discordNotificationsToggle.checked = data.settings.discordNotificationsEnabled;
                 }
                 if (typeof data.settings.glowIntensity === 'string') {
                     const serverGlowIntensity = data.settings.glowIntensity === 'none' ? 'none' : 'medium';
@@ -2066,13 +2088,27 @@ function initSettingsPage() {
         }
 
         if (debugModeToggle) {
-            debugModeToggle.addEventListener('change', () => applyAccessibilityPrefs(getAccessibilityValues()));
+            debugModeToggle.addEventListener('change', () => {
+                const normalized = applyAccessibilityPrefs(getAccessibilityValues());
+                if (!isLoggedIn || !window.fetch) return;
+                const params = new URLSearchParams();
+                params.append('debugMode', normalized.debugMode ? 'on' : 'off');
+                fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: params.toString(),
+                }).catch(() => {});
+            });
         }
 
         document.addEventListener('change', event => {
             const control = event.target;
             if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)) return;
-            if (!control.closest('#appearance-settings, #accessibility-settings, #admin-settings')) return;
+            if (control.id.startsWith('fruity-dance-') || control.id === 'debug-mode-toggle') return;
+            if (!control.closest('#appearance-settings, #accessibility-settings, #notification-settings, #admin-settings')) return;
             markSettingsDirty();
         });
 
@@ -2104,6 +2140,8 @@ function initSettingsPage() {
             const shouldReloadForMobileView = mobileViewEnabled !== lastSavedMobileViewEnabled;
             const accessibilityPrefs = applyAccessibilityPrefs(getAccessibilityValues());
             const titleAnimationPrefs = setTitleAnimationControls(getTitleAnimationValues());
+            setLocalNotificationSoundsEnabled(!notificationSoundsToggle || notificationSoundsToggle.checked);
+            setLocalHourlyBeepEnabled(!hourlyBeepToggle || hourlyBeepToggle.checked);
 
             if (isToastSession) {
                 if (isLoggedIn && window.fetch) {
@@ -2146,7 +2184,6 @@ function initSettingsPage() {
             }
             const onekoEnabled = !!(onekoToggle && onekoToggle.checked);
             setOnekoEnabled(onekoEnabled);
-            setLocalHourlyBeepEnabled(!hourlyBeepToggle || hourlyBeepToggle.checked);
             if (isLoggedIn && window.fetch) {
                 const params = new URLSearchParams();
                 params.append('glowIntensity', selected);
@@ -2157,6 +2194,9 @@ function initSettingsPage() {
                 params.append('titleAnimation', titleAnimationPrefs.animation);
                 params.append('titleAnimationAlways', titleAnimationPrefs.always ? 'on' : 'off');
                 params.append('titleAnimationDesync', titleAnimationPrefs.desync ? 'on' : 'off');
+                if (discordNotificationsToggle && !discordNotificationsToggle.disabled) {
+                    params.append('discordNotificationsEnabled', discordNotificationsToggle.checked ? 'on' : 'off');
+                }
 
                 if (themeSupportsColorPrefs(selectedTheme) && Object.keys(mergedColors).length) {
                     // flatten colors into separate fields (merged so defaults persist server-side)

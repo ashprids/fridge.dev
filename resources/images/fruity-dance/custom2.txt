@@ -1,0 +1,14 @@
+---
+Numbers in square brackets [] are how many seconds to wait before sending the next message. If the square brackets are blank, then wait for the user to press enter before sending the next message
+Text in brackets () are events that need to occur before sending the next message
+Any hashtags #### should be garbled, corrupted text
+
+Messages should be formatted like:
+[?] > text here
+---
+
+T## functi### i# 
+[2]
+op##at#onGe#MeTheF##kO#tOfH#r#()
+[3]
+B##t o# l### d#de.

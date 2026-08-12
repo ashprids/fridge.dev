@@ -1,0 +1,30 @@
+[Unit]
+Description=fridge.dev Toast Discord bot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=http
+Group=http
+WorkingDirectory=/var/www/fridge.dev/others/toast-discord-bot/bot
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/test -x /var/www/fridge.dev/others/toast-discord-bot/bot/venv/bin/python
+ExecStartPre=/usr/bin/test -r /var/www/fridge.dev/data/etc/toast.json
+ExecStart=/var/www/fridge.dev/others/toast-discord-bot/bot/venv/bin/python /var/www/fridge.dev/others/toast-discord-bot/bot/main.py
+Restart=always
+RestartSec=5s
+KillSignal=SIGINT
+TimeoutStopSec=30s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/www/fridge.dev/data
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=toast-discord-bot
+
+[Install]
+WantedBy=multi-user.target

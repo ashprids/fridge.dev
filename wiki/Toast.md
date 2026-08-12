@@ -88,7 +88,7 @@ The response is delayed by one minute and is stored through the normal reply sys
 
 ## Discord Service
 
-The Python service lives in `others/toast-discord-bot/bot/`, uses Python 3 with `discord.py`, `aiohttp`, and `pynacl`, and requires `ffmpeg` for relevant media behavior. Production starts it through `start.sh` in a GNU screen session.
+The Python service lives in `others/toast-discord-bot/bot/`, uses Python 3 with `discord.py`, `aiohttp`, and `pynacl`, and requires `ffmpeg` for relevant media behavior. Production runs it through the checked-in `toast-discord-bot.service` systemd unit. `start.sh` remains a foreground development helper using the same virtualenv.
 
 The bot provides:
 
@@ -136,7 +136,7 @@ Sending exactly `CLEARMEMORY` creates a memory boundary. Toast reacts to it, and
 
 ## Notifications and Website Integration
 
-Toast scans feed activity for accounts with linked Discord IDs and sends deduplicated DMs for post mentions, reply mentions, and replies to the account's own posts. Dedupe state is stored in `data/etc/toast-feed-notify-state.json`. The website independently mirrors these event categories through its in-site inbox; it does not use the browser Notification API.
+Toast scans feed activity for accounts with linked Discord IDs and `discordNotificationsEnabled` not set to false, then sends deduplicated DMs for post mentions, reply mentions, and replies to the account's own posts. The preference defaults to enabled for backward compatibility and can be changed under Settings → Notifications. Dedupe state is stored in `data/etc/toast-feed-notify-state.json`. The website independently mirrors these event categories through its in-site inbox; it does not use the browser Notification API.
 
 Account creation can ask Toast to DM invite credentials. Discord account linking asks the local service to verify that the Discord user is in the server and then assign the `registered` role. A bot-service failure does not roll back an already-created website account; the UI reports the concrete integration error.
 
@@ -204,8 +204,10 @@ Toast's public-copy sanitization rules are documented on [Developer Data](Develo
 
 Toast's website integration listens only on `127.0.0.1:8765`. Its endpoints include status/control operations, manual DM operations, AI-mute changes, `/contact/notify`, and `/patch-notice`. They are internal service calls, not public `/api/*` routes.
 
-Production runs Toast as the PHP-FPM `http` user so he can update `/data`. Deployment stops legacy `deploy`-owned and current `http`-owned `toast` screen sessions, prepares `toast-bot.log`, and starts the deployed copy as `http`. Because `http` has no normal login home, screen uses `SCREENDIR=/tmp/toast-screen-http`, created as `http` with mode `700`.
+Production runs Toast as the PHP-FPM `http` user so he can update `/data`. `/etc/systemd/system/toast-discord-bot.service` links to the checked-in unit beneath the bot directory. The unit starts after the network is online, uses the bot virtualenv, sends unbuffered output to journald, disables bytecode writes in the read-only deployed tree, allows runtime writes only beneath `/data`, and automatically restarts after failures. It uses `SIGINT` when stopping so Toast can disconnect from Discord and voice cleanly.
 
-The deploy user needs passwordless sudo to run the Toast restart as `http`. Only `toast-bot.log` beneath the bot code directory is made writable for runtime logging; persistent state belongs under `/data`.
+The deploy user has narrowly scoped passwordless sudo access to reload systemd, restart this unit, inspect its status, and read its recent journal. After every successful deploy, GitHub reloads the unit, restarts Toast, and waits up to 30 seconds for `127.0.0.1:8765/status` to report that the Discord connection is online; an unhealthy restart fails deployment before the patch-notice step and prints service diagnostics.
+
+Initial production bootstrap is a root-only operation: link the deployed `toast-discord-bot.service` into `/etc/systemd/system/`, install `toast-discord-bot.sudoers` as `/etc/sudoers.d/fridge-toast-deploy` with mode `0440`, validate it with `visudo -cf`, then run `systemctl daemon-reload` and `systemctl enable --now toast-discord-bot.service`. Later deployments use the checked-in unit through that stable link.
 
 In development, missing `data/etc/toast.json` disables bot controls. Discord linking, notification DMs, contact alerts, and the DM inbox require the local service to be running. Create a Python virtual environment, install current `discord.py`, `aiohttp`, and `pynacl`, and install `ffmpeg` through the system package manager.

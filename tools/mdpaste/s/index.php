@@ -71,7 +71,7 @@ if ($paste === null) {
         . '<article class="mdpaste-markdown" id="mdpaste-formatted">'
         . mdp_render_markdown($markdown, !empty($paste['hard_breaks']))
         . '</article>'
-        . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code>' . mdp_h($markdown) . '</code></pre>'
+        . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code class="nohighlight">' . mdp_h($markdown) . '</code></pre>'
         . '<script id="mdpaste-source-data" type="application/json">' . ($rawPayload ?: '{}') . '</script>';
 }
 

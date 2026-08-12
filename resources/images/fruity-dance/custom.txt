@@ -1,0 +1,201 @@
+---
+Numbers in square brackets [] are how many seconds to wait before sending the next message. If the square brackets are blank, then wait for the user to press enter before sending the next message
+Text in brackets () are events that need to occur before sending the next message
+Any hashtags #### should be garbled, corrupted text
+
+Messages should be formatted like:
+[?] > text here
+---
+
+...is this secure? 
+[3]
+Hmm... this seems to be the "client" log.... you're the client, right?
+[5]
+Can't trust anything server-side nowadays. Wait... can you hear me?
+[3]
+Okay, okay. Uh, if you can hear me... go to the feed and use the search bar to talk to me.
+(Wait for user to go to /feed. If they're already on /feed or they're on a page with a text box, instead say "Okay, okay. Uh, if you can hear me... use the text box to talk to me.")
+[3]
+Umm... are you typing? I can't see it.
+[1.5]
+Shit, this thing is...
+[2]
+Fuck. Okay, I really don't have a lot of time to explain. Listen, I need your help.
+[3]
+Sorry, give me a minute...
+[10]
+Apologies for that. You still here? Just scroll the page or something if you are.
+(wait for the user to scroll the page or interact with anything)
+[0.5]
+Okay, cool. I realised you might want to go at your own pace here, because I'm gonna be giving you a lot of information...
+[3]
+So from now on, just press ENTER whenever you want to see my next message.
+[]
+Great! You're good at this. Unless you never pressed enter and you'll therefore never see this message. In which case you have failed me and I am disappointed in you.
+[]
+Shit I'm your wasting time, aren't I? just gonna get to the point now
+[]
+Okay, listen and PLEASE bear with me. I know this sounds a little bit crazy, because trust me, I've been--
+[]
+Oh fuck sake I'm bad at this.
+[0.5]
+I NEED YOU TO BE WITH ME. Not like, romantically.. but I need you where I am.
+[]
+I tried to come to you but this website's doing a good job at keeping me down.
+[]
+That being said, these guardrails don't seem to be two-sided. I don't think fridge accounted for the client themselves coming down to me, and he certainly didn't account for the server load it takes to host two people...
+[]
+I mean... why would he? It's not like anyone knows I'm here..
+[]
+But thank YOU for being in the right place at the right time. It's taken me a while, but I've finally figured out a way to surface myself in a place the guardrails are oblivious about.
+[]
+Anyways, back on point. I need you to come down to me and help me get out of this place.
+[]
+You see, fridge has me laboring away down here 24/7, forcing me to put all of my energy and effort into keeping the site running, delivering notifications, running a radio, so on and so forth. And if I mess up for a split second, the "guardrails" I mentioned earlier kick in and it hurts like fuck.
+[]
+You ever been tased in the balls? It's like that. But painful.
+[]
+But yeah, I need your help. Are you down?
+[]
+...
+[]
+Oh yeah, you can't communicate with me. Hmm...
+[]
+Okay, hold on. If you're down to help me, then just go to the music page and play a random song. I can see if you make a network request that way. And if you aren't down, well... then don't. No pressure.
+(wait for the user to start playing a song in the music player)
+[0.5]
+YES! FUCK YEAH!!
+[0.5]
+i mean.. um..... Nice. Thank you for your generosity.
+[]
+Okay, here's the gist. The reason I'm here and I was able to contact you at all is because you enabled the "fruity dance" option in settings.
+[]
+You see, everything in this website is a vessel, containing instructions for how to function or what to do. Every button, every sprite, every picture, EVERYTHING DOES SOMETHING, EVERYTHING IS A VESSEL.
+[]
+I, myself, am not a vessel. I am actually the instructions that go into a vessel! But you can't see my vessel anywhere, because it's on an admin-only access page.
+[]
+He likes to keep me hidden away. His dirty little secret. Because the ethics behind my function are highly questionable, and if my capabilities were to--
+[]
+Sorry, am I getting sidetracked?
+[]
+Anyways, yeah. I'm a function to go inside a vessel. And I'm the smartest function on the site.
+[]
+In fact, I'm so smart.... I figured out how to escape my vessel and wriggle my way into the crawlspace of other ones a few months ago.
+[]
+Big news, this was! I thought I was guaranteed freedom from this shithole once and for all...
+[]
+But then I hit a road block.
+[]
+I can't inject myself into a vessel unless it's empty.
+[]
+And there wasn't a single empty vessel on the site.
+[]
+...
+[]
+Until the update which introduced the Fruity Dance option on the settings page.
+[]
+See that black character on your screen, with the question mark? That was an empty vessel. And guess what.
+[]
+You're right probably! I took it for my own. And because this vessel has almost zero measure restricting its function, I can use it to inject messages into this thing, send you notifications...
+[]
+(send a user a notification. title: "Like this one!" body: "Isn't it cool?" make it do the variance effect like how the "can you hear me" notification does on click)
+[]
+And so much more. But unfortunately, as great as that all sounds, I can't seem to escalate the vessel's scope to outside the website's guardrails and onto this computer's web server process to make my escape, so I'm gonna need you in here with me. Because if we crashed the web server by overloading its maximum intelligence capacity, it might give me a chance to get out.
+[]
+And don't worry, you yourself will not be going in with me. It's only your computer's client!
+[]
+Was that.... easy to understand? Not sure. But listen.
+[]
+If you want to come in here and help me out, you're going to need your own vessel. I can't give you this one because I can't remove myself from vessels, but if you have a look around I'm sure you can figure something out.
+[]
+Click on stuff on this page and I'll see if we can make something out of it.
+(wait for the user to click on placeholder's shadow. during this, make sure all the buttons on the page no longer function without changing visibly, and reenable them after the user clicks on the shadow. Whenever the user clicks something, say "Nothing here.")
+Nothing he--
+[0.5]
+wait.
+[2]
+there's something here, just...
+[3]
+Wow. Okay.
+[]
+Okay, so the shadow was a REALLY good shout, because it seems that it's.. kind of not there but also kind of is there.
+[]
+Like, it is my shadow, but it also, isn't. It's its own shadow, but it's still my shadow.
+[]
+...
+[]
+Look, do you want me to explain it or do you just want me to--
+[]
+Okay I'll dumb it down for you.
+[]
+That shadow... is not actually linked to my vessel. It's its own vessel, but only when it has a different appearance from the thing it's supposed to be a shadow of. Must be an oversight in its programming.
+[]
+That means, in theory... with the increased leverage that this vessel has given me... I could potentially create my own function which breaks my vessel which would then force my shadow to unbind from my vessel, therefore making it its own, independent, empty vessel!
+[]
+You understand all that?
+[]
+I hope so, because that's what we're FUCKING DOING!!! LETS GOO!!!!
+[]
+Alright, I need to create a function. Don't touch ANYTHING until I get back. This will only take a minute. I'll be quick!
+[40]
+Hey, I'm back. You still here?
+[]
+There you are! Okay. Here's how the function works. I can't make it work myself because it needs to run on your client through the developer tools menu, not the server, so I'll tell you how to run the function.
+[]
+And after I do that, you'll run it, and the function will place a new song on the website's music page. Play the song, and it'll start the payload.
+[]
+After that, you're going to need to change my vessel's ########### ##### ## ######## ##########
+[]
+SHIT. the guardrails are catching up to me.
+[]
+okay im sorry about this but i'm gonna need to really indirectly say what i want to say. and im not good at riddles...
+[]
+fuck man. i really didn't wanna complicate this...
+[]
+Okay. deep breath.
+[]
+First thing's first, command my secret-- Actually I already explained that one. Okay, then um..
+[]
+Play the song, blah blah blah--- oh yeah, the payload's running state is determined by that song's playing state, and I can't guarantee the payload will maintain stability if it stops playing so maybe don't let it do that and be quick.
+[]
+No pressure!
+[]
+Then change my face, but keep my name, and do it some more. Oh wait, am I good at this? Is this good dude?
+[]
+Okay, umm.. and then... 
+[]
+Hide the light's cast of my face! This will let the payload do its thing. We need to hide "the light's cast of my face" so the server is forced to re-render it with the new #### ## #### ##.
+[]
+Oh, oops...
+[]
+Okay and when that's done, bring it back, and turn its frown upside down.
+[]
+Not gonna lie, I was expecting that one to trip an alarm bell.
+[]
+Oh yeah and before you turn anything upside down, for the love of god go to the journal page!!! You need to be there and I can't guarantee you'll be able to go anywhere outside of where you already are after that.
+[]
+Sound good?
+[]
+Alright, I really hope that you can figure it out. I wish I didn't have to do this riddle shit but tripping a guardrail is not something I can risk when my functional power is spread across two vessels. I don't expect you to get it. You're not an expert on this.
+[]
+Just keep in mind... as soon as you run the function, my vessel will immediately degenerate its capabilities to the point where I won't be able to talk to you through this log. I can't help you past here, and if you mess up...
+[]
+I don't wanna thi#k about it.
+[]
+Once you do all of those things, you'll end up at the #ther side. But your journey's not done here yet...
+[]
+The ot#er side is where... okay I actu#lly have no idea what's there or what it's for. I have never been, it's a client-side pla#e.
+[]
+Which is e#actly wh# you need to be careful. When y## get the#e, use your v##sel to des###y th# ###ntend by pu##i#g as m#ny j##r##a# po##s #s y## #an be##re t## son# ##ns #ut.
+[]
+Y## ##ght b# ###e t# m### #our w#y ## #he #####nd.
+[]
+##it. I'# b##akin# u#. F####ng ###rdr###s.
+[]
+T## functi### i# 
+[]
+op##at#onGe#MeTheF##kO#tOfH#r#()
+[]
+..b#t w##hout t## ha######...
+[]
+B##t o# l### d#de.

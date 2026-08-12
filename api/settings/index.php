@@ -8,6 +8,7 @@ require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
+require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'fruity-dance.php';
 
 $renderHelperPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'render.php';
 if (is_file($renderHelperPath)) {
@@ -61,6 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
         exit;
     }
+    $defaultFruityDanceSheet = fridg3_default_fruity_dance_spritesheet(dirname(__DIR__, 2));
+    $fruityDanceSheets = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2));
     $result = [
         'ok' => true,
         'settings' => [
@@ -68,6 +71,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'glowIntensity' => null,
             'colors' => null,
             'onekoEnabled' => null,
+            'fruityDanceEnabled' => false,
+            'fruityDanceSpritesheet' => $defaultFruityDanceSheet,
+            'fruityDanceAnimations' => $fruityDanceSheets[$defaultFruityDanceSheet]['animations'] ?? fridg3_default_fruity_dance_animations(),
+            'fruityDanceLoop' => 0,
+            'fruityDanceSpeed' => 100,
+            'fruityDanceReflection' => 30,
+            'discordNotificationsEnabled' => true,
             'reduceMotion' => null,
             'debugMode' => null,
             'titleAnimation' => 'wobble',
@@ -98,6 +108,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
             if (array_key_exists('onekoEnabled', $account)) {
                 $result['settings']['onekoEnabled'] = is_truthy_setting($account['onekoEnabled']);
+            }
+            if (array_key_exists('fruityDanceEnabled', $account)) {
+                $result['settings']['fruityDanceEnabled'] = is_truthy_setting($account['fruityDanceEnabled']);
+            }
+            if (isset($account['fruityDanceSpritesheet'])) {
+                $result['settings']['fruityDanceSpritesheet'] = fridg3_normalize_fruity_dance_spritesheet($account['fruityDanceSpritesheet'], dirname(__DIR__, 2));
+                $sheets = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2));
+                $result['settings']['fruityDanceAnimations'] = $sheets[$result['settings']['fruityDanceSpritesheet']]['animations'] ?? fridg3_default_fruity_dance_animations();
+            }
+            if (isset($account['fruityDanceLoop']) && is_numeric($account['fruityDanceLoop'])) {
+                $animationCount = count($result['settings']['fruityDanceAnimations'] ?? fridg3_default_fruity_dance_animations());
+                $result['settings']['fruityDanceLoop'] = max(0, min(max(0, $animationCount - 1), (int)$account['fruityDanceLoop']));
+            }
+            if (isset($account['fruityDanceSpeed']) && is_numeric($account['fruityDanceSpeed'])) {
+                $result['settings']['fruityDanceSpeed'] = max(25, min(200, (int)$account['fruityDanceSpeed']));
+            }
+            if (isset($account['fruityDanceReflection']) && is_numeric($account['fruityDanceReflection'])) {
+                $result['settings']['fruityDanceReflection'] = max(0, min(100, (int)$account['fruityDanceReflection']));
+            }
+            if (array_key_exists('discordNotificationsEnabled', $account)) {
+                $result['settings']['discordNotificationsEnabled'] = is_truthy_setting($account['discordNotificationsEnabled']);
             }
             if (array_key_exists('reduceMotion', $account)) {
                 $result['settings']['reduceMotion'] = is_truthy_setting($account['reduceMotion']);
@@ -180,6 +211,20 @@ $debugModeRaw = $debugModeProvided ? (string)$_POST['debugMode'] : null;
 $onekoProvided = array_key_exists('onekoEnabled', $_POST);
 $onekoRaw = $onekoProvided ? (string)$_POST['onekoEnabled'] : null;
 
+$fruityDanceEnabledProvided = array_key_exists('fruityDanceEnabled', $_POST);
+$fruityDanceEnabledRaw = $fruityDanceEnabledProvided ? (string)$_POST['fruityDanceEnabled'] : null;
+$fruityDanceSpritesheetProvided = array_key_exists('fruityDanceSpritesheet', $_POST);
+$fruityDanceSpritesheetRaw = $fruityDanceSpritesheetProvided ? (string)$_POST['fruityDanceSpritesheet'] : null;
+$fruityDanceLoopProvided = array_key_exists('fruityDanceLoop', $_POST);
+$fruityDanceLoopRaw = $fruityDanceLoopProvided ? (string)$_POST['fruityDanceLoop'] : null;
+$fruityDanceSpeedProvided = array_key_exists('fruityDanceSpeed', $_POST);
+$fruityDanceSpeedRaw = $fruityDanceSpeedProvided ? (string)$_POST['fruityDanceSpeed'] : null;
+$fruityDanceReflectionProvided = array_key_exists('fruityDanceReflection', $_POST);
+$fruityDanceReflectionRaw = $fruityDanceReflectionProvided ? (string)$_POST['fruityDanceReflection'] : null;
+
+$discordNotificationsProvided = array_key_exists('discordNotificationsEnabled', $_POST);
+$discordNotificationsRaw = $discordNotificationsProvided ? (string)$_POST['discordNotificationsEnabled'] : null;
+
 $titleAnimationProvided = array_key_exists('titleAnimation', $_POST);
 $titleAnimationRaw = $titleAnimationProvided ? strtolower(trim((string)$_POST['titleAnimation'])) : null;
 
@@ -255,6 +300,113 @@ if ($onekoProvided) {
     foreach ($data['accounts'] as &$account) {
         if (isset($account['username']) && (string)$account['username'] === $username) {
             $account['onekoEnabled'] = $onekoEnabled;
+            $updated = true;
+            break;
+        }
+    }
+    unset($account);
+
+    if ($updated) {
+        if (!save_accounts_data($accountsPath, $data)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'write_failed']);
+            exit;
+        }
+        $didWork = true;
+    }
+}
+
+if ($fruityDanceEnabledProvided || $fruityDanceSpritesheetProvided || $fruityDanceLoopProvided || $fruityDanceSpeedProvided || $fruityDanceReflectionProvided) {
+    $fruityDanceValues = [];
+    if ($fruityDanceEnabledProvided) {
+        $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+        $falsy  = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+        $lower = strtolower(trim((string)$fruityDanceEnabledRaw));
+        if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'invalid_fruity_dance_enabled_value']);
+            exit;
+        }
+        $fruityDanceValues['fruityDanceEnabled'] = in_array($lower, $truthy, true);
+    }
+    if ($fruityDanceSpritesheetProvided) {
+        $availableSpritesheets = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2));
+        if (!isset($availableSpritesheets[$fruityDanceSpritesheetRaw])) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'invalid_fruity_dance_spritesheet']);
+            exit;
+        }
+        $fruityDanceValues['fruityDanceSpritesheet'] = $fruityDanceSpritesheetRaw;
+    }
+    $fruityDanceLoopMaximum = 255;
+    if ($fruityDanceSpritesheetProvided) {
+        $requestedSheet = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2))[$fruityDanceSpritesheetRaw] ?? null;
+        if ($requestedSheet) $fruityDanceLoopMaximum = max(0, count($requestedSheet['animations']) - 1);
+    }
+    $integerInputs = [
+        'fruityDanceLoop' => [$fruityDanceLoopProvided, $fruityDanceLoopRaw, 0, $fruityDanceLoopMaximum],
+        'fruityDanceSpeed' => [$fruityDanceSpeedProvided, $fruityDanceSpeedRaw, 25, 200],
+        'fruityDanceReflection' => [$fruityDanceReflectionProvided, $fruityDanceReflectionRaw, 0, 100],
+    ];
+    foreach ($integerInputs as $key => [$provided, $raw, $minimum, $maximum]) {
+        if (!$provided) continue;
+        $value = filter_var($raw, FILTER_VALIDATE_INT);
+        if ($value === false || $value < $minimum || $value > $maximum) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'invalid_' . strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $key))]);
+            exit;
+        }
+        $fruityDanceValues[$key] = $value;
+    }
+
+    $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+    $data = load_accounts_data($accountsPath);
+    if ($data === null) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
+        exit;
+    }
+    $updated = false;
+    foreach ($data['accounts'] as &$account) {
+        if (isset($account['username']) && (string)$account['username'] === $username) {
+            foreach ($fruityDanceValues as $key => $value) $account[$key] = $value;
+            $updated = true;
+            break;
+        }
+    }
+    unset($account);
+    if ($updated) {
+        if (!save_accounts_data($accountsPath, $data)) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'write_failed']);
+            exit;
+        }
+        $didWork = true;
+    }
+}
+
+if ($discordNotificationsProvided) {
+    $truthy = ['1', 'true', 'yes', 'y', 'on', 'enabled'];
+    $falsy  = ['0', 'false', 'no', 'n', 'off', 'disabled'];
+    $lower = strtolower(trim((string)$discordNotificationsRaw));
+    if (!in_array($lower, $truthy, true) && !in_array($lower, $falsy, true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_discord_notifications_value']);
+        exit;
+    }
+
+    $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+    $data = load_accounts_data($accountsPath);
+    if ($data === null) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
+        exit;
+    }
+
+    $updated = false;
+    foreach ($data['accounts'] as &$account) {
+        if (isset($account['username']) && (string)$account['username'] === $username) {
+            $account['discordNotificationsEnabled'] = in_array($lower, $truthy, true);
             $updated = true;
             break;
         }

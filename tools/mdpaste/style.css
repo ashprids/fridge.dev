@@ -296,6 +296,10 @@ h1 {
 	margin-top: 0;
 }
 
+.markdown-body li + li {
+	margin-top: 6px;
+}
+
 .markdown-body strong {
 	color: var(--fg);
 }

@@ -615,9 +615,15 @@ def load_accounts_index():
         if not username:
             continue
         discord_user_id = str(account.get('discordUserId', '')).strip()
+        discord_notifications_raw = account.get('discordNotificationsEnabled', True)
+        if isinstance(discord_notifications_raw, str):
+            discord_notifications_enabled = discord_notifications_raw.strip().lower() not in ('0', 'false', 'no', 'off', 'disabled')
+        else:
+            discord_notifications_enabled = bool(discord_notifications_raw)
         index[username.lower()] = {
             'username': username,
             'discord_user_id': discord_user_id,
+            'discord_notifications_enabled': discord_notifications_enabled,
         }
     return index
 
@@ -1883,7 +1889,7 @@ async def feed_notifications_monitor():
                 if target_key == author_key:
                     continue
                 discord_user_id = target.get('discord_user_id', '')
-                if not discord_user_id:
+                if not discord_user_id or not target.get('discord_notifications_enabled', True):
                     continue
                 await send_dm_to_user(
                     discord_user_id,
@@ -1919,7 +1925,7 @@ async def feed_notifications_monitor():
                     if target_key == reply_author_key or target_key == post_owner_key:
                         continue
                     discord_user_id = target.get('discord_user_id', '')
-                    if not discord_user_id:
+                    if not discord_user_id or not target.get('discord_notifications_enabled', True):
                         continue
                     await send_dm_to_user(
                         discord_user_id,
@@ -1927,7 +1933,7 @@ async def feed_notifications_monitor():
                         f"> \"{format_quote_block(reply.get('body', ''))}\""
                     )
 
-                if not post_owner_discord_id:
+                if not post_owner_discord_id or not (post_owner or {}).get('discord_notifications_enabled', True):
                     continue
                 if reply['username'].lower() == post['username'].lower():
                     continue

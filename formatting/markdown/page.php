@@ -68,7 +68,7 @@ $showcase = '<style>'
     . '<button type="button" id="mdpaste-format-toggle" data-tooltip="toggle formatting" aria-label="toggle formatting" aria-pressed="false"><i class="fa-solid fa-code"></i></button>'
     . '</div>'
     . '<article class="mdpaste-markdown" id="mdpaste-formatted">' . $rendered . '</article>'
-    . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code>' . mdp_h($markdown) . '</code></pre>'
+    . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code class="nohighlight">' . mdp_h($markdown) . '</code></pre>'
     . '<script id="mdpaste-source-data" type="application/json">' . $payload . '</script>';
 $contentTemplate = (string)file_get_contents($root . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 's' . DIRECTORY_SEPARATOR . 'content.html');
 $content = str_replace('{paste_content}', $showcase, $contentTemplate);

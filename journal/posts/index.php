@@ -135,7 +135,7 @@ if ($isV2) {
     $v2Clearance = $editButton !== '' ? 116 : 86;
     $paste = $journalViewerStyles . '<div class="journal-mdpaste-post" style="--journal-action-clearance:' . $v2Clearance . 'px">' . $actions
         . '<article class="mdpaste-markdown" id="mdpaste-formatted">' . $content_html . '</article>'
-        . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code>' . mdp_h($parsedPost['markdown']) . '</code></pre>'
+        . '<pre class="mdpaste-raw-markdown" id="mdpaste-raw" hidden><code class="nohighlight">' . mdp_h($parsedPost['markdown']) . '</code></pre>'
         . '<script id="mdpaste-source-data" type="application/json">' . $payload . '</script></div>';
     $content = str_replace('{paste_content}', $paste, $sharedContent);
 } else {

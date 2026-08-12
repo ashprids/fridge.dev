@@ -692,9 +692,10 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/main.js' => '/main.js?v=20260810-mobile-ascii-stable-sizing-1',
-            '/js/settings.js' => '/js/settings.js?v=20260810-mobile-routing-hourly-beep-1',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260810-notification-volume-30-1',
+            '/main.js' => '/main.js?v=20260812-fruity-spa-5',
+            '/js/settings.js' => '/js/settings.js?v=20260812-settings-split-72',
+            '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260812-unlocked-track-route-94',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260812-media-state-35',
             '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
             '/js/bbcode.js' => '/js/bbcode.js?v=20260810-preview-mention-tooltips-1',
         ];

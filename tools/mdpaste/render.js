@@ -21,6 +21,24 @@ const loadScript = (id, source) => {
     });
 };
 
+function highlightRawMarkdown(root = document) {
+    if (!window.hljs?.highlight) return;
+    const scope = root?.querySelectorAll ? root : document;
+    scope.querySelectorAll(".mdpaste-raw-markdown code:not([data-mdpaste-highlighted])").forEach(code => {
+        const source = code.textContent || "";
+        const frontMatter = source.match(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/)?.[0] || "";
+        const body = source.slice(frontMatter.length);
+        const highlightedFrontMatter = frontMatter && window.hljs.getLanguage?.("yaml")
+            ? window.hljs.highlight(frontMatter, { language: "yaml", ignoreIllegals: true }).value
+            : frontMatter.replace(/[&<>]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[character]);
+        const highlightedBody = window.hljs.highlight(body, { language: "markdown", ignoreIllegals: true }).value;
+        code.innerHTML = highlightedFrontMatter + highlightedBody;
+        code.classList.remove("nohighlight");
+        code.classList.add("hljs", "language-markdown");
+        code.dataset.mdpasteHighlighted = "1";
+    });
+}
+
 async function enhanceMdpaste(root = document) {
     const scope = root?.querySelectorAll ? root : document;
     if (typeof window.initInlineMediaPlayers === "function") window.initInlineMediaPlayers(scope);
@@ -117,7 +135,11 @@ function initPasteActions(root = document) {
 window.fridg3RenderMdpasteEnhancements = enhanceMdpaste;
 window.fridg3InitMdpasteView = async function (root = document) {
     initPasteActions(root);
+    highlightRawMarkdown(root);
     await enhanceMdpaste(root);
 };
 window.fridg3InitMdpasteView(document);
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => highlightRawMarkdown(document), { once: true });
+}
 })();

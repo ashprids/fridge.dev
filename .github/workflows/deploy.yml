@@ -129,67 +129,35 @@ jobs:
           ssh "$REMOTE" TARGET="$TARGET" bash -s <<'EOF'
           set -euo pipefail
 
-          SCREEN_SESSION="toast"
-          RUNTIME_USER="http"
-          BOT_DIR="$TARGET/others/toast-discord-bot/bot"
-          START_SCRIPT="$BOT_DIR/start.sh"
-          LOG_FILE="$BOT_DIR/toast-bot.log"
-          SCREEN_DIR="/tmp/toast-screen-$RUNTIME_USER"
+          SERVICE="toast-discord-bot.service"
+          UNIT_SOURCE="$TARGET/others/toast-discord-bot/bot/$SERVICE"
+          UNIT_LINK="/etc/systemd/system/$SERVICE"
+          [ "$TARGET" = "/var/www/fridge.dev" ] || { echo "refusing to restart Toast for unexpected target: $TARGET" >&2; exit 1; }
+          [ -r "$UNIT_SOURCE" ] || { echo "Toast service unit is missing: $UNIT_SOURCE" >&2; exit 1; }
+          [ "$(readlink -f "$UNIT_LINK" 2>/dev/null || true)" = "$UNIT_SOURCE" ] || {
+            echo "$UNIT_LINK must link to $UNIT_SOURCE; run the production Toast systemd bootstrap as root." >&2
+            exit 1
+          }
 
-          if ! sudo -n -u "$RUNTIME_USER" true; then
-            echo "deploy must have passwordless sudo permission to run Toast as $RUNTIME_USER."
+          echo "Reloading the Toast systemd unit and restarting the service..."
+          sudo -n /usr/bin/systemctl daemon-reload
+          sudo -n /usr/bin/systemctl restart "$SERVICE"
+
+          for _ in $(seq 1 30); do
+            status="$(curl -fsS --max-time 2 http://127.0.0.1:8765/status 2>/dev/null || true)"
+            if grep -Eq '"online"[[:space:]]*:[[:space:]]*true' <<<"$status"; then
+              echo "Toast is connected to Discord and its status endpoint is healthy."
+              break
+            fi
+            sleep 1
+          done
+
+          if ! grep -Eq '"online"[[:space:]]*:[[:space:]]*true' <<<"${status:-}"; then
+            echo "Toast did not connect to Discord within 30 seconds." >&2
+            sudo -n /usr/bin/systemctl status "$SERVICE" --no-pager >&2 || true
+            sudo -n /usr/bin/journalctl -u "$SERVICE" --no-pager -n 100 >&2 || true
             exit 1
           fi
-
-          if screen -list | grep -q "\.${SCREEN_SESSION}[[:space:]]"; then
-            echo "Stopping deploy-owned Toast bot screen session '$SCREEN_SESSION'..."
-            screen -S "$SCREEN_SESSION" -X stuff $'\003'
-
-            for _ in $(seq 1 30); do
-              if ! screen -list | grep -q "\.${SCREEN_SESSION}[[:space:]]"; then
-                break
-              fi
-              sleep 1
-            done
-
-            if screen -list | grep -q "\.${SCREEN_SESSION}[[:space:]]"; then
-              echo "Toast bot did not stop within 30 seconds; refusing to force-kill it."
-              exit 1
-            fi
-          else
-            echo "Deploy-owned Toast bot screen session '$SCREEN_SESSION' is not running."
-          fi
-
-          echo "Preparing screen socket directory for $RUNTIME_USER..."
-          sudo -n -u "$RUNTIME_USER" mkdir -p "$SCREEN_DIR"
-          sudo -n -u "$RUNTIME_USER" chmod 700 "$SCREEN_DIR"
-
-          if sudo -n -u "$RUNTIME_USER" env SCREENDIR="$SCREEN_DIR" screen -list | grep -q "\.${SCREEN_SESSION}[[:space:]]"; then
-            echo "Stopping $RUNTIME_USER-owned Toast bot screen session '$SCREEN_SESSION'..."
-            sudo -n -u "$RUNTIME_USER" env SCREENDIR="$SCREEN_DIR" screen -S "$SCREEN_SESSION" -X stuff $'\003'
-
-            for _ in $(seq 1 30); do
-              if ! sudo -n -u "$RUNTIME_USER" env SCREENDIR="$SCREEN_DIR" screen -list | grep -q "\.${SCREEN_SESSION}[[:space:]]"; then
-                break
-              fi
-              sleep 1
-            done
-
-            if sudo -n -u "$RUNTIME_USER" env SCREENDIR="$SCREEN_DIR" screen -list | grep -q "\.${SCREEN_SESSION}[[:space:]]"; then
-              echo "Toast bot did not stop within 30 seconds; refusing to force-kill it."
-              exit 1
-            fi
-          else
-            echo "$RUNTIME_USER-owned Toast bot screen session '$SCREEN_SESSION' is not running."
-          fi
-
-          echo "Preparing Toast bot log for $RUNTIME_USER..."
-          touch "$LOG_FILE"
-          chgrp "$RUNTIME_USER" "$LOG_FILE"
-          chmod 664 "$LOG_FILE"
-
-          echo "Starting Toast bot as $RUNTIME_USER with $START_SCRIPT..."
-          sudo -n -u "$RUNTIME_USER" env SCREENDIR="$SCREEN_DIR" bash "$START_SCRIPT"
           EOF
 
       - name: send patch notice
