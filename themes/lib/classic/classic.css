@@ -407,39 +407,6 @@ button[data-tooltip] {
     margin-top: auto;
 }
 
-#sidebar > a#sidebar-active-chat {
-    display: flex !important;
-    align-items: center;
-    gap: 7px;
-    width: calc(100% - 16px) !important;
-    margin: 8px !important;
-    padding: 7px 8px !important;
-    border: 1px solid var(--border);
-    box-sizing: border-box;
-    color: var(--fg);
-    background: var(--bg);
-    font-family: "MainRegular", var(--emoji-font), monospace;
-    font-size: 12px;
-    line-height: 1.2;
-    overflow: hidden;
-}
-
-#sidebar > a#sidebar-active-chat:hover {
-    background: rgb(30, 30, 30);
-}
-
-#sidebar > a#sidebar-active-chat i {
-    flex: 0 0 auto;
-    color: var(--subtle);
-}
-
-#sidebar > a#sidebar-active-chat span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 #sidebar-footer {
     width: 100%;
     padding: 18px 8px 12px 8px;

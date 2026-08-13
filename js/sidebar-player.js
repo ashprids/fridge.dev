@@ -6,8 +6,12 @@ const sidebar = document.getElementById('sidebar');
 const mobileCollapsedHeader = document.getElementById('mobile-collapsed-header');
 const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
 const SIDEBAR_KEY = 'sidebarVisible';
+let mobileMenuScrollY = null;
 
 function setSidebarVisible(visible, persist = true) {
+    if (isMobileTemplateActive() && visible && document.body.classList.contains('sidebar-is-hidden')) {
+        mobileMenuScrollY = window.scrollY;
+    }
     if (sidebar) {
         sidebar.style.display = 'flex';
     }
@@ -21,6 +25,11 @@ function setSidebarVisible(visible, persist = true) {
         showSidebarBtn.setAttribute('aria-label', visible ? 'hide menu' : 'show menu');
     }
     updateMobileCollapsedHeader(!visible);
+    if (isMobileTemplateActive() && mobileMenuScrollY !== null) {
+        const preservedScrollY = mobileMenuScrollY;
+        window.requestAnimationFrame(() => window.scrollTo(0, preservedScrollY));
+        if (!visible) mobileMenuScrollY = null;
+    }
     if (persist && !isMobileTemplateActive()) {
         try {
             localStorage.setItem(SIDEBAR_KEY, visible ? 'true' : 'false');
@@ -1123,18 +1132,26 @@ function syncAccountFooterButton() {
 
 window.addEventListener('DOMContentLoaded', syncAccountFooterButton);
 
+function syncSidebarShortcutWidths() {
+    const sidebarEl = document.getElementById('sidebar');
+    const footer = document.getElementById('sidebar-footer');
+    if (!sidebarEl || !footer) return;
+    const footerWidth = footer.offsetWidth;
+    const leftOffset = Math.max(0, footer.offsetLeft);
+    if (footerWidth <= 0) return;
+    sidebarEl.querySelectorAll('a.sidebar-notifications').forEach(link => {
+        link.style.setProperty('width', `${footerWidth}px`, 'important');
+        link.style.setProperty('margin-left', `${leftOffset}px`, 'important');
+        link.style.setProperty('margin-right', '0', 'important');
+    });
+}
+
 function syncActiveChatSidebarButton() {
     try {
         const sidebarEl = document.getElementById('sidebar');
         if (!sidebarEl || !window.fetch) return;
 
         const existing = document.getElementById('sidebar-active-chat');
-        const isLoggedInNow = !!document.getElementById('user-greeting');
-        if (!isLoggedInNow) {
-            if (existing) existing.remove();
-            return;
-        }
-
         fetch('/chat?action=active-account-chat', {
             cache: 'no-store',
             credentials: 'same-origin',
@@ -1146,6 +1163,7 @@ function syncActiveChatSidebarButton() {
             })
             .then(data => {
                 const chat = data && data.ok ? data.chat : null;
+                const chats = data && data.ok && Array.isArray(data.chats) ? data.chats : [];
                 const current = document.getElementById('sidebar-active-chat');
                 if (!chat || !chat.url) {
                     if (current) current.remove();
@@ -1153,11 +1171,21 @@ function syncActiveChatSidebarButton() {
                 }
                 sidebarDebugLog('active chat shortcut synchronized');
 
+                const unreadCount = chats.reduce((count, candidate) => {
+                    if (!candidate || !candidate.id || !candidate.lastIncomingMessageId) return count;
+                    let seenMessageId = '';
+                    try { seenMessageId = localStorage.getItem(`fridg3-chat-seen-${candidate.id}`) || ''; } catch (_) { /* no-op */ }
+                    return count + (seenMessageId === candidate.lastIncomingMessageId ? 0 : 1);
+                }, 0);
+
                 const link = current || document.createElement('a');
                 link.id = 'sidebar-active-chat';
+                link.className = 'sidebar-notifications';
                 link.href = chat.url;
                 link.setAttribute('data-tooltip', 'open your active private chat');
-                link.innerHTML = '<i class="fa-solid fa-comment-dots"></i><span>active chat</span>';
+                link.setAttribute('aria-label', `${unreadCount} unread chat${unreadCount === 1 ? '' : 's'}`);
+                link.classList.toggle('sidebar-notifications-unread', unreadCount > 0);
+                link.innerHTML = `<i class="fa-solid fa-comment-dots"></i><span class="sidebar-notification-label">active chat</span>${unreadCount > 0 ? `<strong class="sidebar-notification-count">${unreadCount}</strong>` : ''}`;
 
                 if (!current) {
                     const tracks = document.getElementById('mini-player-tracks');
@@ -1165,6 +1193,7 @@ function syncActiveChatSidebarButton() {
                     const footer = document.getElementById('sidebar-footer');
                     sidebarEl.insertBefore(link, tracks || miniPlayer || footer || null);
                 }
+                syncSidebarShortcutWidths();
             })
             .catch(() => {
                 sidebarDebugLog('active chat shortcut request failed');
@@ -1175,6 +1204,8 @@ function syncActiveChatSidebarButton() {
 }
 
 window.addEventListener('DOMContentLoaded', syncActiveChatSidebarButton);
+window.setInterval(syncActiveChatSidebarButton, 10000);
+window.addEventListener('resize', syncSidebarShortcutWidths);
 
 let notificationRevisionPollTimer = null;
 let notificationRevisionKnown = null;
@@ -1264,6 +1295,8 @@ async function markSiteNotificationsRead(keys, csrfToken = '') {
 }
 
 function showNextSiteNotificationToast() {
+    const path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+    if (path === '/chat' || path.startsWith('/chat/')) return;
     if (siteNotificationToastActive || siteNotificationToastQueue.length === 0) return;
     siteNotificationToastActive = true;
     const event = siteNotificationToastQueue.shift();
@@ -1372,10 +1405,17 @@ function showNextSiteNotificationToast() {
     syncToastVisibilityCountdown();
 }
 
+window.showTransientSiteNotification = function(title, body, url = '/notifications') {
+    siteNotificationToastQueue.push({ title: title || 'notification', body: body || '', url });
+    showNextSiteNotificationToast();
+};
+
 function notificationKeysForVisitedPage(events, visitedUrl) {
     let visitedPath = '';
     try { visitedPath = new URL(visitedUrl || window.location.href, window.location.href).pathname.replace(/\/+$/, ''); } catch (_) { return []; }
-    if (!visitedPath.startsWith('/feed/posts/')) return [];
+    const isFeedPost = visitedPath.startsWith('/feed/posts/');
+    const isChat = /^\/chat\/(?:[a-z0-9]{9}|[a-f0-9]{32})$/i.test(visitedPath);
+    if (!isFeedPost && !isChat) return [];
     return (Array.isArray(events) ? events : []).filter(event => {
         if (!event || !event.unread || !event.key || !event.url) return false;
         try { return new URL(event.url, window.location.href).pathname.replace(/\/+$/, '') === visitedPath; } catch (_) { return false; }
@@ -1446,6 +1486,7 @@ function updateMobileMenuNotificationBadge(unreadCount) {
 
 function syncNotificationsSidebarButton(options = {}) {
     try {
+        showNextSiteNotificationToast();
         const sidebarEl = document.getElementById('sidebar');
         if (!sidebarEl || !window.fetch) return;
         fetch(notificationInboxUrl(), {
@@ -1493,17 +1534,19 @@ function syncNotificationsSidebarButton(options = {}) {
 
                 const link = current || document.createElement('a');
                 link.id = 'sidebar-notifications';
+                link.classList.add('sidebar-notifications');
                 link.href = '/notifications';
                 link.setAttribute('data-tooltip', 'open your notifications');
                 link.setAttribute('aria-label', `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`);
                 link.classList.toggle('sidebar-notifications-unread', unreadCount > 0);
-                link.innerHTML = `<i class="fa-solid fa-bell"></i><span class="sidebar-notification-label">notifications</span><strong class="sidebar-notification-count">${unreadCount}</strong>`;
+                link.innerHTML = `<i class="fa-solid fa-bell"></i><span class="sidebar-notification-label">notifications</span>${unreadCount > 0 ? `<strong class="sidebar-notification-count">${unreadCount}</strong>` : ''}`;
                 const footer = document.getElementById('sidebar-footer');
                 if (footer && (link.parentNode !== sidebarEl || link.nextElementSibling !== footer)) {
                     sidebarEl.insertBefore(link, footer);
                 } else if (!current && !footer) {
                     sidebarEl.append(link);
                 }
+                syncSidebarShortcutWidths();
                 if (hasNewNotifications) {
                     link.classList.remove('sidebar-notifications-new');
                     void link.offsetWidth;
@@ -1926,10 +1969,12 @@ if (showSidebarBtn) {
     });
 }
 
-if (mobileMenuBackdrop) {
-    mobileMenuBackdrop.addEventListener('click', function() {
-        setSidebarVisible(false);
-    });
-}
+document.addEventListener('click', function(event) {
+    if (!isMobileTemplateActive() || document.body.classList.contains('sidebar-is-hidden')) return;
+    if (sidebar?.contains(event.target) || showSidebarBtn?.contains(event.target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSidebarVisible(false);
+}, true);
 
 // Detect logged-in state based on presence of the Logout footer link

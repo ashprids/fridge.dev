@@ -2380,6 +2380,13 @@ function updatePageViewFooter(rawUrl) {
         if (!footerViewsEl) return;
         const path = normalizePageViewPath(rawUrl);
         if (!path || path.startsWith('/api/')) return;
+        if (path === '/chat' || path.startsWith('/chat/')) {
+            const footer = footerViewsEl.closest('#content-footer');
+            if (footer) footer.style.display = 'none';
+            return;
+        }
+        const footer = footerViewsEl.closest('#content-footer');
+        if (footer) footer.style.removeProperty('display');
         if (lastPageViewPathRequested === path) return;
         lastPageViewPathRequested = path;
 
@@ -2640,6 +2647,14 @@ document.addEventListener('submit', function(e) {
 
         const continueAfterPassword = function() {
             form.dataset.confirmed = '1';
+
+            if (isChatDelete) {
+                try {
+                    const actionPath = new URL(form.getAttribute('action') || window.location.href, window.location.href).pathname.replace(/\/+$/, '');
+                    const match = actionPath.match(/^\/chat\/([a-z0-9]{9}|[a-f0-9]{32})$/i);
+                    if (match) sessionStorage.setItem(`fridg3-chat-ended-self-${match[1].toLowerCase()}`, '1');
+                } catch (_) { /* storage may be unavailable */ }
+            }
 
             if (form.getAttribute('data-delete-animation') === 'account-rip') {
                 playAccountDeleteRipAnimation(form).then(submitConfirmedForm).catch(submitConfirmedForm);

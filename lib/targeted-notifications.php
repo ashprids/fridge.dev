@@ -31,3 +31,68 @@ function fridg3_targeted_notifications_notify_admins(string $title, string $mess
     }
     return $adminCount === 0 || fridg3_targeted_notifications_save($records);
 }
+
+function fridg3_targeted_notifications_notify_user(string $username, string $title, string $message, string $url, string $date, string $idSeed): bool {
+    $username = strtolower(ltrim(trim($username), '@'));
+    if ($username === '') return false;
+    $records = fridg3_targeted_notifications_load();
+    $id = $idSeed . '-' . substr(hash('sha256', $username), 0, 12);
+    foreach ($records as $record) {
+        if ((string)($record['id'] ?? '') === $id) return true;
+    }
+    $records[] = [
+        'id' => $id,
+        'targetType' => 'user',
+        'target' => $username,
+        'title' => $title,
+        'message' => $message,
+        'url' => $url,
+        'date' => $date,
+    ];
+    return fridg3_targeted_notifications_save($records);
+}
+
+function fridg3_targeted_notifications_replace_user_group(string $username, string $group, string $title, string $message, string $url, string $date, string $idSeed): bool {
+    $username = strtolower(ltrim(trim($username), '@'));
+    $group = trim($group);
+    if ($username === '' || $group === '') return false;
+    $records = array_values(array_filter(fridg3_targeted_notifications_load(), static function (array $record) use ($username, $group): bool {
+        return !(
+            (string)($record['targetType'] ?? '') === 'user'
+            && strtolower((string)($record['target'] ?? '')) === $username
+            && (
+                (string)($record['group'] ?? '') === $group
+                || (
+                    $group === 'chat-message'
+                    && (string)($record['title'] ?? '') === 'New chat message'
+                    && str_starts_with((string)($record['id'] ?? ''), 'chat-')
+                )
+            )
+        );
+    }));
+    $records[] = [
+        'id' => $idSeed . '-' . substr(hash('sha256', $username), 0, 12),
+        'group' => $group,
+        'targetType' => 'user',
+        'target' => $username,
+        'title' => $title,
+        'message' => $message,
+        'url' => $url,
+        'date' => $date,
+    ];
+    return fridg3_targeted_notifications_save($records);
+}
+
+function fridg3_targeted_notifications_replace_admin_group(string $group, string $title, string $message, string $url, string $date, string $idSeed): bool {
+    $accountsPath = dirname(__DIR__) . '/data/accounts/accounts.json';
+    $accountsData = is_file($accountsPath) ? json_decode((string)@file_get_contents($accountsPath), true) : [];
+    $accounts = is_array($accountsData) ? (array)($accountsData['accounts'] ?? []) : [];
+    $ok = true;
+    foreach ($accounts as $account) {
+        if (!is_array($account) || !filter_var($account['isAdmin'] ?? false, FILTER_VALIDATE_BOOLEAN)) continue;
+        $username = (string)($account['username'] ?? '');
+        if ($username === '') continue;
+        $ok = fridg3_targeted_notifications_replace_user_group($username, $group, $title, $message, $url, $date, $idSeed) && $ok;
+    }
+    return $ok;
+}

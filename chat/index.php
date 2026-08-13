@@ -6,6 +6,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
+require_once $sessionBootstrapDir . "/lib/targeted-notifications.php";
+require_once $sessionBootstrapDir . "/lib/video-embeds.php";
 fridg3_start_session();
 
 $title = 'chat';
@@ -374,6 +376,22 @@ function chat_user_can_manage(): bool {
     return !empty($_SESSION['user']['isAdmin']) || in_array('chat', $allowedPages, true);
 }
 
+function chat_user_is_admin(): bool {
+    return !empty($_SESSION['user']['isAdmin']);
+}
+
+function chat_username_is_admin(string $username): bool {
+    $username = strtolower(trim($username));
+    if ($username === '') return false;
+    $accountsPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+    $accountsData = is_file($accountsPath) ? json_decode((string)@file_get_contents($accountsPath), true) : [];
+    foreach ((array)($accountsData['accounts'] ?? []) as $account) {
+        if (!is_array($account) || strtolower(trim((string)($account['username'] ?? ''))) !== $username) continue;
+        return filter_var($account['isAdmin'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    }
+    return false;
+}
+
 function chat_current_username(): string {
     return isset($_SESSION['user']['username']) ? (string)$_SESSION['user']['username'] : '';
 }
@@ -722,6 +740,249 @@ function chat_message_summary(array $message): string {
     return 'message';
 }
 
+function chat_extract_urls(string $body): array {
+    if (preg_match_all('~https?://[^\s<>"\']+~iu', $body, $matches) !== 1) return [];
+    $urls = [];
+    foreach ($matches[0] as $candidate) {
+        $url = rtrim((string)$candidate, '.,!?;:)\]}');
+        if (filter_var($url, FILTER_VALIDATE_URL) && !isset($urls[$url])) $urls[$url] = true;
+        if (count($urls) >= 4) break;
+    }
+    return array_keys($urls);
+}
+
+function chat_linkify_body(string $body): string {
+    $parts = preg_split('~(https?://[^\s<>"\']+)~iu', $body, -1, PREG_SPLIT_DELIM_CAPTURE);
+    if (!is_array($parts)) return nl2br(chat_h($body), false);
+    $html = '';
+    foreach ($parts as $index => $part) {
+        if ($index % 2 === 0) {
+            $html .= nl2br(chat_h($part), false);
+            continue;
+        }
+        $url = rtrim($part, '.,!?;:)\]}');
+        $suffix = substr($part, strlen($url));
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            $html .= chat_h($part);
+            continue;
+        }
+        $html .= '<a class="chat-message-link" href="' . chat_h($url) . '" target="_blank" rel="noopener noreferrer nofollow">' . chat_h($url) . '</a>' . chat_h($suffix);
+    }
+    return $html;
+}
+
+function chat_giphy_embed_url(string $url): ?string {
+    $parts = parse_url($url);
+    $host = strtolower((string)($parts['host'] ?? ''));
+    $host = preg_replace('/^www\./', '', $host) ?? $host;
+    $path = (string)($parts['path'] ?? '');
+    if ($host !== 'giphy.com') return null;
+    if (preg_match('~/embed/([a-zA-Z0-9]+)~', $path, $match) || preg_match('~/gifs/(?:[^/]*-)?([a-zA-Z0-9]+)$~', $path, $match)) {
+        return 'https://giphy.com/embed/' . rawurlencode($match[1]);
+    }
+    return null;
+}
+
+function chat_url_host_is_public(string $url): bool {
+    $host = strtolower(rtrim((string)(parse_url($url, PHP_URL_HOST) ?? ''), '.'));
+    if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost')) return false;
+    $ips = [];
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        $ips[] = $host;
+    } else {
+        foreach (gethostbynamel($host) ?: [] as $ip) $ips[] = $ip;
+        if (function_exists('dns_get_record')) {
+            foreach (dns_get_record($host, DNS_AAAA) ?: [] as $record) {
+                if (!empty($record['ipv6'])) $ips[] = (string)$record['ipv6'];
+            }
+        }
+    }
+    if ($ips === []) return false;
+    foreach (array_unique($ips) as $ip) {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) return false;
+    }
+    return true;
+}
+
+function chat_fetch_link_metadata(string $url): ?array {
+    if (!chat_url_host_is_public($url)) return null;
+    $body = '';
+    $contentType = '';
+    $status = 0;
+    $fetchSucceeded = false;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        if ($ch === false) return null;
+        curl_setopt_array($ch, [
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_TIMEOUT => 4,
+        CURLOPT_USERAGENT => 'fridge.dev chat link preview/1.0',
+        CURLOPT_HTTPHEADER => ['Accept: text/html,application/xhtml+xml;q=0.9'],
+        CURLOPT_RETURNTRANSFER => false,
+        CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$contentType): int {
+            if (stripos($header, 'Content-Type:') === 0) $contentType = trim(substr($header, 13));
+            return strlen($header);
+        },
+        CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk) use (&$body): int {
+            $remaining = 262144 - strlen($body);
+            if ($remaining <= 0) return 0;
+            $body .= substr($chunk, 0, $remaining);
+            return strlen($chunk) <= $remaining ? strlen($chunk) : 0;
+        },
+        ]);
+        if (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTP') && defined('CURLPROTO_HTTPS')) curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+        $ok = curl_exec($ch);
+        $curlError = curl_errno($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        $stoppedAtLimit = $ok === false && defined('CURLE_WRITE_ERROR') && $curlError === CURLE_WRITE_ERROR && strlen($body) >= 262144;
+        $fetchSucceeded = $ok !== false || $stoppedAtLimit;
+    } elseif (filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN)) {
+        $context = stream_context_create(['http' => [
+            'method' => 'GET', 'timeout' => 4, 'follow_location' => 0, 'max_redirects' => 0, 'ignore_errors' => true,
+            'header' => "Accept: text/html,application/xhtml+xml;q=0.9\r\nUser-Agent: fridge.dev chat link preview/1.0\r\n",
+        ]]);
+        $stream = @fopen($url, 'rb', false, $context);
+        if (is_resource($stream)) {
+            $body = (string)stream_get_contents($stream, 262144);
+            $headers = $http_response_header ?? [];
+            fclose($stream);
+            foreach ($headers as $header) {
+                if (preg_match('~^HTTP/\S+\s+(\d+)~i', $header, $match)) $status = (int)$match[1];
+                if (stripos($header, 'Content-Type:') === 0) $contentType = trim(substr($header, 13));
+            }
+            $fetchSucceeded = true;
+        }
+    }
+    if (!$fetchSucceeded || $status < 200 || $status >= 300) return null;
+    if (stripos($contentType, 'image/') !== false) {
+        return ['title' => rawurldecode(basename((string)(parse_url($url, PHP_URL_PATH) ?? ''))) ?: 'linked image', 'description' => '', 'image' => $url];
+    }
+    if ($contentType !== '' && stripos($contentType, 'text/html') === false && stripos($contentType, 'application/xhtml+xml') === false) return null;
+
+    $title = '';
+    $description = '';
+    $image = '';
+    if (class_exists('DOMDocument')) {
+        $previous = libxml_use_internal_errors(true);
+        $document = new DOMDocument();
+        if (@$document->loadHTML($body, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING)) {
+            foreach ($document->getElementsByTagName('meta') as $meta) {
+                $key = strtolower(trim($meta->getAttribute('property') ?: $meta->getAttribute('name')));
+                $value = trim($meta->getAttribute('content'));
+                if ($value === '') continue;
+                if ($description === '' && in_array($key, ['og:description', 'twitter:description', 'description'], true)) $description = $value;
+                if ($title === '' && in_array($key, ['og:title', 'twitter:title'], true)) $title = $value;
+                if ($image === '' && in_array($key, ['og:image', 'twitter:image', 'twitter:image:src'], true)) $image = $value;
+            }
+            if ($title === '') {
+                $titles = $document->getElementsByTagName('title');
+                if ($titles->length > 0) $title = trim((string)$titles->item(0)?->textContent);
+            }
+        }
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+    }
+    if ($description === '' && preg_match_all('/<meta\b[^>]*>/i', $body, $metaTags)) {
+        foreach ($metaTags[0] as $tag) {
+            $attributes = [];
+            if (preg_match_all('/([a-zA-Z:-]+)\s*=\s*(["\'])(.*?)\2/s', $tag, $matches, PREG_SET_ORDER)) {
+                foreach ($matches as $match) $attributes[strtolower($match[1])] = $match[3];
+            }
+            $key = strtolower(trim((string)($attributes['property'] ?? $attributes['name'] ?? '')));
+            $value = trim((string)($attributes['content'] ?? ''));
+            if ($description === '' && $value !== '' && in_array($key, ['og:description', 'twitter:description', 'description'], true)) $description = $value;
+            if ($title === '' && $value !== '' && in_array($key, ['og:title', 'twitter:title'], true)) $title = $value;
+            if ($image === '' && $value !== '' && in_array($key, ['og:image', 'twitter:image', 'twitter:image:src'], true)) $image = $value;
+        }
+    }
+    if ($title === '' && preg_match('/<title\b[^>]*>(.*?)<\/title>/is', $body, $match)) $title = $match[1];
+    $clean = static function (string $value, int $limit): string {
+        $value = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
+        return function_exists('mb_substr') ? mb_substr($value, 0, $limit) : substr($value, 0, $limit);
+    };
+    $title = $clean($title, 160);
+    $description = $clean($description, 320);
+    if (str_starts_with($image, '//')) $image = 'https:' . $image;
+    if ($image !== '' && !preg_match('~^https?://~i', $image)) {
+        $baseParts = parse_url($url);
+        $origin = (string)($baseParts['scheme'] ?? 'https') . '://' . (string)($baseParts['host'] ?? '');
+        $image = $origin . '/' . ltrim($image, '/');
+    }
+    if ($image !== '' && !filter_var($image, FILTER_VALIDATE_URL)) $image = '';
+    return ($title === '' && $description === '' && $image === '') ? null : ['title' => $title, 'description' => $description, 'image' => $image];
+}
+
+function chat_collect_link_metadata(string $body): array {
+    $metadata = [];
+    foreach (chat_extract_urls($body) as $url) {
+        $parts = parse_url($url);
+        $extension = strtolower(pathinfo((string)($parts['path'] ?? ''), PATHINFO_EXTENSION));
+        if (in_array($extension, ['jpg','jpeg','png','gif','webp','avif','mp4','webm','ogv','mov','m4v','mp3','wav','ogg','oga','flac','m4a'], true)) continue;
+        $meta = chat_fetch_link_metadata($url);
+        if ($meta !== null) $metadata[$url] = $meta;
+    }
+    return $metadata;
+}
+
+function chat_backfill_link_metadata(array &$conversation, int $limit = 5): bool {
+    $messages = (array)($conversation['messages'] ?? []);
+    $changed = false;
+    $checked = 0;
+    foreach ($messages as &$message) {
+        if (!is_array($message) || (int)($message['linkMetadataVersion'] ?? 0) >= 2 || !empty($message['deletedAt'])) continue;
+        $body = (string)($message['body'] ?? '');
+        if (chat_extract_urls($body) !== []) {
+            $metadata = chat_collect_link_metadata($body);
+            if ($metadata !== []) $message['linkMetadata'] = $metadata;
+        }
+        $message['linkMetadataChecked'] = true;
+        $message['linkMetadataVersion'] = 2;
+        $changed = true;
+        $checked++;
+        if ($checked >= $limit) break;
+    }
+    unset($message);
+    if ($changed) $conversation['messages'] = $messages;
+    return $changed;
+}
+
+function chat_link_embeds_html(string $body, array $metadata = []): string {
+    $html = '';
+    foreach (chat_extract_urls($body) as $url) {
+        $parts = parse_url($url);
+        $host = strtolower((string)($parts['host'] ?? 'link'));
+        $path = (string)($parts['path'] ?? '');
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $video = fridg3_external_video_embed_data($url);
+        $giphyUrl = chat_giphy_embed_url($url);
+        $meta = is_array($metadata[$url] ?? null) ? $metadata[$url] : [];
+        $cardTitle = trim((string)($meta['title'] ?? '')) ?: $host;
+        $cardDescription = trim((string)($meta['description'] ?? ''));
+        if ($video !== null) {
+            $html .= '<div class="chat-link-embed chat-link-video">' . fridg3_external_video_embed_html($video) . '</div>';
+        } elseif ($giphyUrl !== null) {
+            $html .= '<div class="chat-link-embed chat-link-video chat-link-giphy"><iframe src="' . chat_h($giphyUrl) . '" title="Giphy animation" loading="lazy" allowfullscreen></iframe></div>';
+        } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'], true)) {
+            $html .= '<a class="chat-link-embed chat-link-image" href="' . chat_h($url) . '" target="_blank" rel="noopener noreferrer nofollow"><img src="' . chat_h($url) . '" alt="linked image" loading="lazy"></a>';
+        } elseif (in_array($extension, ['mp4', 'webm', 'ogv', 'mov', 'm4v'], true)) {
+            $html .= '<div class="chat-link-embed chat-link-video chat-link-direct-video"><video controls preload="metadata" playsinline src="' . chat_h($url) . '"></video></div>';
+        } elseif (in_array($extension, ['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a'], true)) {
+            $html .= '<div class="chat-link-embed"><audio controls preload="metadata" src="' . chat_h($url) . '"></audio><a href="' . chat_h($url) . '" target="_blank" rel="noopener noreferrer nofollow">' . chat_h(basename($path) ?: $host) . '</a></div>';
+        } else {
+            $label = basename($path);
+            $label = $label !== '' ? rawurldecode($label) : $host;
+            $cardDescription = trim((string)($meta['description'] ?? '')) ?: $label;
+            $cardImage = trim((string)($meta['image'] ?? ''));
+            $html .= '<a class="chat-link-embed chat-link-card" href="' . chat_h($url) . '" target="_blank" rel="noopener noreferrer nofollow">'
+                . ($cardImage !== '' ? '<img src="' . chat_h($cardImage) . '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '')
+                . '<strong>' . chat_h($cardTitle) . '</strong><span>' . chat_h($cardDescription) . '</span></a>';
+        }
+    }
+    return $html === '' ? '' : '<div class="chat-link-embeds">' . $html . '</div>';
+}
+
 function chat_normalize_emoji(string $emoji): string {
     $emoji = trim($emoji);
     if (
@@ -748,9 +1009,9 @@ function chat_last_message_payload(array $messages): array {
     ];
 }
 
-function chat_set_participant_cookie(string $id, string $secret): void {
+function chat_set_participant_cookie(string $id, string $secret, ?int $expires = null): void {
     setcookie(chat_cookie_name($id), $secret, [
-        'expires' => time() + 60 * 60 * 24 * 365,
+        'expires' => $expires ?? time() + 60 * 60 * 24 * 365,
         'path' => '/chat',
         'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
         'httponly' => true,
@@ -760,6 +1021,7 @@ function chat_set_participant_cookie(string $id, string $secret): void {
 }
 
 function chat_render_page(string $title, string $description, string $content): void {
+    $content = '<style id="chat-page-shell-overrides">#content-footer{display:none!important}</style>' . $content;
     $renderHelperPath = chat_find_template_file('lib/render.php');
     if ($renderHelperPath) {
         require_once $renderHelperPath;
@@ -838,13 +1100,21 @@ function chat_message_html(array $conversation, string $viewerRole): string {
         $sender = (string)($message['sender'] ?? 'unknown');
         $isOwn = $sender === $viewerRole;
         $isDeleted = !empty($message['deletedAt']);
+        $hiddenFor = is_array($message['hiddenFor'] ?? null) ? $message['hiddenFor'] : [];
+        $isHidden = !$isDeleted && !empty($hiddenFor[$viewerRole]);
         $senderLabel = chat_message_label($message, $viewerRole, $recipientName);
         $time = date('H:i', $createdAt);
-        $body = $isDeleted ? 'message deleted' : nl2br(chat_h((string)($message['body'] ?? '')), false);
+        $messageBody = (string)($message['body'] ?? '');
+        $body = $isDeleted ? 'message deleted' : ($isHidden ? 'message hidden' : chat_linkify_body($messageBody));
+        $linkMetadata = is_array($message['linkMetadata'] ?? null) ? $message['linkMetadata'] : [];
+        $linkEmbedsHtml = !$isDeleted && !$isHidden ? chat_link_embeds_html($messageBody, $linkMetadata) : '';
         $messageSummary = chat_message_summary($message);
         $replyHtml = '';
         $replyTo = (string)($message['replyTo'] ?? '');
-        if ($replyTo !== '' && isset($messagesById[$replyTo])) {
+        $replyTargetHiddenFor = $replyTo !== '' && isset($messagesById[$replyTo]) && is_array($messagesById[$replyTo]['hiddenFor'] ?? null)
+            ? $messagesById[$replyTo]['hiddenFor']
+            : [];
+        if (!$isDeleted && !$isHidden && $replyTo !== '' && isset($messagesById[$replyTo]) && empty($messagesById[$replyTo]['deletedAt']) && empty($replyTargetHiddenFor[$viewerRole])) {
             $replyMessage = $messagesById[$replyTo];
             $replyHtml = '<button class="chat-reply-reference" type="button" data-scroll-message="' . chat_h($replyTo) . '">'
                 . '<strong>' . chat_h(chat_message_label($replyMessage, $viewerRole, $recipientName)) . '</strong>'
@@ -854,7 +1124,7 @@ function chat_message_html(array $conversation, string $viewerRole): string {
         $attachmentHtml = '';
         $hasImageAttachment = false;
         $hasMediaAttachment = false;
-        $attachment = !$isDeleted && is_array($message['attachment'] ?? null) ? $message['attachment'] : null;
+        $attachment = !$isDeleted && !$isHidden && is_array($message['attachment'] ?? null) ? $message['attachment'] : null;
         if ($attachment !== null && isset($conversation['id'])) {
             $attachmentId = (string)($attachment['id'] ?? '');
             $attachmentName = chat_clean_filename((string)($attachment['name'] ?? 'attachment'));
@@ -936,6 +1206,9 @@ function chat_message_html(array $conversation, string $viewerRole): string {
         if ($isDeleted) {
             $messageClasses[] = 'chat-message-deleted';
         }
+        if ($isHidden) {
+            $messageClasses[] = 'chat-message-hidden';
+        }
 
         $html .= '<article class="' . chat_h(implode(' ', $messageClasses)) . '" data-message-id="' . chat_h((string)($message['id'] ?? '')) . '" data-message-own="' . ($isOwn ? '1' : '0') . '" data-message-deleted="' . ($isDeleted ? '1' : '0') . '">'
             . '<div class="chat-message-meta"><strong>' . chat_h($senderLabel) . '</strong><span>' . chat_h($time) . '</span></div>'
@@ -943,7 +1216,8 @@ function chat_message_html(array $conversation, string $viewerRole): string {
             . $replyHtml
             . ($body !== '' ? '<div class="chat-message-body">' . $body . '</div>' : '')
             . $attachmentHtml
-            . $reactionHtml
+            . $linkEmbedsHtml
+            . ($isHidden ? '' : $reactionHtml)
             . '</article>';
     }
 
@@ -961,19 +1235,56 @@ if ($action === 'status' && $conversationId !== '') {
 }
 
 if ($action === 'active-account-chat' && $conversationId === '') {
-    $activeConversation = chat_find_account_conversation($chatDataDir, $chatKeyPath, chat_current_username());
-    if ($activeConversation === null) {
-        chat_json_response(['ok' => true, 'chat' => null]);
+    if ($canManage) {
+        chat_json_response(['ok' => true, 'chat' => null, 'chats' => []]);
     }
-
-    $activeId = (string)($activeConversation['id'] ?? '');
+    $accessibleChats = [];
+    $username = chat_current_username();
+    foreach (chat_load_all_conversations($chatDataDir, $chatKeyPath) as $candidate) {
+        $candidateId = (string)($candidate['id'] ?? '');
+        if (!chat_is_valid_conversation_id($candidateId)) {
+            continue;
+        }
+        $viewerRole = '';
+        if ($username !== '' && (string)($candidate['participantUsername'] ?? '') === $username) {
+            $viewerRole = 'participant';
+        } else {
+            $secret = (string)($_COOKIE[chat_cookie_name($candidateId)] ?? '');
+            $participantHash = (string)($candidate['participantHash'] ?? '');
+            if ($secret !== '' && $participantHash !== '' && hash_equals($participantHash, hash('sha256', $secret))) {
+                $viewerRole = 'participant';
+            }
+        }
+        if ($viewerRole === '') {
+            continue;
+        }
+        $messages = (array)($candidate['messages'] ?? []);
+        $lastMessage = end($messages);
+        $lastIncomingMessageId = '';
+        foreach (array_reverse($messages) as $message) {
+            if (is_array($message) && (string)($message['sender'] ?? '') !== $viewerRole) {
+                $lastIncomingMessageId = (string)($message['id'] ?? '');
+                break;
+            }
+        }
+        $accessibleChats[] = [
+            'id' => $candidateId,
+            'name' => (string)($candidate['name'] ?? 'private chat'),
+            'url' => '/chat/' . $candidateId,
+            'viewerRole' => $viewerRole,
+            'lastMessageId' => is_array($lastMessage) ? (string)($lastMessage['id'] ?? '') : '',
+            'lastMessageSender' => is_array($lastMessage) ? (string)($lastMessage['sender'] ?? '') : '',
+            'lastIncomingMessageId' => $lastIncomingMessageId,
+        ];
+    }
+    $activeConversation = $accessibleChats[0] ?? null;
+    if ($activeConversation === null) {
+        chat_json_response(['ok' => true, 'chat' => null, 'chats' => []]);
+    }
     chat_json_response([
         'ok' => true,
-        'chat' => chat_is_valid_conversation_id($activeId) ? [
-            'id' => $activeId,
-            'name' => (string)($activeConversation['name'] ?? 'private chat'),
-            'url' => '/chat/' . $activeId,
-        ] : null,
+        'chat' => $activeConversation,
+        'chats' => $accessibleChats,
     ]);
 }
 
@@ -1158,6 +1469,50 @@ if ($action === 'delete-message' && $conversationId !== '') {
     ]);
 }
 
+if ($action === 'hide-message' && $conversationId !== '') {
+    $conversation = chat_read_conversation($chatDataDir, $chatKeyPath, $conversationId);
+    if ($conversation === null) {
+        chat_json_response(['ok' => false, 'exists' => false]);
+    }
+    $viewerRole = chat_get_viewer_role($conversation, $conversationId, $canManage);
+    if ($viewerRole === '') {
+        http_response_code(403);
+        chat_json_response(['ok' => false, 'exists' => true]);
+    }
+    $messageId = preg_replace('/[^a-f0-9]/', '', strtolower((string)($_POST['messageId'] ?? '')));
+    $messages = (array)($conversation['messages'] ?? []);
+    $updated = false;
+    foreach ($messages as &$message) {
+        if (!is_array($message) || (string)($message['id'] ?? '') !== $messageId) continue;
+        if (!empty($message['deletedAt']) || (string)($message['sender'] ?? '') === $viewerRole) {
+            http_response_code(400);
+            chat_json_response(['ok' => false, 'exists' => true, 'error' => 'only the other person\'s message can be hidden.']);
+        }
+        $hiddenFor = is_array($message['hiddenFor'] ?? null) ? $message['hiddenFor'] : [];
+        if (!empty($hiddenFor[$viewerRole])) unset($hiddenFor[$viewerRole]);
+        else $hiddenFor[$viewerRole] = true;
+        if ($hiddenFor === []) unset($message['hiddenFor']);
+        else $message['hiddenFor'] = $hiddenFor;
+        $updated = true;
+        break;
+    }
+    unset($message);
+    if (!$updated) {
+        http_response_code(404);
+        chat_json_response(['ok' => false, 'exists' => true, 'error' => 'message not found.']);
+    }
+    $conversation['messages'] = $messages;
+    chat_write_conversation($chatDataDir, $chatKeyPath, $conversation);
+    chat_json_response([
+        'ok' => true,
+        'exists' => true,
+        'html' => chat_message_html($conversation, $viewerRole),
+        'count' => count($messages),
+        ...chat_last_message_payload($messages),
+        'revision' => chat_messages_revision($messages),
+    ]);
+}
+
 if ($action === 'attachment' && $conversationId !== '') {
     $conversation = chat_read_conversation($chatDataDir, $chatKeyPath, $conversationId);
     if ($conversation === null || !chat_user_can_view_conversation($conversation, $conversationId, $canManage)) {
@@ -1244,12 +1599,43 @@ if ($conversationId === '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        header('Location: /chat?created=' . rawurlencode($id));
+        header('Location: /chat');
         exit;
     }
 }
 
 if ($conversationId !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($action === 'revoke') {
+        if (!chat_user_is_admin()) {
+            chat_render_error('chat access denied', 'only administrators can revoke chat ownership.', 403);
+        }
+        $conversation = chat_read_conversation($chatDataDir, $chatKeyPath, $conversationId);
+        if ($conversation === null) {
+            chat_render_error('this conversation has ended', 'the conversation data has already been deleted from the server.', 410);
+        }
+        $hadBrowserOwner = !empty($conversation['participantHash']);
+        unset(
+            $conversation['participantUsername'],
+            $conversation['participantHash'],
+            $conversation['pendingParticipantHash'],
+            $conversation['pendingParticipantAt'],
+            $conversation['claimedAt']
+        );
+        $conversation['participantHash'] = '';
+        $conversation['claimedAt'] = null;
+        if (!chat_write_conversation($chatDataDir, $chatKeyPath, $conversation)) {
+            chat_render_error('chat revoke failed', 'the conversation ownership could not be updated. check data/chat permissions.', 500);
+        }
+        $presence = chat_read_presence($chatDataDir, $conversationId);
+        unset($presence['participant']);
+        chat_write_presence($chatDataDir, $conversationId, $presence);
+        if ($hadBrowserOwner) {
+            chat_set_participant_cookie($conversationId, '', time() - 3600);
+        }
+        header('Location: /chat/' . rawurlencode($conversationId));
+        exit;
+    }
+
     if ($action === 'delete') {
         $conversation = chat_read_conversation($chatDataDir, $chatKeyPath, $conversationId);
         if ($conversation === null) {
@@ -1259,7 +1645,19 @@ if ($conversationId !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             chat_render_error('chat access denied', 'only chat managers and the linked recipient account can delete this conversation.', 403);
         }
 
-        chat_delete_conversation($chatDataDir, $conversationId);
+        $participantUsername = trim((string)($conversation['participantUsername'] ?? ''));
+        $conversationName = trim((string)($conversation['name'] ?? 'private chat'));
+        $deletedConversation = chat_delete_conversation($chatDataDir, $conversationId);
+        if ($deletedConversation && $canManage && $participantUsername !== '' && !chat_username_is_admin($participantUsername)) {
+            fridg3_targeted_notifications_notify_user(
+                $participantUsername,
+                'Conversation ended',
+                'Your conversation with fridge.dev (' . ($conversationName !== '' ? $conversationName : 'private chat') . ') was ended.',
+                '/notifications',
+                date('Y-m-d H:i:s'),
+                'chat-ended-' . $conversationId . '-' . time()
+            );
+        }
         header('Location: ' . ($canManage ? '/chat?deleted=1' : '/?chat_deleted=1'));
         exit;
     }
@@ -1330,9 +1728,40 @@ if ($conversationId !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($attachment !== null) {
                 $message['attachment'] = $attachment;
             }
+            $linkMetadata = chat_collect_link_metadata($body);
+            if ($linkMetadata !== []) {
+                $message['linkMetadata'] = $linkMetadata;
+            }
+            $message['linkMetadataChecked'] = true;
+            $message['linkMetadataVersion'] = 2;
             $messages[] = $message;
             $conversation['messages'] = $messages;
-            chat_write_conversation($chatDataDir, $chatKeyPath, $conversation);
+            $conversationSaved = chat_write_conversation($chatDataDir, $chatKeyPath, $conversation);
+            if ($conversationSaved && $viewerRole === 'participant') {
+                $conversationName = trim((string)($conversation['name'] ?? 'recipient'));
+                if ($conversationName === '') $conversationName = 'recipient';
+                fridg3_targeted_notifications_replace_admin_group(
+                    'chat-message',
+                    'New chat message',
+                    'There is a new reply to the conversation with ' . $conversationName . '.',
+                    '/chat/' . $conversationId,
+                    date('Y-m-d H:i:s'),
+                    'chat-' . $conversationId . '-' . (string)$message['id']
+                );
+            } elseif ($conversationSaved && $viewerRole === 'manager') {
+                $participantUsername = trim((string)($conversation['participantUsername'] ?? ''));
+                if ($participantUsername !== '' && !chat_username_is_admin($participantUsername)) {
+                    fridg3_targeted_notifications_replace_user_group(
+                        $participantUsername,
+                        'chat-message',
+                        'New chat message',
+                        'There is a new message in your conversation with fridge.dev.',
+                        '/chat/' . $conversationId,
+                        date('Y-m-d H:i:s'),
+                        'chat-recipient-' . $conversationId . '-' . (string)$message['id']
+                    );
+                }
+            }
         }
 
         if (chat_request_wants_json()) {
@@ -1408,6 +1837,10 @@ if ($conversationId !== '') {
         }
     }
 
+    if (chat_backfill_link_metadata($conversation)) {
+        chat_write_conversation($chatDataDir, $chatKeyPath, $conversation);
+    }
+
     $viewerRole = chat_get_viewer_role($conversation, $conversationId, $canManage);
     $showRecipientIntro = !$canManage && $viewerRole === 'participant' && empty($conversation['recipientIntroSeenAt']);
     if ($showRecipientIntro) {
@@ -1438,6 +1871,7 @@ function initChat(){
     var attachmentKindInput=form?form.querySelector("[name='attachmentKind']"):null;
     var fileIndicator=form?form.querySelector(".chat-file-indicator"):null;
     var sendButton=form?form.querySelector(".chat-send-button"):null;
+    var holdVoiceButton=form?form.querySelector(".chat-hold-voice-button"):null;
     var replyPreview=form?form.querySelector(".chat-reply-compose"):null;
     var replyName=replyPreview?replyPreview.querySelector("strong"):null;
     var replyText=replyPreview?replyPreview.querySelector("span"):null;
@@ -1459,10 +1893,18 @@ function initChat(){
     var alertAudio=null;
     var unreadCount=0;
     var originalTitle=document.title;
+    var deleteWarningAcknowledged=false;
     var currentlyTyping=false;
+    var conversationEndedHandled=false;
+    var chatTimers=[];
+    var swipeState=null;
+    var suppressMessageClick=false;
     var lastTypingSentAt=0;
     var typingIdleTimer=null;
+    var viewportFrame=0;
     var EMOJI_DATA_URL="https://cdn.jsdelivr.net/npm/emojibase-data@16.0.3/en/data.json";
+    function isViewingThisChat(){var path=(window.location.pathname||"").replace(/\/+$/,"");return root.isConnected&&path==="/chat/"+id;}
+    function handleConversationMissing(){if(conversationEndedHandled)return;conversationEndedHandled=true;chatTimers.forEach(function(timer){clearInterval(timer);});chatTimers=[];var selfEnded=false;try{var key="fridg3-chat-ended-self-"+id;selfEnded=sessionStorage.getItem(key)==="1";sessionStorage.removeItem(key);}catch(error){}var shortcut=document.getElementById("sidebar-active-chat");if(shortcut)shortcut.remove();if(isViewingThisChat()){window.location.href="/chat/"+id;return;}if(!selfEnded){var accountLinked=root.getAttribute("data-account-linked-recipient")==="1";if(accountLinked&&typeof window.syncNotificationsSidebarButton==="function")window.syncNotificationsSidebarButton();else if(typeof window.showTransientSiteNotification==="function")window.showTransientSiteNotification("conversation ended","your private chat was ended and is no longer available.","/notifications");else if(typeof window.showSiteNotice==="function")window.showSiteNotice("conversation ended","your private chat was ended and is no longer available.");}}
     var quickEmojiOrder=["👍","👎","❤️","😮","😆","🔥","💩"];
     var fallbackEmojiItems=[
         {emoji:"👍",label:"thumbs up",tags:["yes","approve"]},
@@ -1480,6 +1922,7 @@ function initChat(){
         {emoji:"💀",label:"skull",tags:["dead"]},
         {emoji:"🚀",label:"rocket",tags:["launch"]}
     ];
+    try{deleteWarningAcknowledged=localStorage.getItem("fridg3-chat-delete-warning-acknowledged")==="1";}catch(error){}
     var emojiItems=fallbackEmojiItems.slice();
     var emojiFilteredItems=[];
     var emojiRenderedCount=0;
@@ -1488,7 +1931,8 @@ function initChat(){
     function scrollMessages(force){if(!messagesEl)return;var nearBottom=messagesEl.scrollHeight-messagesEl.scrollTop-messagesEl.clientHeight<110;if(force||nearBottom){messagesEl.scrollTop=messagesEl.scrollHeight;}}
     function isChatActive(){return (!document.visibilityState||document.visibilityState==="visible")&&document.hasFocus();}
     function updateUnreadTitle(){document.title=unreadCount>0?"("+unreadCount+") "+originalTitle:originalTitle;}
-    function clearUnread(){if(unreadCount<1)return;unreadCount=0;updateUnreadTitle();}
+    function markChatRead(){if(!messagesEl)return;var incoming=messagesEl.querySelectorAll(".chat-message-other[data-message-id]");var latest=incoming.length?incoming[incoming.length-1].getAttribute("data-message-id")||"":"";try{if(latest)localStorage.setItem("fridg3-chat-seen-"+id,latest);else localStorage.removeItem("fridg3-chat-seen-"+id);}catch(error){}}
+    function clearUnread(){markChatRead();if(unreadCount<1)return;unreadCount=0;updateUnreadTitle();}
     function playMessageAlert(){if(isChatActive())return;if(!alertAudio){alertAudio=new Audio("/chat/alert.ogg");alertAudio.preload="auto";}try{alertAudio.currentTime=0;var playPromise=alertAudio.play();if(playPromise&&typeof playPromise.catch==="function"){playPromise.catch(function(){});}}catch(error){}}
     function trackIncomingMessages(data,force){if(force||!data||!data.lastMessageId||!lastMessageId)return;if(data.lastMessageId!==lastMessageId&&data.lastMessageSender&&data.lastMessageSender!==viewerRole){if(!isChatActive()){unreadCount+=Math.max(1,Number(data.count||0)-lastMessageCount);updateUnreadTitle();}playMessageAlert();}}
     function renderPresence(data){if(!data||!data.ok)return;var status=data.otherStatus||(data.otherOnline?"online":(data.otherAway?"away":"offline"));if(presenceEl){presenceEl.className="chat-presence chat-presence-"+status;presenceEl.textContent=label(data.otherRole)+" is "+status;}if(typingEl){typingEl.textContent=data.otherTyping?(label(data.otherRole)+" is typing..."):"";typingEl.style.display=data.otherTyping?"block":"none";}}
@@ -1533,27 +1977,36 @@ function initChat(){
             updateSpeed();
         });
     }
-    function renderMessages(data,force){if(!messagesEl||!data||!data.ok)return;var revision=data.revision||"";if((revision&&revision!==lastRevision)||data.lastMessageId!==lastMessageId||messagesEl.innerHTML===""){trackIncomingMessages(data,force);messagesEl.innerHTML=data.html;initChatMediaPlayers();lastMessageId=data.lastMessageId||"";lastMessageCount=Number(data.count||0);lastRevision=revision;scrollMessages(force);if(isChatActive())clearUnread();}}
-    function showRecipientIntro(){if(root.getAttribute("data-show-recipient-intro")!=="1"||typeof window.showSitePopup!=="function")return;root.setAttribute("data-show-recipient-intro","0");var accountLinked=root.getAttribute("data-account-linked-recipient")==="1";window.showSitePopup({title:"private chat secured",html:accountLinked?"<p>this invite is linked to your fridge.dev account, so you can reopen it while logged in without relying on a browser cookie.</p><p>messages and attachments are stored in an encrypted chat file, and ending the chat deletes that file from the server.</p><p>click or tap any message to reply to it or react with an emoji.</p>":"<p>this invite is locked to this browser after you open it. other browsers that try the same link get denied.</p><p>messages and attachments are stored in an encrypted chat file, and ending the chat deletes that file from the server.</p><p>click or tap any message to reply to it or react with an emoji.</p>",okText:"got it"});}
+    function renderMessages(data,force){if(!messagesEl||!data||!data.ok)return;var revision=data.revision||"";if((revision&&revision!==lastRevision)||data.lastMessageId!==lastMessageId||messagesEl.innerHTML===""){var incoming=!!(lastMessageId&&data.lastMessageId&&data.lastMessageId!==lastMessageId&&data.lastMessageSender&&data.lastMessageSender!==viewerRole);trackIncomingMessages(data,force);messagesEl.innerHTML=data.html;initChatMediaPlayers();lastMessageId=data.lastMessageId||"";lastMessageCount=Number(data.count||0);lastRevision=revision;scrollMessages(!!force||incoming);if(isChatActive())clearUnread();}}
+    function showRecipientIntro(){if(root.getAttribute("data-show-recipient-intro")!=="1"||typeof window.showSitePopup!=="function")return;root.setAttribute("data-show-recipient-intro","0");var accountLinked=root.getAttribute("data-account-linked-recipient")==="1";var ownership=accountLinked?"<p>this chat is linked to your fridge.dev account, so you can reopen it from the active chat button whenever you are logged in.</p>":"<p>this chat is locked to this browser. clearing its chat cookie or opening the link in another browser may prevent you from getting back in unless an administrator revokes and reissues access.</p>";window.showSitePopup({title:"welcome to your private chat",html:ownership+"<p>messages and attachments are kept in an encrypted chat file. ending the chat permanently deletes the conversation and its stored attachments.</p><p><strong>using chat</strong></p><ul><li>send text, images, files, or voice notes from the composer</li><li>on desktop, right-click a message for reply, reaction, and deletion controls</li><li>on mobile, hold a message to react; swipe right to reply</li><li>swipe your own message right to delete it</li><li>swipe the other person's message left to hide or restore it for your view only</li></ul><p>hidden messages remain visible to the other person. deleted messages become placeholders for everyone.</p>",okText:"start chatting"});}
     function syncFileIndicator(){if(!fileIndicator||!fileInput)return;var file=fileInput.files&&fileInput.files[0]?fileInput.files[0]:null;var isVoice=attachmentKindInput&&attachmentKindInput.value==="voice";fileIndicator.textContent=file?((isVoice?"voice note: ":"attached: ")+file.name):"";fileIndicator.style.display=file?"block":"none";}
     function jsonFetch(url,options){return fetch(url,options).then(function(response){return response.json().then(function(data){if(!response.ok){data.ok=false;}return data;});});}
     function presenceBody(typingOverride){var body=new URLSearchParams();var active=isChatActive();var typing=typeof typingOverride==="boolean"?typingOverride:currentlyTyping;body.append("state",active?"online":"away");body.append("typing",(active&&typing)?"1":"0");return body;}
-    function ping(){jsonFetch("/chat/"+id+"?action=presence",{method:"POST",body:presenceBody(),cache:"no-store",credentials:"same-origin",keepalive:true,headers:{"Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){window.location.href="/chat/"+id;return;}renderPresence(data);}).catch(function(){});}
-    function refreshPresence(){jsonFetch("/chat/"+id+"?action=presence",{cache:"no-store",credentials:"same-origin",headers:{Accept:"application/json"}}).then(function(data){if(data.exists===false){window.location.href="/chat/"+id;return;}renderPresence(data);}).catch(function(){});}
+    function ping(){if(conversationEndedHandled)return;jsonFetch("/chat/"+id+"?action=presence",{method:"POST",body:presenceBody(),cache:"no-store",credentials:"same-origin",keepalive:true,headers:{"Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}renderPresence(data);}).catch(function(){});}
+    function refreshPresence(){if(conversationEndedHandled)return;jsonFetch("/chat/"+id+"?action=presence",{cache:"no-store",credentials:"same-origin",headers:{Accept:"application/json"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}renderPresence(data);}).catch(function(){});}
     function pingAway(){var body=new URLSearchParams();body.append("state","away");if(navigator.sendBeacon){navigator.sendBeacon("/chat/"+id+"?action=presence",body);return;}fetch("/chat/"+id+"?action=presence",{method:"POST",body:body,credentials:"same-origin",keepalive:true,headers:{"Content-Type":"application/x-www-form-urlencoded"}}).catch(function(){});}
-    function refreshMessages(force){jsonFetch("/chat/"+id+"?action=messages",{cache:"no-store",credentials:"same-origin",headers:{Accept:"application/json"}}).then(function(data){if(data.exists===false){window.location.href="/chat/"+id;return;}renderMessages(data,force);}).catch(function(){});}
+    function refreshMessages(force){if(conversationEndedHandled)return;jsonFetch("/chat/"+id+"?action=messages",{cache:"no-store",credentials:"same-origin",headers:{Accept:"application/json"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}renderMessages(data,force);}).catch(function(){});}
     function hasFile(){return fileInput&&fileInput.files&&fileInput.files.length>0;}
     function messageSummary(message){var source=message.querySelector(".chat-message-quote-source");var body=source?source.textContent.trim():"";if(!body){body="message";}return body;}
     function messageAuthor(message){var author=message.querySelector(".chat-message-meta strong");return author?author.textContent.trim():"message";}
     function setReply(message){if(!message||!replyInput||!replyPreview)return;replyInput.value=message.getAttribute("data-message-id")||"";if(replyName)replyName.textContent=messageAuthor(message);if(replyText)replyText.textContent=messageSummary(message);replyPreview.style.display="grid";textarea&&textarea.focus();}
     function clearReply(){if(replyInput)replyInput.value="";if(replyPreview)replyPreview.style.display="none";}
-    function sendTypingState(active,force){currentlyTyping=!!(active&&isChatActive());var now=Date.now();if(!force&&currentlyTyping&&now-lastTypingSentAt<1400)return;lastTypingSentAt=now;jsonFetch("/chat/"+id+"?action=presence",{method:"POST",body:presenceBody(currentlyTyping),cache:"no-store",credentials:"same-origin",keepalive:true,headers:{"Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){window.location.href="/chat/"+id;return;}renderPresence(data);}).catch(function(){});}
+    function clearLongPress(state){if(state&&state.longPressTimer){clearTimeout(state.longPressTimer);state.longPressTimer=null;}}
+    function resetSwipe(message){if(!message)return;message.classList.remove("chat-message-swiping","chat-message-swipe-ready","chat-message-swipe-delete","chat-message-swipe-hide");message.style.removeProperty("--chat-swipe-x");}
+    function beginMessageSwipe(event){if(event.pointerType==="mouse"&&event.button!==0)return;var message=event.target.closest(".chat-message[data-message-id]");if(!message||message.getAttribute("data-message-deleted")==="1"||event.target.closest("button,input,.chat-media-player"))return;var own=message.getAttribute("data-message-own")==="1";swipeState={pointerId:event.pointerId,message:message,startX:event.clientX,startY:event.clientY,own:own,direction:own?0:1,action:"reply",dragging:false,ready:false,longPressed:false,longPressTimer:null,threshold:(event.pointerType==="touch"||isMobileChat())?20:44};if(isMobileChat()&&event.pointerType!=="mouse"){swipeState.longPressTimer=setTimeout(function(){if(!swipeState||swipeState.dragging)return;swipeState.longPressed=true;suppressMessageClick=true;closeMenu();var rect=message.getBoundingClientRect();openPicker("react",message.getAttribute("data-message-id")||"",Math.max(8,Math.min(event.clientX,window.innerWidth-20)),Math.max(8,Math.min(event.clientY,rect.bottom)));if(navigator.vibrate)navigator.vibrate(8);},480);}}
+    function moveMessageSwipe(event){if(!swipeState||event.pointerId!==swipeState.pointerId||swipeState.longPressed)return;var dx=event.clientX-swipeState.startX;var dy=event.clientY-swipeState.startY;if(Math.abs(dx)>7||Math.abs(dy)>7)clearLongPress(swipeState);if(!swipeState.dragging){if(Math.abs(dy)>18&&Math.abs(dy)>Math.abs(dx)*1.75){clearLongPress(swipeState);swipeState=null;return;}if(Math.abs(dx)<3)return;var direction=Math.sign(dx);swipeState.direction=direction;swipeState.action=swipeState.own&&direction===1?"delete":(!swipeState.own&&direction===-1?"hide":"reply");swipeState.message.classList.toggle("chat-message-swipe-delete",swipeState.action==="delete");swipeState.message.classList.toggle("chat-message-swipe-hide",swipeState.action==="hide");swipeState.dragging=true;swipeState.message.classList.add("chat-message-swiping");try{swipeState.message.setPointerCapture(event.pointerId);}catch(error){}}
+        event.preventDefault();var distance=Math.min(64,Math.abs(dx));var offset=swipeState.direction*distance;swipeState.message.style.setProperty("--chat-swipe-x",offset+"px");var ready=distance>=swipeState.threshold;if(ready!==swipeState.ready){swipeState.ready=ready;swipeState.message.classList.toggle("chat-message-swipe-ready",ready);if(ready&&navigator.vibrate)navigator.vibrate(8);}}
+    function endMessageSwipe(event){if(!swipeState||event.pointerId!==swipeState.pointerId)return;var state=swipeState;clearLongPress(state);swipeState=null;if(state.longPressed){setTimeout(function(){suppressMessageClick=false;},0);return;}if(!state.dragging)return;suppressMessageClick=true;setTimeout(function(){suppressMessageClick=false;},0);resetSwipe(state.message);if(state.ready){closeMenu();closePicker();if(state.action==="delete"){deleteMessage(state.message.getAttribute("data-message-id")||"");}else if(state.action==="hide"){hideMessage(state.message.getAttribute("data-message-id")||"");}else{setReply(state.message);}}}
+    function cancelMessageSwipe(event){if(!swipeState||event.pointerId!==swipeState.pointerId)return;var message=swipeState.message;clearLongPress(swipeState);swipeState=null;resetSwipe(message);}
+    function sendTypingState(active,force){currentlyTyping=!!(active&&isChatActive());var now=Date.now();if(!force&&currentlyTyping&&now-lastTypingSentAt<1400)return;lastTypingSentAt=now;jsonFetch("/chat/"+id+"?action=presence",{method:"POST",body:presenceBody(currentlyTyping),cache:"no-store",credentials:"same-origin",keepalive:true,headers:{"Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}renderPresence(data);}).catch(function(){});}
     function queueTyping(){if(!textarea)return;var active=textarea.value.trim()!=="";sendTypingState(active,false);if(typingIdleTimer)clearTimeout(typingIdleTimer);typingIdleTimer=setTimeout(function(){sendTypingState(false,true);},2800);}
     function closeMenu(){if(menu)menu.style.display="none";}
     function closeAttachMenu(){if(attachMenu)attachMenu.style.display="none";}
     function closePicker(){if(emojiPicker)emojiPicker.style.display="none";pickerMessageId="";}
     function isMobileChat(){return !!(document.body&&document.body.classList&&document.body.classList.contains("mobile-template"))||window.matchMedia("(max-width: 720px)").matches;}
-    function placeBox(box,x,y){if(!box||!root)return;box.style.display="block";var rootRect=root.getBoundingClientRect();var rect=box.getBoundingClientRect();var localX=x-rootRect.left;var localY=y-rootRect.top;var maxLeft=Math.max(8,root.clientWidth-rect.width-8);var maxTop=Math.max(8,root.clientHeight-rect.height-8);box.style.left=Math.max(8,Math.min(localX,maxLeft))+"px";box.style.top=Math.max(8,Math.min(localY,maxTop))+"px";}
+    function syncMobileViewport(){if(!document.body||!document.body.classList.contains("mobile-template"))return;if(viewportFrame)cancelAnimationFrame(viewportFrame);viewportFrame=requestAnimationFrame(function(){viewportFrame=0;var viewport=window.visualViewport;var height=viewport?viewport.height:window.innerHeight;var top=viewport?viewport.offsetTop:0;var left=viewport?viewport.offsetLeft:0;document.documentElement.style.setProperty("--chat-mobile-height",Math.round(height)+"px");document.documentElement.style.setProperty("--chat-mobile-top",Math.round(top)+"px");document.documentElement.style.setProperty("--chat-mobile-left",Math.round(left)+"px");});}
+    function settleMobileViewport(){syncMobileViewport();setTimeout(syncMobileViewport,80);setTimeout(function(){window.scrollTo(0,0);syncMobileViewport();},260);}
+    function placeBox(box,x,y){if(!box||!root)return;box.style.display="block";var rect=box.getBoundingClientRect();var fixed=window.getComputedStyle(box).position==="fixed";if(fixed){box.style.left=Math.max(8,Math.min(x,window.innerWidth-rect.width-8))+"px";box.style.top=Math.max(8,Math.min(y,window.innerHeight-rect.height-8))+"px";return;}var rootRect=root.getBoundingClientRect();var localX=x-rootRect.left;var localY=y-rootRect.top;var maxLeft=Math.max(8,root.clientWidth-rect.width-8);var maxTop=Math.max(8,root.clientHeight-rect.height-8);box.style.left=Math.max(8,Math.min(localX,maxLeft))+"px";box.style.top=Math.max(8,Math.min(localY,maxTop))+"px";}
     function openMenu(message,x,y){if(!menu||!message)return;menu.dataset.messageId=message.getAttribute("data-message-id")||"";var deleteButton=menu.querySelector('[data-chat-action="delete"]');if(deleteButton){deleteButton.style.display=(canManage||message.getAttribute("data-message-own")==="1")?"block":"none";}placeBox(menu,x,y);}
     function emojiFromHexcode(hexcode){return String(hexcode||"").split("-").map(function(part){var code=parseInt(part,16);return code?String.fromCodePoint(code):"";}).join("");}
     function emojiTagList(value){if(Array.isArray(value))return value.map(String);if(typeof value==="string"&&value)return [value];if(value&&typeof value==="object"){return Object.keys(value).reduce(function(tags,key){var next=value[key];return tags.concat(Array.isArray(next)?next.map(String):[String(next)]);},[]);}return [];}
@@ -1564,39 +2017,48 @@ function initChat(){
     function emojiQueryCandidate(query){var emoji=firstGrapheme(query);return emoji&&looksEmoji(emoji)?{emoji:emoji,label:"typed emoji",tags:["custom"],group:-1,order:-1}:null;}
     function appendEmojiChunk(){if(!emojiGrid)return;var end=Math.min(emojiRenderedCount+emojiBatchSize,emojiFilteredItems.length);var fragment=document.createDocumentFragment();for(var i=emojiRenderedCount;i<end;i++){var item=emojiFilteredItems[i];var btn=document.createElement("button");btn.type="button";btn.textContent=item.emoji;btn.title=item.label;btn.setAttribute("data-emoji",item.emoji);fragment.appendChild(btn);}emojiGrid.appendChild(fragment);emojiRenderedCount=end;}
     function renderEmojiList(query){if(!emojiGrid)return;var q=(query||"").trim().toLowerCase();emojiGrid.innerHTML="";emojiGrid.scrollTop=0;emojiRenderedCount=0;var used={};var combined=[];var typed=emojiQueryCandidate(query);if(typed)combined.push(typed);var quick=[];if(!q){quickEmojiOrder.forEach(function(emoji){var item=fallbackEmojiItems.find(function(candidate){return candidate.emoji===emoji;})||emojiItems.find(function(candidate){return candidate.emoji===emoji;});if(item)quick.push(item);});}var matches=emojiItems.filter(function(item){var haystack=(item.emoji+" "+item.label+" "+item.tags.join(" ")).toLowerCase();return !q||haystack.indexOf(q)!==-1;}).sort(function(a,b){var qa=quickEmojiOrder.indexOf(a.emoji);var qb=quickEmojiOrder.indexOf(b.emoji);if(qa!==-1||qb!==-1)return (qa===-1?999:qa)-(qb===-1?999:qb);return (a.order||0)-(b.order||0);});quick.concat(matches).forEach(function(item){if(used[item.emoji])return;used[item.emoji]=true;combined.push(item);});emojiFilteredItems=combined;appendEmojiChunk();}
-    function openPicker(mode,messageId,x,y){if(!emojiPicker)return;pickerMode=mode;pickerMessageId=messageId||"";if(emojiSearch)emojiSearch.value="";renderEmojiList("");placeBox(emojiPicker,x,y);if(emojiSearch)emojiSearch.focus();}
-    function react(messageId,emoji){var body=new URLSearchParams();body.append("action","react");body.append("messageId",messageId);body.append("emoji",emoji);jsonFetch("/chat/"+id,{method:"POST",body:body,credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest","Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){window.location.href="/chat/"+id;return;}if(data.ok){renderMessages(data,false);}}).catch(function(){});}
-    function confirmDeleteMessage(){if(typeof window.showSitePopup==="function"){return window.showSitePopup({title:"delete message?",detail:"this will replace the message with a deleted placeholder for everyone in the chat.",okText:"delete",cancelText:"cancel"});}return window.showSitePopup({title:"delete message?",detail:"this will replace the message with a deleted placeholder for everyone in the chat.",okText:"delete",cancelText:"cancel"});}
-    function deleteMessage(messageId){if(!messageId)return;confirmDeleteMessage().then(function(confirmed){if(!confirmed)return;var body=new URLSearchParams();body.append("action","delete-message");body.append("messageId",messageId);jsonFetch("/chat/"+id,{method:"POST",body:body,credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest","Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){window.location.href="/chat/"+id;return;}if(data.ok){renderMessages(data,false);}else if(data.error){window.showSiteNotice ? window.showSiteNotice("chat error", data.error) : window.showSitePopup({title:"chat error", detail:data.error, okText:"ok"});}}).catch(function(){});});}
-    function submitMessage(event){event.preventDefault();if(!form||!textarea||postingRestricted)return;var body=textarea.value.trim();if(body===""&&!hasFile())return;var isVoice=attachmentKindInput&&attachmentKindInput.value==="voice";if(hasFile()&&!isVoice&&fileInput.files[0].size>8388608){window.showSiteNotice ? window.showSiteNotice("file too big", "max size is 8 MB.") : window.showSitePopup({title:"file too big", detail:"max size is 8 MB.", okText:"ok"});return;}if(hasFile()&&isVoice&&fileInput.files[0].size>12000000){window.showSiteNotice ? window.showSiteNotice("voice note too big", "keep voice notes under 2 minutes.") : window.showSitePopup({title:"voice note too big", detail:"keep voice notes under 2 minutes.", okText:"ok"});return;}if(typingIdleTimer)clearTimeout(typingIdleTimer);sendTypingState(false,true);var payload=new FormData(form);textarea.disabled=true;if(fileInput)fileInput.disabled=true;if(sendButton)sendButton.disabled=true;jsonFetch(form.getAttribute("action")||("/chat/"+id),{method:"POST",body:payload,credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest"}}).then(function(data){if(data.exists===false){window.location.href="/chat/"+id;return;}if(data.ok){textarea.value="";if(fileInput)fileInput.value="";if(attachmentKindInput)attachmentKindInput.value="";clearReply();syncFileIndicator();renderMessages(data,true);}else if(data.error){window.showSiteNotice ? window.showSiteNotice("chat error", data.error) : window.showSitePopup({title:"chat error", detail:data.error, okText:"ok"});}}).catch(function(){form.submit();}).finally(function(){textarea.disabled=false;if(fileInput)fileInput.disabled=false;if(sendButton)sendButton.disabled=false;textarea.focus();});}
-    if(form&&textarea){form.addEventListener("submit",submitMessage);textarea.addEventListener("input",queueTyping);textarea.addEventListener("blur",function(){if(typingIdleTimer)clearTimeout(typingIdleTimer);sendTypingState(false,true);});textarea.addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();if(form.requestSubmit){form.requestSubmit();}else{submitMessage(event);}}});}
+    function openPicker(mode,messageId,x,y){if(!emojiPicker)return;pickerMode=mode;pickerMessageId=messageId||"";if(emojiSearch)emojiSearch.value="";renderEmojiList("");placeBox(emojiPicker,x,y);if(emojiSearch&&!isMobileChat())emojiSearch.focus();}
+    function react(messageId,emoji){var body=new URLSearchParams();body.append("action","react");body.append("messageId",messageId);body.append("emoji",emoji);jsonFetch("/chat/"+id,{method:"POST",body:body,credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest","Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}if(data.ok){renderMessages(data,false);}}).catch(function(){});}
+    function confirmDeleteMessage(){if(deleteWarningAcknowledged)return Promise.resolve(true);return window.showSitePopup({title:"delete message?",detail:"this will replace the message with a deleted placeholder for everyone in the chat. you will only be asked once.",okText:"delete",cancelText:"cancel"});}
+    function deleteMessage(messageId){if(!messageId)return;confirmDeleteMessage().then(function(confirmed){if(!confirmed)return;if(!deleteWarningAcknowledged){deleteWarningAcknowledged=true;try{localStorage.setItem("fridg3-chat-delete-warning-acknowledged","1");}catch(error){}}var body=new URLSearchParams();body.append("action","delete-message");body.append("messageId",messageId);jsonFetch("/chat/"+id,{method:"POST",body:body,credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest","Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}if(data.ok){renderMessages(data,false);}else if(data.error){window.showSiteNotice ? window.showSiteNotice("chat error", data.error) : window.showSitePopup({title:"chat error", detail:data.error, okText:"ok"});}}).catch(function(){});});}
+    function hideMessage(messageId){if(!messageId)return;var body=new URLSearchParams();body.append("action","hide-message");body.append("messageId",messageId);jsonFetch("/chat/"+id,{method:"POST",body:body,credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest","Content-Type":"application/x-www-form-urlencoded"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}if(data.ok){renderMessages(data,false);}else if(data.error){window.showSiteNotice ? window.showSiteNotice("chat error", data.error) : window.showSitePopup({title:"chat error",detail:data.error,okText:"ok"});}}).catch(function(){});}
+    function submitMessage(event){event.preventDefault();if(!form||!textarea||postingRestricted)return;var body=textarea.value.trim();if(body===""&&!hasFile())return;var isVoice=attachmentKindInput&&attachmentKindInput.value==="voice";if(hasFile()&&!isVoice&&fileInput.files[0].size>8388608){window.showSiteNotice ? window.showSiteNotice("file too big", "max size is 8 MB.") : window.showSitePopup({title:"file too big", detail:"max size is 8 MB.", okText:"ok"});return;}if(hasFile()&&isVoice&&fileInput.files[0].size>12000000){window.showSiteNotice ? window.showSiteNotice("voice note too big", "keep voice notes under 2 minutes.") : window.showSitePopup({title:"voice note too big", detail:"keep voice notes under 2 minutes.", okText:"ok"});return;}if(typingIdleTimer)clearTimeout(typingIdleTimer);sendTypingState(false,true);var payload=new FormData(form);textarea.disabled=true;if(fileInput)fileInput.disabled=true;if(sendButton)sendButton.disabled=true;jsonFetch(form.getAttribute("action")||("/chat/"+id),{method:"POST",body:payload,credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest"}}).then(function(data){if(data.exists===false){handleConversationMissing();return;}if(data.ok){textarea.value="";if(fileInput)fileInput.value="";if(attachmentKindInput)attachmentKindInput.value="";clearReply();syncFileIndicator();renderMessages(data,true);}else if(data.error){window.showSiteNotice ? window.showSiteNotice("chat error", data.error) : window.showSitePopup({title:"chat error", detail:data.error, okText:"ok"});}}).catch(function(){form.submit();}).finally(function(){textarea.disabled=false;if(fileInput)fileInput.disabled=false;if(sendButton)sendButton.disabled=false;textarea.focus();});}
+    if(form&&textarea){form.addEventListener("submit",submitMessage);textarea.addEventListener("focus",settleMobileViewport);textarea.addEventListener("input",queueTyping);textarea.addEventListener("blur",function(){if(typingIdleTimer)clearTimeout(typingIdleTimer);sendTypingState(false,true);settleMobileViewport();});textarea.addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();if(form.requestSubmit){form.requestSubmit();}else{submitMessage(event);}}});}
     if(fileInput){fileInput.addEventListener("change",function(){if(attachmentKindInput)attachmentKindInput.value="";syncFileIndicator();});syncFileIndicator();}
-    if(attachButton&&attachMenu){attachButton.addEventListener("click",function(event){event.preventDefault();closeMenu();closePicker();attachMenu.style.display=attachMenu.style.display==="block"?"none":"block";});attachMenu.addEventListener("click",function(event){var action=event.target.closest("[data-chat-compose-action]");if(!action)return;event.preventDefault();if(action.getAttribute("data-chat-compose-action")==="upload"){if(attachmentKindInput)attachmentKindInput.value="";if(fileInput){fileInput.value="";syncFileIndicator();fileInput.click();}closeAttachMenu();}else if(action.getAttribute("data-chat-compose-action")==="voice"){if(voiceRecorderEl){voiceRecorderEl.hidden=false;}closeAttachMenu();}});}
+    if(attachButton&&attachMenu){attachButton.addEventListener("click",function(event){event.preventDefault();closeMenu();closePicker();if(document.body&&document.body.classList.contains("mobile-template")){if(attachmentKindInput)attachmentKindInput.value="";if(fileInput){fileInput.accept="image/*";fileInput.value="";syncFileIndicator();fileInput.click();}return;}attachMenu.style.display=attachMenu.style.display==="block"?"none":"block";});attachMenu.addEventListener("click",function(event){var action=event.target.closest("[data-chat-compose-action]");if(!action)return;event.preventDefault();if(action.getAttribute("data-chat-compose-action")==="upload"){if(attachmentKindInput)attachmentKindInput.value="";if(fileInput){fileInput.value="";syncFileIndicator();fileInput.click();}closeAttachMenu();}else if(action.getAttribute("data-chat-compose-action")==="voice"){if(voiceRecorderEl){voiceRecorderEl.hidden=false;}closeAttachMenu();}});}
     if(voiceRecorderEl&&typeof window.fridg3CreateVoiceRecorder==="function"){window.fridg3CreateVoiceRecorder(voiceRecorderEl,function(file){var dt=new DataTransfer();dt.items.add(file);if(fileInput)fileInput.files=dt.files;if(attachmentKindInput)attachmentKindInput.value="voice";syncFileIndicator();});}
+    if(holdVoiceButton){holdVoiceButton.addEventListener("click",function(event){event.preventDefault();closeMenu();closePicker();closeAttachMenu();if(!voiceRecorderEl)return;var shouldHide=!voiceRecorderEl.hidden;if(shouldHide){var activeRecordButton=voiceRecorderEl.querySelector('[data-voice-action="record"]');if(activeRecordButton&&!activeRecordButton.disabled&&activeRecordButton.querySelector(".fa-stop"))activeRecordButton.click();voiceRecorderEl.hidden=true;holdVoiceButton.setAttribute("aria-expanded","false");return;}voiceRecorderEl.hidden=false;holdVoiceButton.setAttribute("aria-expanded","true");var recordButton=voiceRecorderEl.querySelector('[data-voice-action="record"]');if(recordButton)recordButton.focus();});}
     if(replyCancel){replyCancel.addEventListener("click",clearReply);}
     if(emojiButton){emojiButton.addEventListener("click",function(event){event.preventDefault();closeMenu();closeAttachMenu();var rect=emojiButton.getBoundingClientRect();openPicker("insert","",rect.left,rect.top-330);});}
-    if(messagesEl){messagesEl.addEventListener("contextmenu",function(event){var message=event.target.closest(".chat-message[data-message-id]");if(!message)return;event.preventDefault();});messagesEl.addEventListener("click",function(event){var ref=event.target.closest("[data-scroll-message]");if(ref){var target=messagesEl.querySelector('.chat-message[data-message-id="'+ref.getAttribute("data-scroll-message")+'"]');if(target){target.scrollIntoView({block:"center",behavior:"smooth"});target.classList.add("chat-message-highlight");setTimeout(function(){target.classList.remove("chat-message-highlight");},1200);}return;}var reaction=event.target.closest(".chat-reaction[data-message-id][data-emoji]");if(reaction){react(reaction.getAttribute("data-message-id"),reaction.getAttribute("data-emoji"));return;}if(event.target.closest(".chat-attachment-image,.chat-attachment-media,.chat-attachment-file,.chat-attachment-download"))return;var message=event.target.closest(".chat-message[data-message-id]");if(message&&message.getAttribute("data-message-deleted")!=="1"){event.preventDefault();closePicker();var rect=message.getBoundingClientRect();openMenu(message,rect.left+12,rect.bottom+6);}});}
+    if(messagesEl){messagesEl.addEventListener("pointerdown",beginMessageSwipe);messagesEl.addEventListener("pointermove",moveMessageSwipe,{passive:false});messagesEl.addEventListener("pointerup",endMessageSwipe);messagesEl.addEventListener("pointercancel",cancelMessageSwipe);messagesEl.addEventListener("contextmenu",function(event){var message=event.target.closest(".chat-message[data-message-id]");if(!message)return;event.preventDefault();if(!isMobileChat()&&message.getAttribute("data-message-deleted")!=="1"){closePicker();openMenu(message,event.clientX,event.clientY);}});messagesEl.addEventListener("click",function(event){if(suppressMessageClick){event.preventDefault();event.stopPropagation();return;}var ref=event.target.closest("[data-scroll-message]");if(ref){var target=messagesEl.querySelector('.chat-message[data-message-id="'+ref.getAttribute("data-scroll-message")+'"]');if(target){target.scrollIntoView({block:"center",behavior:"smooth"});target.classList.add("chat-message-highlight");setTimeout(function(){target.classList.remove("chat-message-highlight");},1200);}return;}var reaction=event.target.closest(".chat-reaction[data-message-id][data-emoji]");if(reaction){react(reaction.getAttribute("data-message-id"),reaction.getAttribute("data-emoji"));return;}});}
     if(menu){menu.addEventListener("click",function(event){var action=event.target.closest("[data-chat-action]");if(!action)return;event.stopPropagation();var message=messagesEl?messagesEl.querySelector('.chat-message[data-message-id="'+menu.dataset.messageId+'"]'):null;if(action.getAttribute("data-chat-action")==="reply"){setReply(message);closeMenu();}else if(action.getAttribute("data-chat-action")==="delete"){deleteMessage(menu.dataset.messageId);closeMenu();}else{var rect=menu.getBoundingClientRect();openPicker("react",menu.dataset.messageId,rect.left,rect.bottom+6);closeMenu();}});}
     if(emojiSearch){emojiSearch.addEventListener("input",function(){renderEmojiList(emojiSearch.value);});}
     if(emojiGrid){emojiGrid.addEventListener("scroll",function(){if(emojiRenderedCount<emojiFilteredItems.length&&emojiGrid.scrollTop+emojiGrid.clientHeight>=emojiGrid.scrollHeight-80){appendEmojiChunk();}});emojiGrid.addEventListener("click",function(event){var btn=event.target.closest("[data-emoji]");if(!btn)return;var emoji=btn.getAttribute("data-emoji");if(pickerMode==="react"&&pickerMessageId){react(pickerMessageId,emoji);}else if(textarea){var start=textarea.selectionStart||textarea.value.length;var end=textarea.selectionEnd||start;textarea.value=textarea.value.slice(0,start)+emoji+textarea.value.slice(end);textarea.focus();textarea.setSelectionRange(start+emoji.length,start+emoji.length);}closePicker();});}
     document.addEventListener("click",function(event){if(menu&&menu.style.display==="block"&&!event.target.closest(".chat-context-menu")&&!event.target.closest(".chat-message"))closeMenu();if(attachMenu&&attachMenu.style.display==="block"&&!event.target.closest(".chat-attach-menu")&&!event.target.closest(".chat-attach-button"))closeAttachMenu();if(emojiPicker&&emojiPicker.style.display==="block"&&!event.target.closest(".chat-emoji-picker")&&!event.target.closest(".chat-emoji-button"))closePicker();});
     document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeMenu();closeAttachMenu();closePicker();}});
-    setInterval(function(){jsonFetch("/chat/"+id+"?action=status",{cache:"no-store"}).then(function(data){if(!data.exists){window.location.href="/chat/"+id;}}).catch(function(){});},5000);
+    chatTimers.push(setInterval(function(){if(conversationEndedHandled)return;jsonFetch("/chat/"+id+"?action=status",{cache:"no-store"}).then(function(data){if(!data.exists)handleConversationMissing();}).catch(function(){});},5000));
     document.addEventListener("visibilitychange",function(){if(!isChatActive())sendTypingState(false,true);ping();if(isChatActive()){clearUnread();refreshMessages(false);}});
     window.addEventListener("focus",function(){clearUnread();ping();refreshMessages(false);});
     window.addEventListener("blur",function(){sendTypingState(false,true);ping();});
     window.addEventListener("pagehide",function(){sendTypingState(false,true);pingAway();});
-    loadEmojiData();initChatMediaPlayers();scrollMessages(true);ping();refreshMessages(true);showRecipientIntro();setInterval(ping,5000);setInterval(refreshPresence,1000);setInterval(function(){refreshMessages(false);},2000);
+    if(document.body&&document.body.classList.contains("mobile-template")){settleMobileViewport();window.addEventListener("resize",settleMobileViewport);window.addEventListener("orientationchange",settleMobileViewport);if(window.visualViewport){window.visualViewport.addEventListener("resize",syncMobileViewport);}}
+    loadEmojiData();initChatMediaPlayers();scrollMessages(true);ping();refreshMessages(true);showRecipientIntro();chatTimers.push(setInterval(ping,5000));chatTimers.push(setInterval(refreshPresence,1000));chatTimers.push(setInterval(function(){refreshMessages(false);},2000));
 }
 if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",initChat);}else{initChat();}
 }());
 </script>
 HTML;
     $canDeleteConversation = chat_user_can_delete_conversation($conversation, $canManage);
+    $canRevokeConversation = chat_user_is_admin()
+        && (!empty($conversation['participantHash']) || !empty($conversation['participantUsername']));
     $isAccountLinkedRecipient = !$canManage && chat_is_account_participant($conversation);
-    $content = '<section class="chat-view" data-chat-id="' . chat_h($conversationId) . '" data-can-manage="' . ($canManage ? '1' : '0') . '" data-posting-restricted="' . ($postingRestricted ? '1' : '0') . '" data-viewer-role="' . chat_h($viewerRole) . '" data-recipient-name="' . chat_h($recipientName) . '" data-show-recipient-intro="' . ($showRecipientIntro ? '1' : '0') . '" data-account-linked-recipient="' . ($isAccountLinkedRecipient ? '1' : '0') . '">'
-        . '<div class="chat-header-row"><div><h1>private chat</h1><h2>recipient: ' . chat_h($recipientName) . '</h2><div class="chat-presence" id="chat-presence" aria-live="polite">checking if the other user is online...</div></div>'
+    $content = '<style id="chat-final-theme-overrides">body .chat-view{--chat-own-bg:#245856;--chat-own-fg:#fff}body .chat-view .chat-message-own{background:#245856!important;background-image:none!important;color:#fff!important}body .chat-view .chat-message-own .chat-message-meta,body .chat-view .chat-message-own .chat-message-body,body .chat-view .chat-message-own .chat-attachment{color:#fff!important}body .chat-view .chat-reply-reference,body .chat-view .chat-reply-compose{background:#252b30!important;background-image:none!important;color:#fff!important}body .chat-view .chat-reply-reference strong,body .chat-view .chat-reply-reference span,body .chat-view .chat-reply-compose strong,body .chat-view .chat-reply-compose span{color:#fff!important}</style>'
+        . '<section class="chat-view" data-chat-id="' . chat_h($conversationId) . '" data-can-manage="' . ($canManage ? '1' : '0') . '" data-posting-restricted="' . ($postingRestricted ? '1' : '0') . '" data-viewer-role="' . chat_h($viewerRole) . '" data-recipient-name="' . chat_h($recipientName) . '" data-show-recipient-intro="' . ($showRecipientIntro ? '1' : '0') . '" data-account-linked-recipient="' . ($isAccountLinkedRecipient ? '1' : '0') . '">'
+        . '<div class="chat-header-row"><div class="chat-header-main"><h2>fridge.dev chat</h2><div class="chat-presence" id="chat-presence" aria-live="polite">checking if the other user is online...</div></div>'
+        . '<div class="chat-header-actions">'
+        . ($canRevokeConversation ? '<form class="chat-revoke-form" method="post" action="/chat/' . chat_h($conversationId) . '" data-no-spa="1" data-site-confirm data-confirm-title="revoke chat?" data-confirm-detail="this releases the current recipient and lets someone else claim the chat link. existing messages are kept." data-confirm-text="revoke"><input type="hidden" name="action" value="revoke"><button class="chat-delete-button" type="submit">revoke chat</button></form>' : '')
         . ($canDeleteConversation ? '<form class="chat-delete-form" method="post" action="/chat/' . chat_h($conversationId) . '" data-no-spa="1" data-confirm-text="end chat"><input type="hidden" name="action" value="delete"><button class="danger-button chat-delete-button" type="submit">end chat</button></form>' : '')
+        . '</div>'
         . '</div>'
         . '<div class="chat-messages-wrap"><div class="chat-messages" id="chat-messages" aria-live="polite">' . chat_message_html($conversation, $viewerRole) . '</div><div class="chat-typing-indicator" id="chat-typing-indicator" aria-live="polite"></div></div>'
         . '<form class="chat-send-form" method="post" action="/chat/' . chat_h($conversationId) . '" enctype="multipart/form-data" data-no-spa="1">'
@@ -1605,12 +2067,13 @@ HTML;
         . '<div class="chat-reply-compose" aria-live="polite"><div><strong></strong><span></span></div><button type="button" aria-label="cancel reply">x</button></div>'
         . '<input type="hidden" name="attachmentKind" value="">'
         . '<input class="chat-attachment-input" name="attachment" type="file" accept="image/*,audio/*,video/*,.pdf,.txt,.md,.zip,.7z,.rar,.mp3,.wav,.ogg,.oga,.flac,.mp4,.webm,.ogv,.mov,.m4v,.mkv,.avi,.json,.csv" hidden>'
-        . '<button class="chat-attach-button" type="button" data-tooltip="add file or voice note">+</button>'
+        . '<button class="chat-attach-button" type="button" data-tooltip="add file or voice note" aria-label="add file or voice note"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>'
         . '<div class="chat-attach-menu"><button type="button" data-chat-compose-action="upload"><i class="fa-solid fa-paperclip"></i><span>upload file</span></button><button type="button" data-chat-compose-action="voice"><i class="fa-solid fa-microphone"></i><span>record voice note</span></button></div>'
         . '<div class="chat-voice-recorder" hidden></div>'
         . '<textarea name="message" rows="2" maxlength="4000" placeholder="message"></textarea>'
         . '<button class="chat-emoji-button" type="button" data-tooltip="emoji">☺</button>'
-        . '<button class="chat-send-button" type="submit">send</button>'
+        . '<button class="chat-send-button chat-hold-voice-button" type="button" data-tooltip="record a voice note" aria-label="record a voice note" aria-expanded="false"><i class="fa-solid fa-microphone" aria-hidden="true"></i></button>'
+        . '<button class="chat-send-button" type="submit"><span>send</span><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>'
         . '<div class="chat-file-indicator" aria-live="polite"></div>'
         . '</form>'
         . '<div class="chat-context-menu" role="menu"><button type="button" data-chat-action="reply">reply</button><button type="button" data-chat-action="react">react</button><button type="button" data-chat-action="delete">delete</button></div>'
@@ -1663,10 +2126,6 @@ foreach ($conversations as $conversation) {
 $contentPath = __DIR__ . DIRECTORY_SEPARATOR . 'content.html';
 $content = (string)file_get_contents($contentPath);
 $createdNotice = '';
-if ($createdId !== '') {
-    $url = 'https://fridge.dev/chat/' . $createdId;
-    $createdNotice = '<div id="result">chat created. share this one-time link:<br><button class="chat-copy-link chat-created-link" type="button" data-copy-url="' . chat_h($url) . '" data-tooltip="copy chat link">' . chat_h($url) . '</button></div><br>';
-}
 if ($deleted) {
     $createdNotice = '<div id="result">conversation ended and deleted.</div><br>';
 }
