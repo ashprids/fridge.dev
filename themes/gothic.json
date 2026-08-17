@@ -1,7 +1,0 @@
-{
-  "name": "gothic",
-  "description": "dark stone panels, iron buttons, and antique gold glow",
-  "thumbnail": "thumbnails/gothic.svg",
-  "html": "gothic/gothic.html",
-  "css": "gothic/gothic.css"
-}

@@ -3372,7 +3372,6 @@ function setupSpaForms() {
         document.querySelectorAll('form').forEach(form => {
             if (form.dataset.searchWaitBound === '1') return;
             const isSearchForm = form.id === 'search'
-                || form.id === 'littlehelps-search'
                 || form.getAttribute('role') === 'search'
                 || !!form.querySelector('input[type="search"], input[name="q"]');
             if (!isSearchForm) return;

@@ -11,7 +11,6 @@ const COLOR_PREFS_KEY = 'colorPrefs';
 const COLOR_FIELDS = ['bg', 'fg', 'border', 'subtle', 'links'];
 const THEME_COLOR_FIELDS = {
     classic: COLOR_FIELDS,
-    ambercrt: ['links'],
 };
 const COLOR_DEFAULTS = {
     bg: '#000000',
@@ -22,9 +21,6 @@ const COLOR_DEFAULTS = {
 };
 const THEME_COLOR_DEFAULTS = {
     classic: COLOR_DEFAULTS,
-    ambercrt: {
-        links: '#FFB84D',
-    },
 };
 const MOBILE_VIEW_COOKIE = 'mobile_friendly_view';
 const MOBILE_VIEW_DOMAIN = '.fridge.dev';
@@ -455,10 +451,7 @@ function normalizeTheme(theme) {
     const normalized = theme.trim().toLowerCase();
     if (normalized === '' || normalized === 'default') return 'default';
     if (normalized === 'blackprint') return 'default';
-    if (normalized === 'crt') return 'ambercrt';
-    if (normalized === 'liminal') return 'default';
     if (normalized === 'custom') return 'classic';
-    if (normalized === 'newsprint') return 'whiteprint';
     if (/^[a-z0-9_-]+$/.test(normalized)) return normalized;
     return 'default';
 }
@@ -1531,16 +1524,14 @@ function initSettingsPage() {
             colorSection.style.display = fields.length ? '' : 'none';
             const heading = colorSection.querySelector('h3');
             if (heading) {
-                heading.textContent = normalizedTheme === 'ambercrt' ? 'CRT phosphor' : 'color scheme';
+                heading.textContent = 'color scheme';
             }
             const allowed = new Set(fields);
             colorInputs.forEach(inp => {
                 const row = inp.closest('.color-row');
                 if (row) row.style.display = allowed.has(inp.dataset.colorKey) ? '' : 'none';
                 const label = row ? row.querySelector('span') : null;
-                if (label && normalizedTheme === 'ambercrt' && inp.dataset.colorKey === 'links') {
-                    label.textContent = 'main';
-                } else if (label && inp.dataset.colorKey === 'links') {
+                if (label && inp.dataset.colorKey === 'links') {
                     label.textContent = 'links';
                 }
             });
@@ -2059,6 +2050,9 @@ function initSettingsPage() {
                 saveLocalThemePref(currentTheme);
                 setThemeCookie(currentTheme);
                 applyThemeSelection(currentTheme);
+                if (currentTheme === 'classic') {
+                    resetColorsToDefault();
+                }
             });
         }
 

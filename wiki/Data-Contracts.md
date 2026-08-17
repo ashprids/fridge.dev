@@ -66,8 +66,8 @@ Notes:
 - Extra unknown keys can exist and are preserved by `account/admin/edit`
 - Bookmarks are the current source of truth for logged-in users
 - Bookmark ids currently use raw feed ids and `journal:{id}`; legacy `newsletter:{id}` values can exist but are ignored
-- `theme: default` is Blackprint and uses the base template plus `/style.css`; `theme: classic` enables saved `colors` for `bg`/`fg`/`border`/`subtle`/`links`; `theme: ambercrt` is shown as `CRT` and uses only saved `colors.links` as its main phosphor color; any other valid value refers to a `/themes/{theme-id}.json` file with `name`, `description`, `thumbnail`, `html`, and `css`
-- Legacy `blackprint` normalizes to `default`, `custom` normalizes to `classic`, `newsprint` normalizes to `whiteprint`, `crt` normalizes to `ambercrt`, and removed `liminal`/`syswave` preferences normalize to `default`
+- `theme: default` is Blackprint and uses the base template plus `/style.css`; `theme: classic` enables `colors` for `bg`/`fg`/`border`/`subtle`/`links`, and selecting Classic in the settings picker overwrites those five values with Classic's defaults before persistence; any other valid value refers to a discovered `/themes/{theme-id}.json` package with `name`, `description`, `thumbnail`, `html`, and `css`
+- The aliases `blackprint` and `custom` normalize to `default` and `classic` respectively; preferences for theme packages that no longer exist fall back to Blackprint during rendering
 - Text glow is stored in `glowIntensity`; the settings UI writes `none` for off and `medium` for on, while legacy `low`/`high` values are treated as enabled medium glow when saved again
 - Title motion is stored in `titleAnimation` (`wobble`, `bounce`, `rubberhose`, `bubble`, `slot-machine`, `moonwalk`, or `heartbeat`), `titleAnimationAlways` (boolean), and `titleAnimationDesync` (boolean, default `true`); removed `pinball` values migrate to `wobble`; legacy `orbit`, `domino`, and `lava-lamp` values migrate to `bubble`; removed `tidal-wave`, `accordion`, and `typewriter` values migrate to `slot-machine`, while `helicopter`, `haunted`, and `juggle` migrate to `moonwalk`; guests keep the same values in local storage
 - Accessibility toggles are stored as account booleans such as `reduceMotion`; logged-out browsers keep the same preferences in localStorage. Debug mode applies immediately when its checkbox changes and, for logged-in users, posts its account value independently of the general “save changes” action; changing that checkbox alone therefore does not mark the settings form dirty
@@ -148,8 +148,9 @@ Notes:
 - The metadata filename is the saved theme id, for example `/themes/cool.json` becomes `cool`
 - `name` is the label shown in `/settings`
 - `description` is the short supporting text shown under the theme name in the picker
+- optional `base` may be `blackprint`; unsupported base values invalidate the package
 - `thumbnail` is a 4:3 preview path relative to `/themes`, usually `thumbnails/{theme-id}.svg`
-- `html` and `css` must be relative paths in `/themes/lib`, for example `aero/aero.html` and `aero/aero.css`
+- `html` and `css` must be relative paths in `/themes/lib`, for example `example/example.html` and `example/example.css`
 - Theme asset paths cannot be absolute, contain `..`, or use characters outside letters, numbers, `.`, `_`, `-`, and `/`
 - Desktop rendering uses both themed HTML and CSS
 - Mobile rendering keeps `template_mobile.html` and only swaps the CSS

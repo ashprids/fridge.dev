@@ -1,7 +1,0 @@
-{
-  "name": "CRT",
-  "description": "dark scanline terminal with one adjustable phosphor colour",
-  "thumbnail": "thumbnails/crt.svg",
-  "html": "ambercrt/ambercrt.html",
-  "css": "ambercrt/ambercrt.css"
-}
