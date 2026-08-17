@@ -6,6 +6,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
+fridg3_feed_refresh_session_user();
 
 $title = 'feed';
 $description = 'short snippets and updates.';
@@ -71,7 +72,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -96,7 +97,7 @@ $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);
@@ -112,6 +113,7 @@ $paginationHtml = '';
 $postsData = [];
 $feedPostIps = fridg3_feed_load_post_ips();
 $viewerIsAdmin = !empty($_SESSION['user']['isAdmin']);
+$viewerIsModerator = !empty($_SESSION['user']['isModerator']);
 
 // Load existing bookmarks for the logged-in user so we can
 // render bookmark icons in the correct filled/empty state.
@@ -231,7 +233,8 @@ if (is_dir($postsDir)) {
         if (isset($_SESSION['user'])) {
             $currentUser = $_SESSION['user']['username'] ?? '';
             $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
-            $canEdit = ($currentUser === $username) || $isAdmin;
+            $canEdit = ($currentUser === $username) || $isAdmin
+                || ($viewerIsModerator && !fridg3_feed_account_is_admin($username));
         }
 
         // Build edit icon if allowed
@@ -244,16 +247,32 @@ if (is_dir($postsDir)) {
         // Determine if this post is bookmarked for the current user
         $isBookmarked = in_array($postIdRaw, $userBookmarks, true);
         $bookmarkIconClass = $isBookmarked ? 'fa-solid' : 'fa-regular';
-        if ($canEdit) {
+        $postIp = (string)($feedPostIps[$postIdRaw]['ip'] ?? '');
+        $canModeratePostAuthor = $viewerIsAdmin || ($viewerIsModerator && !fridg3_feed_account_is_admin($username));
+        $hasManageablePostIp = $canModeratePostAuthor && filter_var($postIp, FILTER_VALIDATE_IP);
+        if ($canEdit || $hasManageablePostIp) {
             // Use a span with a data-edit-href attribute instead of a nested
             // anchor so we don't produce invalid <a><a> markup inside the
             // outer feed-post link. JS will handle navigation.
-            $editIcon = '<span id="post-edit-feed" data-tooltip="edit post" style="cursor:pointer !important" data-edit-href="/feed/edit?post=' . $postId . '.txt"><i class="fa-solid fa-pencil"></i></span> ';
+            $editIcon = '<details class="site-action-menu" data-no-card-navigation><summary data-tooltip="post actions" aria-label="post actions"><i class="fa-solid fa-ellipsis"></i></summary>'
+                . '<div class="site-action-menu-dropdown">';
+            if ($canEdit) {
+                $editIcon .= '<a class="site-action-menu-item" href="/feed/edit?post=' . $postId . '.txt"><i class="fa-solid fa-pencil"></i><span>edit</span></a>';
+            }
+            if ($hasManageablePostIp) {
+                $editIcon .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($postIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
+            }
+            if ($canEdit) {
+                $editIcon .= '<form class="site-action-menu-form" method="post" action="/feed/edit?post=' . $postId . '.txt" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete feed post?" data-confirm-detail="this removes the feed post, attached media, voice notes, and replies." data-confirm-text="delete" data-cancel-text="cancel">'
+                    . '<input type="hidden" name="delete" value="1">'
+                    . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-trash"></i><span>delete</span></button>'
+                    . '</form>';
+            }
+            $editIcon .= '</div></details> ';
         }
 
         $postLink = '/feed/posts/' . $postId;
-        $postIp = (string)($feedPostIps[$postIdRaw]['ip'] ?? '');
-        $postUserIpAttribute = $viewerIsAdmin
+        $postUserIpAttribute = $canModeratePostAuthor
             ? ' data-context-tooltip="' . (filter_var($postIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($postIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
             : '';
 

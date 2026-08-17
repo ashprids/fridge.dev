@@ -1344,8 +1344,19 @@ body.mobile-template.sidebar-is-hidden #sidebar {
     cursor: context-menu;
 }
 
+body.mobile-template [data-context-tooltip],
+body.mobile-template .site-ip-popup {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 .account-ip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.account-ip-value { padding: 4px 6px; border: 1px solid var(--border); }
+.account-ip-value {
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 14px;
+}
 .account-ip-empty { color: var(--subtle); font-family: "MainItalic", var(--emoji-font), monospace; }
 
 #content [data-tooltip]:not(a) {
@@ -2343,8 +2354,12 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
 }
 
 .settings-admin-panel {
-    margin-bottom: 20px;
+    margin-bottom: 0;
     border: 1px solid var(--border);
+}
+
+#admin-settings-separator hr {
+    margin: 30px 0 20px;
 }
 
 .settings-admin-panel > summary {
@@ -2356,14 +2371,6 @@ body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mob
 
 .settings-admin-panel-content {
     padding: 0 12px 12px;
-}
-
-body.mobile-template #debug-mode-setting {
-    display: none !important;
-}
-
-@media (max-width: 700px) {
-    #debug-mode-setting { display: none !important; }
 }
 
 .title-animation-settings.is-disabled {
@@ -4625,6 +4632,95 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
     color: rgb(200, 200, 200);
 }
 
+.site-action-menu {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    color: var(--subtle);
+}
+
+.site-action-menu > summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--subtle);
+    cursor: pointer;
+    list-style: none;
+}
+
+.site-action-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.site-action-menu > summary:hover,
+.site-action-menu[open] > summary {
+    color: var(--fg);
+}
+
+.site-action-menu-dropdown {
+    position: absolute;
+    z-index: 1000;
+    top: calc(100% + 5px);
+    right: 0;
+    min-width: 180px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--bg) 96%, var(--fg) 4%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.site-action-menu-form {
+    display: block;
+    margin: 0;
+}
+
+.site-action-menu-item,
+button.site-action-menu-item {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 7px 9px !important;
+    border: 0 !important;
+    border-radius: 2px !important;
+    box-sizing: border-box;
+    background: transparent !important;
+    color: var(--fg) !important;
+    box-shadow: none !important;
+    font: 12px/1.2 "MainRegular", var(--emoji-font), monospace !important;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.site-action-menu-item > i,
+button.site-action-menu-item > i {
+    flex: 0 0 12px;
+    width: 12px;
+    text-align: center;
+}
+
+.site-action-menu-item:hover,
+button.site-action-menu-item:hover,
+.site-action-menu-item:focus-visible,
+button.site-action-menu-item:focus-visible {
+    background: color-mix(in srgb, var(--links) 22%, transparent) !important;
+    color: var(--fg) !important;
+    outline: none;
+    transform: none !important;
+}
+
 .feed-reply-edit-box {
     margin-top: 12px;
 }
@@ -4857,6 +4953,11 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
     font: 12px/1.5 monospace;
 }
 .debug-log-entry { display: block; }
+.debug-log-virtual-spacer {
+    display: block;
+    width: 1px;
+    pointer-events: none;
+}
 .debug-log-timestamp { color: #808080; }
 .debug-log-source { color: #c7c7c7; }
 .debug-log-message.is-error { color: #ff5f5f; }
@@ -5004,8 +5105,65 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
     font-size: 11px;
 }
 
-@media (max-width: 700px) {
-    #debug-console { display: none !important; }
+body.mobile-template #debug-console {
+    inset: 0 !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+body.mobile-template #debug-console .debug-console-resize-handle {
+    display: none !important;
+}
+
+body.mobile-template.mobile-debug-console-open {
+    overflow: hidden !important;
+}
+
+body.mobile-template #show-debug-console {
+    position: fixed !important;
+    z-index: 2147483647 !important;
+    top: 58px !important;
+    right: 8px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    background: rgba(0, 0, 0, 0.88) !important;
+    color: var(--fg) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(10px);
+}
+
+body.mobile-template #show-debug-console[hidden] {
+    display: none !important;
+}
+
+body.mobile-template #debug-console .debug-log-search:has(#show-debug-console) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+body.mobile-template #debug-console .debug-log-search:has(#show-debug-console) input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+}
+
+body.mobile-template #debug-console #show-debug-console.is-in-debug-console {
+    position: static !important;
+    z-index: auto !important;
+    flex: 0 0 auto;
+    padding: 4px 8px !important;
+    background: var(--bg) !important;
+    backdrop-filter: none;
 }
 
 .dev-bootstrap-progress-dialog {
@@ -5757,6 +5915,77 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .account-admin-list {
     display: grid;
     gap: 12px;
+}
+
+.account-admin-grid,
+.guest-management-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.restricted-ip-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.restricted-ip-actions form {
+    display: inline-flex !important;
+    margin: 0 !important;
+}
+
+.restricted-ip-view-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    box-sizing: border-box;
+    background: var(--bg);
+    color: #fff !important;
+    font: 14px/1.2 "MainRegular", var(--emoji-font), monospace;
+    text-decoration: none;
+}
+
+.restricted-ip-view-button:hover {
+    border-color: var(--links);
+    color: #fff !important;
+}
+
+body.blackprint-theme .restricted-ip-view-button {
+    background: linear-gradient(90deg, #776490, #6caaa7);
+    color: #fff !important;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    box-shadow: 3px 3px 0 rgba(236, 231, 220, 0.2);
+}
+
+body.blackprint-theme .restricted-ip-view-button:hover {
+    background: var(--links);
+    color: #fff !important;
+}
+
+.restricted-ip-history {
+    display: grid;
+    gap: 12px;
+}
+
+.restricted-ip-history-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.restricted-ip-history-entry > .restricted-ip-history-state {
+    display: block;
+    margin: 0 0 5px;
+    color: var(--subtle);
+    font: 11px/1.2 "MainItalic", var(--emoji-font), monospace;
 }
 
 .chat-admin-list {
@@ -10479,6 +10708,22 @@ body.mobile-template #show-sidebar .mobile-menu-notification-badge {
 body.mobile-template #content-main #ascii,
 body.mobile-template #content-main #ascii-time {
     transition: none !important;
+}
+
+body.blackprint-theme.mobile-template #content-main #homepage-hero-ascii > #ascii {
+    margin-bottom: 2px !important;
+}
+
+.mobile-homepage-hero-break {
+    display: none;
+}
+
+body.mobile-template .mobile-homepage-hero-break {
+    display: inline;
+}
+
+body.mobile-template .desktop-homepage-hero-break {
+    display: none;
 }
 
 /* Chat controls and quoted replies stay flat regardless of the active theme. */

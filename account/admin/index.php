@@ -27,11 +27,15 @@ foreach ($accountsData['accounts'] as $account) {
 
     $name = isset($account['name']) ? (string)$account['name'] : '';
     $isAdmin = !empty($account['isAdmin']);
+    $isModerator = !empty($account['isModerator']);
     $allowedPages = array_values(array_map('strval', (array)($account['allowedPages'] ?? [])));
     $tags = [];
 
     if ($isAdmin) {
         $tags[] = '<span class="account-admin-badge">admin</span>';
+    }
+    if ($isModerator) {
+        $tags[] = '<span class="account-page-badge">moderator</span>';
     }
     if (trim((string)($account['emailAddress'] ?? '')) !== '') {
         $tags[] = '<span class="account-page-badge">email</span>';

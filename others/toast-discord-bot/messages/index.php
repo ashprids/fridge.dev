@@ -44,7 +44,7 @@ function render_toast_messages_page(string $title, string $description, string $
         $templatePath = find_template_file('template.html');
     }
     if (!$templatePath) {
-        die('page template not found. report this issue to me@fridge.dev.');
+        die('page template not found. report this issue to ashton@fridge.dev.');
     }
 
     $template = (string) file_get_contents($templatePath);
@@ -522,7 +522,7 @@ if ($selectedUserId !== '') {
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);

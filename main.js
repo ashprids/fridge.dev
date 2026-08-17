@@ -38,6 +38,7 @@ function showSitePopup(options) {
     return new Promise(resolve => {
         const overlay = document.createElement('div');
         overlay.className = 'site-popup-overlay';
+        if (config.className) overlay.classList.add(...String(config.className).split(/\s+/).filter(Boolean));
         overlay.setAttribute('role', 'dialog');
         overlay.setAttribute('aria-modal', 'true');
 
@@ -117,7 +118,13 @@ function showSitePopup(options) {
         };
 
         if (cancel) cancel.addEventListener('click', () => close(input ? null : false));
-        if (custom) custom.addEventListener('click', () => close('custom'));
+        if (custom) custom.addEventListener('click', async () => {
+            if (typeof config.customAction === 'function') {
+                await config.customAction(custom);
+                if (config.customCloses === false) return;
+            }
+            close('custom');
+        });
         if (ok) ok.addEventListener('click', () => close(input ? input.value : true));
         if (!noButtons) {
             overlay.addEventListener('click', event => {
@@ -126,8 +133,10 @@ function showSitePopup(options) {
             document.addEventListener('keydown', onKeydown);
         }
         document.body.append(overlay);
-        if (input || ok) (input || ok).focus();
-        if (input) input.select();
+        if (input) {
+            input.focus();
+            input.select();
+        }
     });
 }
 
@@ -155,6 +164,68 @@ function showSitePrompt(title, detail, value) {
 window.showSiteNotice = showSiteNotice;
 window.showSitePrompt = showSitePrompt;
 
+function initIpRestrictionNotification() {
+    fetch('/api/ip-restriction/', { credentials: 'same-origin', cache: 'no-store' })
+        .then(response => response.ok ? response.json() : null)
+        .then(data => {
+            if (!data || !data.ok || !data.restricted || !data.notificationId) return;
+            const storageKey = `fridg3-ip-restriction-notice-${data.notificationId}`;
+            try {
+                if (localStorage.getItem(storageKey) === '1') return;
+                localStorage.setItem(storageKey, '1');
+            } catch (_) {
+                if (window.__fridg3IpRestrictionNotice === storageKey) return;
+                window.__fridg3IpRestrictionNotice = storageKey;
+            }
+            const messageHtml = data.reason
+                ? `<strong>Reason:</strong> ${siteEscapeHtml(data.reason)}`
+                : '';
+            showSitePopup({
+                title: data.title || 'Your IP address has been restricted from uploading content to the website',
+                html: messageHtml,
+                okText: 'ok'
+            });
+        })
+        .catch(() => {});
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    initIpRestrictionNotification();
+    window.setInterval(initIpRestrictionNotification, 60000);
+});
+
+document.addEventListener('pointerdown', event => {
+    document.querySelectorAll('.site-action-menu[open]').forEach(menu => {
+        if (!menu.contains(event.target)) menu.removeAttribute('open');
+    });
+}, true);
+
+document.addEventListener('click', event => {
+    const activeMenu = event.target.closest('.site-action-menu');
+    document.querySelectorAll('.site-action-menu[open]').forEach(menu => {
+        if (menu !== activeMenu || event.target.closest('.site-action-menu-item')) menu.removeAttribute('open');
+    });
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.site-action-menu[open]').forEach(menu => menu.removeAttribute('open'));
+});
+
+document.addEventListener('click', event => {
+    const listing = event.target.closest('.restricted-ip-history-link[data-history-href]');
+    if (!listing || event.target.closest('a, button, input, textarea, select')) return;
+    window.location.href = listing.dataset.historyHref;
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const listing = event.target.closest('.restricted-ip-history-link[data-history-href]');
+    if (!listing || event.target.closest('a, button, input, textarea, select')) return;
+    event.preventDefault();
+    window.location.href = listing.dataset.historyHref;
+});
+
 const fridg3DebugLogs = { client: [], server: [] };
 let fridg3AccessLogs = [];
 const FRIDG3_DEBUG_LOG_LIMIT = 1000;
@@ -176,6 +247,7 @@ let fridg3ServerDebugAuthorized = false;
 let fridg3DebugPersistTimer = null;
 const fridg3DeferredOutputUpdates = new Map();
 let fridg3SelectionUpdateListenerBound = false;
+const fridg3VirtualDebugOutputs = new WeakMap();
 
 function fridg3OutputHasActiveSelection(output) {
     const selection = window.getSelection ? window.getSelection() : null;
@@ -231,6 +303,15 @@ function fridg3ReadDebugHistory(key) {
             .slice(-FRIDG3_DEBUG_LOG_LIMIT)
             .map(entry => {
                 entry.channel = key.includes('Server') ? 'server' : 'client';
+                if (!entry.createdAt) {
+                    const parts = entry.timestamp.split(':').map(Number);
+                    if (parts.length === 3 && parts.every(Number.isFinite)) {
+                        const inferred = new Date();
+                        inferred.setHours(parts[0], parts[1], parts[2], 0);
+                        if (inferred.getTime() > Date.now() + 60000) inferred.setDate(inferred.getDate() - 1);
+                        entry.createdAt = inferred.toISOString();
+                    }
+                }
                 if (/^\[PHP\]\s+warning:/i.test(entry.message)) {
                     entry.isError = false;
                     entry.isWarning = true;
@@ -276,6 +357,7 @@ function fridg3DebugAppend(channel, value, processLog = false, transient = false
     const explicitPhpWarning = /^\[PHP\]\s+warning:/i.test(message);
     const entry = {
         timestamp,
+        createdAt: now.toISOString(),
         message,
         processLog,
         transient,
@@ -299,34 +381,72 @@ function fridg3DebugAppend(channel, value, processLog = false, transient = false
     const output = target === 'server'
         ? document.querySelector('.debug-console-server-output')
         : document.querySelector('.debug-console-client-output');
-    if (output) {
-        if (trimmed || !fridg3DebugEntryVisible(entry) || !fridg3DebugSearchMatches(target, entry.message)) {
-            fridg3RenderDebugOutput(output, fridg3DebugLogs[target]);
-        } else {
-            fridg3UpdateDebugOutputWithoutScrollJump(output, () => {
-                output.append(fridg3CreateDebugLogLine(entry));
-            });
-        }
-    }
-}
-
-function fridg3UpdateDebugOutputWithoutScrollJump(output, update) {
-    const wasAtBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 20;
-    const previousScrollTop = output.scrollTop;
-    update();
-    output.scrollTop = wasAtBottom ? output.scrollHeight : previousScrollTop;
+    if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs[target]);
 }
 
 function fridg3RenderDebugOutput(output, entries) {
     const channel = output.classList.contains('debug-console-server-output') ? 'server' : 'client';
     fridg3RunAfterOutputSelection(output, () => {
-        fridg3UpdateDebugOutputWithoutScrollJump(output, () => {
-            output.replaceChildren();
-            entries
-                .filter(entry => fridg3DebugEntryVisible(entry) && fridg3DebugSearchMatches(channel, entry.message))
-                .forEach(entry => output.append(fridg3CreateDebugLogLine(entry)));
-        });
+        const visibleEntries = entries.filter(entry =>
+            fridg3DebugEntryVisible(entry) && fridg3DebugSearchMatches(channel, entry.message)
+        );
+        fridg3SetVirtualDebugOutput(output, visibleEntries, fridg3CreateDebugLogLine);
     });
+}
+
+function fridg3SetVirtualDebugOutput(output, items, createRow) {
+    let state = fridg3VirtualDebugOutputs.get(output);
+    const wasAtBottom = !state || output.scrollHeight - output.scrollTop - output.clientHeight < 20;
+    if (!state) {
+        state = { items: [], createRow, rowHeight: 18, frame: 0 };
+        fridg3VirtualDebugOutputs.set(output, state);
+        output.addEventListener('scroll', () => {
+            if (state.frame) return;
+            state.frame = window.requestAnimationFrame(() => {
+                state.frame = 0;
+                fridg3RunAfterOutputSelection(output, () => fridg3RenderVirtualDebugOutput(output, false));
+            });
+        }, { passive: true });
+    }
+    state.items = items;
+    state.createRow = createRow;
+    fridg3RenderVirtualDebugOutput(output, wasAtBottom);
+}
+
+function fridg3RenderVirtualDebugOutput(output, forceBottom) {
+    const state = fridg3VirtualDebugOutputs.get(output);
+    if (!state) return;
+    const count = state.items.length;
+    const rowHeight = Math.max(1, state.rowHeight || 18);
+    const overscan = 12;
+    const viewportRows = Math.max(1, Math.ceil((output.clientHeight || 300) / rowHeight));
+    const start = forceBottom
+        ? Math.max(0, count - viewportRows - overscan)
+        : Math.max(0, Math.floor(output.scrollTop / rowHeight) - overscan);
+    const end = forceBottom
+        ? count
+        : Math.min(count, start + viewportRows + overscan * 2);
+    const fragment = document.createDocumentFragment();
+    const topSpacer = document.createElement('span');
+    topSpacer.className = 'debug-log-virtual-spacer';
+    topSpacer.style.height = `${start * rowHeight}px`;
+    topSpacer.setAttribute('aria-hidden', 'true');
+    fragment.append(topSpacer);
+    for (let index = start; index < end; index += 1) fragment.append(state.createRow(state.items[index]));
+    const bottomSpacer = document.createElement('span');
+    bottomSpacer.className = 'debug-log-virtual-spacer';
+    bottomSpacer.style.height = `${Math.max(0, count - end) * rowHeight}px`;
+    bottomSpacer.setAttribute('aria-hidden', 'true');
+    fragment.append(bottomSpacer);
+    output.replaceChildren(fragment);
+
+    const renderedRows = output.querySelectorAll('.debug-log-entry');
+    if (renderedRows.length) {
+        const renderedHeight = Array.from(renderedRows).reduce((height, row) => height + row.getBoundingClientRect().height, 0);
+        const measured = renderedHeight / renderedRows.length;
+        if (Number.isFinite(measured) && measured > 0) state.rowHeight = state.rowHeight * 0.7 + measured * 0.3;
+    }
+    if (forceBottom) output.scrollTop = output.scrollHeight;
 }
 
 function fridg3DebugEntryVisible(entry) {
@@ -363,6 +483,7 @@ function fridg3CreateDebugLogLine(entry) {
     const timestamp = document.createElement('span');
     timestamp.className = 'debug-log-timestamp';
     timestamp.textContent = `[${entry.timestamp}]`;
+    fridg3SetDebugTimestampTooltip(timestamp, entry.createdAt);
     line.append(timestamp, document.createTextNode(' '));
 
     if (entry.processLog) {
@@ -390,6 +511,17 @@ function fridg3CreateDebugLogLine(entry) {
     line.append(message);
     fridg3HighlightDebugLine(line, entry.channel === 'server' || entry.processLog ? 'server' : 'client');
     return line;
+}
+
+function fridg3SetDebugTimestampTooltip(element, value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return;
+    element.setAttribute('data-tooltip', date.toLocaleString(undefined, {
+        dateStyle: 'full',
+        timeStyle: 'long',
+    }));
+    element.dataset.debugFullTimestamp = element.getAttribute('data-tooltip');
+    if (typeof bindSiteTooltip === 'function') bindSiteTooltip(element);
 }
 
 function fridg3HighlightDebugLine(line, channel) {
@@ -480,6 +612,11 @@ function fridg3EnsureDebugConsole() {
         + '<div class="debug-log-search debug-admin-log-search" hidden><input type="search" data-debug-search="access" aria-label="search access log" placeholder="search access log"></div>'
         + '<pre class="debug-console-output debug-console-access-output"></pre></div></div>';
     panel.addEventListener('click', event => {
+        const timestamp = event.target.closest('.debug-log-timestamp[data-debug-full-timestamp]');
+        if (timestamp && isMobileTemplateActive()) {
+            showSitePopup({ title: 'timestamp', detail: timestamp.dataset.debugFullTimestamp, okText: 'ok' });
+            return;
+        }
         const button = event.target.closest('[data-debug-tab]');
         if (!button) return;
         if (button.getAttribute('aria-disabled') === 'true') return;
@@ -519,6 +656,12 @@ function fridg3InitAccessLogControls(panel) {
     });
     const output = panel.querySelector('.debug-console-access-output');
     if (output) {
+        output.addEventListener('click', event => {
+            const ipElement = event.target.closest('.debug-access-ip[data-access-ip]');
+            if (!ipElement || !isMobileTemplateActive()) return;
+            event.preventDefault();
+            fridg3OpenMobileAccessIpMenu(ipElement);
+        });
         output.addEventListener('contextmenu', event => {
             const ipElement = event.target.closest('.debug-access-ip[data-access-ip]');
             if (!ipElement) return;
@@ -597,6 +740,56 @@ function fridg3OpenAccessIpMenu(ipElement, clientX, clientY) {
         }
     });
     button.focus();
+}
+
+async function fridg3OpenMobileAccessIpMenu(ipElement) {
+    const ip = ipElement.dataset.accessIp || 'unknown';
+    const hardBanned = ipElement.classList.contains('is-hard-banned');
+    const selected = await showSitePopup({
+        title: ip,
+        detail: 'choose an IP action.',
+        customText: 'details',
+        customAction: () => {
+            window.open(ipElement.href, '_blank', 'noopener,noreferrer');
+        },
+        okText: hardBanned ? 'whitelist IP' : 'hard-ban IP',
+        cancelText: 'cancel',
+    });
+    if (selected !== true) return;
+
+    const action = hardBanned ? 'whitelist' : 'hard-ban';
+    const confirmed = await showSitePopup({
+        title: hardBanned ? `whitelist ${ip}?` : `hard-ban ${ip}?`,
+        detail: hardBanned
+            ? 'this IP will be allowed past manual hard bans, source banlists, and identity-based hard bans.'
+            : 'this IP will be added to the custom hard-ban list.',
+        okText: hardBanned ? 'whitelist IP' : 'hard-ban IP',
+        cancelText: 'cancel',
+    });
+    if (!confirmed) return;
+
+    try {
+        const params = new URLSearchParams({ ip });
+        const response = await fetch('/api/debug-access-logs/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Fridg3-Debug-Action': action,
+            },
+            body: params.toString(),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'hard-ban update failed');
+        fridg3AccessLogs.forEach(entry => {
+            if (entry.ip === ip) entry.hardBanned = data.hardBanned === true;
+        });
+        fridg3RenderAccessLogs(fridg3AccessLogs);
+    } catch (_) {
+        await showSiteNotice('unable to update hard bans', `the hard-ban state for ${ip} could not be saved.`);
+    }
 }
 
 function fridg3InitDebugSearch(panel) {
@@ -715,6 +908,10 @@ function fridg3SelectDebugTab(panel, channel, persist = false) {
     }
     if (channel === 'access' && fridg3ServerDebugAuthorized) fridg3StartAccessLogPolling();
     else fridg3StopAccessLogPolling();
+    if (isMobileTemplateActive() && document.body.classList.contains('mobile-debug-console-open')) {
+        fridg3PositionMobileDebugToggle(panel, true);
+        window.requestAnimationFrame(() => fridg3ScrollActiveDebugOutputToBottom(panel));
+    }
     return true;
 }
 
@@ -738,18 +935,71 @@ function fridg3InitClientLogControls(panel) {
 }
 
 function fridg3SetDebugMode(enabled) {
-    const mobile = document.body.classList.contains('mobile-template')
-        || (window.matchMedia && window.matchMedia('(max-width: 700px)').matches);
-    const shouldEnable = enabled === true && !mobile;
+    const mobile = document.body.classList.contains('mobile-template');
+    const shouldEnable = enabled === true;
     fridg3DebugEnabled = shouldEnable;
+    const mobileToggle = fridg3InitMobileDebugToggle();
     if (!shouldEnable) {
         fridg3DeactivateDebugRuntime();
         const existingPanel = document.getElementById('debug-console');
+        if (existingPanel && mobileToggle) fridg3PositionMobileDebugToggle(existingPanel, false);
         if (existingPanel) existingPanel.hidden = true;
+        if (mobileToggle) {
+            mobileToggle.hidden = true;
+            mobileToggle.setAttribute('aria-expanded', 'false');
+        }
+        document.body.classList.remove('mobile-debug-console-open');
         return;
     }
     fridg3ActivateDebugRuntime();
-    fridg3EnsureDebugConsole().hidden = false;
+    const panel = fridg3EnsureDebugConsole();
+    if (mobile && mobileToggle) fridg3PositionMobileDebugToggle(panel, false);
+    panel.hidden = mobile;
+    if (mobileToggle) {
+        mobileToggle.hidden = false;
+        mobileToggle.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function fridg3InitMobileDebugToggle() {
+    const button = document.getElementById('show-debug-console');
+    if (!button) return null;
+    if (button.dataset.bound !== '1') {
+        button.dataset.bound = '1';
+        button.addEventListener('click', () => {
+            if (!fridg3DebugEnabled) return;
+            const panel = fridg3EnsureDebugConsole();
+            const opening = panel.hidden;
+            fridg3PositionMobileDebugToggle(panel, opening);
+            panel.hidden = !opening;
+            button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+            button.setAttribute('aria-label', opening ? 'hide debug console' : 'show debug console');
+            button.setAttribute('data-tooltip', opening ? 'hide debug console' : 'show debug console');
+            document.body.classList.toggle('mobile-debug-console-open', opening);
+            if (opening) window.requestAnimationFrame(() => fridg3ScrollActiveDebugOutputToBottom(panel));
+        });
+    }
+    return button;
+}
+
+function fridg3PositionMobileDebugToggle(panel, insideConsole) {
+    const button = document.getElementById('show-debug-console');
+    if (!button || !isMobileTemplateActive()) return;
+    if (insideConsole) {
+        const search = panel.querySelector('[data-debug-output].is-active .debug-log-search');
+        if (search) search.append(button);
+        button.classList.add('is-in-debug-console');
+    } else {
+        document.body.append(button);
+        button.classList.remove('is-in-debug-console');
+    }
+}
+
+function fridg3ScrollActiveDebugOutputToBottom(panel) {
+    const output = panel.querySelector('[data-debug-output].is-active .debug-console-output');
+    if (!output) return;
+    if (fridg3VirtualDebugOutputs.has(output)) fridg3RenderVirtualDebugOutput(output, true);
+    else output.scrollTop = output.scrollHeight;
 }
 
 window.fridg3DebugClientLog = value => fridg3DebugAppend('client', value);
@@ -964,68 +1214,57 @@ function fridg3RenderAccessLogs(entries) {
     if (!output) return;
     fridg3AccessLogs = entries.slice(-FRIDG3_ACCESS_LOG_LIMIT);
     fridg3RunAfterOutputSelection(output, () => {
-        const firstRender = output.dataset.rendered !== '1';
-        const wasAtBottom = firstRender || output.scrollHeight - output.scrollTop - output.clientHeight < 20;
-        const previousScrollTop = output.scrollTop;
-        output.replaceChildren();
-        fridg3AccessLogs.filter(entry => {
-        const role = ['guest', 'user', 'admin'].includes(entry.role) ? entry.role : (entry.username ? 'user' : 'guest');
-        const roleToggle = document.getElementById(`debug-access-${role}s-toggle`);
-        if (roleToggle && !roleToggle.checked) return false;
-        const bannedToggle = document.getElementById('debug-access-hard-banned-toggle');
-        if (entry.hardBanned && bannedToggle && !bannedToggle.checked) return false;
-        return fridg3DebugSearchMatches(
-            'access',
-            `${entry.ip || ''} ${entry.username ? `@${entry.username}` : ''} ${entry.status || ''} ${entry.path || '/'}`
-        );
-        }).forEach(entry => {
-        const line = document.createElement('span');
-        line.className = 'debug-log-entry';
-        const date = new Date(entry.timestamp);
-        const time = Number.isNaN(date.getTime())
-            ? '--:--:--'
-            : [date.getHours(), date.getMinutes(), date.getSeconds()].map(part => String(part).padStart(2, '0')).join(':');
-        const timestamp = document.createElement('span');
-        timestamp.className = 'debug-log-timestamp';
-        timestamp.textContent = `[${time}]`;
-        const status = Number(entry.status) || 0;
-        const statusElement = document.createElement('span');
-        statusElement.className = 'debug-access-status';
-        if (status >= 200 && status < 300) statusElement.classList.add('is-success');
-        else if (status >= 300 && status < 400) statusElement.classList.add('is-warning');
-        else if (status >= 400) statusElement.classList.add('is-error');
-        statusElement.textContent = String(status || '---');
-        const ip = document.createElement('a');
-        ip.className = 'debug-access-ip' + (entry.hardBanned ? ' is-hard-banned' : '');
-        ip.textContent = entry.ip || 'unknown';
-        ip.dataset.accessIp = entry.ip || '';
-        ip.href = `https://whatismyipaddress.com/ip/${encodeURIComponent(entry.ip || 'unknown')}`;
-        ip.target = '_blank';
-        ip.rel = 'noopener noreferrer';
-        ip.setAttribute('data-no-external-popup', '');
-        line.append(
-            timestamp,
-            document.createTextNode(' ['),
-            ip,
-            document.createTextNode(']')
-        );
-        if (entry.username) {
-            const username = document.createElement('span');
-            username.className = 'debug-access-username';
-            username.textContent = `@${entry.username}`;
-            line.append(document.createTextNode(' ['), username, document.createTextNode(']'));
-        }
-        line.append(
-            document.createTextNode(' ['),
-            statusElement,
-            document.createTextNode(`] ${entry.path || '/'}`)
-        );
-        fridg3HighlightDebugLine(line, 'access');
-            output.append(line);
+        const visibleEntries = fridg3AccessLogs.filter(entry => {
+            const role = ['guest', 'user', 'admin'].includes(entry.role) ? entry.role : (entry.username ? 'user' : 'guest');
+            const roleToggle = document.getElementById(`debug-access-${role}s-toggle`);
+            if (roleToggle && !roleToggle.checked) return false;
+            const bannedToggle = document.getElementById('debug-access-hard-banned-toggle');
+            if (entry.hardBanned && bannedToggle && !bannedToggle.checked) return false;
+            return fridg3DebugSearchMatches(
+                'access',
+                `${entry.ip || ''} ${entry.username ? `@${entry.username}` : ''} ${entry.status || ''} ${entry.path || '/'}`
+            );
         });
-        output.dataset.rendered = '1';
-        output.scrollTop = wasAtBottom ? output.scrollHeight : previousScrollTop;
+        fridg3SetVirtualDebugOutput(output, visibleEntries, fridg3CreateAccessLogLine);
     });
+}
+
+function fridg3CreateAccessLogLine(entry) {
+    const line = document.createElement('span');
+    line.className = 'debug-log-entry';
+    const date = new Date(entry.timestamp);
+    const time = Number.isNaN(date.getTime())
+        ? '--:--:--'
+        : [date.getHours(), date.getMinutes(), date.getSeconds()].map(part => String(part).padStart(2, '0')).join(':');
+    const timestamp = document.createElement('span');
+    timestamp.className = 'debug-log-timestamp';
+    timestamp.textContent = `[${time}]`;
+    fridg3SetDebugTimestampTooltip(timestamp, entry.timestamp);
+    const status = Number(entry.status) || 0;
+    const statusElement = document.createElement('span');
+    statusElement.className = 'debug-access-status';
+    if (status >= 200 && status < 300) statusElement.classList.add('is-success');
+    else if (status >= 300 && status < 400) statusElement.classList.add('is-warning');
+    else if (status >= 400) statusElement.classList.add('is-error');
+    statusElement.textContent = String(status || '---');
+    const ip = document.createElement('a');
+    ip.className = 'debug-access-ip' + (entry.hardBanned ? ' is-hard-banned' : '');
+    ip.textContent = entry.ip || 'unknown';
+    ip.dataset.accessIp = entry.ip || '';
+    ip.href = `https://whatismyipaddress.com/ip/${encodeURIComponent(entry.ip || 'unknown')}`;
+    ip.target = '_blank';
+    ip.rel = 'noopener noreferrer';
+    ip.setAttribute('data-no-external-popup', '');
+    line.append(timestamp, document.createTextNode(' ['), ip, document.createTextNode(']'));
+    if (entry.username) {
+        const username = document.createElement('span');
+        username.className = 'debug-access-username';
+        username.textContent = `@${entry.username}`;
+        line.append(document.createTextNode(' ['), username, document.createTextNode(']'));
+    }
+    line.append(document.createTextNode(' ['), statusElement, document.createTextNode(`] ${entry.path || '/'}`));
+    fridg3HighlightDebugLine(line, 'access');
+    return line;
 }
 
 async function fridg3PollAccessLogs() {
@@ -2664,6 +2903,32 @@ document.addEventListener('submit', function(e) {
             submitConfirmedForm();
         };
 
+        const continueAfterReason = function() {
+            if (form.getAttribute('data-ban-reason-prompt') !== '1') {
+                continueAfterPassword();
+                return;
+            }
+            showSitePopup({
+                title: form.getAttribute('data-reason-title') || 'reason for ban',
+                detail: form.getAttribute('data-reason-detail') || 'optionally provide a reason for this restriction.',
+                input: true,
+                inputPlaceholder: 'optional reason',
+                okText: 'ban',
+                cancelText: 'cancel'
+            }).then(function(reason) {
+                if (reason === null) return;
+                let input = form.querySelector('input[name="ban_reason"]');
+                if (!input) {
+                    input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'ban_reason';
+                    form.appendChild(input);
+                }
+                input.value = reason;
+                continueAfterPassword();
+            });
+        };
+
         if (form.getAttribute('data-admin-password-confirm') === '1') {
             showSitePopup({
                 title: form.getAttribute('data-password-title') || 'confirm destructive action',
@@ -2682,12 +2947,12 @@ document.addEventListener('submit', function(e) {
                     form.appendChild(input);
                 }
                 input.value = password;
-                continueAfterPassword();
+                continueAfterReason();
             });
             return;
         }
 
-        continueAfterPassword();
+        continueAfterReason();
     });
 });
 

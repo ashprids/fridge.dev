@@ -962,9 +962,7 @@ function startGradientRotation(el, durationMs) {
 }
 
 
-function initTooltips() {
-    clearTooltips();
-    document.querySelectorAll('[data-tooltip]').forEach(element => {
+function bindSiteTooltip(element) {
         // Remove previous listeners to avoid duplicates
         element.removeEventListener('mouseenter', element._tooltipMouseEnter);
         element.removeEventListener('mousemove', element._tooltipMouseMove);
@@ -1006,19 +1004,66 @@ function initTooltips() {
         };
         element.addEventListener('mouseenter', element._tooltipMouseEnter);
         element.addEventListener('mouseleave', element._tooltipMouseLeave);
-    });
+}
+
+function initTooltips() {
+    clearTooltips();
+    document.querySelectorAll('[data-tooltip]').forEach(bindSiteTooltip);
     initContextTooltips();
 }
+
+window.bindSiteTooltip = bindSiteTooltip;
 
 function initContextTooltips() {
     document.querySelectorAll('[data-context-tooltip]').forEach(element => {
         element.removeEventListener('contextmenu', element._contextTooltipHandler);
+        element.removeEventListener('touchstart', element._contextTouchStart);
+        element.removeEventListener('touchmove', element._contextTouchMove);
+        element.removeEventListener('touchend', element._contextTouchEnd);
+        element.removeEventListener('touchcancel', element._contextTouchEnd);
         element._contextTooltipHandler = function(event) {
             event.preventDefault();
+            const contextText = this.getAttribute('data-context-tooltip') || '';
+            const ipMatch = contextText.match(/^IP:\s*(.+)$/);
+
+            if (isMobileTemplateActive()) {
+                if (Date.now() - (this._mobileLongPressShownAt || 0) > 1000) {
+                    showMobileContextIpPopup(this);
+                }
+                return;
+            }
+
+            const now = Date.now();
+            const isDoubleContextClick = this._lastContextClick && now - this._lastContextClick <= 500;
+            this._lastContextClick = isDoubleContextClick ? 0 : now;
+            if (isDoubleContextClick && ipMatch) {
+                let tooltip = activeTooltip && activeTooltip.trigger === this
+                    ? activeTooltip.element
+                    : null;
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.className = 'tooltip';
+                    document.body.appendChild(tooltip);
+                    activeTooltip = { element: tooltip, trigger: this };
+                }
+                tooltip.textContent = 'copied to clipboard';
+                const rect = tooltip.getBoundingClientRect();
+                const offset = 10;
+                tooltip.style.left = `${Math.max(4, Math.min(event.clientX + offset, window.innerWidth - rect.width - 4))}px`;
+                tooltip.style.top = `${Math.max(4, Math.min(event.clientY + offset, window.innerHeight - rect.height - 4))}px`;
+                copySiteText(ipMatch[1]);
+                window.setTimeout(() => {
+                    if (activeTooltip && activeTooltip.element === tooltip && tooltip.isConnected) {
+                        tooltip.textContent = contextText;
+                    }
+                }, 1200);
+                return;
+            }
+
             clearTooltips();
             const tooltip = document.createElement('div');
             tooltip.className = 'tooltip';
-            tooltip.textContent = this.getAttribute('data-context-tooltip') || '';
+            tooltip.textContent = contextText;
             document.body.appendChild(tooltip);
             activeTooltip = { element: tooltip, trigger: this };
 
@@ -1028,12 +1073,82 @@ function initContextTooltips() {
             tooltip.style.top = `${Math.max(4, Math.min(event.clientY + offset, window.innerHeight - rect.height - 4))}px`;
         };
         element.addEventListener('contextmenu', element._contextTooltipHandler);
+
+        element._contextTouchStart = function(event) {
+            if (!isMobileTemplateActive() || event.touches.length !== 1) return;
+            const touch = event.touches[0];
+            this._contextTouchOrigin = { x: touch.clientX, y: touch.clientY };
+            window.clearTimeout(this._contextTouchTimer);
+            this._contextTouchTimer = window.setTimeout(() => {
+                this._contextTouchTimer = 0;
+                this._mobileLongPressShownAt = Date.now();
+                showMobileContextIpPopup(this);
+            }, 550);
+        };
+        element._contextTouchMove = function(event) {
+            const origin = this._contextTouchOrigin;
+            const touch = event.touches[0];
+            if (!origin || !touch) return;
+            if (Math.hypot(touch.clientX - origin.x, touch.clientY - origin.y) > 10) {
+                window.clearTimeout(this._contextTouchTimer);
+                this._contextTouchTimer = 0;
+            }
+        };
+        element._contextTouchEnd = function() {
+            window.clearTimeout(this._contextTouchTimer);
+            this._contextTouchTimer = 0;
+            this._contextTouchOrigin = null;
+        };
+        element.addEventListener('touchstart', element._contextTouchStart, { passive: true });
+        element.addEventListener('touchmove', element._contextTouchMove, { passive: true });
+        element.addEventListener('touchend', element._contextTouchEnd, { passive: true });
+        element.addEventListener('touchcancel', element._contextTouchEnd, { passive: true });
     });
 
     if (!document.documentElement.dataset.contextTooltipDismissBound) {
         document.documentElement.dataset.contextTooltipDismissBound = '1';
         document.addEventListener('click', clearTooltips);
         window.addEventListener('scroll', clearTooltips, { passive: true });
+    }
+}
+
+function showMobileContextIpPopup(element) {
+    clearTooltips();
+    const contextText = element.getAttribute('data-context-tooltip') || '';
+    const ipMatch = contextText.match(/^IP:\s*(.+)$/);
+    showSitePopup({
+        className: 'site-ip-popup',
+        title: 'IP address',
+        detail: ipMatch ? ipMatch[1] : contextText,
+        customText: ipMatch ? 'copy' : '',
+        customAction: ipMatch ? async button => {
+            await copySiteText(ipMatch[1]);
+            window.clearTimeout(button._copyFeedbackTimer);
+            button.textContent = 'copied';
+            button._copyFeedbackTimer = window.setTimeout(() => {
+                if (button.isConnected) button.textContent = 'copy';
+            }, 1200);
+        } : null,
+        customCloses: false,
+        okText: 'ok'
+    });
+}
+
+async function copySiteText(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch (_) {
+        const input = document.createElement('textarea');
+        input.value = text;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        const copied = document.execCommand('copy');
+        input.remove();
+        return copied;
     }
 }
 
@@ -1054,6 +1169,8 @@ function initSettingsPage() {
         const glowToggle = document.getElementById('text-glow-toggle');
         const maintenanceGroup = document.getElementById('maintenance-mode-group');
         const adminSection = document.getElementById('admin-settings');
+        const adminSectionSeparator = document.getElementById('admin-settings-separator');
+        const systemInfoButton = document.getElementById('open-system-info-button');
         const themeSelect = document.getElementById('theme-select');
         const titleAnimationSelect = document.getElementById('title-animation-select');
         const titleAnimationAlwaysToggle = document.getElementById('title-animation-always-toggle');
@@ -1336,13 +1453,12 @@ function initSettingsPage() {
             const normalized = normalizeAccessibilityPrefs(prefs);
             if (reduceMotionToggle) reduceMotionToggle.checked = normalized.reduceMotion;
             if (debugModeToggle) {
-                const mobile = document.body.classList.contains('mobile-template')
-                    || (window.matchMedia && window.matchMedia('(max-width: 700px)').matches);
                 debugModeToggle.checked = normalized.debugMode;
-                debugModeToggle.disabled = mobile;
+                debugModeToggle.disabled = false;
                 const debugSetting = debugModeToggle.closest('#debug-mode-setting, .checkbox-group');
-                if (debugSetting) debugSetting.hidden = mobile;
+                if (debugSetting) debugSetting.hidden = false;
             }
+            if (systemInfoButton) systemInfoButton.hidden = !normalized.debugMode;
             syncTitleAnimationAvailability(normalized.reduceMotion);
         };
 
@@ -2090,6 +2206,7 @@ function initSettingsPage() {
         if (debugModeToggle) {
             debugModeToggle.addEventListener('change', () => {
                 const normalized = applyAccessibilityPrefs(getAccessibilityValues());
+                if (systemInfoButton) systemInfoButton.hidden = !normalized.debugMode;
                 if (!isLoggedIn || !window.fetch) return;
                 const params = new URLSearchParams();
                 params.append('debugMode', normalized.debugMode ? 'on' : 'off');
@@ -2262,6 +2379,7 @@ function initSettingsPage() {
             if (adminSection) {
                 adminSection.style.display = isAdmin ? 'block' : 'none';
             }
+            if (adminSectionSeparator) adminSectionSeparator.style.display = isAdmin ? '' : 'none';
             bindDevDataBootstrapButton();
             if (isAdmin) {
                 loadMaintenanceState();
@@ -2271,6 +2389,7 @@ function initSettingsPage() {
         }).catch(() => {
             settingsDebugLog('admin status check failed');
             if (adminSection) adminSection.style.display = 'none';
+            if (adminSectionSeparator) adminSectionSeparator.style.display = 'none';
             bindDevDataBootstrapButton();
         });
     } catch (error) {

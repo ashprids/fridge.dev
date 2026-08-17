@@ -49,7 +49,9 @@ $postBody = $parsedPost['body'];
 // Check if user can edit (owner or admin)
 $currentUser = $_SESSION['user']['username'] ?? '';
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
-$canEdit = ($currentUser === $postUsername) || $isAdmin;
+$isModerator = $_SESSION['user']['isModerator'] ?? false;
+$canEdit = ($currentUser === $postUsername) || $isAdmin
+    || ($isModerator && !fridg3_feed_account_is_admin($postUsername));
 $postingRestricted = fridg3_current_user_posting_restricted();
 
 if (!$canEdit) {
@@ -66,6 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted && !isset($_POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Check if delete action
     if (isset($_POST['delete'])) {
+        $postIdNoExt = pathinfo(basename((string)$postId), PATHINFO_FILENAME);
+        $postIpRecord = fridg3_feed_load_post_ips()[$postIdNoExt] ?? [];
+        $postIp = is_array($postIpRecord) ? (string)($postIpRecord['ip'] ?? '') : '';
         // Parse post content for images in /data/images and delete them
         $imagesDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images';
         preg_match_all('/\[img=\/data\/images\/([^\]]+)\]/i', $postBody, $matches);
@@ -81,11 +86,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        fridg3_feed_delete_post_voice_files(pathinfo(basename($postId), PATHINFO_FILENAME), $postBody);
+        fridg3_feed_delete_post_voice_files($postIdNoExt, $postBody);
         
         // Delete the post file
-        @unlink($postPath);
-        @unlink(fridg3_feed_replies_dir() . DIRECTORY_SEPARATOR . pathinfo(basename($postId), PATHINFO_FILENAME) . '.json');
+        if (@unlink($postPath)) {
+            fridg3_feed_archive_ip_content($postIp, 'feed_post', $postIdNoExt, [
+                'username' => $postUsername,
+                'date' => $postDate,
+                'body' => $postBody,
+                'format' => $postFormat,
+                'postId' => $postIdNoExt,
+            ]);
+            fridg3_moderator_audit_log('deleted feed post', ['postId' => $postIdNoExt, 'author' => $postUsername], [
+                'body' => $postBody,
+                'format' => $postFormat,
+            ]);
+        }
+        foreach (fridg3_feed_load_replies($postIdNoExt) as $deletedReply) {
+            fridg3_feed_archive_ip_content(
+                (string)($deletedReply['ip'] ?? ''),
+                'feed_reply',
+                $postIdNoExt . ':' . (string)($deletedReply['id'] ?? ''),
+                array_merge($deletedReply, ['postId' => $postIdNoExt])
+            );
+        }
+        @unlink(fridg3_feed_replies_dir() . DIRECTORY_SEPARATOR . $postIdNoExt . '.json');
         
         // Redirect back to feed
         header('Location: /feed');
@@ -107,8 +132,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Update the post file (keep original username and date)
     $prefix = $postFormat === 'v2' ? 'v2' . PHP_EOL : '';
     $text = $prefix . '@' . $postUsername . PHP_EOL . $postDate . PHP_EOL . $newContent . PHP_EOL;
-    file_put_contents($postPath, $text);
-    fridg3_notification_revision_touch();
+    if (file_put_contents($postPath, $text) !== false) {
+        fridg3_moderator_audit_log('edited feed post', ['postId' => pathinfo(basename((string)$postId), PATHINFO_FILENAME), 'author' => $postUsername], [
+            'body' => $postBody,
+            'format' => $postFormat,
+        ], [
+            'body' => $newContent,
+            'format' => $postFormat,
+        ]);
+        fridg3_notification_revision_touch();
+    }
 
     // Redirect back to feed
     header('Location: /feed');
@@ -145,7 +178,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -155,7 +188,7 @@ if (function_exists('apply_preferred_theme_stylesheet')) {
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);

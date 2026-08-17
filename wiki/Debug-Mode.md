@@ -1,12 +1,12 @@
 # Debug Mode
 
-Debug mode is the desktop-only diagnostic overlay enabled from the **Accessibility** section of `/settings`. It brings browser, PHP, and site-access diagnostics into the normal fridge.dev interface so developers can inspect a problem without opening several separate tools.
+Debug mode is the diagnostic overlay enabled from the **Accessibility** section of `/settings`. It brings browser, PHP, and site-access diagnostics into the normal fridge.dev interface so developers can inspect a problem without opening several separate tools.
 
 It is an observability feature, not a permission override. Enabling it does not grant access to admin data: ordinary users can use client logging, but only authenticated admins receive server logs and the access-log tab.
 
 ## Enabling and Persistence
 
-Turn on **debug mode** in `/settings` and save the accessibility preferences. The setting applies immediately. It is disabled on mobile view because the overlay and its resize controls are designed for the desktop shell.
+Turn on **debug mode** in `/settings` and save the accessibility preferences. The setting applies immediately on desktop and mobile views.
 
 For guests, the preference is stored locally in the browser. For logged-in users it is also synchronized through `/api/settings` as the account's `debugMode` setting, using the same accessibility-preference flow as Reduce Motion. The overlay width is local to the browser, while the selected tab, searches, filters, and retained client/server entries use session storage and therefore survive page navigation and refreshes within that browser session.
 
@@ -14,7 +14,7 @@ When debug mode is off, its runtime is dormant: the panel is not constructed, di
 
 ## Overlay Layout and Controls
 
-The overlay is fixed to the right side of the desktop viewport and does not reflow the page. Its full left edge is a resize gutter. Drag it with a pointer, or focus it and use the Left and Right Arrow keys; the chosen width persists locally.
+On desktop, the overlay is fixed to the right side of the viewport and does not reflow the page. Its full left edge is a resize gutter. Drag it with a pointer, or focus it and use the Left and Right Arrow keys; the chosen width persists locally. On mobile, enabling debug mode adds a terminal button beneath the menu button. That button opens and closes the overlay as a full-screen layer; while open it moves beside the active tab's search field, and resizing is omitted.
 
 The overlay has up to three tabs:
 
@@ -22,13 +22,13 @@ The overlay has up to three tabs:
 - **server** contains request-local PHP diagnostics and process-log output; non-admins see it disabled with a security explanation
 - **access** contains sensitive site navigation records and is omitted entirely for non-admins
 
-Every entry receives a local `[HH:MM:SS]` display timestamp. Timestamps are grey and bracketed source tags are light grey. Successful actions and 2xx responses are green, redirects and warnings are yellow-orange, and errors plus 4xx/5xx responses are red.
+Every entry receives a local `[HH:MM:SS]` display timestamp. Hovering a timestamp in any desktop tab shows its full local date and time in the shared in-site tooltip; tapping it on mobile shows the same detail in an in-site popup. Timestamps are grey and bracketed source tags are light grey. Successful actions and 2xx responses are green, redirects and warnings are yellow-orange, and errors plus 4xx/5xx responses are red.
 
 Each tab has a case-insensitive search field. An entry is shown only when it contains the complete search term, and every match is highlighted. Search values persist for the session. Filters hide retained entries rather than deleting them, so turning a filter back on restores its matching history.
 
 The icon-only clear button asks for confirmation. Clearing client or server removes that tab's browser-retained history. Clearing access makes an admin-only request that deletes the stored access records, so it affects other admin sessions too.
 
-New output follows the bottom only when the viewer is already near the bottom. If the viewer has scrolled upward, polling, searches, filter changes, and new records preserve that reading position. DOM-rebuilding updates are coalesced while text inside a log is selected, preventing a refresh from destroying the selection; safe append-only updates can continue.
+New output follows the bottom only when the viewer is already near the bottom. Mobile also scrolls the active log to the newest entry whenever the full-screen console opens or its tab changes. If the viewer has scrolled upward, polling, searches, filter changes, and new records preserve that reading position. All three tabs virtualize their output: search and filters evaluate the complete retained history, while only the rows in or just beyond the visible scroll viewport are mounted and highlighted. Rows are mounted and unmounted as scrolling changes the visible window, substantially reducing DOM and text-layout work for long histories. DOM-rebuilding updates are coalesced while text inside a log is selected, preventing a refresh from destroying the selection.
 
 ## Client Tab
 
@@ -123,7 +123,7 @@ Selecting access fetches immediately from `/api/debug-access-logs` and starts on
 
 The display format is `[time] [IP] [@username] [HTTP code] page`, with the username group omitted for guests. Filters for `guests`, `users`, and `admins` select roles; `hard-banned` is an additive filter for effective bans. Only the IP text turns red for a hard-banned address, only the username text is yellow, and status colours follow the shared response palette.
 
-The IP text links to that address on whatismyipaddress.com in a new tab and deliberately bypasses the general external-link confirmation. Right-clicking a normal IP offers to add it to the manual hard-ban list. Right-clicking an effectively hard-banned IP instead offers to whitelist that exact address across manual, source-list, CIDR, and identity-based enforcement. Both actions require confirmation above the overlay; applying a hard ban removes an existing whitelist override for that address. See [Restrictions and Moderation](Restrictions-and-Moderation) for the enforcement model itself.
+On desktop, the IP text links to that address on whatismyipaddress.com in a new tab and deliberately bypasses the general external-link confirmation. Right-clicking a normal IP offers to add it to the manual hard-ban list. Right-clicking an effectively hard-banned IP instead offers to whitelist that exact address across manual, source-list, CIDR, and identity-based enforcement. On mobile, tapping an IP opens a menu headed by that address with `details` plus `hard-ban IP` for an allowed address or `whitelist IP` for an effectively banned address; details opens the same external address page. Moderation actions require confirmation above the overlay, and applying a hard ban removes an existing whitelist override for that address. See [Restrictions and Moderation](Restrictions-and-Moderation) for the enforcement model itself.
 
 ## Bootstrap Diagnostics
 

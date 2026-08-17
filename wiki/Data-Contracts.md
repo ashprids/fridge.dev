@@ -30,6 +30,7 @@ Expected top-level shape:
       "name": "string",
       "password": "bcrypt-hash or empty",
       "isAdmin": true,
+      "isModerator": false,
       "postingRestricted": false,
       "mustResetPassword": false,
       "discordUserId": "optional discord snowflake string",
@@ -93,6 +94,7 @@ Notes:
 - Legacy `browserNotificationsEnabled` and `journalBrowserNotificationsEnabled` keys may remain in older account records as unknown preserved fields, but the application no longer reads, writes, or exposes them and does not use the browser Notification API
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes
 - `postingRestricted` is an admin-managed account boolean; when enabled, server handlers reject new or edited feed posts, journal posts/drafts, feed replies, chat conversations/messages, guestbook entries, contact submissions, mdpaste creation, and upload room/signaling use, while matching composer notices keep text fields, formatting controls, uploads, and submit controls disabled
+- `isModerator` is an admin-managed account boolean. Moderators can access the moderator-settings routes and edit, delete, ban, purge, or inspect IP metadata for content whose author is not an admin; it does not grant account administration, hard-ban configuration, or authority over admin-authored content
 - `discordUserId` links a site account to a Discord member for bot DMs and notifications
 - `discordNotificationsEnabled` controls automated Toast feed-notification DMs and defaults to `true` when absent; it has no effect until `discordUserId` is linked
 - `emailAddress` marks accounts with a fridge.dev email mailbox; when present and valid, shared chrome swaps the footer Discord button to `/account/email`, and `/account/email` shows the assigned address
@@ -159,6 +161,13 @@ Notes:
 - Map of client IP -> unix timestamp array
 - Used for login throttling
 
+### `data/etc/moderator-audit.ndjson`
+
+- Append-only newline-delimited JSON audit trail for successful actions performed through moderator permissions
+- Each record contains an immutable `id`, moderator `username`, request `ip`, ISO-8601 `timestamp`, human-readable `action`, and structured target `details`
+- Edit actions additionally retain structured `before` and `after` snapshots so the admin audit page can display the change without depending on mutable live content
+- Admin actions are not written to this moderator-specific log, even when the admin account also has the moderator flag
+
 ## `data/feed/`
 
 Legacy feed post format:
@@ -223,6 +232,12 @@ Notes:
 - Toast-authored reply storage and automatic reply behavior are documented on [Toast](Toast#automatic-feed-replies)
 
 ### `data/feed/banned_ips.json`
+
+- Soft posting-ban records keyed by IP. Structured records store the ban time, the admin username that applied it, an optional reason, a per-ban browser-notification ID, and observed guest usernames. Legacy string/list entries remain readable.
+
+### `data/etc/banned-ip-content.json`
+
+- Moderation-only snapshots of deleted feed posts, feed replies, and guestbook posts that had an associated IP. `/settings/restricted-ips` combines these snapshots with live content so administrators can review a banned IP's complete retained history, including content deleted before the ban was applied.
 
 IP-keyed posting-ban records can contain ban metadata and usernames observed for each address. Enforcement and moderation behavior are documented on [Restrictions and Moderation](Restrictions-and-Moderation#posting-ip-bans).
 
@@ -343,9 +358,9 @@ The `/music/upload` admin page writes audio files to `data/audio/`, cover art to
 ## `data/contact/`
 
 - Private contact submissions as `{YYYYMMDDHHMMSS}_{random}.json`
-- Each submission stores `id`, `createdAt`, hashed IP, user agent, name, email, message, notification channel id, and optional `notifyError`
+- Each submission stores `id`, `createdAt`, plaintext IP, hashed IP, user agent, name, email, message, notification channel id, and optional `notifyError`; legacy records without plaintext IP display `No IP associated` in the admin dashboard
 - Successful submissions also append one targeted in-site notification per admin account to `data/etc/targeted-notifications.json`
-- `rate_limits.json` stores hashed client IP keys mapped to recent submission timestamps for throttling
+- `rate_limits.json` stores each hashed client IP key with its latest accepted submission timestamp, enforcing the six-hour contact cooldown without retaining another plaintext-IP copy
 - Nginx blocks direct web access to this directory; submissions are only shown through the admin-only `/contact?dashboard=1` route
 
 ## `data/mdpaste/`

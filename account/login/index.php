@@ -148,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     'username' => htmlspecialchars($account['username'], ENT_QUOTES, 'UTF-8'),
                                     'name' => htmlspecialchars($account['name'], ENT_QUOTES, 'UTF-8'),
                                     'isAdmin' => (bool)($account['isAdmin'] ?? false),
+                                    'isModerator' => (bool)($account['isModerator'] ?? false),
                                     'postingRestricted' => (bool)($account['postingRestricted'] ?? false),
                                     'mustResetPassword' => !empty($account['mustResetPassword']),
                                     'emailAddress' => htmlspecialchars((string)($account['emailAddress'] ?? ''), ENT_QUOTES, 'UTF-8'),
@@ -227,7 +228,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -252,7 +253,7 @@ $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 // Start output buffering to safely inject PHP values into HTML

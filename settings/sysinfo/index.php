@@ -446,7 +446,7 @@ if (!$templatePath && $templateName !== 'template.html') {
 }
 if (!$templatePath) {
     http_response_code(500);
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($templatePath);
@@ -457,7 +457,7 @@ if (function_exists('apply_preferred_theme_stylesheet')) {
 $contentPath = find_template_file('content.html');
 if (!$contentPath) {
     http_response_code(500);
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $contentTemplate = file_get_contents($contentPath);

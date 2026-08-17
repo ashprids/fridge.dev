@@ -189,6 +189,13 @@ function sanitizeFeedReplies(string $root): void
     }
 }
 
+function sanitizeFeedPostIps(string $root): void
+{
+    $relativePath = 'feed/post_ips.json';
+    $records = readJsonObject($root, $relativePath);
+    writeJson($root, $relativePath, scrubIpValues($records));
+}
+
 function sanitizeGuestbookEntries(string $root): void
 {
     $guestbookDir = pathFor($root, 'guestbook');
@@ -241,6 +248,16 @@ function assertDirectoryContainsOnly(string $root, string $relativePath, array $
     }
 }
 
+function assertFeedPostIpsSanitized(string $root): void
+{
+    $records = readJsonObject($root, 'feed/post_ips.json');
+    foreach ($records as $postId => $record) {
+        if (is_array($record) && trim((string)($record['ip'] ?? '')) !== '') {
+            throw new RuntimeException("feed post IP remains after sanitizing: {$postId}");
+        }
+    }
+}
+
 /*
  * Edit this block when new sensitive /data paths need scrubbing.
  * Keep the output useful for local dev, but never ship secrets,
@@ -284,6 +301,8 @@ writeJson($root, 'etc/webhooks.json', blankScalarValues($webhooks));
 writeJson($root, 'guestbook/ip_index.json', new stdClass());
 sanitizeGuestbookEntries($root);
 writeJson($root, 'feed/banned_ips.json', []);
+writeJson($root, 'etc/banned-ip-content.json', []);
+sanitizeFeedPostIps($root);
 sanitizeFeedReplies($root);
 clearDirectory($root, 'contact');
 writeJson($root, 'contact/rate_limits.json', new stdClass());
@@ -320,3 +339,4 @@ file_put_contents(
 assertPathAbsent($root, 'etc/access.json');
 assertPathAbsent($root, 'etc/access.json.lock');
 assertDirectoryContainsOnly($root, 'contact', ['rate_limits.json']);
+assertFeedPostIpsSanitized($root);

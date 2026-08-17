@@ -156,6 +156,7 @@ function account_admin_require_admin(): void {
         $foundCurrentUser = true;
         $_SESSION['user']['name'] = htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8');
         $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+        $_SESSION['user']['isModerator'] = (bool)($account['isModerator'] ?? false);
         $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
         $_SESSION['user']['emailAddress'] = htmlspecialchars((string)($account['emailAddress'] ?? ''), ENT_QUOTES, 'UTF-8');
         $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
@@ -167,6 +168,29 @@ function account_admin_require_admin(): void {
     if (!$foundCurrentUser || empty($_SESSION['user']['isAdmin'])) {
         http_response_code(403);
         echo '403 forbidden: admin access required';
+        exit;
+    }
+}
+
+function account_admin_require_moderator(): void {
+    if (!isset($_SESSION['user']['username'])) {
+        header('Location: /account/login');
+        exit;
+    }
+    $currentUsername = (string)$_SESSION['user']['username'];
+    $found = false;
+    foreach (account_admin_load_accounts()['accounts'] as $account) {
+        if ((string)($account['username'] ?? '') !== $currentUsername) continue;
+        $found = true;
+        $_SESSION['user']['name'] = htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+        $_SESSION['user']['isModerator'] = (bool)($account['isModerator'] ?? false);
+        $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
+        break;
+    }
+    if (!$found || (empty($_SESSION['user']['isAdmin']) && empty($_SESSION['user']['isModerator']))) {
+        http_response_code(403);
+        echo '403 forbidden: moderator access required';
         exit;
     }
 }
@@ -185,7 +209,7 @@ function account_admin_render_page(string $title, string $description, string $c
         $templatePath = account_admin_find_template_file('template.html');
     }
     if (!$templatePath) {
-        die('page template not found. report this issue to me@fridge.dev.');
+        die('page template not found. report this issue to ashton@fridge.dev.');
     }
 
     $template = (string)file_get_contents($templatePath);

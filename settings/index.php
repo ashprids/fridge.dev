@@ -121,7 +121,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -146,7 +146,7 @@ $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);
@@ -162,6 +162,7 @@ $content = str_replace('{fruity_dance_spritesheet_options}', $fruityDanceOptions
 
 $isLoggedIn = isset($_SESSION['user']) && isset($_SESSION['user']['username']);
 $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
+$isModerator = $isAdmin || (isset($_SESSION['user']['isModerator']) && $_SESSION['user']['isModerator'] === true);
 $isToast = $isLoggedIn && fridg3_toast_is_current_user();
 $hasLinkedDiscord = false;
 
@@ -174,6 +175,10 @@ if ($isLoggedIn) {
                 if (!isset($account['username']) || (string)$account['username'] !== $currentUsername) {
                     continue;
                 }
+                $isAdmin = !empty($account['isAdmin']);
+                $isModerator = $isAdmin || !empty($account['isModerator']);
+                $_SESSION['user']['isAdmin'] = $isAdmin;
+                $_SESSION['user']['isModerator'] = !empty($account['isModerator']);
                 $hasLinkedDiscord = trim((string)($account['discordUserId'] ?? '')) !== '';
                 break;
             }
@@ -194,6 +199,9 @@ if ($isToast) {
 if (!$isAdmin) {
     // Keep markup to avoid layout shifts; hide by default
     $content = str_replace('<span id="admin-settings">', '<span id="admin-settings" style="display:none">', $content);
+}
+if (!$isModerator) {
+    $content = str_replace('<span id="moderator-settings">', '<span id="moderator-settings" style="display:none">', $content);
 }
 if (!$isToast) {
     $content = str_replace('<span id="toast-settings">', '<span id="toast-settings" style="display:none">', $content);

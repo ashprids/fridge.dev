@@ -87,7 +87,7 @@ if ($templatePath === null && $templateName !== 'template.html') {
     $templatePath = mdp_find_up('template.html');
 }
 if ($templatePath === null) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = (string)file_get_contents($templatePath);
@@ -118,7 +118,7 @@ $template = str_replace('</head>', '<meta name="robots" content="noindex,nofollo
 
 $contentPath = __DIR__ . DIRECTORY_SEPARATOR . 'content.html';
 if (!is_file($contentPath)) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 $content = str_replace('{paste_content}', $pasteContent, (string)file_get_contents($contentPath));
 $html = str_replace(

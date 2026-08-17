@@ -11,13 +11,15 @@ fridg3_start_session();
 $rootDir = dirname(__DIR__);
 require_once $rootDir . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once $rootDir . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'targeted-notifications.php';
+require_once $rootDir . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'render.php';
 
 $title = 'contact';
 $description = 'send a message to fridge.dev.';
 $contactDataDir = $rootDir . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'contact';
 $rateLimitPath = $contactDataDir . DIRECTORY_SEPARATOR . 'rate_limits.json';
-const CONTACT_REPLY_EMAIL = 'me@fridge.dev';
+const CONTACT_REPLY_EMAIL = 'ashton@fridge.dev';
 const CONTACT_NOTIFY_CHANNEL_ID = '1503931489560301609';
+const CONTACT_COOLDOWN_SECONDS = 21600;
 
 function contact_find_template_file(string $filename): ?string {
     $dir = __DIR__;
@@ -162,7 +164,7 @@ function contact_render_page(string $title, string $description, string $content
         $templatePath = contact_find_template_file('template.html');
     }
     if (!$templatePath) {
-        die('page template not found. report this issue to me@fridge.dev.');
+        die('page template not found. report this issue to ashton@fridge.dev.');
     }
 
     $html = (string)file_get_contents($templatePath);
@@ -185,33 +187,54 @@ function contact_render_page(string $title, string $description, string $content
     echo $html;
 }
 
-function contact_check_rate_limit(string $rateLimitPath): ?string {
-    $now = time();
+function contact_latest_submission_time(string $rateLimitPath): int {
     $key = contact_rate_key();
     $limits = contact_read_json_file($rateLimitPath);
-    $windowStart = $now - 3600;
+    $timestamps = $limits[$key] ?? [];
+    if (!is_array($timestamps)) return 0;
+    return $timestamps === [] ? 0 : max(array_map('intval', $timestamps));
+}
 
+function contact_cooldown_remaining(string $rateLimitPath): int {
+    return max(0, contact_latest_submission_time($rateLimitPath) + CONTACT_COOLDOWN_SECONDS - time());
+}
+
+function contact_claim_cooldown(string $rateLimitPath): int {
+    if (!contact_ensure_data_dir(dirname($rateLimitPath))) return -1;
+    $lock = @fopen($rateLimitPath . '.lock', 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) {
+        if (is_resource($lock)) fclose($lock);
+        return -1;
+    }
+
+    $now = time();
+    $limits = contact_read_json_file($rateLimitPath);
     foreach ($limits as $storedKey => $timestamps) {
-        if (!is_array($timestamps)) {
+        $latest = is_array($timestamps) && $timestamps !== [] ? max(array_map('intval', $timestamps)) : 0;
+        if ($latest < 1 || $latest + CONTACT_COOLDOWN_SECONDS <= $now) {
             unset($limits[$storedKey]);
-            continue;
-        }
-        $limits[$storedKey] = array_values(array_filter(array_map('intval', $timestamps), static fn(int $ts): bool => $ts >= $windowStart));
-        if ($limits[$storedKey] === []) {
-            unset($limits[$storedKey]);
+        } else {
+            $limits[$storedKey] = [$latest];
         }
     }
-
-    $attempts = $limits[$key] ?? [];
-    if (count($attempts) >= 5) {
+    $key = contact_rate_key();
+    $latest = isset($limits[$key][0]) ? (int)$limits[$key][0] : 0;
+    $remaining = max(0, $latest + CONTACT_COOLDOWN_SECONDS - $now);
+    if ($remaining === 0) {
+        $limits[$key] = [$now];
+        if (!contact_write_json_file($rateLimitPath, $limits)) $remaining = -1;
+    } else {
         contact_write_json_file($rateLimitPath, $limits);
-        return 'too many messages from this connection. please wait a bit before trying again.';
     }
 
-    $attempts[] = $now;
-    $limits[$key] = $attempts;
-    contact_write_json_file($rateLimitPath, $limits);
-    return null;
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    return $remaining;
+}
+
+function contact_format_cooldown(int $seconds): string {
+    $seconds = max(0, $seconds);
+    return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);
 }
 
 function contact_count_links(string $message): int {
@@ -316,6 +339,7 @@ $csrfToken = contact_create_csrf_token();
 $contactPostingRestricted = fridg3_current_user_posting_restricted();
 $contactIpBanned = fridg3_feed_is_ip_banned(fridg3_feed_client_ip());
 $contactSubmissionBlocked = $contactPostingRestricted || $contactIpBanned;
+$contactCooldownRemaining = contact_cooldown_remaining($rateLimitPath);
 
 if (isset($_GET['dashboard'])) {
     if (!contact_user_is_admin()) {
@@ -350,6 +374,9 @@ if (isset($_GET['dashboard'])) {
         $email = trim((string)($submission['email'] ?? ''));
         $message = (string)($submission['message'] ?? '');
         $notifyError = trim((string)($submission['notifyError'] ?? ''));
+        $submissionIp = trim((string)($submission['ip'] ?? ''));
+        $displayIp = filter_var($submissionIp, FILTER_VALIDATE_IP) ? 'IP: ' . $submissionIp : 'No IP associated';
+        $showNotifyError = $notifyError !== '' && !fridg3_is_local_dev_server();
         $cards[] = '<article class="chat-admin-card contact-admin-card">'
             . '<div class="contact-admin-copy">'
             . '<div class="contact-admin-header">'
@@ -358,8 +385,9 @@ if (isset($_GET['dashboard'])) {
             . '</div>'
             . '<div class="contact-admin-meta">'
             . '<span>' . contact_h(date('Y-m-d H:i', (int)($submission['createdAt'] ?? time()))) . '</span>'
+            . '<span>' . contact_h($displayIp) . '</span>'
             . '</div>'
-            . ($notifyError !== '' ? '<div class="contact-admin-alert">discord notify failed: ' . contact_h($notifyError) . '</div>' : '')
+            . ($showNotifyError ? '<div class="contact-admin-alert">discord notify failed: ' . contact_h($notifyError) . '</div>' : '')
             . '<div class="contact-admin-message">' . nl2br(contact_h($message), false) . '</div>'
             . '</div>'
             . '<form class="contact-admin-actions" method="post" action="/contact?dashboard=1" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete contact submission?" data-confirm-detail="this cannot be undone." data-confirm-text="delete" data-cancel-text="cancel">'
@@ -425,9 +453,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'too many links. keep it human.';
     }
     if ($errors === []) {
-        $rateError = contact_check_rate_limit($rateLimitPath);
-        if ($rateError !== null) {
-            $errors[] = $rateError;
+        $contactCooldownRemaining = contact_claim_cooldown($rateLimitPath);
+        if ($contactCooldownRemaining > 0) {
+            $errors[] = 'please wait ' . contact_format_cooldown($contactCooldownRemaining) . ' before sending another message.';
+        } elseif ($contactCooldownRemaining < 0) {
+            $errors[] = 'contact cooldown storage is unavailable. please try again later.';
         }
     }
 
@@ -436,9 +466,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'contact storage is unavailable. please try again later.';
         } else {
             $id = contact_generate_submission_id($contactDataDir);
+            $submissionIp = contact_client_ip();
             $submission = [
                 'id' => $id,
                 'createdAt' => time(),
+                'ip' => filter_var($submissionIp, FILTER_VALIDATE_IP) ? $submissionIp : 'unknown',
                 'ipHash' => contact_rate_key(),
                 'userAgent' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500),
                 'name' => $values['name'],
@@ -469,12 +501,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $challenge = contact_create_challenge();
+$contactCooldownRemaining = contact_cooldown_remaining($rateLimitPath);
+$cooldownUntil = $contactCooldownRemaining > 0 ? time() + $contactCooldownRemaining : 0;
+$sendButtonAttributes = $contactCooldownRemaining > 0
+    ? ' disabled aria-disabled="true" class="form-button-disabled" data-contact-cooldown-until="' . $cooldownUntil . '"'
+    : '';
+$sendButtonText = $contactCooldownRemaining > 0 ? contact_format_cooldown($contactCooldownRemaining) : 'send';
+$sendButtonTooltip = $contactCooldownRemaining > 0
+    ? 'all users are placed on a 6 hour cooldown to prevent spam'
+    : 'send this contact submission';
 $adminButton = contact_user_is_admin()
     ? '<a id="two-buttons" href="/contact?dashboard=1">open contact dashboard</a>'
     : '';
 $notice = '';
 if (isset($_GET['sent'])) {
-    $notice = '<div id="result">message sent. i\'ll reply from ' . contact_h(CONTACT_REPLY_EMAIL) . '.</div><br>';
+    $popupHtml = 'thanks for contacting me! i\'ll reply on the feed, or from my email <strong>'
+        . contact_h(CONTACT_REPLY_EMAIL) . '</strong>.';
+    $notice = '<script>(function(){function showContactSuccess(){'
+        . 'if(typeof window.showSitePopup!=="function"){window.setTimeout(showContactSuccess,50);return;}'
+        . 'window.showSitePopup({title:"form submitted",html:'
+        . json_encode($popupHtml, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
+        . ',okText:"ok"});}'
+        . 'if(document.readyState==="loading"){window.addEventListener("DOMContentLoaded",showContactSuccess,{once:true});}'
+        . 'else{showContactSuccess();}})();</script>';
 }
 if ($errors !== []) {
     $notice = '<div id="error">' . contact_h(implode(' ', $errors)) . '</div><br>';
@@ -482,7 +531,7 @@ if ($errors !== []) {
 
 $contentPath = contact_find_template_file('content.html');
 if (!$contentPath) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = (string)file_get_contents($contentPath);
@@ -497,6 +546,9 @@ $content = str_replace(
         '{email}',
         '{message}',
         '{security_question}',
+        '{send_button_attributes}',
+        '{send_button_text}',
+        '{send_button_tooltip}',
     ],
     [
         contact_h(CONTACT_REPLY_EMAIL),
@@ -508,6 +560,9 @@ $content = str_replace(
         contact_h($values['email']),
         contact_h($values['message']),
         contact_h($challenge['question']),
+        $sendButtonAttributes,
+        $sendButtonText,
+        contact_h($sendButtonTooltip),
     ],
     $content
 );

@@ -692,10 +692,10 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/main.js' => '/main.js?v=20260813-chat-self-end-7',
-            '/js/settings.js' => '/js/settings.js?v=20260812-settings-split-72',
+            '/main.js' => '/main.js?v=20260817-restricted-history-links-1',
+            '/js/settings.js' => '/js/settings.js?v=20260817-moderator-users-1',
             '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260812-unlocked-track-route-94',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260813-chat-ended-toast-43',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260817-content-action-menus-1',
             '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
             '/js/bbcode.js' => '/js/bbcode.js?v=20260810-preview-mention-tooltips-1',
         ];
@@ -724,6 +724,12 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function apply_preferred_theme_stylesheet($template, $startDir) {
         fridg3_enforce_work_in_progress($startDir);
+
+        $template = preg_replace(
+            '#(<link\b[^>]*\bhref=["\'])/style\.css(?:\?[^"\']*)?(["\'][^>]*>)#i',
+            '$1/style.css?v=admin-settings-spacing-20260817-1$2',
+            $template
+        ) ?: $template;
 
         $theme = fridg3_get_active_theme($startDir);
         if ($theme === null) {
@@ -777,6 +783,10 @@ if (!function_exists('fridg3_inject_dev_mode_banner')) {
         $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
         if (!$isLocalDevServer && !$isAdmin) {
             return $template;
+        }
+
+        if ($isLocalDevServer) {
+            $template = preg_replace('/<title>(?!\s*\[DEV\]\s*)/i', '<title>[DEV] ', $template, 1) ?: $template;
         }
 
         if ($isLocalDevServer && strpos($template, 'id="dev-mode-banner"') === false) {
