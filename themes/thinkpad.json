@@ -1,7 +1,0 @@
-{
-  "name": "thinkpad",
-  "description": "matte black laptop shell with red trackpoint accents and panel lights",
-  "thumbnail": "thumbnails/thinkpad.svg",
-  "html": "thinkpad/thinkpad.html",
-  "css": "thinkpad/thinkpad.css"
-}

@@ -1,7 +1,8 @@
 {
   "name": "whiteprint",
-  "description": "light print layout with purple-to-teal ink accents",
+  "description": "blackprint's paper-and-ink layout in a soft muted light palette",
   "thumbnail": "thumbnails/whiteprint.svg",
   "html": "whiteprint/whiteprint.html",
-  "css": "whiteprint/whiteprint.css"
+  "css": "whiteprint/whiteprint.css",
+  "base": "blackprint"
 }

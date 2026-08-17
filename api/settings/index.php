@@ -243,7 +243,6 @@ $allowedThemes = array_merge(['default'], array_keys($availableThemes));
 $colorFields = ['bg', 'fg', 'border', 'subtle', 'links'];
 $themeColorFields = [
     'classic' => $colorFields,
-    'ambercrt' => ['links'],
 ];
 
 $errors = [];

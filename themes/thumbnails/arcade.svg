@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="arcade theme thumbnail">
-  <rect width="400" height="300" fill="#0b0d22"/>
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ce29c6"/><stop offset=".35" stop-color="#6e26e1"/><stop offset=".68" stop-color="#3495e8"/><stop offset="1" stop-color="#31d7c2"/></linearGradient></defs>
-  <rect width="400" height="300" fill="url(#g)" opacity=".55"/>
-  <rect x="54" y="38" width="292" height="206" rx="18" fill="#12204a" stroke="#61a1e6" stroke-width="8"/>
-  <rect x="92" y="70" width="216" height="116" fill="#080b20" stroke="#31d7c2" stroke-width="4"/>
-  <circle cx="152" cy="214" r="13" fill="#ce29c6"/><circle cx="198" cy="214" r="13" fill="#31d7c2"/><circle cx="244" cy="214" r="13" fill="#6e26e1"/>
-</svg>

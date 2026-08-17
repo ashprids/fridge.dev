@@ -1,177 +1,53 @@
-# Theme Creation Instructions
+# Theme Development Instructions
 
-this directory contains selectable website themes for fridge.dev.
+This directory contains selectable themes for fridge.dev. Blackprint is the built-in default and is implemented by `/template.html`, `/template_mobile.html`, and the Blackprint layer near the end of `/style.css`. It is not a JSON theme package. Classic is the retained selectable reference theme in `/themes/classic.json` and `/themes/lib/classic/`.
 
-if a user says something like "using this AGENTS.md, create an x based theme", you should be able to make the whole theme from this file plus the existing examples. do the work directly unless the request is dangerously unclear.
+Treat `/style.css` as the source of truth. Read it before creating or substantially changing a theme. It contains the complete shared component system, accessibility behavior, responsive rules, Blackprint implementation, and final cross-theme invariants. Do not copy deleted themes or assume an older selector inventory is still accurate.
 
-## Mental Model
+## Theme Package Contract
 
-a theme has two parts:
+A selectable theme has:
 
-- metadata json in `/themes`
-- assets in `/themes/lib`
+- `/themes/{theme-id}.json`
+- `/themes/lib/{theme-id}/{template}.html`
+- `/themes/lib/{theme-id}/{stylesheet}.css`
+- `/themes/thumbnails/{theme-id}.svg` (normally a 4:3 preview)
 
-the metadata file is what makes the theme appear in `/settings`. the filename, minus `.json`, becomes the saved theme id.
+Theme IDs use lowercase `a-z`, `0-9`, `_`, and `-`. The JSON filename without `.json` is the saved theme ID.
 
-example:
+Required metadata:
 
 ```json
 {
-  "name": "Frutiger Aero",
-  "html": "frutiger-aero-template.html",
-  "css": "frutiger-aero.css"
+  "name": "Theme Name",
+  "description": "short picker description",
+  "thumbnail": "thumbnails/theme-id.svg",
+  "html": "theme-id/theme-id.html",
+  "css": "theme-id/theme-id.css"
 }
 ```
 
-this means:
+An optional `"base": "blackprint"` field makes the renderer add both the package's `{theme-id}-theme` body class and `blackprint-theme`. Use it for a deliberate Blackprint derivative so the package inherits the current Blackprint layout and component coverage instead of copying that layer. `blackprint` is currently the only supported base value.
 
-- settings label: `Frutiger Aero`
-- saved id: `example_theme` if the file is `/themes/example_theme.json`
-- desktop template: `/themes/lib/frutiger-aero/frutiger-aero-template.html`
-- theme stylesheet: `/themes/lib/frutiger-aero/frutiger-aero.css`
+`thumbnail` is relative to `/themes`; `html` and `css` are relative to `/themes/lib`. Asset paths may contain only letters, numbers, `.`, `_`, `-`, and `/`. Never use absolute paths, `..`, empty segments, query strings, or shell-like filenames.
 
-## Files To Create
+The renderer discovers valid JSON files dynamically. Blackprint is exposed as `default`; packaged themes receive a `{theme-id}-theme` body class. Missing, malformed, unsupported-base, or unsafe packages are ignored. Desktop may use the package HTML; mobile always uses `/template_mobile.html` and only appends the selected theme CSS.
 
-for a new theme, create:
+## Base Stylesheet Map
 
-- `/themes/{theme-id}.json`
-- `/themes/lib/{theme-id}/{theme-id-or-theme-name}.html`
-- `/themes/lib/{theme-id}/{theme-id-or-theme-name}.css`
+`/style.css` is intentionally ordered into five cascade sections:
 
-keep ids lowercase with `a-z`, `0-9`, `_`, and `-`. avoid spaces in filenames.
+1. Foundations: design variables, selection, loading UI, local fonts, emoji fallback, ASCII/resource typography, global text and element behavior.
+2. Site shell: page wrapper, sidebar, title and title animations, navigation, content layout, notifications, mini-player, footer, sliders, and scrollbars.
+3. Shared controls: checkboxes, settings panels, theme/title/Fruity Dance pickers, forms, popups, prompts, media corruption effects, tables, Markdown/BBCode surfaces, pagination, toolbars, and common responsive rules.
+4. Page features: route-specific feed, journal, account, chat, gallery, upload, admin, notification, music, and tool interfaces.
+5. Theme layers: the full Blackprint skin, Blackprint mobile coverage, application-specific cleanup, and final rules that intentionally apply across every theme.
 
-## Required JSON Rules
+Rules remain in cascade order because later responsive, theme, and coverage rules intentionally override earlier component defaults. A theme stylesheet is appended after the shared stylesheet, but inline mobile rules can still require scoped `!important` overrides.
 
-theme json must be valid JSON and must include:
+## Design Variables
 
-- `name`: human-readable label shown in `/settings`
-- `description`: short supporting text shown in the on-site theme picker
-- `thumbnail`: 4:3 preview image path relative to `/themes`, usually `thumbnails/{theme-id}.svg`
-- `html`: relative path inside `/themes/lib`
-- `css`: relative path inside `/themes/lib`
-
-do not put paths like `/themes/lib/foo.css` in the json. use paths relative to `/themes/lib`, such as `aero/aero.css`.
-do not put paths like `/themes/thumbnails/foo.svg` in the json. use paths relative to `/themes`, such as `thumbnails/aero.svg`.
-
-allowed asset path characters are letters, numbers, `.`, `_`, `-`, and `/`. never use `..`, absolute paths, empty path segments, or weird shell-ish filenames.
-
-## Template Requirements
-
-start from `/template.html` unless the user asks for a radical layout. copy it into `/themes/lib/{theme-id}`, then adapt it.
-
-the template must preserve these placeholders:
-
-- `{title}`
-- `{description}`
-- `{content}`
-- `{user_greeting}`
-
-the template should preserve these scripts/styles unless there is a very good reason:
-
-- Font Awesome CDN link
-- Highlight.js CDN CSS and JS
-- `/main.js`
-- favicon and manifest links
-
-the template should include a stylesheet link to `/style.css`; the renderer appends the selected theme CSS later, so the theme CSS can override base styling.
-
-## Layout Freedom
-
-themes are allowed to change the website layout. this is not just a color-skin system.
-
-you may:
-
-- move the menu
-- redesign the sidebar
-- make the layout top-nav, bottom-nav, split-panel, dashboard-like, etc.
-- add decorative wrappers or background elements
-- change spacing, borders, visual density, typography, and component shape
-
-but you must keep:
-
-- a visible content display area containing `{content}`
-- a usable menu/navigation of some sort
-- account/settings/home navigation available somewhere
-- the mini-player markup unless the theme intentionally restyles it
-- IDs/classes that `main.js` depends on, unless you also verify and update the JS safely
-
-translation: go wild aesthetically, but do not strand users on a pretty page with no content or nav. that would be deeply goofy.
-
-## Mobile Behavior
-
-mobile view uses `/template_mobile.html`, not the theme HTML file. this is easy to forget and then the theme looks half-baked on `m.fridge.dev`, so treat mobile CSS as required theme work, not a nice extra.
-
-when mobile-friendly view is active:
-
-- only the theme CSS is applied
-- the theme HTML is ignored
-- write mobile overrides under `body.mobile-template`
-
-this means every theme CSS must include mobile-specific polish if the theme changes core layout, backgrounds, nav buttons, content spacing, cards, forms, the mini-player, or footer controls. almost every real theme changes at least one of these, so most themes should have a substantial `body.mobile-template` section.
-
-important: `/template_mobile.html` contains inline styles with strong defaults. these include black backgrounds for nav buttons, player/footer blocks, and `#content-main`. if you do not override these with `body.mobile-template ... !important`, light themes will get random black panels and dark themes may get default-looking controls.
-
-important mobile selectors that often need theme overrides:
-
-- `body.mobile-template`
-- `body.mobile-template #sidebar`
-- `body.mobile-template .mobile-collapsed-header`
-- `body.mobile-template .mobile-collapsed-brand`
-- `body.mobile-template .mobile-collapsed-subtitle`
-- `body.mobile-template .mobile-collapsed-title`
-- `body.mobile-template #show-sidebar`
-- `body.mobile-template .mobile-nav-grid`
-- `body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button`
-- `body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button:hover`
-- `body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button.active`
-- `body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button.active:hover`
-- `body.mobile-template #footer-buttons`
-- `body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button`
-- `body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button:hover`
-- `body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button.active`
-- `body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button.active:hover`
-- `body.mobile-template #content`
-- `body.mobile-template #content-layout`
-- `body.mobile-template #content-main`
-- `body.mobile-template #mini-player`
-- `body.mobile-template #mini-player-tracks`
-- `body.mobile-template #mini-player-art-wrapper`
-- `body.mobile-template #mini-player-art`
-- `body.mobile-template #mini-player-download`
-- `body.mobile-template #mini-player-play`
-- `body.mobile-template #mini-player-controls span`
-- `body.mobile-template #mini-player-seek`
-- `body.mobile-template #mini-player-volume`
-- `body.mobile-template .mini-track`
-- `body.mobile-template .mini-track:hover`
-- `body.mobile-template .mini-track.active`
-- `body.mobile-template #sidebar-footer`
-- `body.mobile-template input`
-- `body.mobile-template textarea`
-- `body.mobile-template .dropdown`
-- `body.mobile-template .text-input`
-- `body.mobile-template .bbcode-dropdown`
-- `body.mobile-template .bbcode-btn`
-
-mobile CSS may need `!important` because `template_mobile.html` has inline mobile-specific styles. use it where necessary, not everywhere like a maniac.
-
-minimum mobile checklist for every theme:
-
-- theme the page background
-- theme the collapsed header and menu button
-- theme the expanded menu panel, and force `body.mobile-template #sidebar` back to `width: 100% !important; min-width: 0 !important; max-width: none !important;` so desktop sidebar widths do not make the opened mobile menu skinny
-- theme mobile nav buttons, including hover, active, and active-hover states; every state must explicitly set readable text/icon colors
-- theme footer buttons, including hover, active, and active-hover states; every state must explicitly set readable text/icon colors
-- theme the mini-player, track list, album art, download overlay, play/mute controls, title text, sliders, track rows, hover states, and active track states
-- theme `#content-layout` and `#content-main`; especially remove the mobile template's default black `#content-main` background when making a light theme
-- theme inputs, dropdowns, textareas, BBCode controls, radios, checkboxes, and color inputs if the theme is light or uses non-default colors
-- keep spacing tight enough for small screens without horizontal scrolling
-
-## CSS Strategy
-
-theme CSS is appended after the base stylesheet. normally do not `@import url('/style.css')` in theme CSS, because that can reload base styles after mobile styles and break mobile theming.
-
-set the core color variables early:
+Set the core variables at the start of a theme stylesheet:
 
 ```css
 :root {
@@ -180,109 +56,136 @@ set the core color variables early:
     --border: #3c7895;
     --subtle: #917daa;
     --links: #415fad;
+    --chat-own-fg: #ffffff;
 }
 ```
 
-then override components directly.
+The shared stylesheet also derives or consumes:
 
-common components:
+- `--hero-ascii-muted` and `--hero-ascii-1` through `--hero-ascii-7`
+- `--hero-ascii-opacity`
+- `--resource-ascii`, `--resource-label`, `--time-ascii`, `--time-label`
+- `--emoji-font`
+- `--selection-bg`, `--selection-fg`
+- `--scrollbar-track`, `--scrollbar-thumb`, `--scrollbar-thumb-hover`, `--scrollbar-thumb-border`
+- `--chat-own-bg` in the shared chat layer
 
-- `body`
-- `#page-wrapper`
-- `#sidebar`
-- `#header`
-- `#title`
-- `#tab`
-- `#container`
-- `#content`
-- `#content-layout`
-- `#content-main`
-- `#post`
-- `#search`
-- `#search-box`
-- `#search-button`
-- `#footer-buttons`
-- `#footer-button`
-- `#mini-player`
-- `#mini-player-tracks`
-- `#mini-player-art-wrapper`
-- `#mini-player-art`
-- `#mini-player-download`
-- `#mini-player-play`
-- `#mini-player-controls span`
-- `#mini-player-seek`
-- `#mini-player-volume`
-- `.mini-track`, `.mini-track:hover`, `.mini-track.active`
-- form inputs, buttons, `.dropdown`, `.radio`, `.checkbox`
+Prefer overriding variables over duplicating component rules. Add direct component overrides where the theme changes shape, spacing, typography, imagery, or layout. Classic alone currently exposes account-synced custom values for `bg`, `fg`, `border`, `subtle`, and `links`; adding color controls for another theme requires coordinated changes in `/js/settings.js` and `/api/settings/index.php`.
 
-when styling menus, do not only set the background on hover/active states. set the foreground color too. this includes `#tab:hover`, `#tab.active`, `#footer-button:hover`, `#footer-button.active`, mobile nav buttons, mobile footer buttons, and pseudo-elements like `#tab::before` if the theme uses them. invisible active menu text is a tiny little css jump scare and it is your job to prevent it.
+Available shared fonts are `MainRegular`, `MainBold`, `MainItalic`, `MainBoldItalic`, `IBM_VGA`, `Title`, and the `var(--emoji-font)` fallback stack. Preserve the emoji fallback in custom font families.
 
-## Content Spacing
+## Templates And Runtime Contracts
 
-be careful with padding on `#content-main`: it reduces usable width for page content. if the user asks for more breathing room without shrinking content, prefer outer margins, pseudo-elements, or background wrappers.
+Start desktop work from `/template.html` unless the requested design needs a different layout. Preserve:
 
-good pattern:
+- `{title}`, `{description}`, `{content}`, and `{user_greeting}`
+- the content mount IDs `#container`, `#content`, `#content-layout`, and `#content-main`
+- sidebar/navigation access, including home, account, and settings
+- title markup with `#title` and per-character `.title-letter` spans
+- mini-player IDs and the persistent `#mini-player-audio` element
+- sidebar/footer/notification hooks used by `/js/sidebar-player.js`
+- Font Awesome, Highlight.js, favicon, manifest, `/style.css`, and shared script includes
 
-```css
-#content-layout {
-    position: relative;
-    isolation: isolate;
-}
+The site uses SPA content replacement while leaving the shell and audio element mounted. Do not duplicate IDs, replace the shared audio element during navigation, or remove runtime hooks without updating and verifying the JavaScript.
 
-#content-layout::before {
-    content: "";
-    position: absolute;
-    inset: -20px;
-    z-index: -1;
-    pointer-events: none;
-}
-```
+Themes may radically rearrange the desktop shell, but content and navigation must remain usable. Avoid adding padding directly to `#content-main` when a decorative wrapper or `#content-layout::before` can add breathing room without reducing the page's usable width.
 
-this makes the visual panel larger without stealing content width.
+## Components To Cover
 
-## Accessibility And Usability
+At minimum, inspect the current declarations in `/style.css` for every component the theme visibly changes:
 
-keep themes readable:
+- shell: `body`, `.paper-grain`, `#page-wrapper`, `#sidebar`, `#header`, `#title`, `.title-letter`, `#tab`, `#container`, `#content`, `#content-layout`, `#content-main`
+- navigation/status: active tabs, sidebar notifications, active chat, maintenance/developer indicators, tooltips, notification toasts
+- footer: `#sidebar-footer`, `#footer-text`, `#footer-buttons`, `#footer-button`
+- player: `#mini-player`, `#mini-player-main`, art wrapper/image/download, metadata/title/artist, play/mute/close controls, seek/volume sliders, track list, `.mini-track` hover/active states, live-stream states
+- forms: text inputs, textareas, selects/dropdowns, buttons, radios, checkboxes, color inputs, file controls, field help, disabled/error/success states
+- pickers/popups: theme picker, title-animation picker, Fruity Dance controls, site popup/prompt/dialog surfaces
+- content: headings, links, lists, blockquotes, code/pre, Markdown/BBCode, spoilers, tables, embedded media, pager controls, posts/cards
+- route features: feed/journal editors and cards, accounts/settings/admin, chat and reply UI, gallery/upload, notifications, music albums, tools, logs, wiki/formatting pages
+- ASCII/resource displays: homepage hero, server time/resources, labels, scaling containers
 
-- preserve strong text/background contrast
-- make links visually distinct
-- make focus/hover states visible
-- keep buttons and controls large enough to click
-- avoid hiding overflow in ways that cut off content
-- check long words, ASCII art, forms, and post cards
+Use the stylesheet's actual selectors rather than inventing parallel markup. Search for a route or component name before adding overrides.
 
-if a theme uses very decorative backgrounds, make content panels opaque enough to read.
+## Title And Motion
+
+The shared title uses clipped per-letter backgrounds and runtime-selectable wobble, bounce, rubberhose, bubble, slot-machine, moonwalk, and heartbeat animations. Mobile Safari requires gradients on the individual `.title-letter` elements. Keep transform-safe overflow and padding intact unless the replacement is verified with every animation.
+
+Do not override the shared title's `font-family` in packaged theme styles. Themes may change the title's colour, gradient, decoration, and surrounding panel, but `#title`, `.title-letter`, `.mobile-collapsed-title`, and its letters must retain the shared title typeface. Classic is the existing legacy exception because its original title treatment is part of that preserved theme.
+
+Respect both `@media (prefers-reduced-motion: reduce)` and `html.access-reduced-motion`. Theme animation is decorative and must be suppressible. The global reduced-motion rule forces animation and transition durations down to 1ms; do not defeat it with later theme rules.
+
+## Mobile Requirements
+
+Mobile uses `/template_mobile.html`, ignores theme HTML, and appends theme CSS. Scope mobile work under `body.mobile-template`. The template contains strong inline layout defaults, so targeted `!important` is sometimes necessary.
+
+Verify at least:
+
+- page background, collapsed header, brand/title, menu button, unread badge, backdrop, and expanded menu panel
+- `body.mobile-template #sidebar` preserves the shared safe gutter (`width: calc(100% - 16px)`), uses `min-width: 0`, `max-width: none`, border-box sizing, and never overflows the viewport
+- nav and footer buttons in normal, hover, active, and active-hover states with explicit readable foregrounds
+- content/layout/main backgrounds and spacing; light themes must replace default dark panels
+- complete mini-player and track-list styling
+- inputs, textareas, dropdowns, BBCode controls, radios, checkboxes, and color/file controls
+- narrow content, long words, code blocks, tables, ASCII art, and media without horizontal page overflow
+
+Do not reintroduce a separate collapsed branded header: the current mobile template uses the fixed menu control and expanded sidebar title. Preserve the shared open/close transforms, backdrop behavior, document scroll locking, and reduced-motion overrides.
+
+## Accessibility And Shared Invariants
+
+Themes must maintain readable contrast, distinct links, visible focus/hover/active states, usable target sizes, and unclipped content. Decorative backgrounds need opaque-enough content surfaces.
+
+The shared accessibility layer supplies high contrast through the core variables. If a future light theme needs a light high-contrast mode, add an explicit theme-scoped override rather than a generic name list.
+
+The final rules in `/style.css` are intentional cross-theme contracts:
+
+- sidebar mini-player, track list, and footer remain shadow-free
+- mini-player close controls retain their compact pinned geometry
+- mobile title letters retain independent gradient painting and transform-safe spacing
+- mobile Always Playing title setting stays hidden
+- the mobile menu toggle remains square
+- chat controls and quoted replies remain flat and readable
+- the sidebar suppresses text selection and native image/link dragging while controls remain interactive
+
+Do not casually override these rules in a theme.
+
+## CSS Practices
+
+- Do not `@import /style.css`; the renderer already loads it.
+- Scope theme-specific rules to the theme body class added by the renderer.
+- Set both foreground and background for hover/active states, including pseudo-elements.
+- Reuse shared variables and component markup.
+- Use `!important` only to beat known inline/mobile or final shared declarations.
+- Keep asset URLs rooted under the theme package when practical.
+- Avoid broad selectors that leak into editor previews, popups, or mobile unintentionally.
+- Preserve reduced motion, high contrast, keyboard focus, and touch behavior.
 
 ## Validation
 
-after creating or changing a theme:
+After creating or changing a theme:
 
-1. validate json:
-
-```bash
-php -r 'json_decode(file_get_contents("themes/{theme-id}.json"), true); echo json_last_error_msg(), "\n";'
-```
-
-2. check the theme loader sees it:
+1. Validate metadata:
 
 ```bash
-php -r 'require "lib/render.php"; echo json_encode(array_values(array_map(fn($t)=>["id"=>$t["id"],"name"=>$t["name"]], fridg3_list_themes(__DIR__))), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";'
+php -r '$v=json_decode(file_get_contents("themes/{theme-id}.json"), true); echo json_last_error_msg(), "\n";'
 ```
 
-3. check whitespace:
+2. Verify discovery:
 
 ```bash
-git diff --check -- themes/{theme-id}.json themes/lib/{theme-id}/{theme}.html themes/lib/{theme-id}/{theme}.css
+php -r 'require "lib/render.php"; echo json_encode(array_values(array_map(fn($t) => ["id" => $t["id"], "name" => $t["name"]], fridg3_list_themes(__DIR__))), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";'
 ```
 
-4. if PHP render helper changed, run:
+3. Lint and check whitespace:
 
 ```bash
 php -l lib/render.php
+git diff --check -- themes/{theme-id}.json themes/lib/{theme-id} themes/thumbnails/{theme-id}.svg
 ```
 
-do not start a dev server for this repo. assume one is already running if preview is needed.
+4. Test desktop and mobile, normal and reduced motion, keyboard focus, long content, forms, mini-player states, and the routes whose components the theme overrides.
+
+Do not start a development server; assume one is already running if preview is needed.
 
 ## Documentation
 
-if you change how themes work, update the wiki. if you only add a normal theme, wiki changes usually are not needed.
+Update `/wiki/Frontend-and-Templates.md`, `/wiki/Routing-and-Rendering.md`, `/wiki/Data-Contracts.md`, and `/wiki/API-Reference.md` when the package contract, renderer, settings behavior, color support, or shared theme architecture changes. A normal new theme usually needs only a concise catalog mention if its behavior is noteworthy.

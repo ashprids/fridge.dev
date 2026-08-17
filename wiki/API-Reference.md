@@ -15,7 +15,7 @@ All API routes live under `/api/*` and are handled by PHP.
 
 - Requires logged-in user
 - Returns current settings from `data/accounts/accounts.json`
-- Currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `fruityDanceEnabled`, `fruityDanceSpritesheet`, `fruityDanceLoop`, `fruityDanceSpeed`, `fruityDanceReflection`, `reduceMotion`, `discordNotificationsEnabled`, `titleAnimation`, `titleAnimationAlways`, and `titleAnimationDesync`; `colors` is honored by `classic` for the full palette and by `ambercrt`/`CRT` for the single `links` phosphor color
+- Currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `fruityDanceEnabled`, `fruityDanceSpritesheet`, `fruityDanceLoop`, `fruityDanceSpeed`, `fruityDanceReflection`, `reduceMotion`, `discordNotificationsEnabled`, `titleAnimation`, `titleAnimationAlways`, and `titleAnimationDesync`; `colors` is honored by `classic` for its full palette
 - Toast-only settings fields are documented on [Toast](Toast#personality-sources)
 
 `POST`
@@ -29,7 +29,7 @@ All API routes live under `/api/*` and are handled by PHP.
 - Can set the Fruity Dance enabled state, a directory-backed spritesheet, one of its metadata-defined animation rows, speed from 25–200%, and reflection strength from 0–100%; GET also returns `fruityDanceAnimations`, parsed from the selected sheet's same-basename `.txt` file, and the settings UI sends changes automatically
 - Can set `discordNotificationsEnabled` to opt a linked account in or out of automated Toast feed-notification DMs
 - Syncs the `theme_pref` cookie so anonymous and first-load rendering can pick the active theme
-- Validates color fields as `#RRGGBB`; the settings UI sends the full palette for `classic` and only `links` for `CRT`
+- Validates Classic color fields as `#RRGGBB`
 - Admin users can also toggle maintenance mode through the settings flow
 - Toast-only personality persistence is documented on [Toast](Toast#personality-sources)
 
@@ -48,8 +48,9 @@ All API routes live under `/api/*` and are handled by PHP.
 `GET`
 
 - Public route
-- Returns selectable themes, with `default` displayed as `blackprint` before discovered themes
+- Returns Blackprint as `default`, then Whiteprint and Classic, followed by any other discovered selectable themes
 - Each valid theme must include `name`, `description`, `thumbnail`, `html`, and `css`
+- Theme metadata may set `base` to `blackprint` to inherit Blackprint's body layer
 - Theme `html` and `css` paths are resolved from `/themes/lib`; picker thumbnails are resolved from `/themes`
 
 ### `/api/bookmark`

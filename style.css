@@ -517,6 +517,8 @@ body {
     display: flex;
     flex-direction: column;
     overflow-y: auto; /* allow sidebar content to scroll if taller than viewport */
+    user-select: none;
+    -webkit-user-select: none;
     opacity: 1;
     transform: translateX(0);
     transition:
@@ -527,6 +529,11 @@ body {
         transform 0.16s ease,
         border-color 0.16s ease,
         box-shadow 0.16s ease;
+}
+
+#sidebar img,
+#sidebar a {
+    -webkit-user-drag: none;
 }
 
 body.sidebar-is-hidden #sidebar {
@@ -6295,33 +6302,6 @@ html.access-high-contrast body {
     color: var(--fg) !important;
 }
 
-html.access-high-contrast body.whiteprint-theme,
-html.access-high-contrast body.bubblegum-theme,
-html.access-high-contrast body.cottagecore-theme,
-html.access-high-contrast body.littlehelps-theme {
-    --bg: #ffffff !important;
-    --fg: #000000 !important;
-    --border: #000000 !important;
-    --subtle: #333333 !important;
-    --links: #003cff !important;
-    color: var(--fg) !important;
-}
-
-html.access-high-contrast body.whiteprint-theme,
-html.access-high-contrast body.bubblegum-theme,
-html.access-high-contrast body.cottagecore-theme,
-html.access-high-contrast body.littlehelps-theme,
-html.access-high-contrast body.whiteprint-theme #sidebar,
-html.access-high-contrast body.bubblegum-theme #sidebar,
-html.access-high-contrast body.cottagecore-theme #sidebar,
-html.access-high-contrast body.littlehelps-theme #sidebar,
-html.access-high-contrast body.whiteprint-theme #content-layout,
-html.access-high-contrast body.bubblegum-theme #content-layout,
-html.access-high-contrast body.cottagecore-theme #content-layout,
-html.access-high-contrast body.littlehelps-theme #content-layout {
-    background: #ffffff !important;
-}
-
 html.access-high-contrast a,
 html.access-high-contrast button,
 html.access-high-contrast input,
@@ -8208,6 +8188,7 @@ pre code.hljs {
 
 .theme-picker-description,
 .theme-picker-option-description {
+    font-family: "MainRegular", var(--emoji-font), monospace;
     font-size: 12px;
     line-height: 1.25;
     color: var(--subtle);

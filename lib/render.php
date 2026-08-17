@@ -263,20 +263,8 @@ if (!function_exists('fridg3_normalize_theme_id')) {
         if ($theme === 'blackprint') {
             return 'default';
         }
-        if ($theme === 'crt') {
-            return 'ambercrt';
-        }
-        if ($theme === 'liminal') {
-            return 'default';
-        }
-        if ($theme === 'syswave') {
-            return 'default';
-        }
         if ($theme === 'custom') {
             return 'classic';
-        }
-        if ($theme === 'newsprint') {
-            return 'whiteprint';
         }
         if (preg_match('/^[a-z0-9_-]+$/', $theme)) {
             return $theme;
@@ -343,6 +331,10 @@ if (!function_exists('fridg3_list_themes')) {
 
             $name = trim((string)($meta['name'] ?? ''));
             $description = trim((string)($meta['description'] ?? ''));
+            $base = strtolower(trim((string)($meta['base'] ?? '')));
+            if ($base !== '' && $base !== 'blackprint') {
+                continue;
+            }
             $html = fridg3_normalize_theme_asset_path($meta['html'] ?? '');
             $css = fridg3_normalize_theme_asset_path($meta['css'] ?? '');
             $thumbnail = fridg3_normalize_theme_asset_path($meta['thumbnail'] ?? '');
@@ -373,6 +365,7 @@ if (!function_exists('fridg3_list_themes')) {
                 'id' => $id,
                 'name' => $name,
                 'description' => $description,
+                'base' => $base,
                 'thumbnail' => $thumbnail,
                 'html' => $html,
                 'css' => $css,
@@ -385,6 +378,8 @@ if (!function_exists('fridg3_list_themes')) {
         }
 
         uasort($themes, function($a, $b) {
+            // Blackprint is prepended by the themes API; packaged themes follow
+            // it with Whiteprint and Classic pinned ahead of future themes.
             $priority = ['whiteprint' => 0, 'classic' => 1];
             $aPriority = $priority[$a['id']] ?? 10;
             $bPriority = $priority[$b['id']] ?? 10;
@@ -734,6 +729,11 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
                 ),
                 $startDir
             );
+        }
+
+        $template = fridg3_apply_body_theme_class($template, $theme['id'] . '-theme');
+        if (($theme['base'] ?? '') === 'blackprint') {
+            $template = fridg3_apply_body_theme_class($template, 'blackprint-theme');
         }
 
         $href = htmlspecialchars($theme['cssHref'], ENT_QUOTES, 'UTF-8');
