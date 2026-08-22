@@ -517,13 +517,13 @@ $notice = '';
 if (isset($_GET['sent'])) {
     $popupHtml = 'thanks for contacting me! i\'ll reply on the feed, or from my email <strong>'
         . contact_h(CONTACT_REPLY_EMAIL) . '</strong>.';
-    $notice = '<script>(function(){function showContactSuccess(){'
+    $notice = '<scr' . 'ipt>(function(){function showContactSuccess(){'
         . 'if(typeof window.showSitePopup!=="function"){window.setTimeout(showContactSuccess,50);return;}'
         . 'window.showSitePopup({title:"form submitted",html:'
         . json_encode($popupHtml, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)
         . ',okText:"ok"});}'
         . 'if(document.readyState==="loading"){window.addEventListener("DOMContentLoaded",showContactSuccess,{once:true});}'
-        . 'else{showContactSuccess();}})();</script>';
+        . 'else{showContactSuccess();}})();</scr' . 'ipt>';
 }
 if ($errors !== []) {
     $notice = '<div id="error">' . contact_h(implode(' ', $errors)) . '</div><br>';
