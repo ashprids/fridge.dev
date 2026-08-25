@@ -405,10 +405,6 @@ Toast configuration, personality, AI behavior, notification state, approvals, DM
 - Opaque revision value updated after notification-producing feed/targeted writes and inbox read/dismissal changes
 - The lightweight revision endpoint reads this single small file so browsers do not repeatedly rebuild or poll their full inboxes
 
-### `off-topic-archive.json`
-
-- Discord export blob used by the archive viewer
-
 ### `page_views.json`
 
 Shape is roughly:

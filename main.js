@@ -2758,8 +2758,8 @@ function loadPageIntoContent(url, addToHistory = true) {
                 initToastFeedGenerator();
                 initAsciiUsage();
                 setupSpaForms();
-                if (typeof window.fridg3InitOffTopicArchive === 'function') {
-                    window.fridg3InitOffTopicArchive();
+                if (typeof window.fridg3InitDiscordExportViewer === 'function') {
+                    window.fridg3InitDiscordExportViewer();
                 }
                 initSettingsPage();
                 if (typeof window.fridg3InitFruityDanceSettings === 'function') {
@@ -3265,8 +3265,8 @@ function bindSpaForm(form) {
                 initToastFeedGenerator();
                 initAsciiUsage();
                 initAsciiTime();
-                if (typeof window.fridg3InitOffTopicArchive === 'function') {
-                    window.fridg3InitOffTopicArchive();
+                if (typeof window.fridg3InitDiscordExportViewer === 'function') {
+                    window.fridg3InitDiscordExportViewer();
                 }
                 initSettingsPage();
                 if (typeof window.fridg3InitFruityDanceSettings === 'function') {

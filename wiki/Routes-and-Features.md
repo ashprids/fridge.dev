@@ -323,7 +323,6 @@ Misc landing page for routes that do not fit elsewhere.
 Subroutes:
 
 - `/others/firefox-theme`
-- `/others/off-topic-archive`
 - Toast's website routes are documented on [Toast](Toast#discord-service)
 - `/others/fridge-builds-websites`
 
@@ -353,9 +352,20 @@ Tools and utilities landing page.
 
 Subroutes:
 
+- `/tools/discord-export-viewer`
 - `/tools/mdpaste`
 
 Any current or future tool that creates, uploads, or shares user content must enforce both the account `postingRestricted` flag and the shared `data/feed/banned_ips.json` list in every write/API handler. Disabled controls and notices are only the UI layer and must not be the sole enforcement. Read-only tool pages may remain available.
+
+### `/tools/discord-export-viewer`
+
+Browser-only viewer for local Discord JSON exports.
+
+- Accepts one or more local JSON files containing a `messages` array, or a top-level message array, and combines their messages in the current browser tab
+- Preserves the archive viewer's author, timestamp, role-colour, attachment, Tenor/GIF, searching, sorting, and paginated rendering behavior, with inclusive before/after date filters and mutually exclusive toggles to show only messages containing image or video attachments
+- Text-search and image-only results include a `Show in list` action that clears the text search and image-only filter, renders through the message's position with the remaining filters applied, scrolls to it, and briefly highlights it
+- Reads files with the browser File API and makes no request containing the file or its contents; nothing is written to server storage
+- Remote avatar, attachment, GIF, and Tenor URLs contained in an export are still loaded from their respective hosts for display
 
 ### `/tools/mdpaste`
 
@@ -386,10 +396,6 @@ New top-level feed post files use `v2` as their first line, followed by the exis
 ### `/formatting/markdown` and `/formatting/markdown/feed`
 
 These centered, sidebar-free reference pages use the standard Markdown presentation and fixed top-right controls to switch between rendered output and raw source or toggle the content between the website font and Fira Sans. `/formatting/markdown` is the canonical site-wide reference backed by `formatting/markdown/formatting.md`. `/formatting/markdown/feed` renders its route-local source through the restricted v2 feed renderer, including literal examples of unsupported syntax so the boundary remains visible and testable.
-
-### `/others/off-topic-archive`
-
-Frontend archive viewer backed by `data/etc/off-topic-archive.json`.
 
 ### Toast Routes
 

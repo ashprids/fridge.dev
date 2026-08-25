@@ -57,7 +57,7 @@ Page-specific behavior belongs in a route-local `{page-name}.js` file and the pa
 
 - `/music/upload` uses `/music/upload/upload.js`
 - Toast's route-local frontend is documented on [Toast](Toast#discord-service)
-- `/others/off-topic-archive` uses `/others/off-topic-archive/off-topic-archive.js`
+- `/tools/discord-export-viewer` uses `/tools/discord-export-viewer/discord-export-viewer.js`; selected JSON exports are parsed locally with the browser File API and never submitted to the server
 
 If several pages in the same route family need the same code, put one script at the highest shared route directory and reference that script from each page instead of duplicating it. Keep genuinely cross-page helpers in `main.js`.
 

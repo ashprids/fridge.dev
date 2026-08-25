@@ -193,7 +193,6 @@ Some features depend on data or services that may not exist in local dev:
 - Contact dashboard if `data/contact` is empty
 - Music listings if `data/music` and `data/audio` are missing
 - Toast features require their configuration and local service; see [Toast](Toast#local-service-and-production-operation) for setup and failure boundaries
-- Off-topic archive if `data/etc/off-topic-archive.json` is missing
 - Deploy/backup workflows because those are GitHub Actions + server side
 
 That does not mean the site is broken. It just means local dev has no content yet.

@@ -319,10 +319,6 @@ writeJson($root, 'etc/toast-patch-approvals.json', [
 writeJson($root, 'etc/feed-browser-notify-state.json', [
     'users' => new stdClass(),
 ]);
-writeJson($root, 'etc/off-topic-archive.json', [
-    'channels' => [],
-    'exported_at' => null,
-]);
 writeJson($root, 'upload/rooms.json', ['rooms' => new stdClass()]);
 
 clearDirectory($root, 'mdpaste');
