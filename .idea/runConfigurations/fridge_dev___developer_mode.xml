@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="fridge.dev | developer mode" type="PhpBuiltInWebServerConfigurationType" factoryName="PHP Built-in Web Server" activateToolWindowBeforeRun="false" document_root="$PROJECT_DIR$" host="0.0.0.0" port="4000">
+    <method v="2" />
+  </configuration>
+</component>
