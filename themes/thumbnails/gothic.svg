@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="gothic theme thumbnail">
-  <rect width="400" height="300" fill="#0b090d"/>
-  <path d="M0 0h400v300H0z" fill="#241b2b" opacity=".55"/>
-  <rect x="34" y="28" width="94" height="240" fill="#131016" stroke="#d6b36a" stroke-width="3"/>
-  <path d="M166 216V92c0-42 34-62 66-62s66 20 66 62v124z" fill="#151116" stroke="#d6b36a" stroke-width="4"/>
-  <rect x="54" y="76" width="54" height="10" fill="#d6b36a"/><rect x="54" y="110" width="54" height="10" fill="#6d5a83"/>
-</svg>

@@ -1,7 +1,0 @@
-{
-  "name": "little helps",
-  "description": "clean supermarket aisles, iconic blue controls, and local modern fonts",
-  "thumbnail": "thumbnails/littlehelps.svg",
-  "html": "littlehelps/littlehelps.html",
-  "css": "littlehelps/littlehelps.css"
-}

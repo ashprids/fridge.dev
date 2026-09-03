@@ -34,6 +34,9 @@ The Nginx configurations on the web server can be found at `/etc/nginx/nginx.con
 
 ## AI Workflow
 
+### Theme Work
+Blackprint is the built-in default implemented by `/style.css`, `/template.html`, and `/template_mobile.html`; Classic is the retained packaged theme under `/themes`. Before creating or reworking themes, read `/themes/AGENTS.md` and treat the current five-section cascade in `/style.css` as the canonical component, responsive, accessibility, and cross-theme contract.
+
 ### Updating the Wiki
 Whenever you make a change, you should always check if the change is worth mentioning in the wiki by looking through the pages and checking whether or not the topic of your change is mentioned. 
 

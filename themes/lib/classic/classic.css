@@ -3214,14 +3214,51 @@ body.mobile-template #container {
 }
 
 body.mobile-template #sidebar {
-    width: 100% !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
     min-width: 0 !important;
-    max-width: none !important;
+    max-width: calc(100vw - 16px) !important;
     height: auto !important;
     min-height: 0 !important;
-    border-right: 0 !important;
-    border-bottom: 1px solid var(--border) !important;
-    overflow: visible !important;
+    max-height: calc(100dvh - 20px) !important;
+    box-sizing: border-box !important;
+    border: 1px solid var(--border) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding-bottom: 10px !important;
+    transform: translateY(-50%) !important;
+    box-shadow: inset -1px 0 0 var(--border) !important;
+    contain: inline-size;
+}
+
+body.mobile-template.sidebar-is-hidden #sidebar {
+    transform: translateY(-50%) scale(0.96) !important;
+}
+
+body.mobile-template #header {
+    margin: 0 !important;
+    padding: 12px 14px 10px !important;
+    box-sizing: border-box !important;
+}
+
+body.mobile-template .mobile-nav-grid {
+    width: auto !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    padding: 10px 12px 0 !important;
+    box-sizing: border-box !important;
+}
+
+body.mobile-template .mobile-nav-grid a.mobile-nav-link {
+    min-width: 0 !important;
+}
+
+body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 38px !important;
+    margin: 0 !important;
 }
 
 body.mobile-template #content {
@@ -3272,9 +3309,101 @@ body.mobile-template #mini-player,
 body.mobile-template #mini-player-tracks,
 body.mobile-template #sidebar-footer {
     width: auto !important;
-    margin: 10px 14px 0 14px !important;
+    margin: 10px 12px 0 !important;
+    box-sizing: border-box !important;
     background: var(--bg) !important;
     border-color: var(--border) !important;
+}
+
+/* Current shared player structure: metadata occupies the centre, volume stays
+   on the playback row, and only close is pinned in the top-right corner. */
+#mini-player {
+    position: relative;
+}
+
+#mini-player-title {
+    padding-right: 16px;
+    box-sizing: border-box;
+}
+
+#mini-player-artist {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--subtle);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 10px;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#mini-player-row {
+    width: 100%;
+    min-width: 0;
+}
+
+#mini-player-seek {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+#mini-player-volume-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    gap: 0;
+}
+
+#mini-player-mute {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    color: var(--links) !important;
+    font-size: 13px;
+    line-height: 1;
+}
+
+#mini-player-volume {
+    position: absolute;
+    right: 16px;
+    bottom: 5px;
+}
+
+#mini-player-row.mini-player-volume-expanded #mini-player-volume-wrapper {
+    flex: 1 1 auto;
+    width: auto;
+    gap: 6px;
+}
+
+#mini-player-row.mini-player-volume-expanded #mini-player-volume {
+    position: static;
+    order: -1;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    opacity: 1;
+}
+
+#mini-player-controls {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 14px;
+    min-width: 14px;
+    padding: 0;
+}
+
+#mini-player-close {
+    color: var(--subtle) !important;
 }
 
 body.mobile-template #footer-buttons {
@@ -3293,6 +3422,10 @@ body.mobile-template #footer-buttons {
     }
 
     body.mobile-template #footer-buttons {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    body.mobile-template .mobile-nav-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 }

@@ -1,0 +1,58 @@
+/* Persistent sidebar music player and playlist. */
+body.your-theme-theme :is(#mini-player, #mini-player-tracks, #sidebar-footer),
+body.your-theme-theme.mobile-template :is(#mini-player, #mini-player-tracks, #sidebar-footer) {
+    background: var(--theme-panel) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+    border-radius: var(--theme-radius) !important;
+    box-shadow: none !important;
+}
+
+body.your-theme-theme :is(#mini-player-title-inner, #mini-player-artist, .mini-track) {
+    color: var(--theme-ink) !important;
+}
+
+body.your-theme-theme #mini-player-artist {
+    color: var(--theme-muted) !important;
+}
+
+body.your-theme-theme :is(#mini-player-play, #mini-player-mute, #mini-player-download) {
+    color: var(--theme-accent) !important;
+}
+
+body.your-theme-theme #mini-player-close {
+    background: transparent !important;
+    color: var(--theme-muted) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+body.your-theme-theme #mini-player-close:hover {
+    background: transparent !important;
+    color: var(--theme-danger) !important;
+}
+
+body.your-theme-theme :is(#mini-player-art-wrapper, #mini-player-art) {
+    background: var(--theme-input) !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.your-theme-theme :is(#mini-player-seek, #mini-player-volume) {
+    background: var(--theme-input) !important;
+    border-color: var(--theme-border) !important;
+    accent-color: var(--theme-accent) !important;
+}
+
+body.your-theme-theme .mini-track {
+    background: transparent !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.your-theme-theme .mini-track:hover,
+body.your-theme-theme .mini-track.active {
+    background: var(--theme-surface-raised) !important;
+    color: var(--theme-accent) !important;
+    border-color: var(--theme-accent) !important;
+}

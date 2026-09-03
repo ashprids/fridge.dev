@@ -1,0 +1,90 @@
+/*
+ * Design tokens
+ *
+ * Start here. The required shared variables are mapped from the more specific
+ * theme tokens below. Keeping component colours out of the other modules makes
+ * palette changes quick and consistent.
+ */
+:root,
+body.gruvbox-theme {
+    /* Required shared palette. */
+    --theme-canvas: #282828;
+    --theme-ink: #ebdbb2;
+    --theme-border: #665c54;
+    --theme-muted: #bdae93;
+    --theme-link: #8ec07c;
+    --theme-on-accent: #282828;
+
+    --bg: var(--theme-canvas);
+    --fg: var(--theme-ink);
+    --border: var(--theme-border);
+    --subtle: var(--theme-muted);
+    --links: var(--theme-link);
+    --chat-own-bg: var(--theme-accent);
+    --chat-own-fg: var(--theme-on-accent);
+
+    /* Surfaces, from furthest back to nearest to the reader. */
+    --theme-sidebar: #1d2021;
+    --theme-panel: #282828;
+    --theme-surface: #3c3836;
+    --theme-surface-raised: #504945;
+    --theme-input: #1d2021;
+    --theme-overlay: rgb(29 32 33 / 82%);
+    --theme-page-background:
+        linear-gradient(135deg, rgb(104 157 106 / 7%), rgb(177 98 134 / 6%)),
+        var(--theme-canvas);
+    --theme-paper-grain-opacity: 0.12;
+
+    /* Interactive and semantic colours. */
+    --theme-accent: #b8bb26;
+    --theme-accent-strong: #b16286;
+    --theme-danger: #fb4934;
+    --theme-success: #8ec07c;
+    --theme-warning: #fabd2f;
+    --theme-focus: #8ec07c;
+    --theme-disabled: #7c6f64;
+
+    /* Shape, spacing, depth, and type. */
+    --theme-font-body: "MainRegular", var(--emoji-font), sans-serif;
+    --theme-font-strong: "MainBold", var(--emoji-font), sans-serif;
+    --theme-radius-small: 0;
+    --theme-radius: 2px;
+    --theme-radius-large: 2px;
+    --theme-border-width: 1px;
+    --theme-space: 12px;
+    --theme-panel-padding: 24px;
+    --theme-sidebar-width: 280px;
+    --theme-content-width: 920px;
+    --theme-nav-prefix: ">> ";
+    --theme-nav-transform: uppercase;
+    --theme-shadow-small: 2px 2px 0 #1d2021;
+    --theme-shadow: 6px 6px 0 rgb(29 32 33 / 72%);
+    --theme-transition-duration: 140ms;
+    --theme-focus-width: 2px;
+
+    /* Decorative title and shared ASCII gradients. */
+    --theme-title-1: #b8bb26;
+    --theme-title-2: #83a598;
+    --theme-title-gradient: linear-gradient(90deg, #b8bb26 0%, #8ec07c 55%, #83a598 100%);
+    --hero-ascii-muted: #7c6f64;
+    --hero-ascii-1: #fb4934;
+    --hero-ascii-2: #fe8019;
+    --hero-ascii-3: #fabd2f;
+    --hero-ascii-4: #b8bb26;
+    --hero-ascii-5: #8ec07c;
+    --hero-ascii-6: #83a598;
+    --hero-ascii-7: #d3869b;
+    --hero-ascii-opacity: 1;
+    --resource-ascii: #b8bb26;
+    --resource-label: var(--theme-muted);
+    --time-ascii: #d3869b;
+    --time-label: var(--theme-muted);
+
+    /* Browser-level UI. */
+    --selection-bg: var(--theme-accent);
+    --selection-fg: var(--theme-on-accent);
+    --scrollbar-track: var(--theme-input);
+    --scrollbar-thumb: var(--theme-border);
+    --scrollbar-thumb-hover: var(--theme-accent);
+    --scrollbar-thumb-border: var(--theme-canvas);
+}

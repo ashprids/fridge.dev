@@ -1,7 +1,0 @@
-{
-  "name": "arcade",
-  "description": "neon cabinet colours with teal, blue, violet, and magenta",
-  "thumbnail": "thumbnails/arcade.svg",
-  "html": "arcade/arcade.html",
-  "css": "arcade/arcade.css"
-}

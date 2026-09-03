@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="gruvbox theme thumbnail">
+  <rect width="400" height="300" fill="#282828"/>
+  <rect width="400" height="300" fill="#282828"/>
+  <rect x="28" y="26" width="92" height="248" fill="#1d2021" stroke="#665c54" stroke-width="4"/>
+  <rect x="144" y="42" width="226" height="196" fill="#282828" stroke="#665c54" stroke-width="4"/>
+  <rect x="47" y="64" width="54" height="10" fill="#b8bb26"/><rect x="47" y="92" width="54" height="10" fill="#8ec07c"/><rect x="47" y="120" width="54" height="10" fill="#83a598"/>
+  <rect x="170" y="78" width="152" height="18" fill="#b8bb26"/><rect x="170" y="122" width="108" height="14" fill="#8ec07c"/><rect x="170" y="158" width="138" height="14" fill="#ebdbb2" opacity=".8"/>
+</svg>

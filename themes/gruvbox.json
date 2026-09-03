@@ -1,0 +1,8 @@
+{
+  "name": "gruvbox",
+  "description": "warm retro contrast inspired by the Gruvbox dark palette",
+  "thumbnail": "thumbnails/gruvbox.svg",
+  "html": "gruvbox/theme.html",
+  "css": "gruvbox/theme.css",
+  "base": "blackprint"
+}

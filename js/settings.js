@@ -11,7 +11,6 @@ const COLOR_PREFS_KEY = 'colorPrefs';
 const COLOR_FIELDS = ['bg', 'fg', 'border', 'subtle', 'links'];
 const THEME_COLOR_FIELDS = {
     classic: COLOR_FIELDS,
-    ambercrt: ['links'],
 };
 const COLOR_DEFAULTS = {
     bg: '#000000',
@@ -22,9 +21,6 @@ const COLOR_DEFAULTS = {
 };
 const THEME_COLOR_DEFAULTS = {
     classic: COLOR_DEFAULTS,
-    ambercrt: {
-        links: '#FFB84D',
-    },
 };
 const MOBILE_VIEW_COOKIE = 'mobile_friendly_view';
 const MOBILE_VIEW_DOMAIN = '.fridge.dev';
@@ -455,10 +451,7 @@ function normalizeTheme(theme) {
     const normalized = theme.trim().toLowerCase();
     if (normalized === '' || normalized === 'default') return 'default';
     if (normalized === 'blackprint') return 'default';
-    if (normalized === 'crt') return 'ambercrt';
-    if (normalized === 'liminal') return 'default';
     if (normalized === 'custom') return 'classic';
-    if (normalized === 'newsprint') return 'whiteprint';
     if (/^[a-z0-9_-]+$/.test(normalized)) return normalized;
     return 'default';
 }
@@ -1209,7 +1202,6 @@ function initSettingsPage() {
         const isLoggedIn = !!document.getElementById('user-greeting');
         const isToastSession = !!(toastSettingsSection && toastSettingsSection.dataset.toastSession === '1');
         let currentTheme = loadLocalThemePref();
-        let lastSavedTheme = currentTheme;
         let renderedTheme = currentTheme;
         let themeChangedByUser = false;
         let themeOptions = [];
@@ -1647,16 +1639,14 @@ function initSettingsPage() {
             colorSection.style.display = fields.length ? '' : 'none';
             const heading = colorSection.querySelector('h3');
             if (heading) {
-                heading.textContent = normalizedTheme === 'ambercrt' ? 'CRT phosphor' : 'color scheme';
+                heading.textContent = 'color scheme';
             }
             const allowed = new Set(fields);
             colorInputs.forEach(inp => {
                 const row = inp.closest('.color-row');
                 if (row) row.style.display = allowed.has(inp.dataset.colorKey) ? '' : 'none';
                 const label = row ? row.querySelector('span') : null;
-                if (label && normalizedTheme === 'ambercrt' && inp.dataset.colorKey === 'links') {
-                    label.textContent = 'main';
-                } else if (label && inp.dataset.colorKey === 'links') {
+                if (label && inp.dataset.colorKey === 'links') {
                     label.textContent = 'links';
                 }
             });
@@ -1768,11 +1758,11 @@ function initSettingsPage() {
             return Promise.resolve();
         };
 
-        const resetColorsToDefault = () => {
+        const resetColorsToDefault = (opts = {}) => {
             const selectedTheme = getThemeSelection();
             const defaults = getThemeColorDefaults(selectedTheme);
             setColorInputs(defaults);
-            persistColors(defaults);
+            persistColors(defaults, opts);
         };
 
         const bindSitemapButton = () => {
@@ -2048,7 +2038,8 @@ function initSettingsPage() {
         const initial = stored || GLOW_DEFAULT_INTENSITY;
         glowToggle.checked = initial !== 'none';
 
-        // Load theme/color prefs: local first, then server if logged in
+        // Theme selection is browser-only; account settings may still supply
+        // Classic's separately configurable colour values.
         const initialTheme = currentTheme;
         setThemeSelection(initialTheme);
         const initialColors = Object.assign({}, getThemeColorDefaults(initialTheme), loadLocalColorPrefs() || {});
@@ -2076,7 +2067,6 @@ function initSettingsPage() {
                     setThemeSelection(currentTheme);
                     saveLocalThemePref(currentTheme);
                     applyThemeSelection(currentTheme);
-                    lastSavedTheme = currentTheme;
                     renderedTheme = currentTheme;
                 } else {
                     setThemeSelection(currentTheme);
@@ -2090,13 +2080,6 @@ function initSettingsPage() {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
             }).then(r => r.ok ? r.json() : null).then(data => {
                 if (!data || !data.ok || !data.settings) return;
-
-                currentTheme = normalizeTheme(data.settings.theme);
-                setThemeSelection(currentTheme);
-                saveLocalThemePref(currentTheme);
-                setThemeCookie(currentTheme);
-                lastSavedTheme = currentTheme;
-                renderedTheme = currentTheme;
 
                 if (data.settings.colors) {
                     const serverColors = {};
@@ -2175,6 +2158,9 @@ function initSettingsPage() {
                 saveLocalThemePref(currentTheme);
                 setThemeCookie(currentTheme);
                 applyThemeSelection(currentTheme);
+                if (currentTheme === 'classic') {
+                    resetColorsToDefault({ skipServer: true });
+                }
             });
         }
 
@@ -2304,7 +2290,6 @@ function initSettingsPage() {
             if (isLoggedIn && window.fetch) {
                 const params = new URLSearchParams();
                 params.append('glowIntensity', selected);
-                params.append('theme', selectedTheme);
                 params.append('reduceMotion', accessibilityPrefs.reduceMotion ? 'on' : 'off');
                 params.append('debugMode', accessibilityPrefs.debugMode ? 'on' : 'off');
                 params.append('onekoEnabled', onekoEnabled ? 'on' : 'off');
@@ -2345,7 +2330,6 @@ function initSettingsPage() {
                         body: params.toString(),
                     });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    lastSavedTheme = selectedTheme;
                     settingsDebugLog('account-backed settings synchronized');
                 } catch (error) {
                     settingsDebugLog(`account-backed settings sync failed: ${error.message || 'unknown error'}`);
@@ -2353,7 +2337,6 @@ function initSettingsPage() {
                 }
             } else {
                 /* local settings already applied */
-                lastSavedTheme = selectedTheme;
             }
 
             lastSavedMobileViewEnabled = mobileViewEnabled;

@@ -1,0 +1,132 @@
+/* Forms, buttons, dialogs, notifications, pickers, and pagination. */
+body.your-theme-theme :is(
+    input,
+    textarea,
+    select,
+    .text-input,
+    .dropdown,
+    .bbcode-dropdown,
+    #bbcode-textbox,
+    #search-box,
+    .theme-picker-button,
+    .theme-picker-option,
+    .site-popup-input
+) {
+    background: var(--theme-input) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+    border-radius: var(--theme-radius-small) !important;
+    box-shadow: none !important;
+}
+
+body.your-theme-theme :is(select, .dropdown, .bbcode-dropdown) option {
+    background: var(--theme-input);
+    color: var(--theme-ink);
+}
+
+body.your-theme-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dropdown):hover,
+body.your-theme-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dropdown):focus {
+    border-color: var(--theme-accent) !important;
+}
+
+body.your-theme-theme :is(
+    button,
+    #search-button,
+    #form-button,
+    #two-buttons,
+    .bbcode-btn,
+    input[type="submit"],
+    input[type="button"],
+    #settings-save,
+    #color-reset
+) {
+    background: var(--theme-surface-raised) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border: var(--theme-border-width) solid var(--theme-border) !important;
+    border-radius: var(--theme-radius-small) !important;
+    box-shadow: var(--theme-shadow-small) !important;
+    transition:
+        background-color var(--theme-transition-duration) ease,
+        border-color var(--theme-transition-duration) ease,
+        color var(--theme-transition-duration) ease;
+}
+
+body.your-theme-theme :is(
+    button,
+    #search-button,
+    #form-button,
+    #two-buttons,
+    .bbcode-btn,
+    input[type="submit"],
+    input[type="button"],
+    #settings-save,
+    #color-reset
+):is(:hover, :active) {
+    background: var(--theme-accent) !important;
+    color: var(--theme-on-accent) !important;
+    border-color: var(--theme-accent) !important;
+}
+
+body.your-theme-theme :is(.danger-button, .grid-delete-button, .guestbook-delete-btn, .chat-delete-button) {
+    background: var(--theme-danger) !important;
+    color: var(--theme-canvas) !important;
+    border-color: var(--theme-danger) !important;
+}
+
+body.your-theme-theme :is(
+    button:disabled,
+    input:disabled,
+    .disabled,
+    .form-button-disabled
+) {
+    background: var(--theme-surface) !important;
+    color: var(--theme-disabled) !important;
+    border-color: var(--theme-border) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+body.your-theme-theme :is(.checkbox, .radio) {
+    appearance: auto !important;
+    -webkit-appearance: auto !important;
+    accent-color: var(--theme-accent) !important;
+    background: initial !important;
+    border: initial !important;
+}
+
+body.your-theme-theme :is(.site-popup-overlay, .image-modal) {
+    background: var(--theme-overlay) !important;
+}
+
+body.your-theme-theme :is(
+    .site-popup-dialog,
+    .site-notification-toast,
+    .site-notice-banner,
+    .tooltip,
+    .chat-context-menu,
+    #spa-loading
+) {
+    background: var(--theme-surface-raised) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-accent) !important;
+    border-radius: var(--theme-radius) !important;
+    box-shadow: var(--theme-shadow) !important;
+}
+
+body.your-theme-theme .content-pagination .guestbook-page-btn {
+    background: var(--theme-surface) !important;
+    color: var(--theme-ink) !important;
+    border: var(--theme-border-width) solid var(--theme-border) !important;
+    border-radius: var(--theme-radius-small) !important;
+    box-shadow: none !important;
+}
+
+body.your-theme-theme .content-pagination a.guestbook-page-btn:hover,
+body.your-theme-theme .content-pagination .guestbook-page-btn.current {
+    background: var(--theme-accent) !important;
+    color: var(--theme-on-accent) !important;
+    border-color: var(--theme-accent) !important;
+}

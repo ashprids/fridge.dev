@@ -1,7 +1,0 @@
-{
-  "name": "occult",
-  "description": "sigil-lit dark panels with purple and candle-gold accents",
-  "thumbnail": "thumbnails/occult.svg",
-  "html": "occult/occult.html",
-  "css": "occult/occult.css"
-}

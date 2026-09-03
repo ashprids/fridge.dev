@@ -168,7 +168,6 @@ Example:
       "discordUserId": "",
       "allowedPages": ["feed", "journal", "comments", "chat"],
       "bookmarks": [],
-      "theme": "default",
       "glowIntensity": "medium",
       "colors": {
         "bg": "#000000",

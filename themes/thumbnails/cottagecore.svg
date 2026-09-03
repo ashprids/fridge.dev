@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="cottagecore theme thumbnail">
-  <rect width="400" height="300" fill="#f6ead0"/>
-  <circle cx="348" cy="44" r="80" fill="#d98b80" opacity=".5"/><circle cx="54" cy="260" r="92" fill="#8a9f72" opacity=".42"/>
-  <rect x="30" y="28" width="96" height="240" fill="#fff6dd" stroke="#8d6d43" stroke-width="4" stroke-dasharray="8 5"/>
-  <rect x="154" y="54" width="212" height="164" fill="#fffaf0" stroke="#8d6d43" stroke-width="4"/>
-  <path d="M50 80h54M50 112h54M50 144h54" stroke="#8a9f72" stroke-width="10"/>
-</svg>

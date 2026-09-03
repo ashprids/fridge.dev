@@ -1,0 +1,88 @@
+/*
+ * Design tokens
+ *
+ * Start here. The required shared variables are mapped from the more specific
+ * theme tokens below. Keeping component colours out of the other modules makes
+ * palette changes quick and consistent.
+ */
+:root,
+body.your-theme-theme {
+    /* Required shared palette. */
+    --theme-canvas: #10151b;
+    --theme-ink: #edf4f5;
+    --theme-border: #55727a;
+    --theme-muted: #9bafb3;
+    --theme-link: #7dd3c7;
+    --theme-on-accent: #071312;
+
+    --bg: var(--theme-canvas);
+    --fg: var(--theme-ink);
+    --border: var(--theme-border);
+    --subtle: var(--theme-muted);
+    --links: var(--theme-link);
+    --chat-own-bg: var(--theme-accent);
+    --chat-own-fg: var(--theme-on-accent);
+
+    /* Surfaces, from furthest back to nearest to the reader. */
+    --theme-sidebar: #141c23;
+    --theme-panel: #19242c;
+    --theme-surface: #202e37;
+    --theme-surface-raised: #273842;
+    --theme-input: #0d1419;
+    --theme-overlay: rgb(4 10 13 / 76%);
+    --theme-page-background: var(--theme-canvas);
+    --theme-paper-grain-opacity: 0.16;
+
+    /* Interactive and semantic colours. */
+    --theme-accent: #7dd3c7;
+    --theme-accent-strong: #a491c7;
+    --theme-danger: #e38b91;
+    --theme-success: #8ed1a5;
+    --theme-warning: #e1bd78;
+    --theme-focus: #bffbf2;
+    --theme-disabled: #637177;
+
+    /* Shape, spacing, depth, and type. */
+    --theme-font-body: "MainRegular", var(--emoji-font), sans-serif;
+    --theme-font-strong: "MainBold", var(--emoji-font), sans-serif;
+    --theme-radius-small: 4px;
+    --theme-radius: 8px;
+    --theme-radius-large: 12px;
+    --theme-border-width: 1px;
+    --theme-space: 12px;
+    --theme-panel-padding: 24px;
+    --theme-sidebar-width: 280px;
+    --theme-content-width: 920px;
+    --theme-nav-prefix: ">> ";
+    --theme-nav-transform: uppercase;
+    --theme-shadow-small: 0 2px 0 rgb(0 0 0 / 24%);
+    --theme-shadow: 0 10px 28px rgb(0 0 0 / 25%);
+    --theme-transition-duration: 140ms;
+    --theme-focus-width: 2px;
+
+    /* Decorative title and shared ASCII gradients. */
+    --theme-title-1: #a491c7;
+    --theme-title-2: #7dd3c7;
+    --theme-title-gradient: linear-gradient(90deg, var(--theme-title-1), var(--theme-title-2));
+    --hero-ascii-muted: #60747a;
+    --hero-ascii-1: #a491c7;
+    --hero-ascii-2: #9b9dcc;
+    --hero-ascii-3: #91a9ce;
+    --hero-ascii-4: #87b6cd;
+    --hero-ascii-5: #7dc2c9;
+    --hero-ascii-6: #73ccc2;
+    --hero-ascii-7: #8ed1a5;
+    --hero-ascii-opacity: 1;
+    --resource-ascii: var(--theme-link);
+    --resource-label: var(--theme-muted);
+    --time-ascii: var(--theme-accent-strong);
+    --time-label: var(--theme-muted);
+
+    /* Browser-level UI. */
+    --selection-bg: var(--theme-accent);
+    --selection-fg: var(--theme-on-accent);
+    --scrollbar-track: var(--theme-input);
+    --scrollbar-thumb: var(--theme-border);
+    --scrollbar-thumb-hover: var(--theme-accent);
+    --scrollbar-thumb-border: var(--theme-canvas);
+}

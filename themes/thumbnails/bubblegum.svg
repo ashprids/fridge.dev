@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="bubblegum theme thumbnail">
-  <rect width="400" height="300" fill="#fbf4fb"/>
-  <circle cx="72" cy="58" r="64" fill="#f1c7dc"/><circle cx="334" cy="78" r="78" fill="#bce5e1"/><circle cx="292" cy="250" r="90" fill="#d9c6ed"/>
-  <rect x="32" y="36" width="92" height="228" fill="#fffaff" stroke="#b99fd0" stroke-width="4"/>
-  <rect x="150" y="56" width="216" height="162" fill="#fffaff" stroke="#70aaa8" stroke-width="4"/>
-  <rect x="50" y="78" width="54" height="12" fill="#70aaa8"/><rect x="50" y="110" width="54" height="12" fill="#b99fd0"/>
-</svg>

@@ -1,34 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="aero theme thumbnail">
-  <rect width="400" height="300" fill="#07141f"/>
-  <path d="M0 0h400v300H0z" fill="url(#bg)"/>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#10294a"/>
-      <stop offset=".46" stop-color="#0b5870"/>
-      <stop offset="1" stop-color="#06151d"/>
-    </linearGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#ffffff" stop-opacity=".32"/>
-      <stop offset=".44" stop-color="#58c8e2" stop-opacity=".26"/>
-      <stop offset="1" stop-color="#061b27" stop-opacity=".76"/>
-    </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-      <stop stop-color="#776490"/>
-      <stop offset=".55" stop-color="#58c8e2"/>
-      <stop offset="1" stop-color="#82f0d8"/>
-    </linearGradient>
-  </defs>
-  <ellipse cx="98" cy="22" rx="120" ry="58" fill="#ffffff" opacity=".14"/>
-  <ellipse cx="330" cy="250" rx="145" ry="74" fill="#82f0d8" opacity=".16"/>
-  <rect x="26" y="24" width="102" height="252" rx="10" fill="url(#glass)" stroke="#a3efff" stroke-opacity=".58" stroke-width="3"/>
-  <rect x="150" y="42" width="220" height="184" rx="12" fill="url(#glass)" stroke="#a3efff" stroke-opacity=".58" stroke-width="3"/>
-  <rect x="45" y="58" width="64" height="12" rx="4" fill="#edfaff"/>
-  <rect x="44" y="90" width="66" height="22" rx="7" fill="#12364c" stroke="#a3efff" stroke-opacity=".55"/>
-  <rect x="44" y="122" width="66" height="22" rx="7" fill="url(#accent)"/>
-  <rect x="44" y="154" width="66" height="22" rx="7" fill="#12364c" stroke="#a3efff" stroke-opacity=".55"/>
-  <rect x="184" y="76" width="130" height="17" rx="4" fill="#edfaff"/>
-  <rect x="184" y="116" width="148" height="12" rx="3" fill="#9dccd8"/>
-  <rect x="184" y="148" width="108" height="12" rx="3" fill="#82f0d8"/>
-  <rect x="184" y="184" width="82" height="24" rx="8" fill="url(#accent)"/>
-  <path d="M164 52h192" stroke="#fff" stroke-opacity=".36" stroke-width="4"/>
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#75aabe"/><stop offset=".72" stop-color="#e8f1f3"/><stop offset=".73" stop-color="#9fbd89"/><stop offset="1" stop-color="#6f9b68"/></linearGradient><linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#c8dce3" stop-opacity=".88"/></linearGradient></defs>
+  <rect width="400" height="300" fill="url(#sky)"/><ellipse cx="68" cy="48" rx="46" ry="14" fill="#fff" opacity=".76"/><ellipse cx="314" cy="65" rx="60" ry="17" fill="#fff" opacity=".68"/>
+  <rect x="28" y="26" width="92" height="248" rx="12" fill="url(#glass)" stroke="#7899a7" stroke-width="3"/><rect x="144" y="42" width="226" height="196" rx="14" fill="#edf3f4" fill-opacity=".94" stroke="#7899a7" stroke-width="3"/>
+  <rect x="47" y="64" width="54" height="10" rx="5" fill="#648da0"/><rect x="47" y="92" width="54" height="10" rx="5" fill="#87a979"/><rect x="47" y="120" width="54" height="10" rx="5" fill="#648da0"/>
+  <rect x="170" y="78" width="152" height="18" rx="8" fill="#648da0"/><rect x="170" y="122" width="108" height="14" rx="7" fill="#87a979"/><rect x="170" y="158" width="138" height="14" rx="7" fill="#7899a7"/>
 </svg>

@@ -1,7 +1,8 @@
 {
   "name": "aero",
-  "description": "blackprint structure under polished blue Aero glass",
+  "description": "a bright Frutiger Aero world of glass, blue skies, and green hills",
   "thumbnail": "thumbnails/aero.svg",
   "html": "aero/aero.html",
-  "css": "aero/aero.css"
+  "css": "aero/aero.css",
+  "base": "blackprint"
 }

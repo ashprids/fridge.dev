@@ -1,0 +1,8 @@
+{
+  "name": "base16",
+  "description": "Base16 Default Dark with strictly flat, textureless components",
+  "thumbnail": "thumbnails/base16.svg",
+  "html": "whiteprint/whiteprint.html",
+  "css": "base16/base16.css",
+  "base": "blackprint"
+}

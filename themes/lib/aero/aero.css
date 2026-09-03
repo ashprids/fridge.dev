@@ -1,524 +1,913 @@
 @font-face {
-    font-family: "AeroTahoma";
-    src: url("/themes/lib/aero/tahoma.ttf") format("truetype");
-    font-weight: 400;
+    font-family: "Aero Tahoma";
+    src: url('/themes/lib/aero/tahoma.ttf') format('truetype');
     font-style: normal;
+    font-weight: normal;
     font-display: swap;
 }
 
-:root {
-    --bg: #07141f;
-    --fg: #edfaff;
-    --border: #58c8e2;
-    --subtle: #9dccd8;
-    --links: #82f0d8;
-    --chat-own-fg: #052b35;
-    --hero-ascii-muted: #7faab7;
-    --hero-ascii-1: #776490;
-    --hero-ascii-2: #7c7ba3;
-    --hero-ascii-3: #7795b4;
-    --hero-ascii-4: #70adbf;
-    --hero-ascii-5: #69c7c5;
-    --hero-ascii-6: #73dfca;
-    --hero-ascii-7: #82f0d8;
-    --hero-ascii-opacity: 0.96;
-    --aero-glass: rgba(10, 30, 42, 0.66);
-    --aero-glass-strong: rgba(8, 24, 34, 0.82);
-    --aero-shine: rgba(237, 250, 255, 0.24);
-    --aero-blue: #58c8e2;
-    --aero-teal: #82f0d8;
-    --aero-purple: #776490;
+:root,
+body.aero-theme {
+    --bg: #dff4ff;
+    --fg: #18354a;
+    --border: #4d91c7;
+    --subtle: #52758a;
+    --links: #0876be;
+    --chat-own-bg: #1688d0;
+    --chat-own-fg: #ffffff;
+    --hero-ascii-muted: #78afd2;
+    --hero-ascii-1: #126fc0;
+    --hero-ascii-2: #0789cf;
+    --hero-ascii-3: #00a8dc;
+    --hero-ascii-4: #29baba;
+    --hero-ascii-5: #58bd7c;
+    --hero-ascii-6: #78bd48;
+    --hero-ascii-7: #a3ce42;
+    --selection-bg: #168bd1;
+    --selection-fg: #ffffff;
+    --scrollbar-track: #d6effb;
+    --scrollbar-thumb: #65acd5;
+    --scrollbar-thumb-hover: #2c8dc8;
+    --scrollbar-thumb-border: #eefaff;
 }
 
-body {
-    background:
-        radial-gradient(ellipse at 22% 4%, rgba(150, 236, 255, 0.34), transparent 34%),
-        radial-gradient(ellipse at 86% 84%, rgba(130, 240, 216, 0.2), transparent 32%),
-        linear-gradient(135deg, rgba(119, 100, 144, 0.18), rgba(88, 200, 226, 0.1)),
-        linear-gradient(180deg, #081524 0%, #0b2f43 46%, #082b36 68%, #06151d 100%);
-    background-attachment: fixed;
-    color: var(--fg);
-    font-family: "AeroTahoma", Tahoma, "MainRegular", var(--emoji-font), sans-serif;
+body.aero-theme,
+body.aero-theme :is(
+    #subtitle,
+    #tab,
+    #footer-text,
+    #footer-button,
+    #user-greeting,
+    #content-main,
+    #content-footer,
+    h1, h2, h3, h4, h5, h6,
+    p, li, label, summary, legend,
+    input, textarea, select, button,
+    .text-input,
+    .dropdown,
+    .bbcode-dropdown,
+    .bbcode-btn,
+    .grid-caption,
+    .grid-subcaption,
+    .mini-track,
+    .tooltip,
+    .site-notification-toast,
+    .site-popup-dialog
+) {
+    font-family: "Aero Tahoma", Tahoma, Verdana, var(--emoji-font), sans-serif !important;
 }
 
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -3;
-    pointer-events: none;
-    background:
-        linear-gradient(110deg, transparent 0 17%, rgba(255, 255, 255, 0.16) 17% 19%, transparent 19% 100%),
-        linear-gradient(152deg, transparent 0 68%, rgba(130, 240, 216, 0.12) 68% 70%, transparent 70% 100%),
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 28px);
+body.aero-theme :is(#ascii, #ascii-time, .usage-ascii, .ascii-scale-inner) {
+    font-family: "IBM_VGA", var(--emoji-font), monospace !important;
 }
 
-.aero-sky,
-.aero-waterline {
-    position: fixed;
-    left: 0;
-    right: 0;
-    pointer-events: none;
+body.aero-theme :is(pre, code, pre *, code *) {
+    font-family: "MainRegular", var(--emoji-font), monospace !important;
 }
 
-.aero-sky {
-    top: 0;
-    height: 44vh;
-    z-index: -2;
-    background:
-        linear-gradient(180deg, rgba(186, 246, 255, 0.24), transparent 62%),
-        radial-gradient(ellipse at 42% 0%, rgba(255, 255, 255, 0.22), transparent 46%);
-}
-
-.aero-waterline {
-    bottom: 0;
-    height: 36vh;
-    z-index: -1;
-    background:
-        linear-gradient(180deg, transparent 0%, rgba(130, 240, 216, 0.16) 28%, rgba(10, 56, 58, 0.26) 100%),
-        repeating-radial-gradient(ellipse at 50% 100%, rgba(160, 255, 242, 0.16) 0 2px, transparent 3px 18px);
-    opacity: 0.88;
-}
-
-#page-wrapper,
-#container {
-    background: transparent;
-}
-
-#sidebar {
-    width: 282px;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 22%),
-        linear-gradient(180deg, rgba(18, 68, 89, 0.7), rgba(4, 22, 31, 0.82)),
-        var(--aero-glass);
-    border-right: 1px solid rgba(163, 239, 255, 0.48);
-    box-shadow:
-        inset -1px 0 0 rgba(255, 255, 255, 0.18),
-        12px 0 36px rgba(0, 8, 18, 0.34);
-    backdrop-filter: blur(18px) saturate(1.35);
-}
-
-#header {
-    position: relative;
-    margin: 12px;
-    padding: 14px 12px 16px;
-    text-align: center;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 42%),
-        linear-gradient(135deg, rgba(119, 100, 144, 0.32), rgba(88, 200, 226, 0.26)),
-        rgba(8, 34, 48, 0.72);
-    border: 1px solid rgba(178, 244, 255, 0.46);
-    border-radius: 8px;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.26),
-        0 10px 24px rgba(0, 8, 18, 0.24);
-}
-
-#title,
-.mobile-collapsed-title {
-    background-image: linear-gradient(0deg, #dffbff, #82f0d8 48%, #776490);
-    background-clip: text;
-    -webkit-background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-    font-family: "MainBold", "AeroTahoma", Tahoma, var(--emoji-font), sans-serif;
-    text-shadow: none;
-}
-
-#subtitle,
-#footer-text,
-#user-greeting,
-#content-footer,
-#post-date,
-#post-date-feed,
-#post-description,
-#post-username,
-.usage-label {
-    color: var(--subtle);
-}
-
-a,
-#hide-sidebar,
-#show-sidebar {
-    color: var(--links);
-}
-
-#sidebar > a {
-    display: block;
-    margin: 0 12px 8px;
-}
-
-#tab,
-#footer-button,
-.theme-picker-button,
-.theme-picker-option {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 42%),
-        linear-gradient(90deg, rgba(119, 100, 144, 0.22), rgba(88, 200, 226, 0.18)),
-        rgba(7, 36, 51, 0.66) !important;
-    border: 1px solid rgba(163, 239, 255, 0.48) !important;
-    border-radius: 8px !important;
+body.aero-theme,
+body.aero-theme.mobile-template {
+    background: #78bde0 !important;
     color: var(--fg) !important;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.24),
-        0 5px 14px rgba(0, 8, 18, 0.2) !important;
+    isolation: isolate;
 }
 
-#tab::before {
-    content: ">> ";
-    color: var(--links);
+body.aero-theme .paper-grain {
+    opacity: 1;
+    inset: -12px;
+    z-index: -1;
+    background: url('/themes/lib/aero/background.jpg') center / cover no-repeat fixed;
+    filter: blur(6px) saturate(1.08);
+    transform: scale(1.02);
 }
 
-#tab:hover,
-#tab.active,
-#footer-button:hover,
-#footer-button.active,
-.theme-picker-option:hover,
-.theme-picker-option.selected {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08) 44%),
-        linear-gradient(90deg, #776490, #58c8e2 54%, #82f0d8) !important;
-    border-color: rgba(224, 255, 255, 0.82) !important;
-    color: #031923 !important;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.48),
-        0 8px 18px rgba(88, 200, 226, 0.26) !important;
-    transform: translateY(-1px);
+body.aero-theme #page-wrapper,
+body.aero-theme #container { background: transparent !important; }
+
+body.aero-theme #sidebar,
+body.aero-theme.mobile-template #sidebar {
+    background: linear-gradient(180deg, rgba(238,250,255,.9), rgba(177,224,244,.82)) !important;
+    border: 1px solid rgba(255,255,255,.9) !important;
+    border-right-color: #438cb9 !important;
+    box-shadow: inset -1px 0 rgba(255,255,255,.65), 6px 0 20px rgba(17,74,112,.25) !important;
+    backdrop-filter: blur(14px) saturate(1.25);
 }
 
-#tab:hover::before,
-#tab.active::before {
-    color: #031923;
+body.aero-theme #header {
+    margin: 10px !important;
+    padding: 13px 10px !important;
+    border: 1px solid #4c98c9 !important;
+    border-radius: 12px !important;
+    background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(120,202,240,.58)) !important;
+    box-shadow: inset 0 1px #fff, 0 2px 5px rgba(30,91,126,.18) !important;
 }
 
-#content {
-    padding: 34px;
+body.aero-theme #title,
+body.aero-theme #title .title-letter,
+body.aero-theme .mobile-collapsed-title,
+body.aero-theme .mobile-collapsed-title .title-letter {
+    background-image: linear-gradient(0deg, #0879c4, #21a6dc 44%, #74c546 48%, #1483cc 55%, #0879c4) !important;
+    filter: drop-shadow(0 1px rgba(255,255,255,.9));
 }
 
-#content-layout {
-    max-width: 940px;
-    min-height: calc(100% - 2px);
-    padding: 24px 30px;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 28%),
-        linear-gradient(145deg, rgba(119, 100, 144, 0.13), rgba(88, 200, 226, 0.1)),
-        rgba(6, 27, 39, 0.7);
-    border: 1px solid rgba(163, 239, 255, 0.48);
-    border-radius: 10px;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.24),
-        0 18px 46px rgba(0, 8, 18, 0.34);
-    backdrop-filter: blur(18px) saturate(1.32);
+body.aero-theme #sidebar > a { margin-left: 10px; margin-right: 10px; }
+
+body.aero-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button, #show-sidebar) {
+    background: linear-gradient(180deg, #ffffff 0%, #dff4fd 47%, #acd8ee 50%, #d9f1fb 100%) !important;
+    color: #174967 !important;
+    border: 1px solid #4a94c2 !important;
+    border-radius: 7px !important;
+    box-shadow: inset 0 1px #fff, 0 1px 2px rgba(24,77,108,.2) !important;
+    text-shadow: 0 1px #fff;
 }
 
-#content-main > *:first-child {
-    margin-top: 0;
+body.aero-theme #tab {
+    text-transform: lowercase !important;
 }
 
-#post,
-.account-admin-card,
-.usage-card,
-.form-card,
-.grid-item,
-pre code.hljs,
-#mini-player,
-#mini-player-tracks,
-#sidebar-footer,
-.site-popup-dialog,
-#bbcode-preview {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 34%),
-        rgba(8, 31, 44, 0.72);
-    color: var(--fg);
-    border: 1px solid rgba(163, 239, 255, 0.42);
-    border-radius: 8px;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.18),
-        0 10px 24px rgba(0, 8, 18, 0.24);
-    backdrop-filter: blur(12px) saturate(1.2);
+body.aero-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button, #show-sidebar):hover,
+body.aero-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button).active {
+    background: linear-gradient(180deg, #fbfff2, #cbed9e 48%, #79c641 51%, #b9e687) !important;
+    color: #174d20 !important;
+    border-color: #4d9c35 !important;
+    box-shadow: inset 0 1px #fff, 0 0 7px rgba(96,190,57,.55) !important;
 }
 
-#post {
-    padding: 14px 16px;
+body.aero-theme #tab::before {
+    content: none !important;
 }
 
-#post:hover,
-.account-admin-card:hover,
-.usage-card:hover {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 34%),
-        rgba(12, 44, 60, 0.78);
+body.aero-theme #footer-button::before { color: #1d8dcc !important; }
+
+body.aero-theme #content-layout,
+body.aero-theme.mobile-template #content-layout,
+body.aero-theme.mobile-template #content-main {
+    background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(226,246,255,.9)) !important;
+    color: var(--fg) !important;
+    border: 1px solid rgba(255,255,255,.95) !important;
+    border-radius: 16px !important;
+    outline: 1px solid #4b98c9;
+    box-shadow: inset 0 1px rgba(255,255,255,.95), 0 10px 30px rgba(17,70,105,.28) !important;
+    backdrop-filter: blur(12px) saturate(1.15);
 }
 
-#post-content,
-#post-title,
-.form-card,
-.form-card p,
-.form-field label,
-.checkbox-label span,
-.radio-label span,
-.color-row,
-.color-row span,
-.feed-reply-body,
-.feed-reply-meta,
-.guestbook-post-actions,
-#content-main,
-#content-main h1,
-#content-main h2,
-#content-main h3,
-#content-main h4,
-#content-main p,
-#content-main li {
-    color: var(--fg);
+body.aero-theme :is(#post, .feed-post, .journal-post, .form-card, .grid-item, .notification-item, .music-album, .gallery-item, .chat-admin-card, .account-admin-card, .site-popup-dialog, .image-modal-content, .feed-reply-notice, .bbcode-editor, #bbcode-preview, table, details, .settings-section) {
+    background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(211,239,250,.86)) !important;
+    background-image: linear-gradient(180deg, rgba(255,255,255,.94), rgba(211,239,250,.86)) !important;
+    color: var(--fg) !important;
+    border: 1px solid #69a9ce !important;
+    border-radius: 10px !important;
+    box-shadow: inset 0 1px #fff, 0 3px 8px rgba(27,86,119,.14) !important;
 }
 
-input,
-textarea,
-.dropdown,
-.text-input,
-.bbcode-dropdown,
-.bbcode-btn,
-#bbcode-textbox,
-.color-input {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(0, 0, 0, 0.08)),
-        rgba(3, 20, 30, 0.8);
-    color: var(--fg);
-    border: 1px solid rgba(163, 239, 255, 0.44);
-    border-radius: 7px;
+body.aero-theme :is(#post, .feed-post, .journal-post, .grid-item, .music-album, .gallery-item, .account-admin-card):hover {
+    background: linear-gradient(180deg, #fff, #d8f3ff) !important;
+    border-color: #268ac4 !important;
 }
 
-input:hover,
-input:focus,
-textarea:hover,
-textarea:focus,
-.dropdown:hover,
-.dropdown:focus,
-.text-input:hover,
-.text-input:focus,
-.bbcode-dropdown:hover,
-.bbcode-dropdown:focus,
-.bbcode-btn:hover,
-.bbcode-btn:focus,
-#bbcode-textbox:focus {
-    border-color: rgba(130, 240, 216, 0.88);
-    box-shadow: 0 0 0 2px rgba(130, 240, 216, 0.16);
+body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dropdown, #bbcode-textbox, #search-box) {
+    background: linear-gradient(180deg, #fff, #effaff) !important;
+    color: #17384c !important;
+    border: 1px solid #5d9fc7 !important;
+    border-radius: 6px !important;
+    box-shadow: inset 0 1px 3px rgba(30,84,116,.14) !important;
+}
+
+body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dropdown, #bbcode-textbox, #search-box):focus {
+    background: #fff !important;
+    border-color: #158ed1 !important;
+    box-shadow: 0 0 0 3px rgba(22,142,209,.22), inset 0 1px 2px rgba(30,84,116,.1) !important;
     outline: none;
 }
 
-button,
-#search-button,
-#form-button,
-#lastfm-link-button,
-#settings-save,
-#color-reset,
-.danger-button,
-.site-popup-button {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.04) 45%),
-        linear-gradient(90deg, #776490, #58c8e2 58%, #82f0d8);
-    color: #031923;
-    border: 1px solid rgba(224, 255, 255, 0.74);
-    border-radius: 8px;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.46),
-        0 8px 18px rgba(0, 8, 18, 0.24);
+body.aero-theme :is(select, .dropdown, .bbcode-dropdown) option { background: #effaff; color: var(--fg); }
+
+body.aero-theme :is(button, #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
+    background: linear-gradient(180deg, #fbfff7, #d9f2bb 48%, #79c445 51%, #a9db77) !important;
+    color: #174c21 !important;
+    border: 1px solid #4c9538 !important;
+    border-radius: 7px !important;
+    box-shadow: inset 0 1px #fff, 0 1px 3px rgba(38,100,33,.22) !important;
+    text-shadow: 0 1px rgba(255,255,255,.8);
 }
 
-button:hover,
-#search-button:hover,
-#form-button:hover,
-#lastfm-link-button:hover,
-#settings-save:hover,
-#color-reset:hover,
-.site-popup-button:hover {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.08) 44%),
-        linear-gradient(90deg, #8b73a8, #6fd8ef 58%, #a1ffe9);
-    color: #031923;
+body.aero-theme :is(button, #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
+    background: linear-gradient(180deg, #fff, #eaffd3 48%, #8ed458 51%, #c5ed9d) !important;
+    color: #103d18 !important;
 }
 
-.danger-button {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04)),
-        #8c2d3d;
-    color: #fff7f7;
+body.aero-theme :is(.danger-button, .grid-delete-button, #admin-account-delete-form button) {
+    background: linear-gradient(180deg, #ffeded, #f09595 48%, #d84e4e 51%, #ed7777) !important;
+    color: #641313 !important;
+    border-color: #ba4141 !important;
 }
 
-.checkbox,
-.radio {
-    background: rgba(3, 20, 30, 0.82);
-    border: 1px solid rgba(163, 239, 255, 0.44);
+body.aero-theme #search {
+    padding: 7px;
+    border: 1px solid #79b5d5;
+    border-radius: 10px;
+    background: rgba(189,229,247,.62) !important;
 }
 
-.checkbox:checked {
-    background-color: var(--links);
-}
-
-.radio {
-    border-radius: 50%;
-}
-
-.radio:checked {
-    background: radial-gradient(circle, var(--links) 0 42%, rgba(3, 20, 30, 0.82) 46%);
-}
-
-input[type="range"] {
-    accent-color: var(--links);
-}
-
-#mini-player,
-#mini-player-tracks {
-    color: var(--fg);
-}
-
-#mini-player-art-wrapper,
-#mini-player-art {
-    border-radius: 6px;
-    background: rgba(3, 20, 30, 0.88);
-    border-color: rgba(163, 239, 255, 0.36);
-}
-
-#mini-player-download,
-#mini-player-play,
-#mini-player-controls span {
-    color: var(--links);
-}
-
-#mini-player-download:hover,
-#mini-player-play:hover,
-#mini-player-controls span:hover,
-.mini-track:hover,
-.mini-track.active {
-    background: rgba(130, 240, 216, 0.18);
-    color: var(--fg);
-}
-
-#mini-player-title-inner,
-.mini-track {
-    color: var(--fg);
-}
-
-.tooltip {
-    background: rgba(4, 25, 36, 0.94);
-    color: var(--fg);
-    border-color: rgba(163, 239, 255, 0.48);
-    box-shadow: 0 10px 24px rgba(0, 8, 18, 0.38);
-}
-
-.theme-picker-menu {
-    background: rgba(5, 24, 35, 0.95);
-    border-color: rgba(163, 239, 255, 0.48);
-}
-
-.theme-picker-description,
-.theme-picker-option-description {
-    color: var(--subtle);
-}
-
-.theme-picker-option:hover .theme-picker-option-title,
-.theme-picker-option:hover .theme-picker-option-description,
-.theme-picker-option.selected .theme-picker-option-title,
-.theme-picker-option.selected .theme-picker-option-description {
-    color: #031923 !important;
-}
-
-.chat-view {
-    --chat-bg: rgba(7, 28, 40, 0.72);
-    --chat-fg: #edfaff;
-    --chat-border: rgba(163, 239, 255, 0.42);
-    --chat-muted: #9dccd8;
-    --chat-own-bg: #82f0d8;
-    --chat-own-fg: #052b35;
-    --chat-other-bg: rgba(28, 65, 80, 0.84);
-    --chat-other-fg: #edfaff;
-}
-
-
-body.mobile-template {
-    background:
-        radial-gradient(ellipse at 22% 4%, rgba(150, 236, 255, 0.32), transparent 34%),
-        radial-gradient(ellipse at 86% 84%, rgba(130, 240, 216, 0.18), transparent 32%),
-        linear-gradient(180deg, #081524 0%, #0b2f43 46%, #082b36 68%, #06151d 100%) !important;
+body.aero-theme :is(#mini-player, #mini-player-tracks, #sidebar-footer),
+body.aero-theme.mobile-template :is(#mini-player, #mini-player-tracks, #sidebar-footer) {
+    background: linear-gradient(180deg, rgba(255,255,255,.88), rgba(175,221,241,.88)) !important;
     color: var(--fg) !important;
+    border: 1px solid #5599c1 !important;
+    border-radius: 10px !important;
+    box-shadow: inset 0 1px #fff !important;
 }
 
-body.mobile-template #sidebar {
-    width: 100% !important;
-    min-width: 0 !important;
+body.aero-theme #mini-player-art-wrapper,
+body.aero-theme .grid-image { border-radius: 7px; overflow: hidden; }
+body.aero-theme :is(#mini-player-title-inner, .mini-track.active) { color: #0876be !important; }
+body.aero-theme .mini-track { background: rgba(255,255,255,.4) !important; border-radius: 5px !important; }
+body.aero-theme .mini-track:hover,
+body.aero-theme .mini-track.active { background: rgba(188,235,166,.75) !important; color: #20582b !important; }
+body.aero-theme #mini-player-close { background: transparent !important; border: 0 !important; box-shadow: none !important; color: #28698f !important; }
+body.aero-theme :is(#mini-player-seek, #mini-player-volume) { accent-color: #68bb3f; }
+
+body.aero-theme :is(pre, code, blockquote) { background: rgba(212,239,250,.7) !important; color: #17384c; border-color: #79afd0 !important; }
+body.aero-theme :is(#homepage-hero-ascii, #homepage-hero-ascii pre, #ascii, #ascii-time, #usage-grid, #usage-grid .usage-card, .usage-ascii, .usage-label) { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+body.aero-theme a { color: var(--links); }
+body.aero-theme .tooltip,
+body.aero-theme :is(.site-notification-toast, .chat-context-menu) { background: linear-gradient(180deg, #fff, #dff3fc) !important; color: var(--fg) !important; border-color: #4e98c4 !important; border-radius: 7px !important; }
+body.aero-theme :is(.site-popup-overlay, .image-modal, .mobile-menu-backdrop) { background: rgba(22,68,94,.5) !important; backdrop-filter: blur(4px); }
+body.aero-theme :is(.chat-message:not(.chat-message-own), .chat-reply-reference, .chat-reply-compose) { background: #e5f6fc !important; color: var(--fg) !important; border-color: #7eb5d2 !important; border-radius: 10px !important; }
+body.aero-theme .chat-message-own { background: linear-gradient(180deg, #30a3df, #1179bb) !important; color: #fff !important; }
+
+/* Aero editor: compact Windows 7 toolbar chrome above a clean writing pane. */
+body.aero-theme .bbcode-editor,
+body.aero-theme .feed-thread-page .bbcode-editor,
+body.aero-theme .feed-markdown-editor {
+    overflow: hidden;
+    background: rgba(226, 245, 253, .92) !important;
+    background-image: none !important;
+    border: 1px solid #438fbd !important;
+    border-radius: 11px !important;
+    box-shadow: inset 0 1px #fff, 0 4px 12px rgba(23, 79, 112, .18) !important;
+}
+
+body.aero-theme .bbcode-toolbar,
+body.aero-theme .feed-thread-page .bbcode-toolbar,
+body.aero-theme .feed-markdown-toolbar {
+    min-width: 0;
+    padding: 7px !important;
+    gap: 5px !important;
+    overflow: visible;
+    background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(180,224,244,.94)) !important;
+    background-image: linear-gradient(180deg, rgba(255,255,255,.98), rgba(180,224,244,.94)) !important;
+    border: 0 !important;
+    border-bottom: 1px solid #438fbd !important;
+    border-radius: 10px 10px 0 0 !important;
+    box-shadow: inset 0 1px #fff !important;
+}
+
+body.aero-theme .feed-markdown-formatting {
+    gap: 3px;
+    padding: 1px 2px 4px 1px;
+    scrollbar-color: #4f9dca transparent;
+}
+
+body.aero-theme .feed-markdown-actions {
+    gap: 3px;
+    margin-left: 2px;
+    padding-left: 7px;
+    border-left-color: rgba(55, 132, 176, .45);
+}
+
+body.aero-theme .bbcode-btn,
+body.aero-theme .feed-thread-page .bbcode-btn,
+body.aero-theme .feed-markdown-editor .bbcode-btn,
+body.aero-theme .journal-markdown-editor .bbcode-btn {
+    display: inline-flex;
+    width: 34px;
+    min-width: 34px;
+    height: 32px;
+    padding: 0 !important;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #fff 0%, #dff4fd 47%, #acd8ee 50%, #d9f1fb 100%) !important;
+    background-image: linear-gradient(180deg, #fff 0%, #dff4fd 47%, #acd8ee 50%, #d9f1fb 100%) !important;
+    color: #15597e !important;
+    border: 1px solid #4b94bf !important;
+    border-radius: 6px !important;
+    box-shadow: inset 0 1px #fff, 0 1px 2px rgba(24, 77, 108, .16) !important;
+    text-shadow: 0 1px #fff;
+}
+
+body.aero-theme .bbcode-btn:hover,
+body.aero-theme .bbcode-btn:focus-visible {
+    background: linear-gradient(180deg, #fff, #e7f8ff 47%, #8dcae8 50%, #c9ecfa) !important;
+    color: #064f78 !important;
+    border-color: #147db7 !important;
+    box-shadow: 0 0 0 2px rgba(22, 142, 209, .18), inset 0 1px #fff !important;
+    outline: none;
+}
+
+body.aero-theme .bbcode-btn:active,
+body.aero-theme .bbcode-btn[aria-pressed="true"] {
+    background: linear-gradient(180deg, #83bddb, #d9f1fb) !important;
+    box-shadow: inset 0 2px 3px rgba(28, 84, 116, .24) !important;
+    transform: none;
+}
+
+body.aero-theme .bbcode-btn:disabled,
+body.aero-theme .bbcode-btn.disabled {
+    opacity: .48;
+    filter: grayscale(.35);
+}
+
+body.aero-theme .bbcode-dropdown,
+body.aero-theme .feed-thread-page .bbcode-dropdown {
+    width: auto;
+    min-width: 72px;
+    height: 32px;
+    padding: 4px 24px 4px 8px !important;
+    background: linear-gradient(180deg, #fff, #d9eff9) !important;
+    color: #174967 !important;
+    border: 1px solid #4b94bf !important;
+    border-radius: 6px !important;
+    box-shadow: inset 0 1px #fff !important;
+}
+
+body.aero-theme #bbcode-textbox,
+body.aero-theme .feed-thread-page #bbcode-textbox,
+body.aero-theme .feed-markdown-editor #bbcode-textbox,
+body.aero-theme .markdown-highlight-layer,
+body.aero-theme #bbcode-preview,
+body.aero-theme .feed-markdown-preview {
+    margin: 0 !important;
+    background: rgba(250, 254, 255, .96) !important;
+    background-image: none !important;
+    color: #18384b !important;
+    border: 0 !important;
+    border-radius: 0 0 10px 10px !important;
+    box-shadow: inset 0 2px 4px rgba(32, 93, 127, .1) !important;
+    caret-color: #0876be;
+}
+
+body.aero-theme #bbcode-textbox::placeholder,
+body.aero-theme .markdown-highlight-input::placeholder {
+    color: #718d9d !important;
+    opacity: 1;
+}
+
+body.aero-theme #bbcode-textbox:focus {
+    background: #fff !important;
+    box-shadow: inset 0 0 0 2px rgba(22, 142, 209, .16) !important;
+    outline: none;
+}
+
+body.aero-theme .markdown-highlight-input {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 0 10px 10px !important;
+    box-shadow: none !important;
+}
+
+body.aero-theme .markdown-highlight-input:focus {
+    background: transparent !important;
+    outline: none;
+}
+
+body.aero-theme :is(.bbcode-voice-recorder, .chat-voice-recorder) {
+    background: linear-gradient(180deg, #f8fdff, #d8eff9) !important;
+    color: var(--fg) !important;
+    border: 0 !important;
+    border-top: 1px solid #6ca8c9 !important;
+}
+
+/* Compact Winamp-inspired player skin inside the bright Aero shell. */
+body.aero-theme #mini-player,
+body.aero-theme.mobile-template #mini-player {
+    position: relative;
+    padding: 22px 7px 7px !important;
+    background:
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px) 0 0 / 3px 3px,
+        linear-gradient(180deg, #3c4656, #1a202a) !important;
+    color: #d9e2e8 !important;
+    border: 2px solid !important;
+    border-color: #eef3f7 #111720 #111720 #eef3f7 !important;
+    border-radius: 2px !important;
+    box-shadow: inset 1px 1px #778393, inset -1px -1px #080b10 !important;
+    font-family: "Aero Tahoma", Tahoma, sans-serif !important;
+}
+
+body.aero-theme #mini-player::before {
+    content: "FRIDGEAMP";
+    position: absolute;
+    top: 4px;
+    left: 7px;
+    color: #f1f4f6;
+    font-family: "Aero Tahoma", Tahoma, sans-serif;
+    font-size: 9px;
+    font-weight: bold;
+    line-height: 12px;
+    letter-spacing: 1.3px;
+    text-shadow: 1px 1px #06090d;
+}
+
+body.aero-theme #mini-player::after {
+    content: "";
+    position: absolute;
+    top: 7px;
+    right: 27px;
+    left: 78px;
+    height: 3px;
+    border-top: 1px solid #8996a6;
+    border-bottom: 1px solid #10151d;
+}
+
+body.aero-theme #mini-player-main { gap: 6px !important; }
+
+body.aero-theme #mini-player-art-wrapper {
+    width: 42px !important;
+    height: 42px !important;
+    flex: 0 0 42px !important;
+    margin: 0 !important;
+    background: #050806 !important;
+    border: 2px solid !important;
+    border-color: #080b10 #778393 #778393 #080b10 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+body.aero-theme #mini-player-art { border-radius: 0 !important; }
+
+body.aero-theme #mini-player-download {
+    background: rgba(5, 8, 6, .78) !important;
+    color: #8eff54 !important;
+    border-radius: 0 !important;
+}
+
+body.aero-theme #mini-player-meta {
+    gap: 3px !important;
+    min-width: 0;
+}
+
+body.aero-theme #mini-player-title,
+body.aero-theme #mini-player-artist {
+    min-width: 0;
+    padding: 2px 5px !important;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #07100a !important;
+    border: 1px solid !important;
+    border-color: #050806 #5b6875 #5b6875 #050806 !important;
+    border-radius: 0 !important;
+    color: #8eff54 !important;
+    font-family: "Aero Tahoma", Tahoma, sans-serif !important;
+    font-size: 10px !important;
+    line-height: 13px !important;
+    text-shadow: 0 0 4px rgba(106,255,66,.5) !important;
+}
+
+body.aero-theme #mini-player-title-inner,
+body.aero-theme #mini-player-title-inner.scrolling,
+body.aero-theme #mini-player-artist {
+    color: #8eff54 !important;
+    font-family: inherit !important;
+}
+
+body.aero-theme #mini-player-artist { color: #5fcf42 !important; }
+body.aero-theme #mini-player-row { gap: 4px !important; align-items: center !important; }
+
+body.aero-theme :is(#mini-player-play, #mini-player-mute) {
+    display: inline-flex;
+    width: 20px !important;
+    min-width: 20px !important;
+    height: 18px !important;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, #d8dde1, #788493) !important;
+    color: #10161e !important;
+    border: 1px solid !important;
+    border-color: #f5f7f8 #303945 #303945 #f5f7f8 !important;
+    border-radius: 0 !important;
+    box-shadow: inset 1px 1px rgba(255,255,255,.45) !important;
+    font-size: 9px !important;
+    text-shadow: none !important;
+}
+
+body.aero-theme :is(#mini-player-play, #mini-player-mute):hover {
+    background: linear-gradient(180deg, #f0f3f5, #91a0b0) !important;
+    color: #005ba0 !important;
+}
+
+body.aero-theme :is(#mini-player-play, #mini-player-mute):active {
+    border-color: #303945 #f5f7f8 #f5f7f8 #303945 !important;
+    background: #768291 !important;
+}
+
+body.aero-theme #mini-player-volume-wrapper { gap: 3px !important; }
+
+body.aero-theme :is(#mini-player-seek, #mini-player-volume) {
+    height: 10px !important;
+    padding: 0 !important;
+    background: #080d13 !important;
+    border: 1px solid !important;
+    border-color: #05070a #66717d #66717d #05070a !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    accent-color: #168ed1;
+}
+
+body.aero-theme :is(#mini-player-seek, #mini-player-volume)::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(90deg, #0879c4, #61d8ff) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+}
+
+body.aero-theme :is(#mini-player-seek, #mini-player-volume)::-webkit-slider-thumb {
+    width: 7px !important;
+    height: 10px !important;
+    margin-top: -3px !important;
+    background: linear-gradient(90deg, #e2e6e9, #788492) !important;
+    border: 1px solid #222b35 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+body.aero-theme :is(#mini-player-seek, #mini-player-volume)::-moz-range-track {
+    height: 4px;
+    background: linear-gradient(90deg, #0879c4, #61d8ff) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+}
+
+body.aero-theme :is(#mini-player-seek, #mini-player-volume)::-moz-range-thumb {
+    width: 7px !important;
+    height: 10px !important;
+    background: linear-gradient(90deg, #e2e6e9, #788492) !important;
+    border: 1px solid #222b35 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+body.aero-theme #mini-player-close {
+    top: 3px !important;
+    right: 5px !important;
+    width: 15px !important;
+    height: 14px !important;
+    min-width: 15px !important;
+    background: linear-gradient(180deg, #d8dde1, #788493) !important;
+    color: #751414 !important;
+    border: 1px solid !important;
+    border-color: #f5f7f8 #303945 #303945 #f5f7f8 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-size: 9px !important;
+}
+
+body.aero-theme #mini-player-tracks,
+body.aero-theme.mobile-template #mini-player-tracks {
+    padding: 3px !important;
+    background: #080d13 !important;
+    background-image: none !important;
+    color: #8eff54 !important;
+    border: 2px solid !important;
+    border-color: #080b10 #75808e #75808e #080b10 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-family: "Aero Tahoma", Tahoma, sans-serif !important;
+}
+
+body.aero-theme .mini-track {
+    padding: 4px 5px !important;
+    background: #080d13 !important;
+    color: #76df4e !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    font-family: inherit !important;
+    font-size: 10px !important;
+}
+
+body.aero-theme .mini-track:hover,
+body.aero-theme .mini-track.active {
+    background: #1d4f78 !important;
+    color: #fff !important;
+}
+
+body.aero-theme.mobile-template :is(.mobile-collapsed-header, #show-sidebar) {
+    background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(158,216,242,.92)) !important;
+    color: #155779 !important;
+    border-color: #408dbb !important;
+}
+body.aero-theme.mobile-template #sidebar {
+    width: calc(100% - 16px) !important;
     max-width: none !important;
-    height: auto !important;
-    min-height: 0 !important;
+    min-width: 0 !important;
     box-sizing: border-box !important;
 }
+body.aero-theme.mobile-template #content { background: transparent !important; color: var(--fg) !important; }
 
-body.mobile-template #sidebar,
-body.mobile-template .mobile-collapsed-header,
-body.mobile-template #content-layout,
-body.mobile-template #content-main,
-body.mobile-template #mini-player,
-body.mobile-template #mini-player-tracks,
-body.mobile-template #sidebar-footer {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 28%),
-        rgba(6, 27, 39, 0.82) !important;
+@media (max-width: 600px) {
+    body.aero-theme .bbcode-toolbar,
+    body.aero-theme .feed-markdown-toolbar { padding: 6px !important; gap: 3px !important; }
+    body.aero-theme .bbcode-btn,
+    body.aero-theme .feed-markdown-editor .bbcode-btn { width: 31px; min-width: 31px; height: 30px; }
+    body.aero-theme .feed-markdown-actions { padding-left: 5px; }
+    body.aero-theme.mobile-template #mini-player { padding-top: 22px !important; }
+    body.aero-theme.mobile-template #mini-player-art-wrapper { width: 38px !important; height: 38px !important; flex-basis: 38px !important; }
+}
+
+/* Calm Aero palette: misty blue glass and soft sage instead of saturated cyan
+   and lime, while retaining enough separation for controls and content. */
+body.aero-theme {
+    --bg: #dce9ee;
+    --fg: #29434e;
+    --border: #7899a7;
+    --subtle: #667d86;
+    --links: #3f7892;
+    --chat-own-bg: #5d8799;
+    --hero-ascii-muted: #8ba8b4;
+    --hero-ascii-1: #537f98;
+    --hero-ascii-2: #598ba1;
+    --hero-ascii-3: #6096a5;
+    --hero-ascii-4: #6c9f9d;
+    --hero-ascii-5: #78a58d;
+    --hero-ascii-6: #86aa7d;
+    --hero-ascii-7: #94ae75;
+    --selection-bg: #648da0;
+    --scrollbar-track: #d9e6eb;
+    --scrollbar-thumb: #8aa7b3;
+    --scrollbar-thumb-hover: #668c9d;
+}
+
+body.aero-theme,
+body.aero-theme.mobile-template { background-color: #91b9c8 !important; }
+
+body.aero-theme #sidebar,
+body.aero-theme.mobile-template #sidebar {
+    background: linear-gradient(180deg, rgba(239,247,249,.9), rgba(200,221,228,.86)) !important;
+    border-right-color: #7699a8 !important;
+    box-shadow: inset -1px 0 rgba(255,255,255,.7), 6px 0 18px rgba(42,72,84,.18) !important;
+}
+
+body.aero-theme #header {
+    background: linear-gradient(180deg, rgba(255,255,255,.88), rgba(193,220,230,.68)) !important;
+    border-color: #7d9faa !important;
+}
+
+body.aero-theme #title,
+body.aero-theme #title .title-letter,
+body.aero-theme .mobile-collapsed-title,
+body.aero-theme .mobile-collapsed-title .title-letter {
+    background-image: linear-gradient(0deg, #547f97, #6997a8 44%, #87a979 49%, #6991a0 56%, #547f97) !important;
+}
+
+body.aero-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button, #show-sidebar) {
+    background: linear-gradient(180deg, #f8fbfc, #d9e8ed 52%, #c2d8e0) !important;
+    color: #355868 !important;
+    border-color: #7899a7 !important;
+}
+
+body.aero-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button, #show-sidebar):hover,
+body.aero-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button).active {
+    background: linear-gradient(180deg, #f7faf3, #dce8d4 52%, #c1d4b8) !important;
+    color: #3f6045 !important;
+    border-color: #7f9e79 !important;
+    box-shadow: inset 0 1px #fff, 0 0 5px rgba(105,143,98,.24) !important;
+}
+
+body.aero-theme #content-layout,
+body.aero-theme.mobile-template #content-layout,
+body.aero-theme.mobile-template #content-main {
+    background: linear-gradient(135deg, rgba(249,251,250,.94), rgba(223,235,239,.92)) !important;
+    outline-color: #7899a7;
+    box-shadow: inset 0 1px rgba(255,255,255,.94), 0 9px 24px rgba(42,72,84,.2) !important;
+}
+
+body.aero-theme :is(#post, .feed-post, .journal-post, .form-card, .grid-item, .notification-item, .music-album, .gallery-item, .chat-admin-card, .account-admin-card, .site-popup-dialog, .image-modal-content, .feed-reply-notice, .bbcode-editor, #bbcode-preview, table, details, .settings-section) {
+    background: linear-gradient(180deg, rgba(250,252,251,.94), rgba(218,232,236,.9)) !important;
+    border-color: #8aa5af !important;
+}
+
+body.aero-theme :is(#post, .feed-post, .journal-post, .grid-item, .music-album, .gallery-item, .account-admin-card):hover {
+    background: linear-gradient(180deg, #fbfcfb, #e1edf0) !important;
+    border-color: #6e929f !important;
+}
+
+body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dropdown, #bbcode-textbox, #search-box) {
+    background: linear-gradient(180deg, #fafcfb, #edf3f4) !important;
     color: var(--fg) !important;
-    border-color: rgba(163, 239, 255, 0.48) !important;
-    border-radius: 10px !important;
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.2),
-        0 12px 26px rgba(0, 8, 18, 0.28) !important;
+    border-color: #819faa !important;
 }
 
-body.mobile-template #content {
-    padding: 12px 10px 16px !important;
+body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dropdown, #bbcode-textbox, #search-box):focus {
+    border-color: #648da0 !important;
+    box-shadow: 0 0 0 3px rgba(100,141,160,.16), inset 0 1px 2px rgba(48,75,86,.08) !important;
 }
 
-body.mobile-template #content-layout {
-    padding: 16px !important;
+body.aero-theme :is(button:not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
+    background: linear-gradient(180deg, #f8faf6, #dce8d5 52%, #bfd2b7) !important;
+    color: #3c5c42 !important;
+    border-color: #7d9c77 !important;
+    box-shadow: inset 0 1px #fff, 0 1px 2px rgba(57,87,53,.14) !important;
 }
 
-body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button,
-body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button,
-body.mobile-template #show-sidebar,
-body.mobile-template .mobile-collapsed-header #show-sidebar {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 42%),
-        linear-gradient(90deg, rgba(119, 100, 144, 0.22), rgba(88, 200, 226, 0.18)),
-        rgba(7, 36, 51, 0.76) !important;
+body.aero-theme :is(button:not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
+    background: linear-gradient(180deg, #fff, #e6efe1 52%, #cbdcc4) !important;
+    color: #34533a !important;
+}
+
+body.aero-theme .bbcode-toolbar,
+body.aero-theme .feed-markdown-toolbar {
+    background: linear-gradient(180deg, rgba(250,252,252,.98), rgba(202,222,229,.96)) !important;
+    border-bottom-color: #7899a7 !important;
+}
+
+body.aero-theme .bbcode-btn,
+body.aero-theme .feed-thread-page .bbcode-btn,
+body.aero-theme .feed-markdown-editor .bbcode-btn,
+body.aero-theme .journal-markdown-editor .bbcode-btn {
+    background: linear-gradient(180deg, #fafcfc, #dce9ed 52%, #c4d9e0) !important;
+    color: #416779 !important;
+    border-color: #7b9ba8 !important;
+}
+
+body.aero-theme .bbcode-btn:hover,
+body.aero-theme .bbcode-btn:focus-visible {
+    background: linear-gradient(180deg, #fff, #e5eff2 52%, #d0e1e6) !important;
+    color: #345f73 !important;
+    border-color: #648da0 !important;
+}
+
+body.aero-theme :is(.checkbox, .radio),
+body.aero-theme.mobile-template :is(.checkbox, .radio) {
+    width: 16px;
+    height: 16px;
+    padding: 0 !important;
+    appearance: none;
+    -webkit-appearance: none;
+    background: linear-gradient(180deg, #fbfcfb, #dfe9ec) !important;
+    border: 1px solid #718f9b !important;
+    box-shadow: inset 0 1px #fff, 0 1px 2px rgba(48,75,86,.12) !important;
+}
+
+body.aero-theme .checkbox,
+body.aero-theme.mobile-template .checkbox { border-radius: 3px !important; }
+
+body.aero-theme .checkbox:checked,
+body.aero-theme.mobile-template .checkbox:checked {
+    background-color: #789d75 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.2 8.1 6.5 11l6.3-7' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-position: center !important;
+    background-size: 14px 14px !important;
+    background-repeat: no-repeat !important;
+    border-color: #668861 !important;
+    box-shadow: inset 0 1px rgba(255,255,255,.3), 0 1px 2px rgba(48,75,52,.16) !important;
+}
+
+body.aero-theme .radio,
+body.aero-theme.mobile-template .radio { border-radius: 50% !important; }
+
+body.aero-theme .radio:checked,
+body.aero-theme.mobile-template .radio:checked {
+    background: radial-gradient(circle, #6f966c 0 38%, #f7faf8 42% 58%, #dfe9ec 62%) !important;
+    border-color: #668861 !important;
+    box-shadow: inset 0 1px #fff, 0 1px 2px rgba(48,75,52,.16) !important;
+}
+
+/* Keep the retro player dark, but replace its neon display and electric-blue
+   accents with softer phosphor and slate tones. */
+body.aero-theme #mini-player-title,
+body.aero-theme #mini-player-artist,
+body.aero-theme #mini-player-title-inner,
+body.aero-theme #mini-player-title-inner.scrolling {
+    color: #b4cea4 !important;
+    text-shadow: 0 0 3px rgba(180,206,164,.3) !important;
+}
+body.aero-theme #mini-player-artist { color: #91ad84 !important; }
+body.aero-theme #mini-player-download,
+body.aero-theme #mini-player-tracks,
+body.aero-theme .mini-track { color: #abc99a !important; }
+body.aero-theme :is(#mini-player-seek, #mini-player-volume)::-webkit-slider-runnable-track { background: linear-gradient(90deg, #527e94, #8ab2c1) !important; }
+body.aero-theme :is(#mini-player-seek, #mini-player-volume)::-moz-range-track { background: linear-gradient(90deg, #527e94, #8ab2c1) !important; }
+body.aero-theme .mini-track:hover,
+body.aero-theme .mini-track.active { background: #3e6074 !important; color: #f4f7f5 !important; }
+
+/* Complete mobile shell coverage, including the high-specificity player rules
+   embedded by the shared mobile template. */
+body.aero-theme.mobile-template #sidebar {
+    width: calc(100% - 16px) !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding-bottom: 10px !important;
+    box-sizing: border-box !important;
+    border: 1px solid rgba(255,255,255,.82) !important;
+    border-right-color: #7899a7 !important;
+    border-radius: 13px !important;
+}
+body.aero-theme.mobile-template .mobile-nav-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    padding: 8px 10px 0 !important;
+}
+body.aero-theme.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button {
+    min-width: 0 !important;
+    min-height: 40px !important;
+    background: linear-gradient(180deg, #f8fbfc, #d9e8ed 52%, #c2d8e0) !important;
+    color: #355868 !important;
+    border: 1px solid #7899a7 !important;
+    border-radius: 7px !important;
+}
+body.aero-theme.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button:hover,
+body.aero-theme.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button.active {
+    background: linear-gradient(180deg, #f7faf3, #dce8d4 52%, #c1d4b8) !important;
+    color: #3f6045 !important;
+    border-color: #7f9e79 !important;
+}
+body.aero-theme.mobile-template #content { padding: 10px !important; }
+body.aero-theme.mobile-template #content-layout {
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+}
+body.aero-theme.mobile-template #content-main {
+    min-width: 0 !important;
+    padding: 16px 14px !important;
+    background: linear-gradient(135deg, rgba(249,251,250,.96), rgba(223,235,239,.94)) !important;
+    border: 1px solid rgba(255,255,255,.9) !important;
+    border-radius: 12px !important;
+    outline: 1px solid #7899a7 !important;
+    box-shadow: 0 7px 20px rgba(42,72,84,.16) !important;
+    overflow-x: hidden !important;
+}
+body.aero-theme.mobile-template #sidebar #mini-player {
+    margin: 8px 10px 0 !important;
+    padding: 22px 7px 7px !important;
+    width: auto !important;
+    background: linear-gradient(180deg, #3c4656, #1a202a) !important;
+    border: 2px solid !important;
+    border-color: #eef3f7 #111720 #111720 #eef3f7 !important;
+    border-radius: 2px !important;
+}
+body.aero-theme.mobile-template #sidebar #mini-player-main {
+    grid-template-columns: 46px minmax(0, 1fr) !important;
+    gap: 7px !important;
+}
+body.aero-theme.mobile-template #sidebar #mini-player-art-wrapper { width: 46px !important; height: 46px !important; }
+body.aero-theme.mobile-template #sidebar #mini-player-title-inner { color: #b4cea4 !important; font-family: "Aero Tahoma", Tahoma, sans-serif !important; }
+body.aero-theme.mobile-template #sidebar #mini-player-artist { color: #91ad84 !important; }
+body.aero-theme.mobile-template #sidebar #mini-player-play { background: linear-gradient(180deg, #d8dde1, #788493) !important; color: #10161e !important; border: 1px solid #303945 !important; }
+body.aero-theme.mobile-template #sidebar #mini-player-close { background: linear-gradient(180deg, #d8dde1, #788493) !important; color: #751414 !important; border: 1px solid #303945 !important; }
+body.aero-theme.mobile-template #sidebar #mini-player-tracks {
+    margin: 8px 10px 0 !important;
+    background: #080d13 !important;
+    color: #abc99a !important;
+    border: 2px solid #65717d !important;
+    border-radius: 0 !important;
+}
+body.aero-theme.mobile-template #sidebar #sidebar-footer {
+    margin: 8px 10px 0 !important;
+    background: rgba(239,247,249,.9) !important;
     color: var(--fg) !important;
-    border-color: rgba(163, 239, 255, 0.48) !important;
+    border: 1px solid #7899a7 !important;
     border-radius: 8px !important;
 }
-
-body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button:hover,
-body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button.active,
-body.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button.active:hover,
-body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button:hover,
-body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button.active,
-body.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button.active:hover,
-body.mobile-template #show-sidebar:hover,
-body.mobile-template .mobile-collapsed-header #show-sidebar:hover {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08) 44%),
-        linear-gradient(90deg, #776490, #58c8e2 54%, #82f0d8) !important;
-    color: #031923 !important;
-    border-color: rgba(224, 255, 255, 0.82) !important;
-}
-
-body.mobile-template input,
-body.mobile-template textarea,
-body.mobile-template .dropdown,
-body.mobile-template .text-input,
-body.mobile-template .bbcode-dropdown,
-body.mobile-template .bbcode-btn,
-body.mobile-template #bbcode-textbox,
-body.mobile-template #bbcode-preview,
-body.mobile-template .checkbox,
-body.mobile-template .radio,
-body.mobile-template .color-input {
-    background: rgba(3, 20, 30, 0.86) !important;
+body.aero-theme.mobile-template :is(#post, .feed-post, .journal-post, .notification-item, .music-album, .gallery-item, .form-card, .grid-item, .chat-admin-card, .account-admin-card, .settings-section, details, table) {
+    background: linear-gradient(180deg, rgba(250,252,251,.96), rgba(218,232,236,.94)) !important;
     color: var(--fg) !important;
-    border-color: rgba(163, 239, 255, 0.44) !important;
+    border: 1px solid #8aa5af !important;
+    border-radius: 9px !important;
+    box-shadow: inset 0 1px #fff, 0 2px 6px rgba(42,72,84,.12) !important;
 }
-body.aero-theme .content-pagination .guestbook-page-btn { border-radius: 7px; }
+body.aero-theme.mobile-template :is(#post, .feed-post, .journal-post, .grid-item, .music-album, .gallery-item, .account-admin-card):hover {
+    background: linear-gradient(180deg, #fbfcfb, #e1edf0) !important;
+    border-color: #6e929f !important;
+}
+body.aero-theme.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button {
+    background: linear-gradient(180deg, #f8fbfc, #d9e8ed 52%, #c2d8e0) !important;
+    color: #355868 !important;
+    border: 1px solid #7899a7 !important;
+    border-radius: 7px !important;
+}
+body.aero-theme.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button:hover,
+body.aero-theme.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button.active {
+    background: linear-gradient(180deg, #f7faf3, #dce8d4 52%, #c1d4b8) !important;
+    color: #3f6045 !important;
+    border-color: #7f9e79 !important;
+}
+body.aero-theme.mobile-template :is(#post-content, #post-title, #post-header, .grid-caption, .form-card, .settings-section) { color: var(--fg) !important; }
+body.aero-theme.mobile-template :is(#post-description, #post-date, #post-date-feed, #post-username, .grid-subcaption) { color: var(--subtle) !important; }
+body.aero-theme.mobile-template :is(input, textarea, select, .text-input, .dropdown, .bbcode-dropdown, #bbcode-textbox) { max-width: 100% !important; box-sizing: border-box !important; }
+body.aero-theme.mobile-template :is(table, pre, code, img, video, iframe) { max-width: 100% !important; }
+body.aero-theme.mobile-template :is(pre, table) { overflow-x: auto !important; }
+
+html.access-high-contrast body.aero-theme {
+    --bg: #ffffff !important;
+    --fg: #000000 !important;
+    --border: #003f68 !important;
+    --subtle: #243842 !important;
+    --links: #004f88 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.aero-theme .paper-grain { background-attachment: scroll; }
+}
