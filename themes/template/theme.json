@@ -1,0 +1,8 @@
+{
+  "name": "Your Theme",
+  "description": "replace this with a short description for the theme picker",
+  "thumbnail": "thumbnails/your-theme.svg",
+  "html": "your-theme/theme.html",
+  "css": "your-theme/theme.css",
+  "base": "blackprint"
+}

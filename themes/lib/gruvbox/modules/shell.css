@@ -1,0 +1,102 @@
+/* Page canvas, sidebar, title, navigation, and main content frame. */
+body.gruvbox-theme,
+body.gruvbox-theme.mobile-template {
+    background: var(--theme-page-background) !important;
+    color: var(--theme-ink) !important;
+    font-family: var(--theme-font-body);
+}
+
+body.gruvbox-theme .paper-grain {
+    opacity: var(--theme-paper-grain-opacity);
+    background-image: radial-gradient(circle, var(--theme-accent) 0 1px, transparent 1.5px);
+    background-size: 28px 28px;
+}
+
+body.gruvbox-theme :is(#page-wrapper, #container) {
+    background: transparent !important;
+}
+
+body.gruvbox-theme #sidebar,
+body.gruvbox-theme.mobile-template #sidebar {
+    width: var(--theme-sidebar-width);
+    background: var(--theme-sidebar) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+    box-shadow: var(--theme-shadow) !important;
+}
+
+body.gruvbox-theme #header {
+    background: var(--theme-panel) !important;
+    border-color: var(--theme-border) !important;
+    border-radius: var(--theme-radius) !important;
+}
+
+/* Do not change the title font: animations depend on the shared title face. */
+body.gruvbox-theme :is(
+    #title,
+    #title .title-letter,
+    .mobile-collapsed-title,
+    .mobile-collapsed-title .title-letter
+) {
+    background-image: var(--theme-title-gradient) !important;
+}
+
+body.gruvbox-theme :is(#subtitle, #footer-text, #user-greeting, #content-footer) {
+    color: var(--theme-muted) !important;
+}
+
+body.gruvbox-theme #sidebar > a {
+    margin-inline: 10px;
+}
+
+body.gruvbox-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button, #show-sidebar) {
+    background: var(--theme-surface) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border: var(--theme-border-width) solid var(--theme-border) !important;
+    border-radius: var(--theme-radius-small) !important;
+    box-shadow: var(--theme-shadow-small) !important;
+    transition:
+        background-color var(--theme-transition-duration) ease,
+        border-color var(--theme-transition-duration) ease,
+        color var(--theme-transition-duration) ease;
+}
+
+body.gruvbox-theme #tab::before,
+body.gruvbox-theme #footer-button::before {
+    color: var(--theme-accent) !important;
+}
+
+body.gruvbox-theme #tab {
+    text-transform: var(--theme-nav-transform);
+}
+
+body.gruvbox-theme #tab::before {
+    content: var(--theme-nav-prefix);
+}
+
+body.gruvbox-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button, #show-sidebar):hover,
+body.gruvbox-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button).active,
+body.gruvbox-theme :is(#tab, #footer-button, .mobile-nav-button, .mobile-footer-button).active:hover {
+    background: var(--theme-accent) !important;
+    color: var(--theme-on-accent) !important;
+    border-color: var(--theme-accent) !important;
+}
+
+body.gruvbox-theme #content-layout,
+body.gruvbox-theme.mobile-template #content-layout,
+body.gruvbox-theme.mobile-template #content-main {
+    max-width: var(--theme-content-width);
+    padding: var(--theme-panel-padding);
+    background: var(--theme-panel) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+    border-radius: var(--theme-radius-large) !important;
+    box-shadow: var(--theme-shadow) !important;
+}
+
+body.gruvbox-theme #content-main > :first-child {
+    margin-top: 0;
+}

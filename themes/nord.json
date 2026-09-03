@@ -1,0 +1,8 @@
+{
+  "name": "nord",
+  "description": "an arctic blue interface inspired by the Nord palette",
+  "thumbnail": "thumbnails/nord.svg",
+  "html": "nord/theme.html",
+  "css": "nord/theme.css",
+  "base": "blackprint"
+}

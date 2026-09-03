@@ -13,6 +13,13 @@ A selectable theme has:
 - `/themes/lib/{theme-id}/{stylesheet}.css`
 - `/themes/thumbnails/{theme-id}.svg` (normally a 4:3 preview)
 
+For a new theme, start with the non-selectable scaffold in
+`/themes/template/README.md`. It provides valid metadata and thumbnail examples,
+a current desktop shell, and small ordered CSS modules for design tokens, shell,
+controls, content, the player, mobile, and accessibility. Keeping the scaffold
+below the `/themes` root prevents it from being discovered by the picker before
+it has a real ID and metadata file.
+
 Theme IDs use lowercase `a-z`, `0-9`, `_`, and `-`. The JSON filename without `.json` is the saved theme ID.
 
 Required metadata:
@@ -31,7 +38,23 @@ An optional `"base": "blackprint"` field makes the renderer add both the package
 
 `thumbnail` is relative to `/themes`; `html` and `css` are relative to `/themes/lib`. Asset paths may contain only letters, numbers, `.`, `_`, `-`, and `/`. Never use absolute paths, `..`, empty segments, query strings, or shell-like filenames.
 
+SVG thumbnails must use `/themes/thumbnails/blackprint.svg` as their structural
+template. Preserve its 400×300 view box, rectangle order, coordinates,
+dimensions, stroke widths, and opacities. Use canonical colours from the theme's
+palette rather than approximate blends. Only colour values and, when the theme's
+component geometry calls for it, rectangle border radii (`rx`/`ry`) should vary.
+Do not add a gradient merely because Blackprint has one: omit the gradient
+definition and give the existing full-canvas overlay rectangle a solid palette
+fill unless a gradient is an intentional part of the new theme. Do not add,
+remove, resize, or rearrange visible shapes; consistent geometry makes themes
+directly comparable in the picker.
+
 The renderer discovers valid JSON files dynamically. Blackprint is exposed as `default`; packaged themes receive a `{theme-id}-theme` body class. Missing, malformed, unsupported-base, or unsafe packages are ignored. Desktop may use the package HTML; mobile always uses `/template_mobile.html` and only appends the selected theme CSS.
+
+Theme selection is strictly browser-local. The `themePref` localStorage entry
+drives the settings UI and the `theme_pref` cookie lets PHP select the theme on
+the first render. Never read a theme ID from, or write one to, an account record;
+legacy account `theme` fields are ignored.
 
 ## Base Stylesheet Map
 

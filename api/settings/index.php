@@ -67,7 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $result = [
         'ok' => true,
         'settings' => [
-            'theme' => 'default',
             'glowIntensity' => null,
             'colors' => null,
             'onekoEnabled' => null,
@@ -97,11 +96,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if (isset($account['username']) && (string)$account['username'] === $username) {
             if (isset($account['glowIntensity'])) {
                 $result['settings']['glowIntensity'] = $account['glowIntensity'];
-            }
-            if (isset($account['theme'])) {
-                $result['settings']['theme'] = function_exists('fridg3_normalize_theme_id')
-                    ? fridg3_normalize_theme_id($account['theme'])
-                    : 'default';
             }
             if (isset($account['colors']) && is_array($account['colors'])) {
                 $result['settings']['colors'] = $account['colors'];
@@ -536,7 +530,8 @@ if ($titleAnimationProvided || $titleAnimationAlwaysProvided || $titleAnimationD
     }
 }
 
-// Handle theme update (per-user)
+// Theme selection is device-local. Keep accepting this field for older clients,
+// but never read or write accounts.json for it.
 if ($themeProvided) {
     $theme = function_exists('fridg3_normalize_theme_id') ? fridg3_normalize_theme_id($theme) : (string)$theme;
     if (!in_array($theme, $allowedThemes, true)) {
@@ -549,33 +544,7 @@ if ($themeProvided) {
         setcookie('theme_pref', $theme, fridg3_get_theme_cookie_options());
         $_COOKIE['theme_pref'] = $theme;
     }
-
-    $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
-    $data = load_accounts_data($accountsPath);
-    if ($data === null) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
-        exit;
-    }
-
-    $updated = false;
-    foreach ($data['accounts'] as &$account) {
-        if (isset($account['username']) && (string)$account['username'] === $username) {
-            $account['theme'] = $theme;
-            $updated = true;
-            break;
-        }
-    }
-    unset($account);
-
-    if ($updated) {
-        if (!save_accounts_data($accountsPath, $data)) {
-            http_response_code(500);
-            echo json_encode(['ok' => false, 'error' => 'write_failed']);
-            exit;
-        }
-        $didWork = true;
-    }
+    $didWork = true;
 }
 
 // Handle glow intensity update (per-user)
@@ -635,20 +604,6 @@ if (!empty($colors)) {
         $colorTheme = function_exists('fridg3_normalize_theme_id')
             ? fridg3_normalize_theme_id($_COOKIE['theme_pref'])
             : (string)$_COOKIE['theme_pref'];
-    }
-    if ($colorTheme === null) {
-        $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
-        $data = load_accounts_data($accountsPath);
-        if ($data !== null) {
-            foreach ($data['accounts'] as $account) {
-                if (isset($account['username']) && (string)$account['username'] === $username && isset($account['theme'])) {
-                    $colorTheme = function_exists('fridg3_normalize_theme_id')
-                        ? fridg3_normalize_theme_id($account['theme'])
-                        : (string)$account['theme'];
-                    break;
-                }
-            }
-        }
     }
 }
 

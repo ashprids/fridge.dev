@@ -43,7 +43,7 @@ Typical route flow:
 6. Inject placeholders like `{content}`, `{title}`, `{description}`, `{user_greeting}`
 7. Optionally swap account footer button to logout when logged in
 
-Theme selection also runs through `lib/render.php`. `default` is Blackprint and uses the base template/style. Classic and Whiteprint are packaged selectable themes. Desktop requests for packaged themes can use a theme HTML template from `/themes/lib`; mobile requests always keep `template_mobile.html` and append the selected theme CSS after the mobile inline styles. Every package receives a `{theme-id}-theme` body class; metadata with `base: blackprint` also receives `blackprint-theme`, allowing Whiteprint to inherit Blackprint's layout and component coverage. The aliases `blackprint` and `custom` normalize to `default` and `classic` respectively.
+Theme selection also runs through `lib/render.php` and reads only the browser's `theme_pref` cookie; account records never participate in theme selection. `default` is Blackprint and uses the base template/style. Classic and Whiteprint are packaged selectable themes. Desktop requests for packaged themes can use a theme HTML template from `/themes/lib`; mobile requests always keep `template_mobile.html` and append the selected theme CSS after the mobile inline styles. Every package receives a `{theme-id}-theme` body class; metadata with `base: blackprint` also receives `blackprint-theme`, allowing Whiteprint to inherit Blackprint's layout and component coverage. The aliases `blackprint` and `custom` normalize to `default` and `classic` respectively.
 
 Some routes also pull in extra shared libs like `lib/feed.php` for route-specific persistence helpers instead of keeping all that logic inline.
 

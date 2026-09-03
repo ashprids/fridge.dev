@@ -15,20 +15,20 @@ All API routes live under `/api/*` and are handled by PHP.
 
 - Requires logged-in user
 - Returns current settings from `data/accounts/accounts.json`
-- Currently exposes `theme`, `glowIntensity`, `colors`, `onekoEnabled`, `fruityDanceEnabled`, `fruityDanceSpritesheet`, `fruityDanceLoop`, `fruityDanceSpeed`, `fruityDanceReflection`, `reduceMotion`, `discordNotificationsEnabled`, `titleAnimation`, `titleAnimationAlways`, and `titleAnimationDesync`; `colors` is honored by `classic` for its full palette
+- Currently exposes `glowIntensity`, `colors`, `onekoEnabled`, `fruityDanceEnabled`, `fruityDanceSpritesheet`, `fruityDanceLoop`, `fruityDanceSpeed`, `fruityDanceReflection`, `reduceMotion`, `discordNotificationsEnabled`, `titleAnimation`, `titleAnimationAlways`, and `titleAnimationDesync`; `colors` is honored by `classic` for its full palette
 - Toast-only settings fields are documented on [Toast](Toast#personality-sources)
 
 `POST`
 
 - Requires logged-in user
 - Updates user settings in `accounts.json`
-- Can set `theme` to `default`, `classic`, or a valid `/themes/*.json` theme id
+- Theme selection is browser-only and is never written to `accounts.json`; older clients may still POST `theme`, but that compatibility path only validates it and refreshes the `theme_pref` browser cookie
 - Can set the reduced-motion accessibility boolean
 - Can set the validated title animation id plus the always-playing and character-desync booleans
 - Can set `onekoEnabled` for the optional cursor-following cat
 - Can set the Fruity Dance enabled state, a directory-backed spritesheet, one of its metadata-defined animation rows, speed from 25–200%, and reflection strength from 0–100%; GET also returns `fruityDanceAnimations`, parsed from the selected sheet's same-basename `.txt` file, and the settings UI sends changes automatically
 - Can set `discordNotificationsEnabled` to opt a linked account in or out of automated Toast feed-notification DMs
-- Syncs the `theme_pref` cookie so anonymous and first-load rendering can pick the active theme
+- The settings UI stores theme selection in browser localStorage and the `theme_pref` cookie so first-load server rendering can pick the active theme
 - Validates Classic color fields as `#RRGGBB`
 - Admin users can also toggle maintenance mode through the settings flow
 - Toast-only personality persistence is documented on [Toast](Toast#personality-sources)

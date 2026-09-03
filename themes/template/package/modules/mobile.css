@@ -1,0 +1,81 @@
+/*
+ * Mobile uses /template_mobile.html and appends this package's CSS. The shared
+ * template has strong inline rules, so these scoped !important declarations are
+ * intentional.
+ */
+body.your-theme-theme.mobile-template #sidebar {
+    width: calc(100% - 16px) !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+}
+
+body.your-theme-theme.mobile-template .mobile-collapsed-header #show-sidebar,
+body.your-theme-theme.mobile-template #show-sidebar.mobile-menu-toggle {
+    background: var(--theme-surface-raised) !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.your-theme-theme.mobile-template .mobile-collapsed-header #show-sidebar:hover,
+body.your-theme-theme.mobile-template #show-sidebar.mobile-menu-toggle:hover {
+    background: var(--theme-accent) !important;
+    color: var(--theme-on-accent) !important;
+    border-color: var(--theme-accent) !important;
+}
+
+body.your-theme-theme.mobile-template .mobile-nav-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+body.your-theme-theme.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button,
+body.your-theme-theme.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button {
+    background: var(--theme-surface) !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.your-theme-theme.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button:hover,
+body.your-theme-theme.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button.active,
+body.your-theme-theme.mobile-template .mobile-nav-grid a.mobile-nav-link > #tab.mobile-nav-button.active:hover,
+body.your-theme-theme.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button:hover,
+body.your-theme-theme.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button.active,
+body.your-theme-theme.mobile-template #footer-buttons > a.mobile-footer-link > #footer-button.mobile-footer-button.active:hover {
+    background: var(--theme-accent) !important;
+    color: var(--theme-on-accent) !important;
+    border-color: var(--theme-accent) !important;
+}
+
+body.your-theme-theme.mobile-template #content {
+    padding: var(--theme-space) !important;
+    background: transparent !important;
+}
+
+body.your-theme-theme.mobile-template #content-layout {
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+body.your-theme-theme.mobile-template #content-main {
+    padding: calc(var(--theme-space) + 2px) !important;
+    background: var(--theme-panel) !important;
+    color: var(--theme-ink) !important;
+    border: var(--theme-border-width) solid var(--theme-border) !important;
+    overflow-x: hidden !important;
+}
+
+body.your-theme-theme.mobile-template #sidebar :is(#mini-player, #mini-player-tracks, #sidebar-footer) {
+    margin: 8px 10px 0 !important;
+    width: auto !important;
+}
+
+body.your-theme-theme.mobile-template :is(input, textarea, select, table, pre, img, video, iframe) {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+body.your-theme-theme.mobile-template :is(pre, table) {
+    overflow-x: auto !important;
+}

@@ -1,0 +1,90 @@
+/*
+ * Design tokens
+ *
+ * Start here. The required shared variables are mapped from the more specific
+ * theme tokens below. Keeping component colours out of the other modules makes
+ * palette changes quick and consistent.
+ */
+:root,
+body.nord-theme {
+    /* Required shared palette. */
+    --theme-canvas: #2e3440;
+    --theme-ink: #eceff4;
+    --theme-border: #4c566a;
+    --theme-muted: #d8dee9;
+    --theme-link: #9fd3df;
+    --theme-on-accent: #2e3440;
+
+    --bg: var(--theme-canvas);
+    --fg: var(--theme-ink);
+    --border: var(--theme-border);
+    --subtle: var(--theme-muted);
+    --links: var(--theme-link);
+    --chat-own-bg: var(--theme-accent);
+    --chat-own-fg: var(--theme-on-accent);
+
+    /* Surfaces, from furthest back to nearest to the reader. */
+    --theme-sidebar: #2e3440;
+    --theme-panel: #3b4252;
+    --theme-surface: #434c5e;
+    --theme-surface-raised: #4c566a;
+    --theme-input: #242933;
+    --theme-overlay: rgb(36 41 51 / 82%);
+    --theme-page-background:
+        linear-gradient(145deg, rgb(143 188 187 / 8%), rgb(180 142 173 / 6%)),
+        var(--theme-canvas);
+    --theme-paper-grain-opacity: 0.1;
+
+    /* Interactive and semantic colours. */
+    --theme-accent: #88c0d0;
+    --theme-accent-strong: #b48ead;
+    --theme-danger: #bf616a;
+    --theme-success: #a3be8c;
+    --theme-warning: #ebcb8b;
+    --theme-focus: #8fbcbb;
+    --theme-disabled: #7b8496;
+
+    /* Shape, spacing, depth, and type. */
+    --theme-font-body: "MainRegular", var(--emoji-font), sans-serif;
+    --theme-font-strong: "MainBold", var(--emoji-font), sans-serif;
+    --theme-radius-small: 5px;
+    --theme-radius: 9px;
+    --theme-radius-large: 13px;
+    --theme-border-width: 1px;
+    --theme-space: 12px;
+    --theme-panel-padding: 24px;
+    --theme-sidebar-width: 280px;
+    --theme-content-width: 920px;
+    --theme-nav-prefix: "";
+    --theme-nav-transform: lowercase;
+    --theme-shadow-small: 0 2px 5px rgb(24 29 39 / 32%);
+    --theme-shadow: 0 12px 30px rgb(24 29 39 / 38%);
+    --theme-transition-duration: 140ms;
+    --theme-focus-width: 2px;
+
+    /* Decorative title and shared ASCII gradients. */
+    --theme-title-1: #81a1c1;
+    --theme-title-2: #8fbcbb;
+    --theme-title-gradient: linear-gradient(90deg, #81a1c1 0%, #88c0d0 55%, #8fbcbb 100%);
+    --hero-ascii-muted: #4c566a;
+    --hero-ascii-1: #8fbcbb;
+    --hero-ascii-2: #88c0d0;
+    --hero-ascii-3: #81a1c1;
+    --hero-ascii-4: #5e81ac;
+    --hero-ascii-5: #b48ead;
+    --hero-ascii-6: #a3be8c;
+    --hero-ascii-7: #ebcb8b;
+    --hero-ascii-opacity: 1;
+    --resource-ascii: #8fbcbb;
+    --resource-label: var(--theme-muted);
+    --time-ascii: #b48ead;
+    --time-label: var(--theme-muted);
+
+    /* Browser-level UI. */
+    --selection-bg: var(--theme-accent);
+    --selection-fg: var(--theme-on-accent);
+    --scrollbar-track: var(--theme-input);
+    --scrollbar-thumb: var(--theme-border);
+    --scrollbar-thumb-hover: var(--theme-accent);
+    --scrollbar-thumb-border: var(--theme-canvas);
+}

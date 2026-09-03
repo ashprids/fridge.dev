@@ -1,0 +1,34 @@
+/* Keyboard focus, explicit high contrast surfaces, and motion preferences. */
+body.your-theme-theme :focus-visible {
+    outline: var(--theme-focus-width) solid var(--theme-focus) !important;
+    outline-offset: 3px !important;
+}
+
+html.access-high-contrast body.your-theme-theme {
+    --theme-canvas: #000000;
+    --theme-ink: #ffffff;
+    --theme-border: #ffffff;
+    --theme-muted: #d9d9d9;
+    --theme-link: #7fffd4;
+    --theme-on-accent: #000000;
+    --theme-sidebar: #000000;
+    --theme-panel: #000000;
+    --theme-surface: #000000;
+    --theme-surface-raised: #101010;
+    --theme-input: #000000;
+    --theme-accent: #7fffd4;
+    --theme-accent-strong: #ffff00;
+    --theme-focus: #ffff00;
+    --theme-shadow-small: none;
+    --theme-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.your-theme-theme {
+        --theme-transition-duration: 1ms;
+    }
+}
+
+html.access-reduced-motion body.your-theme-theme {
+    --theme-transition-duration: 1ms;
+}

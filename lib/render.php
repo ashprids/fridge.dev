@@ -393,42 +393,6 @@ if (!function_exists('fridg3_list_themes')) {
     }
 }
 
-if (!function_exists('fridg3_get_account_theme_preference')) {
-    function fridg3_get_account_theme_preference($startDir) {
-        if (!isset($_SESSION['user']['username'])) {
-            return null;
-        }
-
-        $accountsPath = fridg3_find_relative_upward($startDir, 'data/accounts/accounts.json');
-        if (!$accountsPath || !is_file($accountsPath)) {
-            return null;
-        }
-
-        $raw = @file_get_contents($accountsPath);
-        if ($raw === false) {
-            return null;
-        }
-
-        $data = json_decode($raw, true);
-        if (!is_array($data) || !isset($data['accounts']) || !is_array($data['accounts'])) {
-            return null;
-        }
-
-        $username = (string)$_SESSION['user']['username'];
-        foreach ($data['accounts'] as $account) {
-            if (!isset($account['username']) || (string)$account['username'] !== $username) {
-                continue;
-            }
-            if (!array_key_exists('theme', $account)) {
-                return null;
-            }
-            return fridg3_normalize_theme_id($account['theme']);
-        }
-
-        return null;
-    }
-}
-
 if (!function_exists('fridg3_paginate_static_post_list')) {
     function fridg3_paginate_static_post_list(string $content, string $route, int $currentPage, int $perPage = 10): string {
         if ($perPage < 1 || preg_match('#(<div\b[^>]*\bid=([' . "\"'" . '])posts\2[^>]*>)([\s\S]*)(</div>)#i', $content, $wrapper) !== 1) {
@@ -480,11 +444,6 @@ if (!function_exists('fridg3_get_theme_cookie_options')) {
 
 if (!function_exists('fridg3_get_preferred_theme_id')) {
     function fridg3_get_preferred_theme_id($startDir) {
-        $accountTheme = fridg3_get_account_theme_preference($startDir);
-        if ($accountTheme !== null) {
-            return $accountTheme;
-        }
-
         if (isset($_COOKIE['theme_pref'])) {
             return fridg3_normalize_theme_id($_COOKIE['theme_pref']);
         }

@@ -1202,7 +1202,6 @@ function initSettingsPage() {
         const isLoggedIn = !!document.getElementById('user-greeting');
         const isToastSession = !!(toastSettingsSection && toastSettingsSection.dataset.toastSession === '1');
         let currentTheme = loadLocalThemePref();
-        let lastSavedTheme = currentTheme;
         let renderedTheme = currentTheme;
         let themeChangedByUser = false;
         let themeOptions = [];
@@ -1759,11 +1758,11 @@ function initSettingsPage() {
             return Promise.resolve();
         };
 
-        const resetColorsToDefault = () => {
+        const resetColorsToDefault = (opts = {}) => {
             const selectedTheme = getThemeSelection();
             const defaults = getThemeColorDefaults(selectedTheme);
             setColorInputs(defaults);
-            persistColors(defaults);
+            persistColors(defaults, opts);
         };
 
         const bindSitemapButton = () => {
@@ -2039,7 +2038,8 @@ function initSettingsPage() {
         const initial = stored || GLOW_DEFAULT_INTENSITY;
         glowToggle.checked = initial !== 'none';
 
-        // Load theme/color prefs: local first, then server if logged in
+        // Theme selection is browser-only; account settings may still supply
+        // Classic's separately configurable colour values.
         const initialTheme = currentTheme;
         setThemeSelection(initialTheme);
         const initialColors = Object.assign({}, getThemeColorDefaults(initialTheme), loadLocalColorPrefs() || {});
@@ -2067,7 +2067,6 @@ function initSettingsPage() {
                     setThemeSelection(currentTheme);
                     saveLocalThemePref(currentTheme);
                     applyThemeSelection(currentTheme);
-                    lastSavedTheme = currentTheme;
                     renderedTheme = currentTheme;
                 } else {
                     setThemeSelection(currentTheme);
@@ -2081,13 +2080,6 @@ function initSettingsPage() {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
             }).then(r => r.ok ? r.json() : null).then(data => {
                 if (!data || !data.ok || !data.settings) return;
-
-                currentTheme = normalizeTheme(data.settings.theme);
-                setThemeSelection(currentTheme);
-                saveLocalThemePref(currentTheme);
-                setThemeCookie(currentTheme);
-                lastSavedTheme = currentTheme;
-                renderedTheme = currentTheme;
 
                 if (data.settings.colors) {
                     const serverColors = {};
@@ -2167,7 +2159,7 @@ function initSettingsPage() {
                 setThemeCookie(currentTheme);
                 applyThemeSelection(currentTheme);
                 if (currentTheme === 'classic') {
-                    resetColorsToDefault();
+                    resetColorsToDefault({ skipServer: true });
                 }
             });
         }
@@ -2298,7 +2290,6 @@ function initSettingsPage() {
             if (isLoggedIn && window.fetch) {
                 const params = new URLSearchParams();
                 params.append('glowIntensity', selected);
-                params.append('theme', selectedTheme);
                 params.append('reduceMotion', accessibilityPrefs.reduceMotion ? 'on' : 'off');
                 params.append('debugMode', accessibilityPrefs.debugMode ? 'on' : 'off');
                 params.append('onekoEnabled', onekoEnabled ? 'on' : 'off');
@@ -2339,7 +2330,6 @@ function initSettingsPage() {
                         body: params.toString(),
                     });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    lastSavedTheme = selectedTheme;
                     settingsDebugLog('account-backed settings synchronized');
                 } catch (error) {
                     settingsDebugLog(`account-backed settings sync failed: ${error.message || 'unknown error'}`);
@@ -2347,7 +2337,6 @@ function initSettingsPage() {
                 }
             } else {
                 /* local settings already applied */
-                lastSavedTheme = selectedTheme;
             }
 
             lastSavedMobileViewEnabled = mobileViewEnabled;

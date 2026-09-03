@@ -1,0 +1,105 @@
+/* Reusable cards, rich text, editors, tables, and status colours. */
+body.gruvbox-theme a {
+    color: var(--theme-link);
+}
+
+body.gruvbox-theme :is(h1, h2, h3, h4, strong, b) {
+    font-family: var(--theme-font-strong);
+}
+
+body.gruvbox-theme :is(
+    #post,
+    .feed-post,
+    .journal-post,
+    .form-card,
+    .grid-item,
+    .notification-item,
+    .music-album,
+    .gallery-item,
+    .chat-admin-card,
+    .account-admin-card,
+    .feed-reply-notice,
+    .bbcode-editor,
+    #bbcode-preview,
+    .feed-markdown-preview,
+    table,
+    details,
+    .settings-section
+) {
+    background: var(--theme-surface) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+    border-radius: var(--theme-radius) !important;
+    box-shadow: var(--theme-shadow-small) !important;
+}
+
+body.gruvbox-theme :is(#post, .feed-post, .journal-post, .grid-item, .music-album, .gallery-item):hover {
+    background: var(--theme-surface-raised) !important;
+}
+
+body.gruvbox-theme :is(.bbcode-toolbar, .feed-markdown-toolbar) {
+    background: var(--theme-surface-raised) !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.gruvbox-theme :is(pre, code, pre code.hljs, blockquote) {
+    background: var(--theme-input) !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.gruvbox-theme :is(th, td) {
+    border-color: var(--theme-border) !important;
+}
+
+body.gruvbox-theme th {
+    background: var(--theme-surface-raised) !important;
+    color: var(--theme-ink) !important;
+}
+
+body.gruvbox-theme :is(
+    #post-description,
+    #post-date,
+    #post-date-feed,
+    #post-username,
+    .feed-reply-meta,
+    .field-help,
+    .grid-subcaption
+) {
+    color: var(--theme-muted) !important;
+}
+
+body.gruvbox-theme :is(#error, .error, .form-error) {
+    color: var(--theme-danger) !important;
+}
+
+body.gruvbox-theme :is(.success, .form-success) {
+    color: var(--theme-success) !important;
+}
+
+body.gruvbox-theme :is(.warning, .form-warning) {
+    color: var(--theme-warning) !important;
+}
+
+/* Shared ASCII art should remain unboxed so its colour ramp stays readable. */
+body.gruvbox-theme :is(
+    #homepage-hero-ascii,
+    #homepage-hero-ascii pre,
+    #ascii,
+    #ascii-time,
+    #usage-grid,
+    #usage-grid .usage-card,
+    .usage-ascii,
+    .usage-label
+) {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+body.gruvbox-theme .image-modal-content {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}

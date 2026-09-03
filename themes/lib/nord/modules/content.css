@@ -1,0 +1,105 @@
+/* Reusable cards, rich text, editors, tables, and status colours. */
+body.nord-theme a {
+    color: var(--theme-link);
+}
+
+body.nord-theme :is(h1, h2, h3, h4, strong, b) {
+    font-family: var(--theme-font-strong);
+}
+
+body.nord-theme :is(
+    #post,
+    .feed-post,
+    .journal-post,
+    .form-card,
+    .grid-item,
+    .notification-item,
+    .music-album,
+    .gallery-item,
+    .chat-admin-card,
+    .account-admin-card,
+    .feed-reply-notice,
+    .bbcode-editor,
+    #bbcode-preview,
+    .feed-markdown-preview,
+    table,
+    details,
+    .settings-section
+) {
+    background: var(--theme-surface) !important;
+    background-image: none !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+    border-radius: var(--theme-radius) !important;
+    box-shadow: var(--theme-shadow-small) !important;
+}
+
+body.nord-theme :is(#post, .feed-post, .journal-post, .grid-item, .music-album, .gallery-item):hover {
+    background: var(--theme-surface-raised) !important;
+}
+
+body.nord-theme :is(.bbcode-toolbar, .feed-markdown-toolbar) {
+    background: var(--theme-surface-raised) !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.nord-theme :is(pre, code, pre code.hljs, blockquote) {
+    background: var(--theme-input) !important;
+    color: var(--theme-ink) !important;
+    border-color: var(--theme-border) !important;
+}
+
+body.nord-theme :is(th, td) {
+    border-color: var(--theme-border) !important;
+}
+
+body.nord-theme th {
+    background: var(--theme-surface-raised) !important;
+    color: var(--theme-ink) !important;
+}
+
+body.nord-theme :is(
+    #post-description,
+    #post-date,
+    #post-date-feed,
+    #post-username,
+    .feed-reply-meta,
+    .field-help,
+    .grid-subcaption
+) {
+    color: var(--theme-muted) !important;
+}
+
+body.nord-theme :is(#error, .error, .form-error) {
+    color: var(--theme-danger) !important;
+}
+
+body.nord-theme :is(.success, .form-success) {
+    color: var(--theme-success) !important;
+}
+
+body.nord-theme :is(.warning, .form-warning) {
+    color: var(--theme-warning) !important;
+}
+
+/* Shared ASCII art should remain unboxed so its colour ramp stays readable. */
+body.nord-theme :is(
+    #homepage-hero-ascii,
+    #homepage-hero-ascii pre,
+    #ascii,
+    #ascii-time,
+    #usage-grid,
+    #usage-grid .usage-card,
+    .usage-ascii,
+    .usage-label
+) {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+body.nord-theme .image-modal-content {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
