@@ -8,11 +8,14 @@ require_once $sessionBootstrapDir . "/lib/session.php";
 fridg3_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
+fridg3_feed_refresh_session_user();
 
 $title = 'guestbook';
 $description = 'messages left by visitors.';
 $postsDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'guestbook';
 $isAdmin = isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']);
+$isModerator = isset($_SESSION['user']) && !empty($_SESSION['user']['isModerator']);
+$canModerate = $isAdmin || $isModerator;
 $pageSize = 10;
 $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 if (!isset($_SESSION['csrf_token'])) {
@@ -61,34 +64,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $moderationAction = (string)($_POST['moderation_action'] ?? '');
     $moderationIp = trim((string)($_POST['ip'] ?? ''));
-    if ($isAdmin && $moderationAction === 'ban_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
+    if ($canModerate && $moderationAction === 'ban_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
         $guestName = trim((string)($_POST['guest_name'] ?? 'Anonymous'));
-        $_SESSION['guestbook_status'] = fridg3_feed_ban_guest_ip($moderationIp, (string)$_SESSION['user']['username'], $guestName)
-            ? 'IP banned from feed and guestbook posting.'
-            : 'unable to ban that IP.';
+        $banned = fridg3_feed_ban_guest_ip($moderationIp, (string)$_SESSION['user']['username'], $guestName, (string)($_POST['ban_reason'] ?? ''));
+        $_SESSION['guestbook_status'] = $banned ? 'IP banned from feed and guestbook posting.' : 'unable to ban that IP.';
+        if ($banned) fridg3_moderator_audit_log('banned IP', ['ip' => $moderationIp, 'username' => $guestName, 'reason' => (string)($_POST['ban_reason'] ?? '')]);
         header('Location: /guestbook');
         exit;
     }
-    if ($isAdmin && $moderationAction === 'purge_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
+    if ($canModerate && $moderationAction === 'unban_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
+        $unbanned = fridg3_feed_unban_ip($moderationIp);
+        $_SESSION['guestbook_status'] = $unbanned ? 'IP unbanned.' : 'unable to unban that IP.';
+        if ($unbanned) fridg3_moderator_audit_log('unbanned IP', ['ip' => $moderationIp]);
+        header('Location: /guestbook');
+        exit;
+    }
+    if ($canModerate && $moderationAction === 'purge_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
         if (!fridg3_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
-            $_SESSION['guestbook_status'] = 'admin password did not match. purge cancelled.';
+            $_SESSION['guestbook_status'] = 'password did not match. purge cancelled.';
         } else {
             $feedResult = fridg3_feed_purge_guest_replies_by_ip($moderationIp);
             $guestbookResult = fridg3_guestbook_purge_entries_by_ip($moderationIp);
             $_SESSION['guestbook_status'] = 'purged '
                 . ((int)$feedResult['deleted'] + (int)$guestbookResult['deleted'])
                 . ' guest item(s) for this IP.';
+            fridg3_moderator_audit_log('purged IP content', ['ip' => $moderationIp, 'deleted' => (int)$feedResult['deleted'] + (int)$guestbookResult['deleted'], 'failed' => (int)$feedResult['failed'] + (int)$guestbookResult['failed']]);
         }
         header('Location: /guestbook');
         exit;
     }
 
     $deleteFile = basename($_POST['delete_file'] ?? '');
+    $deletedEntry = fridg3_guestbook_load_entry($deleteFile);
     $isOwner = isset($ip_index[$clientIp]) && $ip_index[$clientIp] === $deleteFile;
-    $canDelete = $isAdmin || $isOwner;
+    $canDelete = $canModerate || $isOwner;
 
     if ($canDelete && fridg3_guestbook_delete_entry($deleteFile)) {
         $_SESSION['guestbook_status'] = 'post deleted.';
+        fridg3_moderator_audit_log('deleted guestbook post', ['file' => $deleteFile, 'author' => (string)($deletedEntry['name'] ?? '')], [
+            'name' => (string)($deletedEntry['name'] ?? ''),
+            'body' => (string)($deletedEntry['message'] ?? ''),
+        ]);
     } else {
         $_SESSION['guestbook_status'] = 'invalid delete request.';
     }
@@ -153,7 +169,12 @@ function guestbook_get_files(string $postsDir): array {
         return [];
     }
     usort($files, function($a, $b) {
-        return filemtime($b) <=> filemtime($a);
+        $aEntry = fridg3_guestbook_parse_entry((string)@file_get_contents($a), basename($a));
+        $bEntry = fridg3_guestbook_parse_entry((string)@file_get_contents($b), basename($b));
+        $aTime = strtotime((string)($aEntry['timestamp'] ?? '')) ?: (filemtime($a) ?: 0);
+        $bTime = strtotime((string)($bEntry['timestamp'] ?? '')) ?: (filemtime($b) ?: 0);
+        $order = $bTime <=> $aTime;
+        return $order !== 0 ? $order : strnatcasecmp(basename($b), basename($a));
     });
     return $files;
 }
@@ -203,49 +224,59 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
         $displayTime = $relative !== '' ? $relative : $safeTimestamp;
         $timeHtml = '<span id="post-date-feed" title="' . $safeTimestamp . '">' . $displayTime . '</span>';
 
-        $deleteButton = '';
-        $editButton = '';
+        $menuItems = '';
         $safeFile = htmlspecialchars(basename($file), ENT_QUOTES, 'UTF-8');
         $isOwner = isset($ipIndex[$clientIp]) && $ipIndex[$clientIp] === basename($file);
         if ($isAdmin || $isOwner) {
             $editUrl = '/guestbook/edit?file=' . rawurlencode($safeFile);
-            $editButton = '<a class="guestbook-edit-btn" href="' . $editUrl . '" data-tooltip="edit post"><i class="fa-solid fa-pen"></i></a>';
-            $deleteButton = '<form class="guestbook-delete-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-confirm-title="delete guestbook entry?" data-confirm-detail="this removes the guestbook entry from the site." data-confirm-text="delete" data-cancel-text="cancel">'
+            $menuItems .= '<a class="site-action-menu-item" href="' . $editUrl . '"><i class="fa-solid fa-pen"></i><span>edit</span></a>';
+            $menuItems .= '<form class="site-action-menu-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-confirm-title="delete guestbook entry?" data-confirm-detail="this removes the guestbook entry from the site." data-confirm-text="delete" data-cancel-text="cancel">'
                 . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
                 . '<input type="hidden" name="delete_file" value="' . $safeFile . '">'
-                . '<button type="submit" id="post-edit-feed" class="guestbook-delete-btn" data-tooltip="delete post"><i class="fa-solid fa-trash"></i></button>'
+                . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-trash"></i><span>delete</span></button>'
                 . '</form>';
         }
 
-        $ipModerationButtons = '';
-        if ($isAdmin && $entryIp !== '') {
+        if ($isAdmin && filter_var($entryIp, FILTER_VALIDATE_IP)) {
             $safeIp = htmlspecialchars($entryIp, ENT_QUOTES, 'UTF-8');
+            $menuItems .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($entryIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
             if (!fridg3_feed_is_ip_banned($entryIp)) {
-                $ipModerationButtons .= '<form class="guestbook-delete-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks feed replies and guestbook posts from this IP." data-confirm-text="ban IP" data-cancel-text="cancel">'
+                $menuItems .= '<form class="site-action-menu-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-ban-reason-prompt="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks feed replies and guestbook posts from this IP." data-confirm-text="continue" data-cancel-text="cancel">'
                     . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
                     . '<input type="hidden" name="moderation_action" value="ban_ip">'
                     . '<input type="hidden" name="ip" value="' . $safeIp . '">'
                     . '<input type="hidden" name="guest_name" value="' . $safeName . '">'
-                    . '<button type="submit" id="post-edit-feed" class="guestbook-delete-btn" data-tooltip="ban IP"><i class="fa-solid fa-ban"></i></button>'
+                    . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-ban"></i><span>ban</span></button>'
+                    . '</form>';
+            } else {
+                $menuItems .= '<form class="site-action-menu-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-confirm-title="unban IP?" data-confirm-detail="this allows new feed replies and guestbook posts from this IP." data-confirm-text="unban" data-cancel-text="cancel">'
+                    . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
+                    . '<input type="hidden" name="moderation_action" value="unban_ip">'
+                    . '<input type="hidden" name="ip" value="' . $safeIp . '">'
+                    . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-unlock"></i><span>unban</span></button>'
                     . '</form>';
             }
-            $ipModerationButtons .= '<form class="guestbook-delete-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-admin-password-confirm="1" data-confirm-title="purge guest content from this IP?" data-confirm-detail="this deletes feed replies and guestbook posts from this IP." data-confirm-text="purge content" data-cancel-text="cancel" data-password-title="confirm guest purge" data-password-detail="enter your admin password to purge this IP&apos;s guest content.">'
+            $menuItems .= '<form class="site-action-menu-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-admin-password-confirm="1" data-confirm-title="purge guest content from this IP?" data-confirm-detail="this deletes feed replies and guestbook posts from this IP." data-confirm-text="purge content" data-cancel-text="cancel" data-password-title="confirm guest purge" data-password-detail="enter your password to purge this IP&apos;s guest content.">'
                 . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
                 . '<input type="hidden" name="moderation_action" value="purge_ip">'
                 . '<input type="hidden" name="ip" value="' . $safeIp . '">'
-                . '<button type="submit" id="post-edit-feed" class="guestbook-delete-btn" data-tooltip="purge IP content"><i class="fa-solid fa-broom"></i></button>'
+                . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-eraser"></i><span>purge</span></button>'
                 . '</form>';
         }
 
-        $rightSide = '<div class="guestbook-post-actions">' . $timeHtml . $editButton . $ipModerationButtons . $deleteButton . '</div>';
+        $actionsMenu = $menuItems !== ''
+            ? '<details class="site-action-menu"><summary data-tooltip="entry actions" aria-label="entry actions"><i class="fa-solid fa-ellipsis"></i></summary><div class="site-action-menu-dropdown">' . $menuItems . '</div></details>'
+            : '';
+        $rightSide = '<div class="guestbook-post-actions">' . $timeHtml . $actionsMenu . '</div>';
 
-        $html .= '<div id="post">'
+        $entryAnchor = 'guestbook-entry-' . preg_replace('/[^a-zA-Z0-9_-]/', '-', pathinfo(basename($file), PATHINFO_FILENAME));
+        $html .= '<div id="' . $entryAnchor . '" class="guestbook-entry-anchor"><div id="post">'
             . '<div id="post-header">'
             . '<span id="post-username"' . $guestNameIpAttribute . '>' . $safeName . '</span>'
             . $rightSide
             . '</div>'
             . '<span id="post-content">' . $safeMessage . '</span>'
-            . '</div>';
+            . '</div></div>';
     }
 
     if ($html === '') {
@@ -304,7 +335,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -329,7 +360,7 @@ $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);
@@ -341,7 +372,7 @@ $offset = ($currentPage - 1) * $pageSize;
 $pageFiles = array_slice($allFiles, $offset, $pageSize);
 $posts_html = render_guestbook_posts(
     $pageFiles,
-    $isAdmin,
+    $canModerate,
     $clientIp,
     $ip_index,
     htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8')

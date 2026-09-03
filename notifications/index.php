@@ -27,7 +27,7 @@ if ($renderHelperPath) require_once $renderHelperPath;
 $templateName = function_exists('get_preferred_template_name') ? get_preferred_template_name(__DIR__) : 'template.html';
 $templatePath = find_template_file($templateName);
 if (!$templatePath && $templateName !== 'template.html') $templatePath = find_template_file('template.html');
-if (!$templatePath) die('page template not found. report this issue to me@fridge.dev.');
+if (!$templatePath) die('page template not found. report this issue to ashton@fridge.dev.');
 
 $template = file_get_contents($templatePath);
 if (function_exists('apply_preferred_theme_stylesheet')) {
@@ -35,7 +35,7 @@ if (function_exists('apply_preferred_theme_stylesheet')) {
 }
 
 $contentPath = __DIR__ . DIRECTORY_SEPARATOR . 'content.html';
-if (!is_file($contentPath)) die('content.html not found. report this issue to me@fridge.dev.');
+if (!is_file($contentPath)) die('content.html not found. report this issue to ashton@fridge.dev.');
 $content = file_get_contents($contentPath);
 
 if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));

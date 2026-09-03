@@ -111,12 +111,15 @@ if (!function_exists('fridg3_guestbook_delete_entry')) {
             return false;
         }
         $entryIp = (string)$entry['ip'];
-        if ($entryIp === '' && $expectedIp !== '') {
+        if ($entryIp === '') {
             $index = is_file(fridg3_guestbook_ip_index_path())
                 ? json_decode((string)@file_get_contents(fridg3_guestbook_ip_index_path()), true)
                 : [];
-            if (is_array($index) && (string)($index[$expectedIp] ?? '') === (string)$entry['file']) {
-                $entryIp = $expectedIp;
+            foreach (is_array($index) ? $index : [] as $indexedIp => $indexedFile) {
+                if ((string)$indexedFile === (string)$entry['file'] && filter_var((string)$indexedIp, FILTER_VALIDATE_IP)) {
+                    $entryIp = (string)$indexedIp;
+                    break;
+                }
             }
         }
         if ($expectedIp !== '' && !hash_equals($expectedIp, $entryIp)) {
@@ -125,6 +128,12 @@ if (!function_exists('fridg3_guestbook_delete_entry')) {
         if (!@unlink((string)$entry['path'])) {
             return false;
         }
+        fridg3_feed_archive_ip_content($entryIp, 'guestbook', (string)$entry['file'], [
+            'username' => (string)($entry['name'] ?? 'Anonymous'),
+            'date' => (string)($entry['timestamp'] ?? ''),
+            'body' => (string)($entry['message'] ?? ''),
+            'file' => (string)$entry['file'],
+        ]);
         fridg3_guestbook_remove_index_filename((string)$entry['file']);
         return true;
     }

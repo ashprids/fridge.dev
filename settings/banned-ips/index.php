@@ -16,12 +16,21 @@ $notice = '';
 $editorValue = implode(PHP_EOL, fridg3_hard_ban_load());
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $editorValue = (string)($_POST['hard_banned_ips'] ?? '');
     $submittedToken = (string)($_POST['csrf_token'] ?? '');
+    $action = (string)($_POST['action'] ?? 'save_list');
 
     if (!hash_equals((string)$_SESSION['hard_ban_csrf'], $submittedToken)) {
         $notice = '<div id="error">invalid request token. refresh and try again.</div><br>';
+    } elseif ($action === 'save_settings') {
+        $enforcementEnabled = isset($_POST['enforce_hard_bans']);
+        $strictEnabled = isset($_POST['strict_hard_bans']);
+        if (!fridg3_hard_ban_set_strict_enabled($strictEnabled) || !fridg3_hard_ban_set_enforcement_enabled($enforcementEnabled)) {
+            $notice = '<div id="error">the hard-ban settings could not be updated.</div><br>';
+        } else {
+            $notice = '<div id="result">hard-ban settings saved.</div><br>';
+        }
     } else {
+        $editorValue = (string)($_POST['hard_banned_ips'] ?? '');
         $parsed = fridg3_hard_ban_parse($editorValue);
         if ($parsed['invalid'] !== []) {
             $invalid = htmlspecialchars(implode(', ', $parsed['invalid']), ENT_QUOTES, 'UTF-8');
@@ -37,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $safeValue = htmlspecialchars($editorValue, ENT_QUOTES, 'UTF-8');
 $safeCsrf = htmlspecialchars((string)$_SESSION['hard_ban_csrf'], ENT_QUOTES, 'UTF-8');
+$enforcementChecked = fridg3_hard_ban_enforcement_enabled() ? ' checked' : '';
+$strictChecked = fridg3_hard_ban_strict_enabled() ? ' checked' : '';
 $content = '<style>'
     . '.hard-ban-editor{width:100%;min-height:55vh;resize:vertical;box-sizing:border-box;font:inherit;line-height:1.45;background:var(--bg);color:var(--fg);border:1px solid var(--border);padding:12px;}'
     . '.hard-ban-note{max-width:760px;color:var(--subtle);}'
@@ -50,6 +61,17 @@ $content = '<style>'
     . '<p class="hard-ban-note"><strong>warning:</strong> adding your current IP will lock this browser out after the save completes.</p>'
     . '<form method="post" action="/settings/banned-ips/" data-no-spa="1">'
     . '<input type="hidden" name="csrf_token" value="' . $safeCsrf . '">'
+    . '<input type="hidden" name="action" value="save_settings">'
+    . '<h3>hard-ban settings</h3>'
+    . '<div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" class="checkbox" id="enforce-hard-bans-toggle" name="enforce_hard_bans" value="1"' . $enforcementChecked . '>'
+    . '<span data-tooltip="<b>when enabled:</b>\nrequests are checked against exact-IP\nwhitelist overrides, the manual hard-ban\nlist, source ban lists, and the configured\nidentity enforcement policy.\n\n<b>when disabled:</b>\nthe authorization endpoint immediately\nallows every request. it does not resolve\nthe client IP, read any ban list, inspect\nidentity data, or perform a hard-ban check.">enforce hard bans</span></label></div>'
+    . '<div class="checkbox-group"><label class="checkbox-label"><input type="checkbox" class="checkbox" id="strict-hard-bans-toggle" name="strict_hard_bans" value="1"' . $strictChecked . '>'
+    . '<span data-tooltip="<b>when enabled:</b>\nlater IPs used by a recognized banned\nbrowser are blocked through its existing\nprimary identity. associated IPs stay only\nin hard-ban-identities.json; they are not\nmade primary, copied to the manual list,\nor added to the source-list index.\n\n<b>when disabled:</b>\nonly manual IPs and IPs from source banlists\nare checked. hard-ban-identities.json and\nall other browser tracking are completely\nignored and are not updated.">punish associated identities and future IPs</span></label></div>'
+    . '<br><button id="form-button" type="submit">save hard-ban settings</button>'
+    . '</form><br><hr><br>'
+    . '<form method="post" action="/settings/banned-ips/" data-no-spa="1">'
+    . '<input type="hidden" name="csrf_token" value="' . $safeCsrf . '">'
+    . '<input type="hidden" name="action" value="save_list">'
     . '<label for="hard-banned-ips"><strong>IP addresses</strong></label><br><br>'
     . '<textarea class="hard-ban-editor" id="hard-banned-ips" name="hard_banned_ips" spellcheck="false" autocomplete="off" wrap="off">' . $safeValue . '</textarea>'
     . '<br><br><button id="form-button" type="submit">save hard bans</button>'

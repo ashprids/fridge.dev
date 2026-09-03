@@ -24,6 +24,7 @@ if (is_file($accountsPath)) {
         foreach ($accountsData['accounts'] as $account) {
             if (isset($account['username']) && $account['username'] === $currentUsername) {
                 $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
+                $_SESSION['user']['isModerator'] = (bool)($account['isModerator'] ?? false);
                 break;
             }
         }
@@ -47,6 +48,7 @@ $formName = '';
 $formDiscordUserId = '';
 $formEmailAddress = '';
 $formIsAdmin = false;
+$formIsModerator = false;
 $formPostingRestricted = false;
 $formAllowFeed = false;
 $formAllowJournal = false;
@@ -90,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formDiscordUserId = trim($_POST['discordUserId'] ?? '');
     $formEmailAddress = strtolower(trim((string)($_POST['emailAddress'] ?? '')));
     $formIsAdmin = isset($_POST['isAdmin']);
+    $formIsModerator = isset($_POST['isModerator']);
     $formPostingRestricted = isset($_POST['postingRestricted']);
     $formAllowFeed = isset($_POST['allowFeed']);
     $formAllowJournal = isset($_POST['allowJournal']);
@@ -112,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $formDiscordUserId = '';
         $formEmailAddress = '';
         $formIsAdmin = false;
+        $formIsModerator = false;
         $formPostingRestricted = false;
         $formAllowFeed = true;
         $formAllowJournal = false;
@@ -174,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'name' => $formName,
                 'password' => $passwordHash,
                 'isAdmin' => $formIsAdmin,
+                'isModerator' => $formIsModerator,
                 'postingRestricted' => $formPostingRestricted,
                 'mustResetPassword' => $createdAccountMustResetPassword,
                 'allowedPages' => $allowedPages,
@@ -264,6 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $formDiscordUserId = '';
                 $formEmailAddress = '';
                 $formIsAdmin = false;
+                $formIsModerator = false;
                 $formPostingRestricted = false;
                 $formAllowFeed = false;
                 $formAllowJournal = false;
@@ -302,7 +308,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -312,7 +318,7 @@ if (function_exists('apply_preferred_theme_stylesheet')) {
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);
@@ -327,6 +333,7 @@ $content = str_replace([
     '{form_discord_user_id}',
     '{form_email_address}',
     '{is_admin_checked}',
+    '{is_moderator_checked}',
     '{posting_restricted_checked}',
     '{allow_feed_checked}',
     '{allow_journal_checked}',
@@ -344,6 +351,7 @@ $content = str_replace([
     htmlspecialchars($formDiscordUserId, ENT_QUOTES, 'UTF-8'),
     htmlspecialchars($formEmailAddress, ENT_QUOTES, 'UTF-8'),
     $formIsAdmin ? 'checked' : '',
+    $formIsModerator ? 'checked' : '',
     $formPostingRestricted ? 'checked' : '',
     $formAllowFeed ? 'checked' : '',
     $formAllowJournal ? 'checked' : '',

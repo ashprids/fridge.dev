@@ -60,12 +60,13 @@ The sanitizer currently changes:
 - `data/etc/toast-dm-history.json`: clears Discord DM history
 - `data/etc/toast-feed-notify-state.json`: clears Discord notification state
 - `data/etc/toast-patch-approvals.json`: clears pending and completed Discord update approvals
-- `data/etc/off-topic-archive.json`: replaces exported Discord archive contents with an empty placeholder
 - `data/etc/webhooks.json`: clears all scalar values
 - `data/guestbook/ip_index.json`: clears contents
 - `data/guestbook/*.txt`: removes `IP:` metadata while retaining public messages
 - `data/feed/replies/*.json`: blanks guest IPs and removes guest browser-local inbox identities
+- `data/feed/post_ips.json`: blanks feed-post IPs while retaining post IDs and usernames for local rendering
 - `data/feed/banned_ips.json`: clears the shared posting IP ban list
+- `data/etc/banned-ip-content.json`: clears deleted-content snapshots retained for soft-ban review
 - `data/contact/*.json`: removes private contact submissions
 - `data/contact/rate_limits.json`: clears IP rate-limit state
 - `data/upload/rooms.json`: clears temporary room tokens and public keys

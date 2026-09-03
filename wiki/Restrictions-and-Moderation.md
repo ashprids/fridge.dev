@@ -27,7 +27,15 @@ The shared session helpers in `lib/session.php` refresh the flag from account st
 
 ## Posting IP Bans
 
-Posting bans are stored in `data/feed/banned_ips.json` and managed from `/settings/guests`.
+Accounts with `isModerator: true` share the soft-ban and user-management tools exposed under the settings page's moderator section. Their content actions are limited to non-admin authors. Admin-authored feed posts and replies remain outside moderator edit/delete authority, and the moderator flag does not grant access to account administration or site-wide hard-ban configuration.
+
+Posting bans are stored in `data/feed/banned_ips.json` and can be applied from content menus or `/settings/guests`. Each new ban optionally records a reason, the logged-in administrator who applied it, and a new notification generation. `/settings/restricted-ips` lists these records, supports unbanning, and combines live content with deletion snapshots from `data/etc/banned-ip-content.json` for retained post review. IP-associated feed posts, feed replies, and guestbook posts are snapshotted when deleted so the history also covers deletion that happened before a later ban.
+
+Feed-reply and guestbook post action menus resolve the associated IP's current restriction state when rendered: unrestricted IPs show `ban`, while restricted IPs show `unban`. Both actions are revalidated and applied server-side.
+
+Successful moderator mutations—including feed and guestbook edits/deletions, IP bans and unbans, and IP-content purges—are appended to `data/etc/moderator-audit.ndjson`. Admins review this trail at `/settings/audit-log`; edit entries retain both the before and after values. The audit writer deliberately ignores admins so this remains a moderator-account accountability log.
+
+While the restriction remains active, every browser seen on that exact IP is eligible for a one-time in-site restriction popup. Each browser records the ban generation locally after showing it once; a later unban and re-ban creates a new generation. The popup shows only the restriction title and optional reason. The matching `/notifications` entry keeps the contact instructions and `mailto:ashton@fridge.dev` link, with a blank line after the bold reason label when one was supplied.
 
 These bans do not prevent browsing the website. They block the matching client IP on the submission surfaces that use the shared posting-ban list:
 
@@ -43,7 +51,7 @@ User-facing blocked notices use `your IP address has been restricted.` Account-b
 
 ## Hard Bans
 
-Hard bans are exact IPv4 or IPv6 addresses stored in `data/etc/hard-banned-ips.txt`. Admins edit the list at `/settings/banned-ips`; spaces and newlines are accepted, saves validate every token, remove duplicates, and normalize the file to one address per line.
+Hard bans are exact IPv4 or IPv6 addresses stored in `data/etc/hard-banned-ips.txt`. Admins edit the list and configure global enforcement and browser-identity propagation at `/settings/banned-ips`; spaces and newlines are accepted, saves validate every token, remove duplicates, and normalize the file to one address per line.
 
 Additional read-only sources may be placed in `.txt` files anywhere beneath `data/etc/banlists/`; subdirectories are scanned recursively. Every valid whitespace-separated IP or CIDR subnet in those files is included in the effective hard-ban set. Both IPv4 CIDRs (`/0` through `/32`) and IPv6 CIDRs (`/0` through `/128`) are supported. Source-list entries are deliberately not copied into `hard-banned-ips.txt` and do not appear in the `/settings/banned-ips` textarea.
 

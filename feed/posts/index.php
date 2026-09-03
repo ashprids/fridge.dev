@@ -214,22 +214,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($replyError !== '' && $replyAction === 'create') {
         // Keep the validation error set above.
     } elseif ($replyAction === 'ban_ip') {
-        if (empty($_SESSION['user']['isAdmin'])) {
+        if (!fridg3_feed_current_user_is_moderator()) {
             $replyEditError = 'you do not have permission to ban IP addresses.';
         } elseif ($targetReply === null || ($targetReply['isGuest'] ?? false) !== true || !filter_var((string)($targetReply['ip'] ?? ''), FILTER_VALIDATE_IP)) {
             $replyEditError = 'could not find a guest IP to ban.';
-        } elseif (!fridg3_feed_ban_guest_ip((string)$targetReply['ip'], (string)$_SESSION['user']['username'], (string)($targetReply['username'] ?? 'Anonymous'))) {
+        } elseif (!fridg3_feed_ban_guest_ip((string)$targetReply['ip'], (string)$_SESSION['user']['username'], (string)($targetReply['username'] ?? 'Anonymous'), (string)($_POST['ban_reason'] ?? ''))) {
             $replyEditError = 'failed to ban IP.';
         } else {
+            fridg3_moderator_audit_log('banned IP', ['ip' => (string)$targetReply['ip'], 'username' => (string)($targetReply['username'] ?? 'Anonymous'), 'reason' => (string)($_POST['ban_reason'] ?? '')]);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_banned=1');
             exit;
         }
+    } elseif ($replyAction === 'unban_ip') {
+        if (!fridg3_feed_current_user_is_moderator()) {
+            $replyEditError = 'you do not have permission to unban IP addresses.';
+        } elseif ($targetReply === null || ($targetReply['isGuest'] ?? false) !== true || !filter_var((string)($targetReply['ip'] ?? ''), FILTER_VALIDATE_IP)) {
+            $replyEditError = 'could not find a guest IP to unban.';
+        } elseif (!fridg3_feed_unban_ip((string)$targetReply['ip'])) {
+            $replyEditError = 'failed to unban IP.';
+        } else {
+            fridg3_moderator_audit_log('unbanned IP', ['ip' => (string)$targetReply['ip'], 'username' => (string)($targetReply['username'] ?? 'Anonymous')]);
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_unbanned=1');
+            exit;
+        }
     } elseif ($replyAction === 'purge_ip_replies') {
-        if (empty($_SESSION['user']['isAdmin'])) {
+        if (!fridg3_feed_current_user_is_moderator()) {
             $replyEditError = 'you do not have permission to purge guest content.';
         } elseif (!fridg3_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
-            $replyEditError = 'admin password did not match. purge cancelled.';
+            $replyEditError = 'password did not match. purge cancelled.';
         } elseif ($targetReply === null || ($targetReply['isGuest'] ?? false) !== true || !filter_var((string)($targetReply['ip'] ?? ''), FILTER_VALIDATE_IP)) {
             $replyEditError = 'could not find a guest IP to purge.';
         } else {
@@ -237,6 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $guestbookPurgeResult = fridg3_guestbook_purge_entries_by_ip((string)$targetReply['ip']);
             $purgedCount = (int)$purgeResult['deleted'] + (int)$guestbookPurgeResult['deleted'];
             $failedCount = (int)$purgeResult['failed'] + (int)$guestbookPurgeResult['failed'];
+            fridg3_moderator_audit_log('purged IP content', ['ip' => (string)$targetReply['ip'], 'deleted' => $purgedCount, 'failed' => $failedCount]);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_purged=' . rawurlencode((string)$purgedCount) . '&ip_purge_failed=' . rawurlencode((string)$failedCount));
             exit;
@@ -247,6 +262,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($replyId === '' || !fridg3_feed_delete_reply((string)$postIdNoExt, $replyId)) {
             $replyEditError = 'failed to delete reply.';
         } else {
+            fridg3_moderator_audit_log('deleted feed reply', ['postId' => (string)$postIdNoExt, 'replyId' => $replyId, 'author' => (string)($targetReply['username'] ?? '')], [
+                'body' => (string)($targetReply['body'] ?? ''),
+                'format' => (string)($targetReply['format'] ?? 'legacy'),
+            ]);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?reply_deleted=1');
             exit;
@@ -263,6 +282,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($replyId === '' || !fridg3_feed_update_reply((string)$postIdNoExt, $replyId, $replyBody, $submittedReplyFormat)) {
             $replyEditError = 'failed to update reply.';
         } else {
+            fridg3_moderator_audit_log('edited feed reply', ['postId' => (string)$postIdNoExt, 'replyId' => $replyId, 'author' => (string)($targetReply['username'] ?? '')], [
+                'body' => (string)($targetReply['body'] ?? ''),
+                'format' => (string)($targetReply['format'] ?? 'legacy'),
+            ], [
+                'body' => $replyBody,
+                'format' => $submittedReplyFormat,
+            ]);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?reply_updated=1');
             exit;
@@ -386,7 +412,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -417,7 +443,7 @@ $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);
@@ -433,14 +459,29 @@ $canEdit = false;
 if (isset($_SESSION['user'])) {
     $currentUser = $_SESSION['user']['username'] ?? '';
     $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
-    $canEdit = ($currentUser === $username) || $isAdmin;
+    $canEdit = ($currentUser === $username) || $isAdmin
+        || (!empty($_SESSION['user']['isModerator']) && !fridg3_feed_account_is_admin($username));
 }
 
 // Build edit icon if allowed
 $editIcon = '';
-if ($canEdit) {
+if ($canEdit || (fridg3_feed_current_user_can_moderate_author($username) && filter_var($postAuthorIp, FILTER_VALIDATE_IP))) {
     $postId = urlencode($postFilename);
-    $editIcon = '<span id="post-edit-feed" data-tooltip="edit post"><a href="/feed/edit?post=' . $postId . '" style="color: inherit; text-decoration: none;"><i class="fa-solid fa-pencil"></i></a></span>';
+    $editIcon = '<details class="site-action-menu"><summary data-tooltip="post actions" aria-label="post actions"><i class="fa-solid fa-ellipsis"></i></summary>'
+        . '<div class="site-action-menu-dropdown">';
+    if ($canEdit) {
+        $editIcon .= '<a class="site-action-menu-item" href="/feed/edit?post=' . $postId . '"><i class="fa-solid fa-pencil"></i><span>edit</span></a>';
+    }
+    if (fridg3_feed_current_user_can_moderate_author($username) && filter_var($postAuthorIp, FILTER_VALIDATE_IP)) {
+        $editIcon .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($postAuthorIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
+    }
+    if ($canEdit) {
+        $editIcon .= '<form class="site-action-menu-form" method="post" action="/feed/edit?post=' . $postId . '" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete feed post?" data-confirm-detail="this removes the feed post, attached media, voice notes, and replies." data-confirm-text="delete" data-cancel-text="cancel">'
+            . '<input type="hidden" name="delete" value="1">'
+            . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-trash"></i><span>delete</span></button>'
+            . '</form>';
+    }
+    $editIcon .= '</div></details>';
 }
 
 $bookmarkIcon = '<span id="post-bookmark-feed" data-tooltip="save post"><i class="fa-regular fa-bookmark"></i></span>';
@@ -452,7 +493,7 @@ $postMeta .= $bookmarkIcon;
 
 // Replace placeholders in content
 $content = str_replace('{username}', $safeUser, $content);
-$postUserIpAttribute = !empty($_SESSION['user']['isAdmin'])
+$postUserIpAttribute = fridg3_feed_current_user_can_moderate_author($username)
     ? ' data-context-tooltip="' . (filter_var($postAuthorIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($postAuthorIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
     : '';
 $content = str_replace('<span id="post-username">@' . $safeUser . '</span>', '<span id="post-username"' . $postUserIpAttribute . '>@' . $safeUser . '</span>', $content);
@@ -585,35 +626,50 @@ $renderReply = function (array $reply, int $depth = 0) use (
     $canEditThisReply = $canManageThisReply && !$guestFilteredEditLocked;
     $isEditingReply = $canEditThisReply && $replyEditTargetId !== '' && $replyId === $replyEditTargetId;
     $replyActionsHtml = '';
-    if ($replyId !== '' && ($canCreateReply || $canManageThisReply || (!empty($_SESSION['user']['isAdmin']) && $isGuestReply && $replyIp !== ''))) {
+    if ($replyId !== '' && ($canCreateReply || $canManageThisReply || (fridg3_feed_current_user_is_moderator() && $isGuestReply && $replyIp !== ''))) {
         $replyActionsHtml = '<span class="feed-reply-actions">';
         if ($canCreateReply) {
             $replyActionsHtml .= '<a class="feed-reply-action-link feed-reply-target-button" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?reply_to=' . rawurlencode($replyId) . '#feed-reply-form" data-feed-reply-to="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '" data-feed-reply-user="' . htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8') . '" data-tooltip="reply to comment"><i class="fa-solid fa-reply"></i></a>';
         }
+        $replyMenuItems = '';
         if ($canEditThisReply) {
-            $replyActionsHtml .= '<a class="feed-reply-action-link" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?edit_reply=' . rawurlencode($replyId) . '" data-tooltip="edit reply"><i class="fa-solid fa-pencil"></i></a>';
+            $replyMenuItems .= '<a class="site-action-menu-item" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?edit_reply=' . rawurlencode($replyId) . '"><i class="fa-solid fa-pencil"></i><span>edit</span></a>';
         }
-        if (!empty($_SESSION['user']['isAdmin']) && $isGuestReply && $replyIp !== '') {
-            $replyActionsHtml .= '<form class="feed-reply-delete-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks new feed replies and guestbook posts from this IP." data-confirm-text="ban IP" data-cancel-text="cancel">'
+        if (fridg3_feed_current_user_is_moderator() && $isGuestReply && filter_var($replyIp, FILTER_VALIDATE_IP)) {
+            $replyMenuItems .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($replyIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
+            if (fridg3_feed_is_ip_banned($replyIp)) {
+                $replyMenuItems .= '<form class="site-action-menu-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-confirm-title="unban IP?" data-confirm-detail="this allows new feed replies and guestbook posts from this IP." data-confirm-text="unban" data-cancel-text="cancel">'
+                . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
+                . '<input type="hidden" name="reply_action" value="unban_ip">'
+                . '<input type="hidden" name="reply_id" value="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '">'
+                . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-unlock"></i><span>unban</span></button>'
+                . '</form>';
+            } else {
+                $replyMenuItems .= '<form class="site-action-menu-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-ban-reason-prompt="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks new feed replies and guestbook posts from this IP." data-confirm-text="continue" data-cancel-text="cancel">'
                 . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
                 . '<input type="hidden" name="reply_action" value="ban_ip">'
                 . '<input type="hidden" name="reply_id" value="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '">'
-                . '<button type="submit" class="feed-reply-action-button" data-tooltip="ban IP"><i class="fa-solid fa-ban"></i></button>'
-                . '</form>'
-                . '<form class="feed-reply-delete-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-admin-password-confirm="1" data-confirm-title="purge guest content from this IP?" data-confirm-detail="this deletes feed replies and guestbook posts from this IP. it does not ban or unban the IP." data-confirm-text="purge content" data-cancel-text="cancel" data-password-title="confirm guest purge" data-password-detail="enter your admin password to purge all guest content from this IP.">'
+                . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-ban"></i><span>ban</span></button>'
+                . '</form>';
+            }
+            $replyMenuItems .= '<form class="site-action-menu-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-admin-password-confirm="1" data-confirm-title="purge guest content from this IP?" data-confirm-detail="this deletes feed replies and guestbook posts from this IP. it does not ban or unban the IP." data-confirm-text="purge content" data-cancel-text="cancel" data-password-title="confirm guest purge" data-password-detail="enter your password to purge all guest content from this IP.">'
                 . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
                 . '<input type="hidden" name="reply_action" value="purge_ip_replies">'
                 . '<input type="hidden" name="reply_id" value="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '">'
-                . '<button type="submit" class="feed-reply-action-button" data-tooltip="purge IP content"><i class="fa-solid fa-broom"></i></button>'
+                . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-eraser"></i><span>purge</span></button>'
                 . '</form>';
         }
         if ($canManageThisReply) {
-            $replyActionsHtml .= '<form class="feed-reply-delete-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-confirm-title="delete reply?" data-confirm-detail="this removes the reply from this feed post." data-confirm-text="delete" data-cancel-text="cancel">'
+            $replyMenuItems .= '<form class="site-action-menu-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-confirm-title="delete reply?" data-confirm-detail="this removes the reply from this feed post." data-confirm-text="delete" data-cancel-text="cancel">'
             . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
             . '<input type="hidden" name="reply_action" value="delete">'
             . '<input type="hidden" name="reply_id" value="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '">'
-            . '<button type="submit" class="feed-reply-action-button" data-tooltip="delete reply"><i class="fa-solid fa-trash"></i></button>'
+            . '<button type="submit" class="site-action-menu-item"><i class="fa-solid fa-trash"></i><span>delete</span></button>'
             . '</form>';
+        }
+        if ($replyMenuItems !== '') {
+            $replyActionsHtml .= '<details class="site-action-menu"><summary data-tooltip="reply actions" aria-label="reply actions"><i class="fa-solid fa-ellipsis"></i></summary>'
+                . '<div class="site-action-menu-dropdown">' . $replyMenuItems . '</div></details>';
         }
         $replyActionsHtml .= '</span>';
     }
@@ -680,12 +736,18 @@ $renderReply = function (array $reply, int $depth = 0) use (
                 . fridg3_disable_composer_controls(substr($replyEditFormHtml, strlen('<div class="feed-reply-box feed-reply-edit-box">')));
         }
     }
-    $guestIpAttribute = !empty($_SESSION['user']['isAdmin'])
+    $guestIpAttribute = fridg3_feed_current_user_can_moderate_author((string)($reply['username'] ?? ''))
         ? ' data-context-tooltip="' . (filter_var($replyIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($replyIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
         : '';
     $replyUserHtml = $isGuestReply
         ? '<em' . $guestIpAttribute . '>' . $replyUser . '</em>'
         : '<span' . $guestIpAttribute . '>@' . $replyUser . '</span>';
+    $bannedVisibilityMarker = $canModerateReplies
+        && $isGuestReply
+        && filter_var($replyIp, FILTER_VALIDATE_IP)
+        && fridg3_feed_is_ip_banned($replyIp)
+            ? ' <em data-tooltip="this post is only visible to admins because the user was banned">(banned)</em>'
+            : '';
     $parentReferenceHtml = '';
     $parentId = (string)($reply['parentId'] ?? '');
     if ($parentId !== '' && isset($visibleRepliesById[$parentId])) {
@@ -700,7 +762,7 @@ $renderReply = function (array $reply, int $depth = 0) use (
     $replyAnchorId = $replyId !== '' ? ' id="reply-' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '"' : '';
     $replyHtml = '<div class="' . $replyClasses . '"' . $replyAnchorId . '>'
         . '<div class="feed-reply-header">'
-        . '<span class="feed-reply-username">' . $replyUserHtml . '</span>'
+        . '<span class="feed-reply-username">' . $replyUserHtml . $bannedVisibilityMarker . '</span>'
         . '<span class="feed-reply-date">' . $replyDate . $replyActionsHtml . '</span>'
         . '</div>'
         . $parentReferenceHtml

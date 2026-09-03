@@ -1,0 +1,28 @@
+<link rel="stylesheet" href="/tools/discord-export-viewer/style.css?v=20260823-2">
+
+<div id="discord-export-viewer">
+    <h1>discord export viewer</h1>
+    <h2>view and search Discord JSON exports without sending the files anywhere.</h2>
+
+    <div id="discord-export-picker">
+        <input id="discord-export-files" type="file" accept=".json,application/json" multiple>
+        <label id="discord-export-file-button" for="discord-export-files">Choose JSON file(s)</label>
+        <span id="discord-export-file-name">No files selected</span>
+    </div>
+    <p id="discord-export-privacy">Your files are read only by this browser tab. They are never uploaded to fridge.dev.</p>
+
+    <div id="discord-export-controls" hidden>
+        <input id="discord-export-search" type="search" placeholder="Search messages or authors">
+        <label class="discord-export-date-filter">After <input id="discord-export-after" type="date"></label>
+        <label class="discord-export-date-filter">Before <input id="discord-export-before" type="date"></label>
+        <button id="discord-export-sort" type="button">Sort: Newest → Oldest</button>
+        <button id="discord-export-images" type="button" aria-pressed="false">Images only: Off</button>
+        <button id="discord-export-videos" type="button" aria-pressed="false">Videos only: Off</button>
+        <span id="discord-export-status"></span>
+    </div>
+
+    <div id="discord-export-error" role="alert"></div>
+    <div id="discord-export-messages"></div>
+    <button id="discord-export-load-more" type="button">Load more</button>
+</div>
+<script src="/tools/discord-export-viewer/discord-export-viewer.js?v=20260823-4"></script>

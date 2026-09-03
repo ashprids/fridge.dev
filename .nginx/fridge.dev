@@ -76,11 +76,6 @@ server {
         include fastcgi_params;
     }
 	
-	# Allow public access to the off-topic archive JSON
-    location = /data/etc/off-topic-archive.json {
-        try_files $uri =404;
-    }
-
     # Guestbook entries contain IP metadata and must only be read through PHP
     location = /data/guestbook {
         return 403;

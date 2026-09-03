@@ -372,6 +372,33 @@ foreach (fridg3_targeted_notifications_load() as $targeted) {
     ];
 }
 
+$ipRestriction = fridg3_feed_banned_ip_record($currentClientIp);
+if ($ipRestriction !== null) {
+    $reason = trim((string)($ipRestriction['reason'] ?? ''));
+    $notificationId = trim((string)($ipRestriction['notificationId'] ?? ''));
+    if ($notificationId === '') {
+        $notificationId = hash('sha256', $currentClientIp . "\0" . (string)($ipRestriction['bannedAt'] ?? 'legacy'));
+    }
+    $message = ($reason !== '' ? 'Reason: ' . $reason . "\n\n" : '')
+        . 'Contact me at ashton@fridge.dev if you think this was in error.';
+    $messageHtml = $reason !== ''
+        ? '<strong>Reason:</strong> ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '<br><br>'
+            . 'Contact me at ashton@fridge.dev if you think this was in error.'
+        : 'Contact me at ashton@fridge.dev if you think this was in error.';
+    $events[] = [
+        'key' => 'ip-restriction:' . $notificationId,
+        'type' => 'targeted',
+        'title' => 'Your IP address has been restricted from uploading content to the website',
+        'actor' => '',
+        'actorIsGuest' => false,
+        'action' => '',
+        'body' => $message,
+        'bodyHtml' => $messageHtml,
+        'url' => 'mailto:ashton@fridge.dev',
+        'date' => feed_notifications_iso_date((string)($ipRestriction['bannedAt'] ?? '')),
+    ];
+}
+
 $inboxRequested = (string)($_GET['view'] ?? $_POST['view'] ?? '') === 'inbox';
 if ($inboxRequested) {
     $identity = feed_notifications_inbox_identity($currentUsernameKey, $guestBrowserId, $currentClientIp);

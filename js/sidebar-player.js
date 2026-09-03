@@ -89,7 +89,8 @@ function initSidebarAndBBCode() {
         document.querySelectorAll('.feed-post-link[data-post-href]').forEach(card => {
             if (card.dataset.postNavigationBound === '1') return;
             card.dataset.postNavigationBound = '1';
-            const openPost = () => {
+            const openPost = (event) => {
+                if (event && event.target.closest('[data-no-card-navigation], a, button, input, form, details, summary')) return;
                 const href = card.dataset.postHref || '';
                 if (!href) return;
                 if (typeof loadPageIntoContent === 'function') loadPageIntoContent(href);
@@ -98,8 +99,9 @@ function initSidebarAndBBCode() {
             card.addEventListener('click', openPost);
             card.addEventListener('keydown', event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
+                if (event.target.closest('[data-no-card-navigation], a, button, input, form, details, summary')) return;
                 event.preventDefault();
-                openPost();
+                openPost(event);
             });
         });
 

@@ -9,11 +9,14 @@ fridg3_start_session();
 fridg3_refresh_current_user_posting_restriction();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
+fridg3_feed_refresh_session_user();
 
 $title = 'edit guestbook entry';
-$description = 'edit a guestbook message (admin or owner).';
+$description = 'edit a guestbook message (moderator or owner).';
 
 $isAdmin = isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']);
+$isModerator = isset($_SESSION['user']) && !empty($_SESSION['user']['isModerator']);
+$canModerate = $isAdmin || $isModerator;
 $postingRestricted = fridg3_current_user_posting_restricted();
 
 // Best-effort client IP detection (single IP only)
@@ -36,7 +39,7 @@ function guestbook_client_ip(): string {
 }
 
 $clientIp = guestbook_client_ip();
-$isClientIpBanned = !$isAdmin && fridg3_feed_is_ip_banned($clientIp);
+$isClientIpBanned = !$canModerate && fridg3_feed_is_ip_banned($clientIp);
 $postingBlocked = $postingRestricted || $isClientIpBanned;
 
 $status_message = '';
@@ -84,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $target_file = basename($_POST['file'] ?? '');
     $entry = load_guestbook_entry($posts_dir, $target_file);
     $isOwner = isset($ip_index[$clientIp]) && $ip_index[$clientIp] === $target_file;
-    if (!$entry || (!$isAdmin && !$isOwner)) {
+    if (!$entry || (!$canModerate && !$isOwner)) {
         $status_message = 'could not load that entry.';
         $status_class = 'error';
     } else {
@@ -117,6 +120,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $status_message = 'could not save your changes. please try again later.';
                 $status_class = 'error';
             } else {
+                fridg3_moderator_audit_log('edited guestbook post', ['file' => $target_file, 'author' => (string)($entry['name'] ?? '')], [
+                    'name' => (string)($entry['name'] ?? ''),
+                    'body' => (string)($entry['message'] ?? ''),
+                ], [
+                    'name' => $name,
+                    'body' => $message,
+                ]);
                 $_SESSION['guestbook_status'] = 'post updated.';
                 header('Location: /guestbook');
                 exit;
@@ -130,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $target_file = basename($_GET['file'] ?? '');
     $entry = load_guestbook_entry($posts_dir, $target_file);
     $isOwner = isset($ip_index[$clientIp]) && $ip_index[$clientIp] === $target_file;
-    if (!$entry || (!$isAdmin && !$isOwner)) {
+    if (!$entry || (!$canModerate && !$isOwner)) {
         $_SESSION['guestbook_status'] = 'invalid entry.';
         header('Location: /guestbook');
         exit;
@@ -153,7 +163,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -174,7 +184,7 @@ $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 $content = file_get_contents($content_path);

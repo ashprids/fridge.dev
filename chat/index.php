@@ -1035,7 +1035,7 @@ function chat_render_page(string $title, string $description, string $content): 
         $templatePath = chat_find_template_file('template.html');
     }
     if (!$templatePath) {
-        die('page template not found. report this issue to me@fridge.dev.');
+        die('page template not found. report this issue to ashton@fridge.dev.');
     }
 
     $html = (string)file_get_contents($templatePath);

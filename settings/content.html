@@ -29,22 +29,12 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 </div>
 <br>
 <h4>hard-bans</h4>
-<div class="checkbox-group">
-    <label class="checkbox-label">
-        <input type="checkbox" class="checkbox" id="enforce-hard-bans-toggle">
-        <span data-tooltip="<b>when enabled:</b>\nrequests are checked against exact-IP\nwhitelist overrides, the manual hard-ban\nlist, source ban lists, and the configured\nidentity enforcement policy.\n\n<b>when disabled:</b>\nthe authorization endpoint immediately\nallows every request. it does not resolve\nthe client IP, read any ban list, inspect\nidentity data, or perform a hard-ban check.">enforce hard bans</span>
-    </label>
-</div>
-<div class="checkbox-group">
-    <label class="checkbox-label">
-        <input type="checkbox" class="checkbox" id="strict-hard-bans-toggle">
-        <span data-tooltip="<b>when enabled:</b>\nlater IPs used by a recognized banned\nbrowser are blocked through its existing\nprimary identity. associated IPs stay only\nin hard-ban-identities.json; they are not\nmade primary, copied to the manual list,\nor added to the source-list index.\n\n<b>when disabled:</b>\nonly manual IPs and IPs from source banlists\nare checked. hard-ban-identities.json and\nall other browser tracking are completely\nignored and are not updated.">punish associated identities and future IPs</span>
-    </label>
-</div>
+<button id="form-button" type="button" data-tooltip="manage IPs blocked from the entire website" onclick="window.location='/settings/banned-ips'">manage hard-banned IPs</button>
 <br>
 <h4>site management</h4>
 <button id="form-button" type="button" data-tooltip="regenerate the sitemap.xml file" data-action="generate-sitemap">regenerate sitemap</button>
-<button id="form-button" type="button" data-tooltip="admin-only system and website diagnostics" onclick="window.location='/settings/sysinfo'">open system info</button>
+<button id="open-system-info-button" type="button" data-tooltip="admin-only system and website diagnostics" onclick="window.location='/settings/sysinfo'" hidden>open system info</button>
+<button id="form-button" type="button" data-tooltip="review every action performed by moderators" onclick="window.location='/settings/audit-log'">audit log</button>
 <button id="form-button" type="button" data-tooltip="create banners and one-time popups for users and guests" onclick="window.location='/settings/notices'">manage notices</button>
 <br>
 <h4>chat</h4>
@@ -53,11 +43,15 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <h4>account management</h4>
 <button id="form-button" type="button" data-tooltip="(admin-only) generate a new account with a random password" onclick="window.location='/account/create'">create new account</button>
 <button id="form-button" type="button" data-tooltip="(admin-only) configure all made accounts" onclick="window.location='/account/admin'">manage accounts</button>
-<button id="form-button" type="button" data-tooltip="review feed and guestbook posts and manage guest IP moderation" onclick="window.location='/settings/guests'">manage guests</button>
-<button id="form-button" type="button" data-tooltip="manage IPs blocked from the entire website" onclick="window.location='/settings/banned-ips'">manage hard-banned IPs</button>
-<br><br><hr><br>
 </div>
 </details>
+<span id="admin-settings-separator" style="display:none"><hr></span>
+<span id="moderator-settings">
+<h3>moderator settings</h3>
+<button id="form-button" type="button" data-tooltip="review feed and guestbook posts and manage user IP moderation" onclick="window.location='/settings/guests'">manage users</button>
+<button id="form-button" type="button" data-tooltip="review content-upload bans, reasons, moderators, and post history" onclick="window.location='/settings/restricted-ips'">manage bans</button>
+<br><br><hr><br>
+</span>
 <span id="toast-settings">
 <h3>toast settings</h3>
 <h4>personality (json)</h4>
@@ -116,7 +110,7 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <div class="checkbox-group" id="debug-mode-setting">
     <label class="checkbox-label">
         <input type="checkbox" class="checkbox" id="debug-mode-toggle">
-        <span data-tooltip="show the client and server debug logs (desktop only)">debug mode</span>
+        <span data-tooltip="show the client and server debug logs">debug mode</span>
     </label>
 </div>
 <br><br><hr><br>

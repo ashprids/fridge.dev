@@ -33,5 +33,31 @@ Y888   , Y888 888P 888 888  888   ,ee 888 Y888   ,  888
     <input id="textbox" type="text" name="security_answer" inputmode="numeric" autocomplete="off" required>
     <br><br>
 
-    <button id="form-button" type="submit" data-tooltip="send this contact submission">send</button>
+    <button id="form-button" type="submit" data-tooltip="{send_button_tooltip}"{send_button_attributes}>{send_button_text}</button>
 </form>
+
+<script>
+(() => {
+    const button = document.querySelector('[data-contact-cooldown-until]');
+    if (!button) return;
+    const until = Number(button.dataset.contactCooldownUntil || 0) * 1000;
+    const update = () => {
+        const remaining = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+        if (remaining === 0) {
+            button.textContent = 'send';
+            button.disabled = false;
+            button.removeAttribute('aria-disabled');
+            button.classList.remove('form-button-disabled');
+            button.removeAttribute('data-contact-cooldown-until');
+            button.setAttribute('data-tooltip', 'send this contact submission');
+            return;
+        }
+        const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
+        const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
+        const seconds = String(remaining % 60).padStart(2, '0');
+        button.textContent = `${hours}:${minutes}:${seconds}`;
+        window.setTimeout(update, 250);
+    };
+    update();
+})();
+</script>

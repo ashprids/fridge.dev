@@ -450,7 +450,7 @@ if (!$template_path && $template_name !== 'template.html') {
     $template_path = find_template_file('template.html');
 }
 if (!$template_path) {
-    die('page template not found. report this issue to me@fridge.dev.');
+    die('page template not found. report this issue to ashton@fridge.dev.');
 }
 
 $template = file_get_contents($template_path);
@@ -460,7 +460,7 @@ if (function_exists('apply_preferred_theme_stylesheet')) {
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
-    die('content.html not found. report this issue to me@fridge.dev.');
+    die('content.html not found. report this issue to ashton@fridge.dev.');
 }
 
 // Load drafts from /data/journal/drafts for display under the editor
