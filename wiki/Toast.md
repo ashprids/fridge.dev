@@ -189,6 +189,7 @@ Administrators can bypass the deploy approval flow with `/shareupdate latest` fo
     "model": "openai/gpt-oss-20b",
     "website_model": "openai/gpt-oss-120b",
     "vision_model": "qwen/qwen3.6-27b",
+    "reasoning_effort": "none",
     "temperature": 0.8,
     "top_p": 0.95,
     "max_completion_tokens": 700,
@@ -200,6 +201,8 @@ Administrators can bypass the deploy approval flow with `/shareupdate latest` fo
 ```
 
 If `groq.api_key` is empty, Toast continues non-AI duties and logs inbound DMs, but skips AI DM replies and automatic feed replies; feed draft generation returns an error. `feed_model` remains accepted as a legacy fallback for `website_model`.
+
+Toast and administrators can edit all of the shared Groq request settings from Toast's settings panel: the six scenario models, reasoning effort, temperature, top P, maximum completion tokens, request timeout, history length, and vision-image limit. An empty reasoning selection leaves the model default in place. Qwen 3.6 27B supports `none` and `default`; use `none` for Toast's normal chat and feed writing. Other reasoning values remain available for models that support them. Every PHP and Python completion path reads these values from `toast.json` for each request. Feed output also removes any `<think>...</think>` markup defensively so private reasoning cannot appear in a draft or reply.
 
 Related runtime files are:
 

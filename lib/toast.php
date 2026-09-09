@@ -320,27 +320,10 @@ if (!function_exists('fridg3_toast_load_groq_config')) {
             $groq = [];
         }
 
-        $coerceFloat = static function ($value, float $default, float $min, float $max): float {
-            if (!is_numeric($value)) {
-                return $default;
-            }
-            return max($min, min($max, (float)$value));
-        };
-        $coerceInt = static function ($value, int $default, int $min, int $max): int {
-            if (!is_numeric($value)) {
-                return $default;
-            }
-            return max($min, min($max, (int)$value));
-        };
-
-        return [
+        return array_merge([
             'api_key' => trim((string)($groq['api_key'] ?? '')),
             'model' => toast_model_for($groq, 'feed_replies'),
-            'temperature' => $coerceFloat($groq['temperature'] ?? null, 0.8, 0.0, 2.0),
-            'top_p' => $coerceFloat($groq['top_p'] ?? null, 0.95, 0.0, 1.0),
-            'max_completion_tokens' => $coerceInt($groq['max_completion_tokens'] ?? null, 500, 1, 2048),
-            'timeout_seconds' => $coerceInt($groq['timeout_seconds'] ?? null, 25, 5, 120),
-        ];
+        ], toast_groq_settings($groq));
     }
 }
 

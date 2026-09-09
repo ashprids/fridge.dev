@@ -280,11 +280,23 @@ def get_groq_config() -> dict:
         'vision_model': str(groq_config.get('vision_model', DEFAULT_GROQ_VISION_MODEL)).strip() or DEFAULT_GROQ_VISION_MODEL,
         'temperature': coerce_float(groq_config.get('temperature'), 0.8, 0.0, 2.0),
         'top_p': coerce_float(groq_config.get('top_p'), 0.95, 0.0, 1.0),
-        'max_completion_tokens': coerce_int(groq_config.get('max_completion_tokens'), 700, 1, 4096),
+        'max_completion_tokens': coerce_int(groq_config.get('max_completion_tokens'), 700, 1, 16384),
         'timeout_seconds': coerce_int(groq_config.get('timeout_seconds'), 30, 5, 120),
         'max_history_messages': coerce_int(groq_config.get('max_history_messages'), 12, 0, 30),
         'max_vision_images': coerce_int(groq_config.get('max_vision_images'), 5, 0, 5),
+        'reasoning_effort': str(groq_config.get('reasoning_effort', '')).strip() if str(groq_config.get('reasoning_effort', '')).strip() in ('none', 'default', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max') else '',
     }
+
+def apply_groq_request_settings(payload: dict, groq_config: dict) -> dict:
+    payload.update({key: groq_config[key] for key in ('temperature', 'top_p', 'max_completion_tokens')})
+    if groq_config['reasoning_effort']:
+        payload['reasoning_effort'] = groq_config['reasoning_effort']
+    return payload
+
+def strip_reasoning_markup(content: str) -> str:
+    content = re.sub(r'<think\b[^>]*>.*?</think\s*>', '', content or '', flags=re.I | re.S)
+    content = re.sub(r'^\s*<think\b[^>]*>.*$', '', content, flags=re.I | re.S)
+    return content.strip()
 
 def scenario_model(groq_config: dict, scenario: str) -> str:
     policy = json.loads((Path(__file__).resolve().parents[3] / 'lib/toast-model-policy.json').read_text())
@@ -1277,7 +1289,7 @@ async def request_groq_dm_reply(user, current_message: str, attachments=None, cu
 
     vision_attachments = get_vision_attachments(attachments, groq_config['max_vision_images'])
     model = scenario_model(groq_config, 'discord_images' if vision_attachments else 'discord_text')
-    payload = {
+    payload = apply_groq_request_settings({
         'model': model,
         'messages': build_groq_messages(
             user,
@@ -1286,10 +1298,7 @@ async def request_groq_dm_reply(user, current_message: str, attachments=None, cu
             attachments,
             current_message_ids,
         ),
-        'temperature': groq_config['temperature'],
-        'top_p': groq_config['top_p'],
-        'max_completion_tokens': groq_config['max_completion_tokens'],
-    }
+    }, groq_config)
     headers = {
         'Authorization': f"Bearer {api_key}",
         'Content-Type': 'application/json',
@@ -1319,7 +1328,7 @@ async def request_groq_dm_reply(user, current_message: str, attachments=None, cu
         return ''
 
     message = choices[0].get('message', {})
-    content = str(message.get('content', '')).strip() if isinstance(message, dict) else ''
+    content = strip_reasoning_markup(str(message.get('content', ''))) if isinstance(message, dict) else ''
     if not content:
         logger.warning("Groq response content was empty")
     diagnostics.info('Discord AI reply completed characters=%s', len(content))
@@ -1413,11 +1422,7 @@ async def website_chat_reply_handler(request):
     except Exception:
         logger.exception('Could not load website chat model policy')
         return website_chat_failure('model_config_failed')
-    request_payload = {
-        'model': model, 'messages': messages,
-        'temperature': groq_config['temperature'], 'top_p': groq_config['top_p'],
-        'max_completion_tokens': groq_config['max_completion_tokens'],
-    }
+    request_payload = apply_groq_request_settings({'model': model, 'messages': messages}, groq_config)
     headers = {'Authorization': f"Bearer {groq_config['api_key']}", 'Content-Type': 'application/json'}
     stage = 'model_catalog'
     try:
@@ -1453,7 +1458,7 @@ async def website_chat_reply_handler(request):
     if isinstance(choices, list) and choices and isinstance(choices[0], dict):
         finish_reason = choices[0].get('finish_reason', '')
         if isinstance(choices[0].get('message'), dict):
-            reply = str(choices[0]['message'].get('content', '') or '').strip()
+            reply = strip_reasoning_markup(str(choices[0]['message'].get('content', '') or ''))
     if not reply:
         return website_chat_failure('completion_token_limit' if finish_reason == 'length' else 'completion_empty', model, 200, True)
     chunks = split_natural_messages(reply) or [reply]

@@ -28,7 +28,8 @@ if ($response===false) toast_reply_response(['ok'=>false,'error'=>'Could not rea
 if ($status>=400) toast_reply_response(['ok'=>false,'error'=>'Groq rejected the reply request (HTTP '.$status.').'],502);
 $data=json_decode($response,true);$text=$data['choices'][0]['message']['content']??null;
 if (!is_string($text) || trim($text)==='') toast_reply_response(['ok'=>false,'error'=>'Groq returned no reply text. Try again or check the model and token budget.'],502);
-$text=trim($text);
+$text=toast_strip_reasoning_markup($text);
+if ($text==='') toast_reply_response(['ok'=>false,'error'=>'Groq returned reasoning without reply text. Set reasoning effort to none or generate again.'],502);
 if (strlen($text)>4000) toast_reply_response(['ok'=>false,'error'=>'The generated reply was too long. Generate a shorter reply again.'],502);
 $token=bin2hex(random_bytes(24));
 $_SESSION['toast_reply_drafts']=array_filter($_SESSION['toast_reply_drafts']??[],static fn($draft)=>is_array($draft)&&($draft['expires']??0)>=time());

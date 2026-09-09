@@ -63,14 +63,10 @@ function toast_feed_load_groq_config(): array
         $groq = [];
     }
 
-    return [
+    return array_merge([
         'api_key' => trim((string)($groq['api_key'] ?? '')),
         'model' => toast_model_for($groq, 'feed_drafts'),
-        'temperature' => toast_feed_coerce_float($groq['temperature'] ?? null, 0.8, 0.0, 2.0),
-        'top_p' => toast_feed_coerce_float($groq['top_p'] ?? null, 0.95, 0.0, 1.0),
-        'max_completion_tokens' => toast_feed_coerce_int($groq['max_completion_tokens'] ?? null, 700, 1, 4096),
-        'timeout_seconds' => toast_feed_coerce_int($groq['timeout_seconds'] ?? null, 30, 5, 120),
-    ];
+    ], toast_groq_settings($groq));
 }
 
 function toast_feed_strip_images(string $body): string
@@ -289,10 +285,7 @@ function toast_feed_length_profile(int $length): array
 function toast_feed_build_payload(array $groq, string $context, string $avoidToastPosts, string $spark, string $userInstruction, array $lengthProfile): array
 {
     $maxCompletionTokens = min((int)$groq['max_completion_tokens'], (int)$lengthProfile['token_cap']);
-    $temperature = max((float)$groq['temperature'], 1.08);
-    $topP = max((float)$groq['top_p'], 0.97);
-
-    return [
+    $payload = [
         'model' => $groq['model'],
         'messages' => [
             [
@@ -350,10 +343,12 @@ function toast_feed_build_payload(array $groq, string $context, string $avoidToa
                 'content' => $userInstruction,
             ],
         ],
-        'temperature' => $temperature,
-        'top_p' => $topP,
+        'temperature' => (float)$groq['temperature'],
+        'top_p' => (float)$groq['top_p'],
         'max_completion_tokens' => $maxCompletionTokens,
     ];
+    if ($groq['reasoning_effort'] !== '') $payload['reasoning_effort'] = $groq['reasoning_effort'];
+    return $payload;
 }
 
 function toast_feed_request_groq(array $payload, array $groq): array
@@ -585,7 +580,7 @@ if (!is_array($response)) {
     toast_feed_json_error(502, 'groq_invalid_json', 'Groq returned invalid JSON.');
 }
 
-$content = trim((string)($response['choices'][0]['message']['content'] ?? ''));
+$content = toast_strip_reasoning_markup((string)($response['choices'][0]['message']['content'] ?? ''));
 $content = preg_replace('/^```(?:bbcode|markdown|text)?\s*/i', '', $content);
 $content = preg_replace('/\s*```$/', '', (string)$content);
 $content = toast_feed_strip_generated_metadata((string)$content);

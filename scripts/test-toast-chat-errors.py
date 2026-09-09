@@ -8,9 +8,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 source = Path(__file__).resolve().parents[1] / 'others/toast-discord-bot/bot/main.py'
-names = {'active_model_error', 'verify_active_model', 'website_chat_failure', 'website_chat_reply_handler'}
+names = {'active_model_error', 'verify_active_model', 'apply_groq_request_settings', 'strip_reasoning_markup', 'website_chat_failure', 'website_chat_reply_handler'}
 nodes = [n for n in ast.parse(source.read_text()).body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names]
-config = {'api_key': 'test-only', 'temperature': .8, 'top_p': .95, 'max_completion_tokens': 700, 'timeout_seconds': 30}
+config = {'api_key': 'test-only', 'temperature': .8, 'top_p': .95, 'max_completion_tokens': 700, 'timeout_seconds': 30, 'reasoning_effort': 'none'}
 ns = dict(diagnostics=logging.getLogger('test.diagnostics'), asyncio=asyncio, json=json, re=re, logger=logging.getLogger('test'),
           web=SimpleNamespace(json_response=lambda data, **kwargs: data),
           GROQ_FALLBACK_REPLY='fallback', AI_DM_MIN_SEND_DELAY_SECONDS=5,
@@ -46,7 +46,7 @@ class Request:
 
 async def run():
     active = Response(200, {'data': [{'id': 'test-model', 'active': True}]})
-    answer = Response(200, {'choices': [{'message': {'content': 'hello'}}]})
+    answer = Response(200, {'choices': [{'message': {'content': '<think>private</think>hello'}}]})
     cases = [
         (active, answer, None),
         (Response(403, {}), answer, 'model_catalog_http'),
@@ -64,6 +64,7 @@ async def run():
         ns['ClientSession'] = lambda **kwargs: session
         result = await ns['website_chat_reply_handler'](Request())
         assert result.get('diagnostic', {}).get('code') == code, result
+        if code is None: assert result['chunks'] == ['hello'] and session.completion is answer
         assert 'SECRET' not in json.dumps(result)
         if code and code.startswith('model_'): assert session.posts == 0
         if completion.status == 429 if isinstance(completion, Response) else False:

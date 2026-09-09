@@ -19,7 +19,7 @@ $path = dirname(__DIR__, 2) . '/data/etc/toast.json';
 if ($method === 'POST') {
     $input = json_decode((string)file_get_contents('php://input'), true);
     if (!is_array($input) || !is_string($input['csrf'] ?? null) || !hash_equals($csrf, $input['csrf'])) toast_models_response(['error' => 'Invalid request token.'], 403);
-    try { $models = toast_validate_models($input['models'] ?? null); }
+    try { $models = toast_validate_models($input['models'] ?? null); $settings = toast_validate_groq_settings($input['settings'] ?? null); }
     catch (InvalidArgumentException $e) { toast_models_response(['error' => $e->getMessage()], 400); }
     $current = json_decode((string)@file_get_contents($path), true);
     $active = toast_active_models((string)($current['groq']['api_key'] ?? ''));
@@ -32,6 +32,10 @@ if ($method === 'POST') {
         if (!is_array($config)) throw new RuntimeException('Configuration is missing or invalid.');
         $config['groq'] = is_array($config['groq'] ?? null) ? $config['groq'] : [];
         $config['groq']['models'] = $models;
+        foreach ($settings as $key => $value) {
+            if ($key === 'reasoning_effort' && $value === '') unset($config['groq'][$key]);
+            else $config['groq'][$key] = $value;
+        }
         $temporary = tempnam(dirname($path), '.toast-models-');
         if (!$temporary) throw new RuntimeException('Could not save model settings.');
         try {
@@ -43,7 +47,7 @@ if ($method === 'POST') {
         } finally { if (is_file($temporary)) unlink($temporary); }
     } catch (Throwable $e) { toast_models_response(['error' => 'Could not save model settings.'], 500); }
     finally { flock($lock, LOCK_UN); fclose($lock); }
-    toast_models_response(['ok' => true, 'models' => $models]);
+    toast_models_response(['ok' => true, 'models' => $models, 'settings' => $settings]);
 }
 $config = json_decode((string)@file_get_contents($path), true);
 $groq = is_array($config['groq'] ?? null) ? $config['groq'] : [];
@@ -53,4 +57,4 @@ session_write_close();
 $available = toast_active_models((string)($groq['api_key'] ?? ''));
 $listError = $available === null ? 'Model list unavailable. Saving requires verification with Groq.' : '';
 $available ??= [];
-toast_models_response(['ok' => true, 'models' => $models, 'available' => $available, 'csrf' => $csrf, 'listError' => $listError]);
+toast_models_response(['ok' => true, 'models' => $models, 'settings' => toast_groq_settings($groq), 'available' => $available, 'csrf' => $csrf, 'listError' => $listError]);

@@ -2,6 +2,59 @@
 declare(strict_types=1);
 
 const TOAST_MODEL_SCENARIOS = ['discord_text', 'discord_images', 'website_chat_text', 'website_chat_images', 'feed_drafts', 'feed_replies'];
+const TOAST_REASONING_EFFORTS = ['', 'none', 'default', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+function toast_groq_settings(array $groq): array {
+    $float = static function ($value, float $default, float $min, float $max): float {
+        return is_numeric($value) ? max($min, min($max, (float)$value)) : $default;
+    };
+    $int = static function ($value, int $default, int $min, int $max): int {
+        return is_numeric($value) ? max($min, min($max, (int)$value)) : $default;
+    };
+    $effort = trim((string)($groq['reasoning_effort'] ?? ''));
+    if (!in_array($effort, TOAST_REASONING_EFFORTS, true)) $effort = '';
+    return [
+        'reasoning_effort' => $effort,
+        'temperature' => $float($groq['temperature'] ?? null, 0.8, 0.0, 2.0),
+        'top_p' => $float($groq['top_p'] ?? null, 0.95, 0.0, 1.0),
+        'max_completion_tokens' => $int($groq['max_completion_tokens'] ?? null, 700, 1, 16384),
+        'timeout_seconds' => $int($groq['timeout_seconds'] ?? null, 30, 5, 120),
+        'max_history_messages' => $int($groq['max_history_messages'] ?? null, 12, 0, 30),
+        'max_vision_images' => $int($groq['max_vision_images'] ?? null, 5, 0, 5),
+    ];
+}
+
+function toast_validate_groq_settings($settings): array {
+    if (!is_array($settings) || array_diff(array_keys($settings), array_keys(toast_groq_settings([])))) throw new InvalidArgumentException('Invalid Groq settings.');
+    $effort = $settings['reasoning_effort'] ?? null;
+    if (!is_string($effort) || !in_array($effort, TOAST_REASONING_EFFORTS, true)) throw new InvalidArgumentException('Choose a valid reasoning effort.');
+    $definitions = [
+        'temperature' => [0.0, 2.0], 'top_p' => [0.0, 1.0],
+        'max_completion_tokens' => [1, 16384], 'timeout_seconds' => [5, 120],
+        'max_history_messages' => [0, 30], 'max_vision_images' => [0, 5],
+    ];
+    $result = ['reasoning_effort' => $effort];
+    foreach ($definitions as $key => [$min, $max]) {
+        if (!is_int($settings[$key] ?? null) && !is_float($settings[$key] ?? null)) throw new InvalidArgumentException('Enter a numeric value for every Groq setting.');
+        $value = $settings[$key];
+        if ($value < $min || $value > $max) throw new InvalidArgumentException('A Groq setting is outside its allowed range.');
+        $result[$key] = in_array($key, ['temperature', 'top_p'], true) ? (float)$value : (int)$value;
+    }
+    return $result;
+}
+
+function toast_apply_groq_request_settings(array $payload, array $groq): array {
+    $settings = toast_groq_settings($groq);
+    foreach (['temperature', 'top_p', 'max_completion_tokens'] as $key) $payload[$key] = $settings[$key];
+    if ($settings['reasoning_effort'] !== '') $payload['reasoning_effort'] = $settings['reasoning_effort'];
+    return $payload;
+}
+
+function toast_strip_reasoning_markup(string $content): string {
+    $content = preg_replace('~<think\b[^>]*>.*?</think\s*>~is', '', $content);
+    $content = preg_replace('~^\s*<think\b[^>]*>.*$~is', '', (string)$content);
+    return trim((string)$content);
+}
 
 function toast_model_policy(): array {
     return json_decode((string)file_get_contents(__DIR__ . '/toast-model-policy.json'), true, 512, JSON_THROW_ON_ERROR);

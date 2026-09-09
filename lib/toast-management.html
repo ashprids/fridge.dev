@@ -1,7 +1,7 @@
 <style>
 #toast-inbox-button, #toast-chat-history-button { display: block; width: 100%; padding: 9px 12px; margin: 0 0 16px; font: inherit; color: var(--fg); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
 #toast-model-form { margin: 0 0 24px; }
-#toast-model-fields { display: grid; gap: 16px; }
+#toast-model-fields, #toast-groq-fields { display: grid; gap: 16px; }
 #toast-model-fields label { display: block; min-width: 0; font: inherit; }
 .toast-model-select-wrap { display: block; position: relative; margin-top: 8px; }
 .toast-model-select-wrap::after { content: ''; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px; border-right: 2px solid var(--fg); border-bottom: 2px solid var(--fg); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
@@ -19,9 +19,11 @@
 </div>
 
   <form id="toast-model-form" data-no-spa="1" hidden>
-      <h3>language models</h3>
+      <h3>Groq settings</h3>
       <div id="toast-model-fields"></div>
+      <h4>generation</h4>
+      <div id="toast-groq-fields"></div>
       <p id="toast-model-status" role="status"></p>
-      <button type="submit">save models</button>
+      <button type="submit">save Groq settings</button>
     </form>
-<script src="/js/toast-models.js?v=20260909-feed-replies-2"></script>
+<script src="/js/toast-models.js?v=20260909-groq-settings-1"></script>
