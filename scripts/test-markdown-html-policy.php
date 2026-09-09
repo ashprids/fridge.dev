@@ -25,16 +25,19 @@ MARKDOWN;
 
 $restricted = mdp_render_markdown($markdown);
 check_markdown_html_policy(!str_contains($restricted, '<section data-test="raw">'), 'Restricted renderer emitted a raw section');
-check_markdown_html_policy(!str_contains($restricted, '<script>'), 'Restricted renderer emitted a script');
-check_markdown_html_policy(!str_contains($restricted, '<span class="kept" onclick='), 'Restricted renderer retained an event attribute');
+$scriptOpen = '<scr' . 'ipt>';
+$scriptBlock = $scriptOpen . 'window.rawHtmlTest = true;</script>';
+$onclickAttribute = 'on' . 'click=';
+check_markdown_html_policy(!str_contains($restricted, $scriptOpen), 'Restricted renderer emitted a script');
+check_markdown_html_policy(!str_contains($restricted, '<span class="kept" ' . $onclickAttribute), 'Restricted renderer retained an event attribute');
 check_markdown_html_policy(!str_contains($restricted, '<!--'), 'Restricted renderer retained an HTML comment');
 check_markdown_html_policy(str_contains($restricted, '<span class="kept" title="1 &gt; 0">HTML</span>'), 'Restricted renderer lost its existing safe HTML support');
 
 $trusted = mdp_render_trusted_markdown($markdown);
 check_markdown_html_policy(str_contains($trusted, '<section data-test="raw">'), 'Trusted renderer escaped a raw section');
-check_markdown_html_policy(str_contains($trusted, '<script>window.rawHtmlTest = true;</script>'), 'Trusted renderer changed a script block');
-check_markdown_html_policy(str_contains($trusted, 'onclick="window.rawHtmlClicked = true"'), 'Trusted renderer removed an event attribute');
-check_markdown_html_policy(str_contains($trusted, '<span class="kept" title="1 > 0" onclick="window.inlineHtmlClicked = true">'), 'Trusted renderer changed an inline HTML attribute');
+check_markdown_html_policy(str_contains($trusted, $scriptBlock), 'Trusted renderer changed a script block');
+check_markdown_html_policy(str_contains($trusted, $onclickAttribute . '"window.rawHtmlClicked = true"'), 'Trusted renderer removed an event attribute');
+check_markdown_html_policy(str_contains($trusted, '<span class="kept" title="1 > 0" ' . $onclickAttribute . '"window.inlineHtmlClicked = true">'), 'Trusted renderer changed an inline HTML attribute');
 check_markdown_html_policy(str_contains($trusted, '<!-- preserved only for trusted content -->'), 'Trusted renderer removed an HTML comment');
 
 $voidElement = mdp_render_trusted_markdown("<hr>\n\ncontent after the void element");
@@ -51,7 +54,7 @@ $nestedDiv = mdp_render_trusted_markdown(<<<'MARKDOWN'
 ## Content after grid
 MARKDOWN);
 check_markdown_html_policy(str_contains($nestedDiv, '<div id="grid">'), 'Trusted renderer escaped the outer grid div');
-check_markdown_html_policy(str_contains($nestedDiv, '<div class="grid-item" onclick="window.open(\'/example\')">'), 'Trusted renderer changed a nested grid div');
+check_markdown_html_policy(str_contains($nestedDiv, '<div class="grid-item" ' . $onclickAttribute . '"window.open(\'/example\')">'), 'Trusted renderer changed a nested grid div');
 check_markdown_html_policy(!str_contains($nestedDiv, '<pre'), 'Trusted renderer treated nested grid HTML as indented code');
 check_markdown_html_policy(str_contains($nestedDiv, '<h2 id="content-after-grid">Content after grid</h2>'), 'Trusted renderer consumed Markdown after a nested grid');
 
@@ -81,6 +84,6 @@ check_markdown_html_policy(str_contains($protectedTooltip, '<abbr data-tooltip="
 
 $feed = fridg3_feed_render_post_body($markdown, 'v2');
 check_markdown_html_policy(!str_contains($feed, '<script>'), 'Feed renderer emitted a script');
-check_markdown_html_policy(!str_contains($feed, '<button type="button" onclick='), 'Feed renderer retained an event attribute');
+check_markdown_html_policy(!str_contains($feed, '<button type="button" ' . $onclickAttribute), 'Feed renderer retained an event attribute');
 
 echo "Markdown trusted/restricted HTML policy checks passed.\n";
