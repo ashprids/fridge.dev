@@ -49,7 +49,7 @@ if (!$canCreatePost) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && str_contains(strtolower((string)($_SERVER['CONTENT_TYPE'] ?? '')), 'application/json')) {
     $payload = json_decode((string)file_get_contents('php://input'), true);
     if (!is_array($payload) || ($payload['action'] ?? '') !== 'preview') mdp_json_response(['ok' => false, 'error' => 'invalid preview request'], 400);
-    mdp_json_response(['ok' => true, 'html' => mdp_render_markdown((string)($payload['markdown'] ?? ''))]);
+    mdp_json_response(['ok' => true, 'html' => mdp_render_trusted_markdown((string)($payload['markdown'] ?? ''))]);
 }
 
 $title = 'create journal post';

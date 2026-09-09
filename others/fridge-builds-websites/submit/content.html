@@ -1,0 +1,137 @@
+<style>
+.commission-form { max-width: 760px; }
+.commission-fieldset { min-width: 0; margin: 0 0 28px; padding: 0; border: 0; }
+.commission-fieldset legend,
+.commission-fieldset > h3 { margin: 0 0 10px; padding: 0; color: var(--fg); font-family: "MainBold", var(--emoji-font), monospace; font-size: 16px; }
+.commission-fieldset > p { margin: -3px 0 12px; }
+.commission-options { gap: 10px; }
+.commission-options :is(.radio-label, .checkbox-label) { align-items: flex-start; }
+.commission-options :is(.radio, .checkbox) { margin-top: 2px; }
+.commission-conditional { margin-top: 10px; }
+.commission-conditional > label { display: block; margin-bottom: 6px; color: var(--subtle); font-size: 13px; }
+.commission-conditional[hidden] { display: none !important; }
+.commission-description { min-height: 150px; }
+.commission-terms { margin: 10px 0 16px; padding-left: 24px; }
+.commission-terms li { margin: 8px 0; line-height: 1.45; }
+.commission-signature-status { margin: 12px 0 0; color: var(--subtle); }
+.commission-signature-status[hidden] { display: none !important; }
+.commission-security-question { margin: 0 0 8px; }
+@media (max-width: 700px) { .commission-form { padding: 14px; } }
+</style>
+
+{admin_control}
+{notice}
+
+<form class="form-card commission-form" method="post" action="/others/fridge-builds-websites/submit" data-no-spa="1" autocomplete="on">
+    <input type="hidden" name="csrf" value="{csrf}">
+    <input type="hidden" name="started_at" value="{started_at}">
+    <input type="hidden" name="signature" value="{signature}">
+    <div style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
+        <label>website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+    </div>
+
+    <fieldset class="commission-fieldset">
+        <legend>Name</legend>
+        <input class="text-input" type="text" name="name" maxlength="120" autocomplete="name" value="{name}" required>
+    </fieldset>
+
+    <fieldset class="commission-fieldset">
+        <legend>Email address</legend>
+        <input class="text-input" type="email" name="email" maxlength="254" autocomplete="email" value="{email}" required>
+    </fieldset>
+
+    <fieldset class="commission-fieldset" data-conditional-group="contact_method" data-conditional-value="other" data-conditional-target="contact-other-field">
+        <legend>Preferred method of contact</legend>
+        <div class="radio-group commission-options">
+            <label class="radio-label"><input class="radio" type="radio" name="contact_method" value="email"{contact_method_email_checked} required><span>Email</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="contact_method" value="fridge_chat"{contact_method_fridge_chat_checked}><span>fridge.dev private chat</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="contact_method" value="discord"{contact_method_discord_checked}><span>Discord</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="contact_method" value="whatsapp"{contact_method_whatsapp_checked}><span>WhatsApp</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="contact_method" value="other"{contact_method_other_checked}><span>Other</span></label>
+        </div>
+        <div class="commission-conditional" id="contact-other-field"{contact_other_hidden}>
+            <label for="contact-other">Please input your preferred contact method.</label>
+            <input class="text-input" id="contact-other" type="text" name="contact_other" maxlength="160" value="{contact_other}">
+        </div>
+    </fieldset>
+
+    <fieldset class="commission-fieldset" data-checkbox-other="website_other" data-conditional-target="website-other-field">
+        <legend>Which of the following best describes the website you want?</legend>
+        <p>You may select multiple, if necessary.</p>
+        <div class="checkbox-group commission-options">
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="landing_page"{website_type_landing_page_checked}><span>Landing page (social media links and contact information) only</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="image_portfolio"{website_type_image_portfolio_checked}><span>Image-based portfolio (artists, photographers, etc.)</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="product_showcase"{website_type_product_showcase_checked}><span>Product showcase (developers, music producers, etc.)</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="small_business"{website_type_small_business_checked}><span>Small business site (cafes, local services, tradespeople, etc.)</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="content_site"{website_type_content_site_checked}><span>Content site with posts and updates (blogs, announcements, projects, etc.)</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="community_hub"{website_type_community_hub_checked}><span>Community hub (small communities, threads, publications, etc.)</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="resource_download"{website_type_resource_download_checked}><span>Resource/download sites (archives, downloads, assets, music, etc.)</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="digital_goods"{website_type_digital_goods_checked}><span>Digital goods (marketplace, listings, etc.)</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="not_sure"{website_type_not_sure_checked}><span>Not sure/need help deciding</span></label>
+            <label class="checkbox-label"><input class="checkbox" type="checkbox" name="website_types[]" value="other"{website_type_other_checked}><span>Other</span></label>
+        </div>
+        <div class="commission-conditional" id="website-other-field"{website_other_hidden}>
+            <label for="website-other">Please describe the other type of website.</label>
+            <input class="text-input" id="website-other" type="text" name="website_other" maxlength="200" value="{website_other}">
+        </div>
+    </fieldset>
+
+    <fieldset class="commission-fieldset">
+        <legend>Give a brief description of what you'd like to make.</legend>
+        <p>If you aren't sure, just tell me as much as you can about what you want.</p>
+        <textarea class="text-input large commission-description" name="description" maxlength="3000" required>{project_description}</textarea>
+    </fieldset>
+
+    <fieldset class="commission-fieldset" data-conditional-group="has_budget" data-conditional-value="yes" data-conditional-target="budget-field">
+        <legend>Do you have a budget you'd like to stick with?</legend>
+        <div class="radio-group commission-options">
+            <label class="radio-label"><input class="radio" type="radio" name="has_budget" value="yes"{has_budget_yes_checked} required><span>Yes</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="has_budget" value="no"{has_budget_no_checked}><span>No</span></label>
+        </div>
+        <div class="commission-conditional" id="budget-field"{budget_hidden}>
+            <label for="budget">Please input your budget here. Make sure to specify your currency too (e.g. £100 GBP).</label>
+            <input class="text-input" id="budget" type="text" name="budget" maxlength="160" value="{budget}">
+        </div>
+    </fieldset>
+
+    <fieldset class="commission-fieldset" data-conditional-group="payment_method" data-conditional-value="other" data-conditional-target="payment-other-field">
+        <legend>What is your preferred method of payment?</legend>
+        <div class="radio-group commission-options">
+            <label class="radio-label"><input class="radio" type="radio" name="payment_method" value="bank_transfer"{payment_method_bank_transfer_checked} required><span>Bank transfer</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="payment_method" value="paypal"{payment_method_paypal_checked}><span>PayPal</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="payment_method" value="crypto"{payment_method_crypto_checked}><span>Crypto</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="payment_method" value="other"{payment_method_other_checked}><span>Other</span></label>
+        </div>
+        <div class="commission-conditional" id="payment-other-field"{payment_other_hidden}>
+            <label for="payment-other">Please input your preferred payment method.</label>
+            <input class="text-input" id="payment-other" type="text" name="payment_other" maxlength="160" value="{payment_other}">
+        </div>
+    </fieldset>
+
+    <fieldset class="commission-fieldset" data-commission-agreement>
+        <legend>Commission terms</legend>
+        <p>By submitting this form and initializing a commission, you agree to the following terms, throughout and after your commission's delivery:</p>
+        <ul class="commission-terms">
+            <li>I hold all rights to cancel the commission, with or without warning or reason.</li>
+            <li>I can help you plan out and sketch ideas for your website before any payment, but I will not begin development of any code until after you make your payment.</li>
+            <li>If you wish to get a refund at any point, you will discuss this with me directly instead of trying to initialize a refund via your payment method.</li>
+            <li>If any additional services are required for your commission, you will fully cover the costs for any payments or subscriptions (e.g. web server hosting, domains, etc.).</li>
+            <li>You will take full responsibility for all user-generated content uploaded to the site, regardless of if it abides by your content rules or local and international law.</li>
+        </ul><br>
+        <div class="radio-group commission-options">
+            <label class="radio-label"><input class="radio" type="radio" name="terms_agreed" value="yes"{terms_agreed_yes_checked} required><span>Yes, I agree</span></label>
+            <label class="radio-label"><input class="radio" type="radio" name="terms_agreed" value="no"{terms_agreed_no_checked}><span>No, I do not agree</span></label>
+        </div>
+        <br><p class="commission-signature-status"{signature_status_hidden}>Signed as <strong data-commission-signature-name>{signature}</strong>.</p>
+    </fieldset>
+
+    <fieldset class="commission-fieldset">
+        <legend>Security question</legend>
+        <h5 class="commission-security-question">{security_question}</h5>
+        <input class="text-input" type="text" name="security_answer" inputmode="numeric" autocomplete="off" required>
+    </fieldset>
+
+    <button id="form-button" type="submit" data-tooltip="{submit_button_tooltip}"{submit_button_attributes}>{submit_button_text}</button>
+</form>
+
+<script src="/others/fridge-builds-websites/submit/submit.js?v=20260909-signature-3"></script>

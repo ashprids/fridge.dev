@@ -143,7 +143,9 @@ jobs:
 
           while IFS= read -r file_path; do
             [ -n "$file_path" ] || continue
-            rclone deletefile "${GDRIVE_REMOTE}:${file_path}" --drive-root-folder-id "${GDRIVE_FOLDER_ID}"
+            rclone deletefile "${GDRIVE_REMOTE}:${file_path}" \
+              --drive-root-folder-id "${GDRIVE_FOLDER_ID}" \
+              --drive-use-trash=false
           done <<< "$old_files"
 
       - name: remove local backup archive

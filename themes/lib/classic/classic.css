@@ -407,6 +407,11 @@ button[data-tooltip] {
     margin-top: auto;
 }
 
+body.classic-theme .title-animation-preview,
+body.classic-theme .title-animation-preview .title-letter {
+    background-image: linear-gradient(0deg, #977eb6, #86d3cf) !important;
+}
+
 #sidebar-footer {
     width: 100%;
     padding: 18px 8px 12px 8px;
@@ -1510,13 +1515,13 @@ hr {
     color: rgb(200, 200, 200);
 }
 
-#post-edit-feed,
+#post-edit-feed:not(.journal-post-edit),
 .guestbook-edit-btn,
 .guestbook-delete-btn,
-#post-edit-feed:hover,
+#post-edit-feed:not(.journal-post-edit):hover,
 .guestbook-edit-btn:hover,
 .guestbook-delete-btn:hover,
-#post-edit-feed:active,
+#post-edit-feed:not(.journal-post-edit):active,
 .guestbook-edit-btn:active,
 .guestbook-delete-btn:active {
     background: transparent !important;
@@ -2999,7 +3004,8 @@ pre code.hljs {
 
 #form-button,
 #lastfm-link-button,
-#color-reset {
+#color-reset,
+#theme-accent-reset {
     display: inline-block;
     padding: 8px 16px;
     border: 1px solid var(--border);
@@ -3015,7 +3021,8 @@ pre code.hljs {
     margin-bottom: 16px;
 }
 
-#color-reset {
+#color-reset,
+#theme-accent-reset {
     margin-top: 10px;
 }
 
@@ -3055,14 +3062,16 @@ pre code.hljs {
 
 #form-button:hover,
 #lastfm-link-button:hover,
-#color-reset:hover {
+#color-reset:hover,
+#theme-accent-reset:hover {
     background-color: rgba(255, 255, 255, 0.1);
     cursor: pointer;
 }
 
 #form-button:active,
 #lastfm-link-button:active,
-#color-reset:active {
+#color-reset:active,
+#theme-accent-reset:active {
     background-color: var(--bg)
 }
 
@@ -3432,7 +3441,9 @@ body.mobile-template #footer-buttons {
 
 /* keep the custom settings theme picker crisp inside classic */
 .theme-picker-button,
-.theme-picker-option {
+.theme-picker-option,
+.theme-accent-picker-button,
+.theme-accent-picker-option {
     border: 1px solid var(--border) !important;
     background:
         linear-gradient(135deg, color-mix(in srgb, var(--border) 14%, transparent), color-mix(in srgb, var(--links) 9%, transparent)),
@@ -3440,13 +3451,16 @@ body.mobile-template #footer-buttons {
     color: var(--fg) !important;
 }
 
-.theme-picker-menu {
+.theme-picker-menu,
+.theme-accent-picker-menu {
     background: var(--bg) !important;
     border-color: var(--border) !important;
 }
 
 .theme-picker-option:hover,
-.theme-picker-option.selected {
+.theme-picker-option.selected,
+.theme-accent-picker-option:hover,
+.theme-accent-picker-option.selected {
     background:
         linear-gradient(90deg, color-mix(in srgb, var(--links) 32%, transparent), color-mix(in srgb, var(--border) 24%, transparent)),
         color-mix(in srgb, var(--bg) 88%, var(--fg) 12%) !important;

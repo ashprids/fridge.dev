@@ -24,6 +24,10 @@ body.gruvbox-theme :is(
     .feed-markdown-preview,
     table,
     details,
+    #post-bookmark,
+    #post-bookmark-feed,
+    .journal-post-edit,
+    #mdpaste-font-toggle,
     .settings-section
 ) {
     background: var(--theme-surface) !important;

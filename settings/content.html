@@ -2,7 +2,21 @@
 #fruity-dance-settings { max-width: 520px; padding: 0 0 4px 26px; }
 #fruity-dance-settings .dropdown { width: 100%; }
 #fruity-dance-settings output { color: var(--subtle); }
+#moderator-settings { display: block; }
+#moderator-settings h3 { margin-top: 0; }
+#moderator-settings hr { margin: 20px 0; }
+#moderator-settings > button:last-of-type { margin-bottom: 0; }
+#toast-settings .toast-settings-sections { display: grid; gap: 40px; margin: 24px 0; }
+#toast-settings .toast-settings-sections > form { margin: 0; }
+#toast-settings .toast-conversation-settings,
+#toast-settings .toast-personality-section { display: grid; gap: 16px; }
+#toast-settings .toast-settings-sections :is(h3, h4) { margin: 0 0 8px; }
+#toast-settings .toast-conversation-settings button,
+#toast-settings .toast-personality-section button { margin: 0; }
+#toast-settings #toast-model-fields { margin-top: 16px; gap: 20px; }
+#toast-personality-status:empty { display: none; }
 </style>
+<div id="settings-page">
 <pre id="ascii" style="color:#bc7c55;font-size:12px">
    ___     ___    _  _      ___    ___     ___  
   / __|   / _ \  | \| |    | __|  |_ _|   / __| 
@@ -50,20 +64,25 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <h3>moderator settings</h3>
 <button id="form-button" type="button" data-tooltip="review feed and guestbook posts and manage user IP moderation" onclick="window.location='/settings/guests'">manage users</button>
 <button id="form-button" type="button" data-tooltip="review content-upload bans, reasons, moderators, and post history" onclick="window.location='/settings/restricted-ips'">manage bans</button>
-<br><br><hr><br>
+<hr>
 </span>
 <span id="toast-settings">
 <h3>toast settings</h3>
+<div class="toast-settings-sections">
+{toast_credentials}
+{toast_management}
+{toast_radio}
+<section class="toast-personality-section">
 <h4>personality (json)</h4>
 <div id="toast-personality-editor" class="toast-json-editor">
     <pre aria-hidden="true"><code class="language-json" id="toast-personality-highlight"></code></pre>
     <textarea id="toast-personality-json" spellcheck="false" autocomplete="off" wrap="off" aria-label="toast personality json"></textarea>
 </div>
-<br>
 <span id="toast-personality-status" style="color: var(--subtle);"></span>
-<br>
 <button id="form-button" type="button" data-action="save-toast-personality">apply</button>
-<br><br><hr><br>
+</section>
+</div>
+<br><hr><br>
 </span>
 <span id="user-settings">
 <h3>account</h3>    
@@ -122,6 +141,52 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
     <option value="default">blackprint</option>
 </select>
 <br><br>
+<div id="appearance-color-scheme" class="appearance-subsection" hidden>
+    <h4>color scheme</h4>
+    <div id="color-scheme-section" style="display:none">
+        <div id="color-scheme-group">
+            <label class="color-row">
+                <span>background</span>
+                <input type="color" class="color-input" data-color-key="bg" value="#000000">
+            </label>
+            <label class="color-row">
+                <span>text</span>
+                <input type="color" class="color-input" data-color-key="fg" value="#ffffff">
+            </label>
+            <label class="color-row">
+                <span>lines</span>
+                <input type="color" class="color-input" data-color-key="border" value="#ffffff">
+            </label>
+            <label class="color-row">
+                <span>subtle</span>
+                <input type="color" class="color-input" data-color-key="subtle" value="#808080">
+            </label>
+            <label class="color-row">
+                <span>links</span>
+                <input type="color" class="color-input" data-color-key="links" value="#305aad">
+            </label>
+        </div>
+        <button type="button" id="color-reset" class="color-reset-button" data-tooltip="reset color scheme to defaults">reset to default</button>
+    </div>
+    <div id="theme-accent-section" hidden>
+        <div class="color-row">
+            <span>accent</span>
+            <span class="theme-accent-control">
+                <select id="theme-accent-select" class="native-theme-select" aria-hidden="true" tabindex="-1"></select>
+                <span id="theme-accent-picker" class="theme-accent-picker">
+                    <button type="button" id="theme-accent-picker-button" class="theme-accent-picker-button" aria-haspopup="listbox" aria-expanded="false" aria-label="accent colour">
+                        <span id="theme-accent-preview" class="theme-accent-swatch" aria-hidden="true"></span>
+                        <span id="theme-accent-picker-label" class="theme-accent-picker-label"></span>
+                        <span class="theme-accent-picker-chevron" aria-hidden="true">▾</span>
+                    </button>
+                    <span id="theme-accent-picker-menu" class="theme-accent-picker-menu" role="listbox" aria-label="accent colours"></span>
+                </span>
+            </span>
+        </div>
+        <button type="button" id="theme-accent-reset" class="color-reset-button" data-tooltip="reset accent colour to the theme default">reset to default</button>
+    </div>
+</div>
+<br><br>
 <h4>title animation</h4>
 <div class="title-animation-settings" id="title-animation-section">
     <p class="title-animation-disabled-message" id="title-animation-disabled-message" hidden>you cannot configure this feature while reduce motion is enabled.</p>
@@ -147,33 +212,6 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
     </div>
 </div>
 <br><br>
-<div id="color-scheme-section" style="display:none">
-<h3>color scheme</h3>
-<div id="color-scheme-group">
-    <label class="color-row">
-        <span>background</span>
-        <input type="color" class="color-input" data-color-key="bg" value="#000000">
-    </label>
-    <label class="color-row">
-        <span>text</span>
-        <input type="color" class="color-input" data-color-key="fg" value="#ffffff">
-    </label>
-    <label class="color-row">
-        <span>lines</span>
-        <input type="color" class="color-input" data-color-key="border" value="#ffffff">
-    </label>
-    <label class="color-row">
-        <span>subtle</span>
-        <input type="color" class="color-input" data-color-key="subtle" value="#808080">
-    </label>
-    <label class="color-row">
-        <span>links</span>
-        <input type="color" class="color-input" data-color-key="links" value="#305aad">
-    </label>
-</div>
-<button id="color-reset" data-tooltip="reset color scheme to defaults">reset to default</button>
-<br><br><hr><br>
-</div>
 <h4>misc</h4>
 <div class="checkbox-group" id="text-glow-group">
     <label class="checkbox-label">
@@ -231,3 +269,5 @@ _|"""""|_|"""""|_|"""""|_| """ |_|"""""|_|"""""|
 <br><br><hr><br>
 </span>
 <button style="background-color: #206420" id="settings-save" data-tooltip="save your configuration.\naccount-backed options save to your account if you're logged in">save changes</button>
+
+</div>

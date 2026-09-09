@@ -69,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'settings' => [
             'glowIntensity' => null,
             'colors' => null,
+            'themeAccents' => (object)[],
             'onekoEnabled' => null,
             'fruityDanceEnabled' => false,
             'fruityDanceSpritesheet' => $defaultFruityDanceSheet,
@@ -100,6 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             if (isset($account['colors']) && is_array($account['colors'])) {
                 $result['settings']['colors'] = $account['colors'];
             }
+            $result['settings']['themeAccents'] = (object)fridg3_normalize_theme_accents($account['themeAccents'] ?? []);
             if (array_key_exists('onekoEnabled', $account)) {
                 $result['settings']['onekoEnabled'] = is_truthy_setting($account['onekoEnabled']);
             }
@@ -241,6 +243,21 @@ $themeColorFields = [
 
 $errors = [];
 $didWork = false;
+
+// Validate palette-only choices before any setting in this request is written.
+$themeAccentsProvided = array_key_exists('themeAccents', $_POST);
+$validThemeAccents = [];
+if ($themeAccentsProvided) {
+    $rawAccents = $_POST['themeAccents'];
+    $accentObject = is_string($rawAccents) ? json_decode($rawAccents) : null;
+    $accentValues = is_object($accentObject) ? (array)$accentObject : [];
+    $validThemeAccents = fridg3_normalize_theme_accents($accentValues);
+    if (!$accentValues || count($validThemeAccents) !== count($accentValues)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_theme_accents']);
+        exit;
+    }
+}
 
 if ($toastPersonalityProvided) {
     if (!$isToast) {
@@ -648,6 +665,33 @@ if (!empty($colors) && isset($themeColorFields[$colorTheme])) {
             $didWork = true;
         }
     }
+}
+
+if ($themeAccentsProvided) {
+    $accountsPath = dirname(__DIR__, 2) . '/data/accounts/accounts.json';
+    $data = load_accounts_data($accountsPath);
+    if ($data === null) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
+        exit;
+    }
+    $updated = false;
+    foreach ($data['accounts'] as &$account) {
+        if (($account['username'] ?? null) !== $username) continue;
+        $account['themeAccents'] = array_merge(
+            fridg3_normalize_theme_accents($account['themeAccents'] ?? []),
+            $validThemeAccents
+        );
+        $updated = true;
+        break;
+    }
+    unset($account);
+    if (!$updated || !save_accounts_data($accountsPath, $data)) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'write_failed']);
+        exit;
+    }
+    $didWork = true;
 }
 
 // Handle maintenance mode toggle (admin only)

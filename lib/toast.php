@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+require_once __DIR__ . '/toast-models.php';
 
 if (!function_exists('fridg3_toast_root_dir')) {
     function fridg3_toast_root_dir(): string
@@ -334,7 +335,7 @@ if (!function_exists('fridg3_toast_load_groq_config')) {
 
         return [
             'api_key' => trim((string)($groq['api_key'] ?? '')),
-            'model' => trim((string)($groq['website_model'] ?? $groq['feed_model'] ?? 'llama-3.3-70b-versatile')) ?: 'llama-3.3-70b-versatile',
+            'model' => toast_model_for($groq, 'feed_replies'),
             'temperature' => $coerceFloat($groq['temperature'] ?? null, 0.8, 0.0, 2.0),
             'top_p' => $coerceFloat($groq['top_p'] ?? null, 0.95, 0.0, 1.0),
             'max_completion_tokens' => $coerceInt($groq['max_completion_tokens'] ?? null, 500, 1, 2048),
@@ -523,6 +524,7 @@ if (!function_exists('fridg3_toast_request_feed_reply')) {
             return '';
         }
 
+        if (!in_array($groq['model'], toast_active_models($groq['api_key']) ?? [], true)) return '';
         $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

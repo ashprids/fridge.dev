@@ -271,6 +271,9 @@ writeJson($root, 'accounts/login_attempts.json', new stdClass());
 writeJson($root, 'etc/page_views.json', ['pages' => new stdClass(), 'updated_at' => null]);
 removePath($root, 'etc/access.json');
 removePath($root, 'etc/access.json.lock');
+foreach (['toast-python-log.json', 'toast-python-log.json.1.json', 'toast-python-log.json.2.json'] as $log) {
+    removePath($root, 'etc/' . $log);
+}
 $hardBanPath = pathFor($root, 'etc/hard-banned-ips.txt');
 ensureDirectory(dirname($hardBanPath));
 if (file_put_contents($hardBanPath, '', LOCK_EX) === false) {
@@ -323,6 +326,8 @@ writeJson($root, 'upload/rooms.json', ['rooms' => new stdClass()]);
 
 clearDirectory($root, 'mdpaste');
 clearDirectory($root, 'chat');
+removePath($root, 'etc/toast-chats');
+removePath($root, 'etc/toast-chat');
 
 clearDirectory($root, 'journal/drafts');
 file_put_contents(
@@ -334,5 +339,10 @@ file_put_contents(
 // Fail closed if a privacy rule above is accidentally weakened later.
 assertPathAbsent($root, 'etc/access.json');
 assertPathAbsent($root, 'etc/access.json.lock');
+foreach (['toast-python-log.json', 'toast-python-log.json.1.json', 'toast-python-log.json.2.json'] as $log) {
+    assertPathAbsent($root, 'etc/' . $log);
+}
+assertPathAbsent($root, 'etc/toast-chats');
+assertPathAbsent($root, 'etc/toast-chat');
 assertDirectoryContainsOnly($root, 'contact', ['rate_limits.json']);
 assertFeedPostIpsSanitized($root);

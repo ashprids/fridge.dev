@@ -2,6 +2,7 @@
 <h2>a discord bot providing 24/7 radio in the fridge.dev discord server</h2>
 
 <style>
+#chat-with-toast-button[hidden] { display: none !important; }
 /* Discord fonts */
 @font-face {
 	font-family: 'GG Sans';
@@ -81,7 +82,8 @@
 }
 
 #update-stream-button,
-#toast-inbox-button {
+#toast-inbox-button,
+#toast-chat-history-button {
 	display: block;
 	padding: 8px 16px;
 	border: 1px solid var(--border);
@@ -98,18 +100,29 @@
 }
 
 #update-stream-button:hover,
-#toast-inbox-button:hover {
+#toast-inbox-button:hover,
+#toast-chat-history-button:hover {
 	background-color: rgb(30, 30, 30);
 }
 
 #update-stream-button:disabled,
-#toast-inbox-button:disabled {
+#toast-inbox-button:disabled,
+#toast-chat-history-button:disabled {
 	opacity: 0.65;
 	cursor: not-allowed;
 }
 
-#listen-along-button {
-  display: inline-block;
+#toast-chat-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+#listen-along-button,
+#chat-with-toast-button {
+  display: block;
+  width: 100%;
   padding: 8px 16px;
   border: 1px solid var(--border);
   background-color: var(--bg);
@@ -122,9 +135,11 @@
   border-radius: 3px;
 }
 
-#listen-along-button:hover {
+#listen-along-button:hover,
+#chat-with-toast-button:hover {
   background-color: rgb(30, 30, 30);
 }
+
 
 </style>
 <br>
@@ -144,14 +159,17 @@
 		</div>
 	</div>
 </div><br>
-<button id="listen-along-button" data-tooltip="open the current station in the web player">listen along</button>
+<div id="toast-chat-actions">
+  <button id="listen-along-button" data-tooltip="open the current station in the web player">listen along</button>
+  <button id="chat-with-toast-button" type="button" onclick="window.location='/others/toast-discord-bot/chat'" data-tooltip="start a private website chat with toast">chat with toast</button>
+</div>
 <br>
 <br><br>
 <div id="control-panel-container" style="display:none;">
 	<h3>control panel</h3>
 	<h5>for admin users only</h5><br>
 
-    <button id="toast-inbox-button" type="button" onclick="window.location='/others/toast-discord-bot/messages'" data-tooltip="open toast's dm inbox">open private messages</button>
+{toast_management}
 
   <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
     <input id="status-toggle" type="checkbox" style="width:16px; height:16px;">
@@ -165,4 +183,4 @@
 	<div id="stream-update-status" style="margin-top:12px; font-size:12px; display:none;"></div>
 </div>
 
-<script src="/others/toast-discord-bot/toast-discord-bot.js?v=20260723-debug-logging-1"></script>
+<script src="/others/toast-discord-bot/toast-discord-bot.js?v=20260909-chat-online-4"></script>

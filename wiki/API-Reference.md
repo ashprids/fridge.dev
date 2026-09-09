@@ -15,7 +15,7 @@ All API routes live under `/api/*` and are handled by PHP.
 
 - Requires logged-in user
 - Returns current settings from `data/accounts/accounts.json`
-- Currently exposes `glowIntensity`, `colors`, `onekoEnabled`, `fruityDanceEnabled`, `fruityDanceSpritesheet`, `fruityDanceLoop`, `fruityDanceSpeed`, `fruityDanceReflection`, `reduceMotion`, `discordNotificationsEnabled`, `titleAnimation`, `titleAnimationAlways`, and `titleAnimationDesync`; `colors` is honored by `classic` for its full palette
+- Currently exposes `glowIntensity`, `colors`, `themeAccents`, `onekoEnabled`, `fruityDanceEnabled`, `fruityDanceSpritesheet`, `fruityDanceLoop`, `fruityDanceSpeed`, `fruityDanceReflection`, `reduceMotion`, `discordNotificationsEnabled`, `titleAnimation`, `titleAnimationAlways`, and `titleAnimationDesync`; `colors` is honored by `classic` for its full palette
 - Toast-only settings fields are documented on [Toast](Toast#personality-sources)
 
 `POST`
@@ -30,6 +30,7 @@ All API routes live under `/api/*` and are handled by PHP.
 - Can set `discordNotificationsEnabled` to opt a linked account in or out of automated Toast feed-notification DMs
 - The settings UI stores theme selection in browser localStorage and the `theme_pref` cookie so first-load server rendering can pick the active theme
 - Validates Classic color fields as `#RRGGBB`
+- Accepts palette names for `base16`, `gruvbox`, and `nord` as a nonempty JSON object in the form field `themeAccents`, for example `{"base16":"red","nord":"yellow"}`. It merges only the supplied themes into the current account's accent map, independently of Classic's `colors` and browser theme selection. Names must appear in `themes/palettes/accents.json`; arbitrary hex values, unknown themes, and malformed maps return `400 invalid_theme_accents` before any settings are written
 - Admin users can also toggle maintenance mode through the settings flow
 - Toast-only personality persistence is documented on [Toast](Toast#personality-sources)
 
@@ -162,3 +163,19 @@ Toast feed generation, status, stream control, playback proxy, and localhost ser
 - Write-heavy endpoints should be treated carefully because there is no database transaction safety blanket here
 - `/api/page-view` already uses file locking, which is the sane move
 - Toast's localhost-only endpoints and integrations are documented on [Toast](Toast#local-service-and-production-operation)
+
+### `/api/toast-models/`
+
+GET authorized for admins and the authenticated hardcoded Toast account returns `models` (six scenario IDs), `available` (Groq model IDs), `csrf`, and `listError`. POST accepts `{csrf, models}` and returns the saved model selections. Invalid input or inactive models return 400, unauthorized access or invalid CSRF returns 403, unavailable configuration returns 500, and failure to verify models against Groq’s live catalog returns 503. Provider credentials and raw provider errors are never returned. See [Toast](Toast#admin-model-selection).
+
+### `/api/discord-bot-control/` and `/api/discord-bot-control/status/`
+
+Both require an admin or authenticated Toast session. GET on the base endpoint returns only stream name/URL, online status, and a CSRF token. POST on the base accepts `{csrf, name, url, status?}`; the status endpoint accepts `{csrf, status}`. Status is `online` or `offline` (booleans are also accepted). Stream URLs must use HTTP(S). Missing authorization or invalid CSRF returns 403; invalid values return 400. Successful saves return `{ok: true}` and preserve unrelated Toast configuration.
+
+### `/api/toast-credentials/`
+
+Toast-only GET returns `{ok, csrf, configured}` without exposing the saved Groq API key. POST accepts `{csrf, apiKey}` and atomically updates only `groq.api_key`; it returns `{ok: true}` without the key. Invalid or missing credentials/session CSRF returns 403; invalid key input returns 400. Responses use `Cache-Control: no-store`.
+
+### `/api/toast-feed-reply/`
+
+Toast-only POST accepts form-encoded `csrf_token`, `post_id`, and optional `parent_reply_id`. It generates a draft using server-loaded post/comment context and returns `{ok, reply, token}`. The token must accompany `toast_reply_token` on normal feed reply submission; it is bound to that post and parent. The endpoint never publishes a reply. Unauthorized/restricted access or invalid CSRF returns 403; invalid post IDs return 400; missing post/target returns 404; unavailable key/model/runtime returns 503; provider failures return 502.

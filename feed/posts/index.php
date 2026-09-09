@@ -9,6 +9,8 @@ require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPAR
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 fridg3_feed_refresh_session_user();
+require_once dirname(__DIR__, 2) . '/lib/toast-feed-reply.php';
+$isToast = fridg3_toast_is_current_user();
 
 function find_template_file($filename) {
     $dir = __DIR__;
@@ -195,6 +197,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             fridg3_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
         }
         $replyError = 'invalid request. try again.';
+    } elseif ($isToast && $replyAction === 'create' && !toast_reply_token_valid((string)$postIdNoExt, $parentReplyId, (string)($_POST['toast_reply_token'] ?? ''))) {
+        $replyError = 'generate a reply for this post or comment before submitting.';
     } elseif (!$isLoggedIn && $replyAction !== 'create' && !$canManageTargetReply) {
         $replyEditError = 'You do not have permission to manage replies.';
     } elseif ($postingRestricted && in_array($replyAction, ['create', 'update'], true)) {
@@ -305,6 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $replyError = 'failed to save reply.';
     } else {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        if ($isToast) unset($_SESSION['toast_reply_drafts'][(string)($_POST['toast_reply_token'] ?? '')]);
         header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?reply_posted=1');
         $triggerUsername = $isLoggedIn ? (string)$_SESSION['user']['username'] : ($guestDisplayNameForSave !== '' ? $guestDisplayNameForSave : 'Anonymous');
         $shouldQueueToastAutoReply = strcasecmp($triggerUsername, 'toast') !== 0
@@ -546,7 +551,19 @@ if ($replyParentId !== '' && isset($repliesById[$replyParentId])) {
     $replyTargetHtml = '<div class="feed-reply-target" data-feed-reply-target hidden></div>';
 }
 if (!$isClientIpBanned || $isLoggedIn) {
-    $replyFormHtml = '<form id="feed-reply-form" method="POST" enctype="multipart/form-data" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '">'
+    $replyEditor = fridg3_feed_reply_markdown_editor('{reply_form_value}', $isLoggedIn);
+    $toastReady = false;
+    if ($isToast) {
+        $draftToken = (string)($_POST['toast_reply_token'] ?? '');
+        $toastReady = toast_reply_token_valid((string)$postIdNoExt, $replyParentId, $draftToken);
+        $replyEditor = '<div class="toast-reply-generator">'
+            . '<button type="button" data-toast-generate-reply>generate reply</button>'
+            . '<p data-toast-reply-status role="status">' . ($toastReady ? 'Edit your reply, then post it.' : 'Generate a reply before editing.') . '</p>'
+            . '<label class="toast-reply-label" for="toast-reply-text">reply draft</label>'
+            . '<textarea id="toast-reply-text" class="feed-reply-textbox" name="reply_content" rows="5" maxlength="4000"' . ($toastReady ? '' : ' readonly') . ' placeholder="Your generated reply will appear here.">' . ($toastReady ? '{reply_form_value}' : '') . '</textarea>'
+            . '<input type="hidden" name="toast_reply_token" value="' . htmlspecialchars($toastReady ? $draftToken : '', ENT_QUOTES, 'UTF-8') . '"></div>';
+    }
+    $replyFormHtml = '<form id="feed-reply-form"' . ($isToast ? ' data-toast-reply-post="' . htmlspecialchars((string)$postIdNoExt, ENT_QUOTES, 'UTF-8') . '"' : '') . ' method="POST" enctype="multipart/form-data" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '">'
         . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
         . '<input type="hidden" name="reply_format" value="v2">'
         . '<input type="hidden" name="parent_reply_id" value="' . htmlspecialchars($replyParentId, ENT_QUOTES, 'UTF-8') . '" data-feed-reply-parent-input>'
@@ -554,9 +571,10 @@ if (!$isClientIpBanned || $isLoggedIn) {
         . $replyTargetHtml
         . (!$isLoggedIn ? '<input id="textbox" class="feed-guest-username" name="guest_username" type="text" maxlength="50" placeholder="name (optional)" value="' . $guestUsernameValue . '">' : '')
         . (!$isLoggedIn ? '<br><br>' : '')
-        . fridg3_feed_reply_markdown_editor('{reply_form_value}', $isLoggedIn)
-        . '<button id="form-button" type="submit">reply</button>'
-        . '</form>';
+        . $replyEditor
+        . '<button id="form-button" type="submit"' . ($isToast && !$toastReady ? ' disabled' : '') . '>reply</button>'
+        . '</form>'
+        . ($isToast ? '<script src="/js/toast-feed-reply.js?v=20260909-1"></script>' : '');
     if ($postingRestricted) {
         $replyFormHtml = fridg3_posting_restriction_notice() . fridg3_disable_composer_controls($replyFormHtml);
     }

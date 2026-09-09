@@ -43,6 +43,14 @@ Use `!frdg` to display the fridge.dev site icon inline: !frdg
 > This is a blockquote.
 > It can contain **bold**, *italic*, `inline code`, and ||spoilers||.
 
+## Attributed quotes
+
+Put `[!QUOTE Name]` on the first quoted line to associate a speaker or source with the quote.
+
+> [!QUOTE Grace Hopper]
+> The most dangerous phrase in the language is, “We've always done it this way.”
+> Attributed quotes support the same inline formatting as normal Feed blockquotes.
+
 ## Unordered and ordered lists
 
 - Unordered item

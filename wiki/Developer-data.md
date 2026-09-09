@@ -58,6 +58,7 @@ The sanitizer currently changes:
 - `data/etc/toast.json`: clears `bot.token`, `bot.client_id`, and `groq.api_key`
 - `data/etc/toast-personality.json`: clears `private_lore`
 - `data/etc/toast-dm-history.json`: clears Discord DM history
+- `data/etc/toast-chats/`: removes the complete website-chat directory, including histories, images, identity values, status, and encryption key
 - `data/etc/toast-feed-notify-state.json`: clears Discord notification state
 - `data/etc/toast-patch-approvals.json`: clears pending and completed Discord update approvals
 - `data/etc/webhooks.json`: clears all scalar values
@@ -81,6 +82,7 @@ The sanitizer finishes with privacy assertions that require access logs to be ab
 - `data/etc/hard-ban-identities.json`
 - `data/etc/access.json`
 - `data/etc/banlists/*`
+- `data/etc/toast-chats/*`
 
 To add more privacy rules, edit the marked block in:
 

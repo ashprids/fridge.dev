@@ -7,6 +7,16 @@ const GLOW_CLASS = 'glow-enabled';
 const GLOW_STYLE_ID = 'glow-style-tag';
 const THEME_PREF_KEY = 'themePref';
 const THEME_COOKIE = 'theme_pref';
+const THEME_ACCENT_PREFS_KEY = 'themeAccentPrefs';
+const THEME_SWITCH_PENDING_KEY = 'fridg3ThemeSwitchPending';
+const THEME_SWITCH_RESET_KEY = 'fridg3ThemeSwitchReset';
+const THEME_ACCENT_PALETTES = (() => {
+    try {
+        return JSON.parse(document.getElementById('theme-accent-palettes')?.textContent || '{}');
+    } catch (_) {
+        return {};
+    }
+})();
 const COLOR_PREFS_KEY = 'colorPrefs';
 const COLOR_FIELDS = ['bg', 'fg', 'border', 'subtle', 'links'];
 const THEME_COLOR_FIELDS = {
@@ -22,6 +32,22 @@ const COLOR_DEFAULTS = {
 const THEME_COLOR_DEFAULTS = {
     classic: COLOR_DEFAULTS,
 };
+
+function finishIncomingThemeSwitch() {
+    const root = document.documentElement;
+    if (!root.classList.contains('theme-switch-transition')) return;
+    try { sessionStorage.removeItem(THEME_SWITCH_PENDING_KEY); } catch (_) { /* ignore */ }
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        root.classList.remove('theme-switch-active');
+        window.setTimeout(() => root.classList.remove('theme-switch-transition'), 260);
+    }));
+}
+
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', finishIncomingThemeSwitch, { once: true });
+} else {
+    finishIncomingThemeSwitch();
+}
 const MOBILE_VIEW_COOKIE = 'mobile_friendly_view';
 const MOBILE_VIEW_DOMAIN = '.fridge.dev';
 const ONEKO_ENABLED_KEY = 'onekoEnabled';
@@ -406,6 +432,7 @@ function applyTitleAnimationPrefs(prefs) {
 // Apply saved color prefs early on page load for themes that expose color controls.
 (() => {
     const activeTheme = loadLocalThemePref();
+    applyThemeAccent(activeTheme);
     if (!themeSupportsColorPrefs(activeTheme)) {
         clearColorVars();
         return;
@@ -416,6 +443,58 @@ function applyTitleAnimationPrefs(prefs) {
         applyColorVars(merged, getThemeColorFields(activeTheme));
     }
 })();
+
+function normalizeThemeAccentPrefs(values) {
+    const prefs = {};
+    Object.entries(THEME_ACCENT_PALETTES).forEach(([theme, palette]) => {
+        const value = values && values[theme];
+        if (typeof value === 'string' && Object.prototype.hasOwnProperty.call(palette.colors, value)) {
+            prefs[theme] = value;
+        }
+    });
+    return prefs;
+}
+
+function getThemeAccentPalette(theme) {
+    return Object.prototype.hasOwnProperty.call(THEME_ACCENT_PALETTES, theme)
+        ? THEME_ACCENT_PALETTES[theme]
+        : null;
+}
+
+function loadThemeAccentPrefs() {
+    let stored = {};
+    try {
+        stored = JSON.parse(localStorage.getItem(THEME_ACCENT_PREFS_KEY) || '{}');
+    } catch (_) { /* Cookies still restore first-render preferences. */ }
+    const prefs = normalizeThemeAccentPrefs(stored);
+    Object.keys(THEME_ACCENT_PALETTES).forEach(theme => {
+        const cookie = normalizeThemeAccentPrefs({ [theme]: getCookie(`theme_accent_${theme}`) });
+        if (cookie[theme]) prefs[theme] = cookie[theme];
+    });
+    return prefs;
+}
+
+function saveThemeAccentPrefs(values) {
+    const prefs = normalizeThemeAccentPrefs(values);
+    try {
+        localStorage.setItem(THEME_ACCENT_PREFS_KEY, JSON.stringify(prefs));
+    } catch (_) { /* Cookies also retain the selected accents. */ }
+    const domain = shouldUseSharedFridg3CookieDomain() ? `; Domain=${MOBILE_VIEW_DOMAIN}` : '';
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    Object.entries(prefs).forEach(([theme, accent]) => {
+        document.cookie = `theme_accent_${theme}=${encodeURIComponent(accent)}; Max-Age=31536000; Path=/; SameSite=Lax${domain}${secure}`;
+    });
+    return prefs;
+}
+
+function applyThemeAccent(theme) {
+    const palette = getThemeAccentPalette(theme);
+    if (!palette || !document.body?.classList.contains(`${theme}-theme`)) {
+        document.documentElement.removeAttribute('data-theme-accent');
+        return;
+    }
+    document.documentElement.dataset.themeAccent = loadThemeAccentPrefs()[theme] || palette.default;
+}
 
 function themeSupportsColorPrefs(theme) {
     return Object.prototype.hasOwnProperty.call(THEME_COLOR_FIELDS, normalizeTheme(theme));
@@ -960,17 +1039,27 @@ function bindSiteTooltip(element) {
         element.removeEventListener('mouseenter', element._tooltipMouseEnter);
         element.removeEventListener('mousemove', element._tooltipMouseMove);
         element.removeEventListener('mouseleave', element._tooltipMouseLeave);
+        element.removeEventListener('pointerdown', element._tooltipPointerDown);
+        const createTooltip = () => {
+            const rawText = element.getAttribute('data-tooltip') || '';
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.setAttribute('role', 'tooltip');
+            if (element.matches('abbr')) {
+                tooltip.textContent = rawText.replace(/\\n/g, '\n');
+            } else {
+                tooltip.innerHTML = rawText.replace(/\\n/g, '<br>');
+            }
+            document.body.appendChild(tooltip);
+            fitTooltipToWrappedText(tooltip);
+            activeTooltip = { element: tooltip, trigger: element };
+            return tooltip;
+        };
         // Define handlers
         element._tooltipMouseEnter = function(e) {
             if (isMobileTemplateActive()) return;
             clearTooltips();
-            let rawText = this.getAttribute('data-tooltip') || '';
-            rawText = rawText.replace(/\\n/g, '<br>');
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.innerHTML = rawText;
-            document.body.appendChild(tooltip);
-            activeTooltip = { element: tooltip, trigger: this };
+            const tooltip = createTooltip();
             const updateTooltipPosition = (event) => {
                 const rect = tooltip.getBoundingClientRect();
                 const tooltipWidth = rect.width;
@@ -995,12 +1084,66 @@ function bindSiteTooltip(element) {
             clearTooltips();
             this.removeEventListener('mousemove', element._tooltipMouseMove);
         };
+        element._tooltipPointerDown = function(event) {
+            if (!isMobileTemplateActive()
+                || !this.matches('abbr[data-markdown-abbreviation="1"]')
+                || (event.button !== undefined && event.button !== 0)) return;
+            const tooltip = createTooltip();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const triggerRect = this.getBoundingClientRect();
+            const edge = 8;
+            const offset = 8;
+            const maxX = Math.max(edge, window.innerWidth - tooltipRect.width - edge);
+            let x = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+            let y = triggerRect.bottom + offset;
+            if (y + tooltipRect.height > window.innerHeight - edge) {
+                y = triggerRect.top - tooltipRect.height - offset;
+            }
+            tooltip.style.left = `${Math.max(edge, Math.min(x, maxX))}px`;
+            tooltip.style.top = `${Math.max(edge, y)}px`;
+        };
         element.addEventListener('mouseenter', element._tooltipMouseEnter);
         element.addEventListener('mouseleave', element._tooltipMouseLeave);
+        element.addEventListener('pointerdown', element._tooltipPointerDown);
+}
+
+function fitTooltipToWrappedText(tooltip) {
+    const lineRects = [];
+    const walker = document.createTreeWalker(tooltip, NodeFilter.SHOW_TEXT);
+    let textNode;
+    while ((textNode = walker.nextNode())) {
+        if (!textNode.nodeValue || textNode.nodeValue.trim() === '') continue;
+        const range = document.createRange();
+        range.selectNodeContents(textNode);
+        Array.from(range.getClientRects()).forEach(rect => {
+            let line = lineRects.find(candidate => Math.abs(candidate.top - rect.top) < 1);
+            if (!line) {
+                line = { top: rect.top, left: rect.left, right: rect.right };
+                lineRects.push(line);
+                return;
+            }
+            line.left = Math.min(line.left, rect.left);
+            line.right = Math.max(line.right, rect.right);
+        });
+        range.detach();
+    }
+    if (lineRects.length === 0) return;
+
+    const style = window.getComputedStyle(tooltip);
+    const horizontalChrome = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+        + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+    const longestLine = Math.max(...lineRects.map(line => line.right - line.left));
+    tooltip.style.width = `${Math.min(Math.ceil(longestLine + horizontalChrome), window.innerWidth - 16)}px`;
 }
 
 function initTooltips() {
     clearTooltips();
+    document.querySelectorAll('abbr[title]').forEach(element => {
+        if (!element.hasAttribute('data-tooltip')) {
+            element.setAttribute('data-tooltip', element.getAttribute('title') || '');
+        }
+        element.removeAttribute('title');
+    });
     document.querySelectorAll('[data-tooltip]').forEach(bindSiteTooltip);
     initContextTooltips();
 }
@@ -1100,7 +1243,7 @@ function initContextTooltips() {
 
     if (!document.documentElement.dataset.contextTooltipDismissBound) {
         document.documentElement.dataset.contextTooltipDismissBound = '1';
-        document.addEventListener('click', clearTooltips);
+        document.addEventListener('pointerdown', clearTooltips, true);
         window.addEventListener('scroll', clearTooltips, { passive: true });
     }
 }
@@ -1171,8 +1314,27 @@ function initSettingsPage() {
         const titleAnimationSection = document.getElementById('title-animation-section');
         const titleAnimationDisabledMessage = document.getElementById('title-animation-disabled-message');
         const colorSection = document.getElementById('color-scheme-section');
+        const appearanceColorScheme = document.getElementById('appearance-color-scheme');
         const colorGroup = document.getElementById('color-scheme-group');
         const colorResetBtn = document.getElementById('color-reset');
+        const accentSection = document.getElementById('theme-accent-section');
+        const accentSelect = document.getElementById('theme-accent-select');
+        const accentPreview = document.getElementById('theme-accent-preview');
+        const accentResetBtn = document.getElementById('theme-accent-reset');
+        const accentPicker = document.getElementById('theme-accent-picker');
+        const accentPickerButton = document.getElementById('theme-accent-picker-button');
+        const accentPickerLabel = document.getElementById('theme-accent-picker-label');
+        const accentPickerMenu = document.getElementById('theme-accent-picker-menu');
+        const changedAccentThemes = new Set();
+        let accentSaveQueue = Promise.resolve();
+        let accentTransitioning = false;
+        let themeSwitching = false;
+        let themeResetAfterSwitch = '';
+        try {
+            themeResetAfterSwitch = normalizeTheme(sessionStorage.getItem(THEME_SWITCH_RESET_KEY) || '');
+            sessionStorage.removeItem(THEME_SWITCH_RESET_KEY);
+        } catch (_) { /* ignore */ }
+        if (getThemeAccentPalette(themeResetAfterSwitch)) changedAccentThemes.add(themeResetAfterSwitch);
         const mobileViewToggle = document.getElementById('mobile-friendly-toggle');
         const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
         const debugModeToggle = document.getElementById('debug-mode-toggle');
@@ -1203,7 +1365,6 @@ function initSettingsPage() {
         const isToastSession = !!(toastSettingsSection && toastSettingsSection.dataset.toastSession === '1');
         let currentTheme = loadLocalThemePref();
         let renderedTheme = currentTheme;
-        let themeChangedByUser = false;
         let themeOptions = [];
         let themePicker = null;
         let themePickerButton = null;
@@ -1637,10 +1798,6 @@ function initSettingsPage() {
             const normalizedTheme = normalizeTheme(theme);
             const fields = getThemeColorFields(normalizedTheme);
             colorSection.style.display = fields.length ? '' : 'none';
-            const heading = colorSection.querySelector('h3');
-            if (heading) {
-                heading.textContent = 'color scheme';
-            }
             const allowed = new Set(fields);
             colorInputs.forEach(inp => {
                 const row = inp.closest('.color-row');
@@ -1650,6 +1807,106 @@ function initSettingsPage() {
                     label.textContent = 'links';
                 }
             });
+        };
+
+        const closeAccentPicker = () => {
+            if (!accentPicker) return;
+            accentPicker.classList.remove('open');
+            accentPickerButton?.setAttribute('aria-expanded', 'false');
+        };
+
+        const updateAccentPicker = () => {
+            if (!accentSelect) return;
+            const palette = getThemeAccentPalette(getThemeSelection());
+            const selected = accentSelect.value;
+            if (accentPickerLabel) accentPickerLabel.textContent = selected;
+            if (accentPreview && palette?.colors[selected]) {
+                accentPreview.style.setProperty('--accent-swatch', palette.colors[selected]);
+            }
+            accentPickerMenu?.querySelectorAll('.theme-accent-picker-option').forEach(option => {
+                const active = option.dataset.accent === selected;
+                option.classList.toggle('selected', active);
+                option.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+        };
+
+        const syncAccentSectionForTheme = (theme) => {
+            if (!accentSection || !accentSelect) return;
+            const palette = getThemeAccentPalette(theme);
+            accentSection.hidden = !palette;
+            accentSelect.replaceChildren();
+            accentPickerMenu?.replaceChildren();
+            closeAccentPicker();
+            if (!palette) return;
+            Object.keys(palette.colors).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                accentSelect.appendChild(option);
+
+                if (accentPickerMenu) {
+                    const pickerOption = document.createElement('button');
+                    pickerOption.type = 'button';
+                    pickerOption.className = 'theme-accent-picker-option';
+                    pickerOption.dataset.accent = name;
+                    pickerOption.setAttribute('role', 'option');
+                    const swatch = document.createElement('span');
+                    swatch.className = 'theme-accent-swatch';
+                    swatch.style.setProperty('--accent-swatch', palette.colors[name]);
+                    swatch.setAttribute('aria-hidden', 'true');
+                    const label = document.createElement('span');
+                    label.textContent = name;
+                    pickerOption.append(swatch, label);
+                    pickerOption.addEventListener('click', () => {
+                        closeAccentPicker();
+                        void transitionToAccent(name);
+                    });
+                    accentPickerMenu.appendChild(pickerOption);
+                }
+            });
+            accentSelect.value = loadThemeAccentPrefs()[theme] || palette.default;
+            updateAccentPicker();
+            if (appearanceColorScheme) appearanceColorScheme.hidden = false;
+        };
+
+        const persistAccent = () => {
+            const theme = getThemeSelection();
+            const update = normalizeThemeAccentPrefs({ [theme]: accentSelect?.value });
+            if (!update[theme]) return;
+            changedAccentThemes.add(theme);
+            saveThemeAccentPrefs({ ...loadThemeAccentPrefs(), ...update });
+            applyThemeAccent(theme);
+            syncAccentSectionForTheme(theme);
+            if (!isLoggedIn || !window.fetch) return Promise.resolve();
+            // Serialize rapid changes so an older selection cannot save last.
+            accentSaveQueue = accentSaveQueue.then(async () => {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    keepalive: true,
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: new URLSearchParams({ themeAccents: JSON.stringify(update) }).toString(),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.ok) throw new Error('accent save failed');
+            }).catch(() => settingsDebugLog('accent saved locally; account synchronization failed'));
+            return accentSaveQueue;
+        };
+
+        const transitionToAccent = async (accent) => {
+            const theme = getThemeSelection();
+            const palette = getThemeAccentPalette(theme);
+            if (accentTransitioning || !palette?.colors[accent] || accentSelect?.value === accent) return;
+            accentTransitioning = true;
+            await beginThemeSwitchFade();
+            if (accentSelect) accentSelect.value = accent;
+            updateAccentPicker();
+            void persistAccent();
+            document.documentElement.classList.remove('theme-switch-active');
+            const reduced = document.documentElement.classList.contains('access-reduced-motion')
+                || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+            await new Promise(resolve => window.setTimeout(resolve, reduced ? 10 : 240));
+            document.documentElement.classList.remove('theme-switch-transition');
+            accentTransitioning = false;
         };
 
         const populateThemeOptions = (themes) => {
@@ -1713,7 +1970,12 @@ function initSettingsPage() {
 
         const applyThemeSelection = (theme) => {
             const normalizedTheme = normalizeTheme(theme);
+            if (appearanceColorScheme) {
+                appearanceColorScheme.hidden = !themeSupportsColorPrefs(normalizedTheme) && !getThemeAccentPalette(normalizedTheme);
+            }
             syncColorSectionForTheme(normalizedTheme);
+            syncAccentSectionForTheme(normalizedTheme);
+            applyThemeAccent(normalizedTheme);
             if (themeSupportsColorPrefs(normalizedTheme)) {
                 const fields = getThemeColorFields(normalizedTheme);
                 const colors = Object.assign({}, getThemeColorDefaults(normalizedTheme), loadLocalColorPrefs() || getColorValuesForTheme(normalizedTheme));
@@ -1725,6 +1987,16 @@ function initSettingsPage() {
             }
         };
 
+        const beginThemeSwitchFade = () => new Promise(resolve => {
+            const root = document.documentElement;
+            const reduced = root.classList.contains('access-reduced-motion')
+                || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+            root.classList.add('theme-switch-transition');
+            void getComputedStyle(root, '::after').opacity;
+            window.requestAnimationFrame(() => root.classList.add('theme-switch-active'));
+            window.setTimeout(resolve, reduced ? 10 : 240);
+        });
+
         const postColorsToServer = (colors) => {
             if (!isLoggedIn || !window.fetch) return Promise.resolve();
             const params = new URLSearchParams();
@@ -1733,6 +2005,7 @@ function initSettingsPage() {
             });
             return fetch('/api/settings', {
                 method: 'POST',
+                keepalive: true,
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                     'X-Requested-With': 'XMLHttpRequest',
@@ -1762,7 +2035,7 @@ function initSettingsPage() {
             const selectedTheme = getThemeSelection();
             const defaults = getThemeColorDefaults(selectedTheme);
             setColorInputs(defaults);
-            persistColors(defaults, opts);
+            return persistColors(defaults, opts);
         };
 
         const bindSitemapButton = () => {
@@ -2045,6 +2318,18 @@ function initSettingsPage() {
         const initialColors = Object.assign({}, getThemeColorDefaults(initialTheme), loadLocalColorPrefs() || {});
         setColorInputs(initialColors);
         applyThemeSelection(initialTheme);
+        if (themeResetAfterSwitch === initialTheme) {
+            if (initialTheme === 'classic') {
+                resetColorsToDefault();
+            } else {
+                const palette = getThemeAccentPalette(initialTheme);
+                if (palette && accentSelect) {
+                    accentSelect.value = palette.default;
+                    updateAccentPicker();
+                    persistAccent();
+                }
+            }
+        }
         ensureTitleAnimationPicker();
         syncMobileViewCookieWithCurrentHost();
         setMobileViewToggle(readMobileViewCookie());
@@ -2081,7 +2366,11 @@ function initSettingsPage() {
             }).then(r => r.ok ? r.json() : null).then(data => {
                 if (!data || !data.ok || !data.settings) return;
 
-                if (data.settings.colors) {
+                const serverAccents = normalizeThemeAccentPrefs(data.settings.themeAccents);
+                changedAccentThemes.forEach(theme => delete serverAccents[theme]);
+                saveThemeAccentPrefs({ ...loadThemeAccentPrefs(), ...serverAccents });
+
+                if (data.settings.colors && themeResetAfterSwitch !== 'classic') {
                     const serverColors = {};
                     COLOR_FIELDS.forEach(k => {
                         const n = normalizeColor(data.settings.colors[k] ?? '');
@@ -2141,7 +2430,46 @@ function initSettingsPage() {
             }).catch(() => {});
         }
 
+        accentPickerButton?.addEventListener('click', () => {
+            if (!accentPicker) return;
+            const open = accentPicker.classList.toggle('open');
+            accentPickerButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) {
+                accentPickerMenu?.querySelector('.theme-accent-picker-option.selected')?.focus();
+            }
+        });
+        accentPickerButton?.addEventListener('keydown', event => {
+            if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+            event.preventDefault();
+            accentPicker?.classList.add('open');
+            accentPickerButton.setAttribute('aria-expanded', 'true');
+            const options = [...(accentPickerMenu?.querySelectorAll('.theme-accent-picker-option') || [])];
+            (event.key === 'ArrowUp' ? options.at(-1) : options[0])?.focus();
+        });
+        accentPickerMenu?.addEventListener('keydown', event => {
+            const options = [...accentPickerMenu.querySelectorAll('.theme-accent-picker-option')];
+            const index = options.indexOf(document.activeElement);
+            if (event.key === 'Escape') {
+                closeAccentPicker();
+                accentPickerButton?.focus();
+                return;
+            }
+            if (!['ArrowDown', 'ArrowUp'].includes(event.key) || index < 0) return;
+            event.preventDefault();
+            const offset = event.key === 'ArrowDown' ? 1 : -1;
+            options[(index + offset + options.length) % options.length]?.focus();
+        });
+        document.addEventListener('click', event => {
+            if (accentPicker && !accentPicker.contains(event.target)) closeAccentPicker();
+        });
+
         // Persist colors immediately when changed
+        accentSelect?.addEventListener('change', persistAccent);
+        accentResetBtn?.addEventListener('click', () => {
+            const palette = getThemeAccentPalette(getThemeSelection());
+            if (!palette || !accentSelect) return;
+            void transitionToAccent(palette.default);
+        });
         colorInputs.forEach(inp => {
             inp.addEventListener('input', () => {
                 const selectedTheme = getThemeSelection();
@@ -2152,15 +2480,37 @@ function initSettingsPage() {
         });
 
         if (themeSelect) {
-            themeSelect.addEventListener('change', () => {
-                themeChangedByUser = true;
-                currentTheme = getThemeSelection();
-                saveLocalThemePref(currentTheme);
-                setThemeCookie(currentTheme);
-                applyThemeSelection(currentTheme);
-                if (currentTheme === 'classic') {
-                    resetColorsToDefault({ skipServer: true });
+            themeSelect.addEventListener('change', async () => {
+                const nextTheme = getThemeSelection();
+                if (themeSwitching || nextTheme === renderedTheme) return;
+                themeSwitching = true;
+                settingsDirty = false;
+                currentTheme = nextTheme;
+                closeThemePicker();
+                closeAccentPicker();
+
+                const palette = getThemeAccentPalette(nextTheme);
+                if (nextTheme === 'classic') {
+                    setColorInputs(getThemeColorDefaults(nextTheme));
+                } else if (palette && accentSelect) {
+                    syncAccentSectionForTheme(nextTheme);
+                    accentSelect.value = palette.default;
+                    updateAccentPicker();
                 }
+
+                await beginThemeSwitchFade();
+                if (nextTheme === 'classic') {
+                    void resetColorsToDefault();
+                } else if (palette && accentSelect) {
+                    void persistAccent();
+                }
+                saveLocalThemePref(nextTheme);
+                setThemeCookie(nextTheme);
+                try {
+                    sessionStorage.setItem(THEME_SWITCH_PENDING_KEY, '1');
+                    sessionStorage.setItem(THEME_SWITCH_RESET_KEY, nextTheme);
+                } catch (_) { /* ignore */ }
+                window.location.reload();
             });
         }
 
@@ -2210,6 +2560,7 @@ function initSettingsPage() {
         document.addEventListener('change', event => {
             const control = event.target;
             if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)) return;
+            if (control.id === 'theme-select') return;
             if (control.id.startsWith('fruity-dance-') || control.id === 'debug-mode-toggle') return;
             if (!control.closest('#appearance-settings, #accessibility-settings, #notification-settings, #admin-settings')) return;
             markSettingsDirty();
@@ -2274,7 +2625,6 @@ function initSettingsPage() {
             applyGlowIntensity(selected);
 
             const selectedTheme = getThemeSelection();
-            const themeChanged = themeChangedByUser || selectedTheme !== renderedTheme;
             saveLocalThemePref(selectedTheme);
             setThemeCookie(selectedTheme);
 
@@ -2305,6 +2655,13 @@ function initSettingsPage() {
                     Object.entries(mergedColors).forEach(([k, v]) => {
                         params.append('color' + k.charAt(0).toUpperCase() + k.slice(1), v);
                     });
+                }
+
+                const accentPalette = getThemeAccentPalette(selectedTheme);
+                if (accentPalette) {
+                    const accent = loadThemeAccentPrefs()[selectedTheme] || accentPalette.default;
+                    params.append('themeAccents', JSON.stringify({ [selectedTheme]: accent }));
+                    await accentSaveQueue;
                 }
 
                 if (isAdmin) {
@@ -2346,7 +2703,7 @@ function initSettingsPage() {
                 window.location.replace(desktopUrl.toString());
                 return;
             }
-            await finishSettingsSave(shouldReloadForMobileView || themeChanged);
+            await finishSettingsSave(shouldReloadForMobileView);
         });
 
         if (colorResetBtn) {

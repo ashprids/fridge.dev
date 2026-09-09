@@ -291,7 +291,6 @@ if ($isToast) {
         . '<input id="toast-feed-length" type="range" min="1" max="5" step="1" value="3">'
         . '<output id="toast-feed-length-label" for="toast-feed-length">normal</output>'
         . '</label>'
-        . '<br>'
         . '<button id="form-button" type="button" data-action="toast-generate-feed">write</button>'
         . '<span id="toast-feed-generator-status" style="color: var(--subtle); margin-left: 0.75rem;"></span>'
         . '</div><br>';
@@ -307,11 +306,11 @@ if ($isToast) {
         $content
     );
     $content = str_replace(
-        '<button id="form-button" type="submit">post</button>',
+        '<button id="form-button" type="submit" data-post-submit-wait>post</button>',
         '<button id="form-button" type="submit" data-toast-post-button="1" disabled>post</button>',
         $content
     );
-    $content = str_replace('<div class="bbcode-editor">', $toastGeneratorControls . '<div class="bbcode-editor">', $content);
+    $content = preg_replace('/(<div\b[^>]*class="[^"]*\bbbcode-editor\b[^"]*"[^>]*>)/', $toastGeneratorControls . '$1', $content, 1);
 }
 if ($postingRestricted) {
     $content = fridg3_disable_composer_controls($content);

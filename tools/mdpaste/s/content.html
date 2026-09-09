@@ -103,7 +103,7 @@
         right: 0;
     }
 
-    .mdpaste-paste-actions button {
+    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle)) {
         width: 26px;
         height: 26px;
         padding: 0;
@@ -115,9 +115,9 @@
         cursor: pointer;
     }
 
-    .mdpaste-paste-actions button:hover,
-    .mdpaste-paste-actions button:focus-visible,
-    .mdpaste-paste-actions button[aria-pressed="true"] {
+    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle)):hover,
+    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle)):focus-visible,
+    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle))[aria-pressed="true"] {
         background: rgba(255, 255, 255, 0.06) !important;
         color: var(--fg) !important;
         outline: none;
@@ -204,6 +204,11 @@
         line-height: 1.2;
     }
 
+    .mdpaste-markdown > :is(h1, h2, h3, h4, h5, h6) {
+        margin-top: 1.5em;
+        margin-bottom: 0.75em;
+    }
+
     .mdpaste-markdown h1 { font-size: 2em; }
     .mdpaste-markdown h2 { font-size: 1.5em; }
     .mdpaste-markdown h3 { font-size: 1.17em; }
@@ -251,6 +256,10 @@
     }
 
     .mdpaste-markdown blockquote blockquote { margin: 12px 0 0; background: rgba(255, 255, 255, 0.1); }
+    .mdpaste-markdown .markdown-attributed-quote { max-width: 100%; margin: 14px 0; }
+    .mdpaste-markdown .markdown-attributed-quote > blockquote { margin: 0; }
+    .mdpaste-markdown .markdown-attributed-quote > figcaption { margin-top: 7px; padding-left: 16px; color: var(--subtle); font-size: 0.9em; }
+    .mdpaste-markdown .markdown-attributed-quote cite { font-style: normal; }
     .mdpaste-markdown blockquote > :first-child,
     .mdpaste-markdown .mdpaste-alert > :first-child { margin-top: 0; }
     .mdpaste-markdown blockquote > :last-child,

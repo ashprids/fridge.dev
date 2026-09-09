@@ -49,6 +49,11 @@ Expected top-level shape:
       "titleAnimation": "wobble",
       "titleAnimationAlways": false,
       "titleAnimationDesync": true,
+      "themeAccents": {
+        "base16": "blue",
+        "gruvbox": "green",
+        "nord": "blue"
+      },
       "colors": {
         "bg": "#RRGGBB",
         "fg": "#RRGGBB",
@@ -68,6 +73,7 @@ Notes:
 - Bookmark ids currently use raw feed ids and `journal:{id}`; legacy `newsletter:{id}` values can exist but are ignored
 - Theme selection is not account data. It is stored only in browser localStorage under `themePref` and in the `theme_pref` cookie required for first-load PHP rendering; legacy account `theme` keys are ignored. `default` selects Blackprint, `classic` enables `colors` for `bg`/`fg`/`border`/`subtle`/`links`, and any other valid value refers to a discovered `/themes/{theme-id}.json` package
 - The browser-only aliases `blackprint` and `custom` normalize to `default` and `classic` respectively; preferences for theme packages that no longer exist fall back to Blackprint during rendering
+- `themeAccents` stores independent palette names for Base16, Gruvbox, and Nord; missing entries use the defaults in `themes/palettes/accents.json`. Classic's `colors` remains separate. Browsers retain these choices in `themeAccentPrefs` localStorage and one-year `theme_accent_base16`, `theme_accent_gruvbox`, and `theme_accent_nord` cookies, shared across fridge.dev subdomains. Settings changes preview and persist immediately, including to the account when logged in; account settings fetched on `/settings` restore saved choices without overwriting accents changed while the request was pending. The reset button changes only the current theme, while selecting a different theme resets the incoming theme's colour scheme before its immediate reload
 - Text glow is stored in `glowIntensity`; the settings UI writes `none` for off and `medium` for on, while legacy `low`/`high` values are treated as enabled medium glow when saved again
 - Title motion is stored in `titleAnimation` (`wobble`, `bounce`, `rubberhose`, `bubble`, `slot-machine`, `moonwalk`, or `heartbeat`), `titleAnimationAlways` (boolean), and `titleAnimationDesync` (boolean, default `true`); removed `pinball` values migrate to `wobble`; legacy `orbit`, `domino`, and `lava-lamp` values migrate to `bubble`; removed `tidal-wave`, `accordion`, and `typewriter` values migrate to `slot-machine`, while `helicopter`, `haunted`, and `juggle` migrate to `moonwalk`; guests keep the same values in local storage
 - Accessibility toggles are stored as account booleans such as `reduceMotion`; logged-out browsers keep the same preferences in localStorage. Debug mode applies immediately when its checkbox changes and, for logged-in users, posts its account value independently of the general “save changes” action; changing that checkbox alone therefore does not mark the settings form dirty
@@ -190,7 +196,7 @@ Version 2 feed post format:
 
 Readers must inspect the first line before assigning username/date offsets. Files without the exact `v2` marker remain legacy BBCode and must not be passed through the Markdown renderer.
 
-The v2 feed subset supports `**bold**`, `*italic*`, `<u>underline</u>`, `~~strikethrough~~`, `==highlight==`, `[links](URL)`, feed media syntax, `>` blockquotes, inline/fenced code, pipe tables, `||spoiler text||`, nested ordered/unordered lists, and Font Awesome icons using `!fa style icon-name`. Lists and icons are supported through typed syntax without toolbar buttons. Other Markdown constructs and arbitrary HTML are displayed literally.
+The v2 feed subset supports `**bold**`, `*italic*`, `<u>underline</u>`, `~~strikethrough~~`, `==highlight==`, `[links](URL)`, feed media syntax, `>` blockquotes, attributed quotes beginning with `> [!QUOTE Name]`, inline/fenced code, pipe tables, `||spoiler text||`, nested ordered/unordered lists, and Font Awesome icons using `!fa style icon-name`. Lists, attributed quotes, and icons are supported through typed syntax without dedicated toolbar buttons. Other Markdown constructs and arbitrary HTML are displayed literally.
 
 Other file:
 
@@ -284,7 +290,7 @@ New journal posts are `{id}.md` files:
 
 1. Exact `v2` version marker
 2. YAML front matter containing `title`, `description`, `date`, and optional `card_image`; journal posts do not set `author`
-3. Full site-supported Markdown body
+3. Full site-supported Markdown body, including unfiltered raw HTML
 
 The description uses the article subtitle styling without an author prefix, and the card-image metadata is not part of the rendered body. When the card image is absent, the listing falls back to the first Markdown or legacy HTML image. Readers discover both `.md` and `.txt`, prefer `.md` when resolving an ID, and render unversioned `.txt` bodies with the unchanged trusted-HTML legacy path. The parser accepts the earlier v2 `author` field as a description fallback so development posts created during the transition remain readable.
 
@@ -296,7 +302,7 @@ Draft format:
 4. Optional `FORMAT:html` or `FORMAT:markdown`
 5. Draft body
 
-Without a format marker, preview treats the body as legacy BBCode. `FORMAT:html` preserves raw-HTML legacy edits, while `FORMAT:markdown` uses the full Markdown renderer.
+Without a format marker, preview treats the body as legacy BBCode. `FORMAT:html` preserves raw-HTML legacy edits, while `FORMAT:markdown` uses the trusted Markdown renderer and preserves arbitrary HTML. This HTML support applies only to journal content and repository-authored Markdown pages. Feed posts, feed comments, and mdpaste retain their restricted rendering paths.
 
 ## `data/guestbook/`
 
@@ -368,6 +374,14 @@ The `/music/upload` admin page writes audio files to `data/audio/`, cover art to
 - `rate_limits.json` stores each hashed client IP key with its latest accepted submission timestamp, enforcing the six-hour contact cooldown without retaining another plaintext-IP copy
 - Nginx blocks direct web access to this directory; submissions are only shown through the admin-only `/contact?dashboard=1` route
 
+## `data/website-commissions/`
+
+- Private website commission requests as `{YYYYMMDDHHMMSS}_{random}.json`
+- Each request stores its id and creation time, plaintext and hashed IP identity, user agent, name, email, preferred contact method, selected website categories, project description, budget choice, payment method, affirmative terms acceptance, typed signature, Discord notification channel, and optional `notifyError`
+- `rate_limits.json` stores each hashed client IP with its latest accepted request timestamp for the 48-hour commission cooldown
+- Discord delivery errors do not discard an accepted request; the error is recorded in `notifyError` and written to the PHP error log
+- Nginx blocks direct web access to `/data`; these records are not publicly rendered
+
 ## `data/mdpaste/`
 
 - Temporary markdown paste records as `{id}.json`
@@ -378,6 +392,12 @@ The `/music/upload` admin page writes audio files to `data/audio/`, cover art to
 - `hard_breaks` controls whether single paragraph newlines render as `<br>` instead of spaces
 
 ## `data/etc/`
+
+### `website-commissions.json`
+
+- Stores the admin-controlled `open` state for website commissions, plus the last update time and administrator username
+- A missing file or missing `open` value defaults to open
+- When closed, `/others/fridge-builds-websites/submit` does not render or accept the commission form
 
 ### `wip`
 
@@ -398,6 +418,8 @@ Used key:
 ### Toast Data
 
 Toast configuration, personality, AI behavior, notification state, approvals, DM history, and internal service endpoints are documented on [Toast](Toast#configuration-and-data).
+
+Website chat conversations use encrypted JSON envelopes under `data/etc/toast-chats`. Filenames contain a keyed account/IP identity hash; the decrypted record contains the identity label, daily visitor-message counters, pending-reply state, message records, replies, reactions, deletion/hide state, and attachment metadata. Optional `clearedMessageCount` and `clearedAt` fields retain a visitor/AI visibility boundary while keeping all prior records available in admin history; clearing does not reset daily counters. Each attachment is a separate encrypted envelope containing a base64 JPEG. The tree is private runtime data and is excluded entirely from development-data copies.
 
 ### `notification-inbox-state.json`
 
@@ -431,3 +453,7 @@ Shape is roughly:
 ## `data/downloads/`
 
 - Downloadable binaries, archives, presets, and similar files linked from the site
+
+## Toast Python diagnostics
+
+`data/etc/toast-python-log.json` contains JSON lines with UTC `timestamp`, `level`, and an operational `message`, written by the Python service. It rotates at 2 MiB into `.1.json` and `.2.json` backups, with mode `0640`. These logs contain no message bodies or credentials, are blocked from direct web access by the private JSON rule, and are removed from developer-data exports. The authenticated Toast session reads the current file through `/api/debug-process-logs`; see [Debug Mode](Debug-Mode#python-tab-toast).

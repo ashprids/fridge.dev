@@ -1,9 +1,14 @@
 <?php
 
-session_start();
+$sessionBootstrapDir = __DIR__;
+while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessionBootstrapDir) !== $sessionBootstrapDir) {
+    $sessionBootstrapDir = dirname($sessionBootstrapDir);
+}
+require_once $sessionBootstrapDir . "/lib/session.php";
+fridg3_start_session();
 
-$title = 'minecraft world archive';
-$description = 'an archive of some of the notable minecraft worlds i have dedicated time towards.';
+$title = 'minecraft archive';
+$description = "an archive of the minecraft worlds i've worked on throughout the past couple of years, from builds and survival to modpacks and multiplayer servers.";
 
 
 function find_template_file($filename) {
@@ -27,6 +32,10 @@ if ($render_helper_path) {
     require_once $render_helper_path;
 }
 
+// Example of a route-specific non-process PHP debug entry. Shared request and
+// included-file entries are emitted automatically by lib/debug.php on all pages.
+fridg3_debug_log('[PHP] formatting Markdown example page initialized');
+
 $template_name = function_exists('get_preferred_template_name')
     ? get_preferred_template_name(__DIR__)
     : 'template.html';
@@ -43,12 +52,18 @@ if (function_exists('apply_preferred_theme_stylesheet')) {
     $template = apply_preferred_theme_stylesheet($template, __DIR__);
 }
 
-$content_path = find_template_file('content.html');
-if (!$content_path) {
-    die('content.html not found. report this issue to ashton@fridge.dev.');
+// The page source is Markdown; use the same renderer and presentation as journal posts.
+require_once find_template_file('tools/mdpaste/lib.php');
+$content_path = __DIR__ . DIRECTORY_SEPARATOR . 'content.md';
+if (!is_file($content_path) || !is_readable($content_path)) {
+    http_response_code(500);
+    die('content.md not found. report this issue to ashton@fridge.dev.');
 }
 
-$content = file_get_contents($content_path);
+$markdown = (string)file_get_contents($content_path);
+$rendered = '<article class="mdpaste-markdown">' . mdp_render_trusted_markdown($markdown) . '</article>';
+$markdown_view = (string)file_get_contents(find_template_file('tools/mdpaste/s/content.html'));
+$content = str_replace('{paste_content}', $rendered, $markdown_view);
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

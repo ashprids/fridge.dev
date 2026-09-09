@@ -1,0 +1,39 @@
+{
+    "base16": {
+        "default": "blue",
+        "colors": {
+            "red": "#CC6666",
+            "orange": "#DE935F",
+            "yellow": "#F0C674",
+            "green": "#B5BD68",
+            "aqua": "#8ABEB7",
+            "blue": "#81A2BE",
+            "purple": "#B294BB",
+            "brown": "#A3685A"
+        }
+    },
+    "gruvbox": {
+        "default": "green",
+        "colors": {
+            "red": "#FB4934",
+            "orange": "#FE8019",
+            "yellow": "#FABD2F",
+            "green": "#B8BB26",
+            "aqua": "#8EC07C",
+            "blue": "#83A598",
+            "purple": "#D3869B"
+        }
+    },
+    "nord": {
+        "default": "blue",
+        "colors": {
+            "red": "#BF616A",
+            "orange": "#D08770",
+            "yellow": "#EBCB8B",
+            "green": "#A3BE8C",
+            "aqua": "#8FBCBB",
+            "blue": "#88C0D0",
+            "purple": "#B48EAD"
+        }
+    }
+}

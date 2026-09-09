@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+require_once __DIR__ . '/bot-mode.php';
 
 if (!function_exists('fridg3_get_persistent_login_lifetime')) {
     function fridg3_get_persistent_login_lifetime(): int
@@ -291,6 +292,7 @@ if (!function_exists('fridg3_start_session')) {
     function fridg3_start_session(bool $enforceAccessRules = true): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
+            if ($enforceAccessRules) fridg3_enforce_bot_mode();
             return;
         }
 
@@ -348,6 +350,7 @@ if (!function_exists('fridg3_start_session')) {
             }
         }
 
+        fridg3_enforce_bot_mode();
         fridg3_session_enforce_work_in_progress();
     }
 }

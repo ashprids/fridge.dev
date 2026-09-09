@@ -249,6 +249,27 @@ echo "highlighted code block";
                 <label class="color-row"><span>accent</span><input class="color-input" type="color" value="#4d76c9"></label>
             </div>
 
+            <div id="theme-accent-section">
+                <div class="color-row">
+                    <span>palette accent</span>
+                    <span class="theme-accent-control">
+                        <span class="theme-accent-picker">
+                            <button type="button" class="theme-accent-picker-button" aria-haspopup="listbox" aria-expanded="false" onclick="const picker=this.parentElement;const open=picker.classList.toggle('open');this.setAttribute('aria-expanded',open?'true':'false')">
+                                <span class="theme-accent-swatch" style="--accent-swatch:#88c0d0" aria-hidden="true"></span>
+                                <span class="theme-accent-picker-label">blue</span>
+                                <span class="theme-accent-picker-chevron" aria-hidden="true">▾</span>
+                            </button>
+                            <span class="theme-accent-picker-menu" role="listbox" aria-label="accent colours">
+                                <button type="button" class="theme-accent-picker-option selected"><span class="theme-accent-swatch" style="--accent-swatch:#88c0d0"></span><span>blue</span></button>
+                                <button type="button" class="theme-accent-picker-option"><span class="theme-accent-swatch" style="--accent-swatch:#a3be8c"></span><span>green</span></button>
+                                <button type="button" class="theme-accent-picker-option"><span class="theme-accent-swatch" style="--accent-swatch:#ebcb8b"></span><span>yellow</span></button>
+                            </span>
+                        </span>
+                    </span>
+                </div>
+                <button type="button" class="color-reset-button">reset to default</button>
+            </div>
+
             <div id="search">
                 <input id="search-box" type="search" value="search box">
                 <button id="search-button" type="button">search</button>
@@ -261,15 +282,15 @@ echo "highlighted code block";
 
         <h4>feed card</h4>
         <div id="posts">
-            <a href="/feed/posts/formatting-sample" class="feed-post-link" style="text-decoration:none;color:inherit;">
+            <div class="feed-post-link" style="text-decoration:none;color:inherit;">
                 <div id="post" style="cursor: pointer;">
                     <div id="post-header">
                         <span id="post-username">@fridge</span>
-                        <span id="post-date-feed">2h ago &bull; <span class="feed-reply-count"><i class="fa-regular fa-comment"></i> 3</span> &bull; <span id="post-edit-feed" data-tooltip="edit post" style="cursor:pointer !important" data-edit-href="/feed/edit?post=formatting-sample.txt"><i class="fa-solid fa-pencil"></i></span> <span id="post-bookmark-feed" data-tooltip="save post" data-post-id="formatting-sample"><i class="fa-regular fa-bookmark"></i></span></span>
+                        <span id="post-date-feed">2h ago &bull; <span class="feed-reply-count"><i class="fa-regular fa-comment"></i> 3</span> &bull; <details class="site-action-menu" data-no-card-navigation><summary data-tooltip="post actions" aria-label="post actions"><i class="fa-solid fa-ellipsis"></i></summary><div class="site-action-menu-dropdown"><a class="site-action-menu-item" href="/feed/edit?post=formatting-sample.txt"><i class="fa-solid fa-pencil"></i><span>edit</span></a></div></details> <span id="post-bookmark-feed" data-tooltip="save post" data-post-id="formatting-sample"><i class="fa-regular fa-bookmark"></i></span></span>
                     </div>
                     <span id="post-content">feed-style post content copied from the generated feed card shape.</span>
                 </div>
-            </a>
+            </div>
         </div>
 
         <h4>guestbook card</h4>
@@ -286,8 +307,14 @@ echo "highlighted code block";
         <h4>journal card</h4>
         <div id="posts">
             <a id="post" class="journal-post-link" href="/journal/posts/formatting-sample">
-                <span id="post-date">2026-05-13</span><span id="journal-post-actions" style="position:absolute;top:12px;right:12px;display:inline-flex;align-items:center;gap:8px;"><span id="post-edit-feed" data-tooltip="edit post" data-edit-href="/journal/edit?post=formatting-sample" style="color: var(--subtle); font-size: 12px;"><i class="fa-solid fa-pencil"></i></span><span id="post-bookmark" style="position:static;top:auto;right:auto;" data-tooltip="save post" data-post-id="journal:formatting-sample"><i class="fa-regular fa-bookmark"></i></span></span><span id="post-title">journal card title</span><span id="post-description">short description copied from the generated journal card shape.</span>
+                <span id="post-date">2026-05-13</span><span id="journal-post-actions" style="position:absolute;top:12px;right:12px;display:inline-flex;align-items:center;gap:8px;"><span id="post-edit-feed" class="journal-post-edit" data-tooltip="edit post" data-edit-href="/journal/edit?post=formatting-sample" style="color: var(--subtle); font-size: 12px;"><i class="fa-solid fa-pencil"></i></span><span id="post-bookmark" style="position:static;top:auto;right:auto;" data-tooltip="save post" data-post-id="journal:formatting-sample"><i class="fa-regular fa-bookmark"></i></span></span><span id="post-title">journal card title</span><span id="post-description">short description copied from the generated journal card shape.</span>
             </a>
+        </div>
+
+        <h4>journal article controls</h4>
+        <div class="formatting-row">
+            <a class="journal-post-edit" href="/journal/edit?post=formatting-sample" data-tooltip="edit post" aria-label="edit post"><i class="fa-solid fa-pencil"></i></a>
+            <button type="button" id="mdpaste-font-toggle" data-tooltip="toggle serif font" aria-label="toggle serif font" aria-pressed="false"><i class="fa-solid fa-font"></i></button>
         </div>
 
         <div class="guestbook-pagination" aria-label="pagination sample">

@@ -3,6 +3,7 @@ const debugLog = message => window.fridg3DebugClientLog?.(`[toast controls] ${me
 function initToastDiscordBotPage() {
     const root = document.getElementById('control-panel-container');
     const listenButton = document.getElementById('listen-along-button');
+    const chatButton = document.getElementById('chat-with-toast-button');
     const bindRoot = root || listenButton;
     if (!bindRoot || bindRoot.dataset.toastDiscordBotBound === '1') return;
     bindRoot.dataset.toastDiscordBotBound = '1';
@@ -32,6 +33,7 @@ function initToastDiscordBotPage() {
         if (statusText) statusText.textContent = isOnline ? 'Online' : 'Offline';
         if (nowPlayingEl) nowPlayingEl.style.display = isOnline ? 'block' : 'none';
         if (listenButton) listenButton.style.display = isOnline ? '' : 'none';
+        if (chatButton) chatButton.hidden = !isOnline;
     }
 
     function setStatusUI(isOnline) {
@@ -94,6 +96,12 @@ function initToastDiscordBotPage() {
         }
     }
 
+    async function radioCsrf() {
+        const response = await fetch('/api/discord-bot-control/', {credentials:'same-origin', cache:'no-store'});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Could not authorize radio settings.');
+        return data.csrf;
+    }
     async function persistStatus(isOnline) {
         if (!statusToggle) return;
         statusToggle.disabled = true;
@@ -102,7 +110,7 @@ function initToastDiscordBotPage() {
             const response = await fetch('/api/discord-bot-control/status/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: isOnline ? 'online' : 'offline' }),
+                body: JSON.stringify({ csrf: await radioCsrf(), status: isOnline ? 'online' : 'offline' }),
             });
             const data = await response.json();
             if (!response.ok || data.ok !== true) {
@@ -148,7 +156,7 @@ function initToastDiscordBotPage() {
                 const response = await fetch('/api/discord-bot-control/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, name }),
+                    body: JSON.stringify({ csrf: await radioCsrf(), url, name }),
                 });
                 const data = await response.json();
                 if (!response.ok || !data.ok) {
@@ -171,7 +179,6 @@ function initToastDiscordBotPage() {
 
     setStatusUI(false);
     setLiveControls(false);
-    checkAdminStatus();
     updateNowPlaying();
     if (window.__toastStatusInterval) {
         clearInterval(window.__toastStatusInterval);

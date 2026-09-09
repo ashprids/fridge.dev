@@ -1334,6 +1334,10 @@ body.mobile-template.sidebar-is-hidden #sidebar {
 
 .tooltip {
     position: fixed;
+    width: max-content;
+    /* One 50-character text measure, plus 16px padding and 2px border. */
+    max-width: min(calc(50ch + 18px), calc(100vw - 16px));
+    box-sizing: border-box;
     background-color: rgba(0, 0, 0, 0.9);
     color: var(--fg);
     padding: 4px 8px;
@@ -1341,7 +1345,7 @@ body.mobile-template.sidebar-is-hidden #sidebar {
     border-radius: 4px;
     font-size: 12px;
     white-space: pre-line;
-    word-wrap: break-word;
+    overflow-wrap: anywhere;
     text-align: left;
     z-index: 2147483647;
     pointer-events: none;
@@ -3605,6 +3609,154 @@ body.display-aux-exit-fault #fruity-dance {
     transform: translateY(1px);
 }
 
+#theme-accent-section .color-row {
+    max-width: 360px;
+    padding: 12px;
+}
+
+.appearance-subsection {
+    width: 100%;
+}
+
+.appearance-subsection > h4 {
+    margin-top: 0;
+}
+
+#theme-accent-section .theme-accent-control {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+body .theme-accent-swatch {
+    display: inline-block;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border: 1px solid var(--border);
+    background: var(--accent-swatch, transparent) !important;
+}
+
+.theme-accent-picker {
+    position: relative;
+    display: inline-block;
+    width: 172px;
+    max-width: 100%;
+    font-family: "MainRegular", var(--emoji-font), monospace;
+}
+
+.theme-accent-picker-button,
+.theme-accent-picker-option {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 40px;
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.theme-accent-picker-button {
+    position: relative;
+    padding-right: 30px;
+}
+
+.theme-accent-picker-button .theme-accent-picker-chevron {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.theme-accent-picker-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.theme-accent-picker-chevron {
+    color: var(--subtle);
+}
+
+.theme-accent-picker-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    left: 0;
+    z-index: 90;
+    max-height: min(320px, 55vh);
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    box-shadow: 6px 6px 0 color-mix(in srgb, #000 28%, transparent);
+}
+
+.theme-accent-picker.open .theme-accent-picker-menu {
+    display: block;
+}
+
+.theme-accent-picker-option {
+    grid-template-columns: 28px minmax(0, 1fr);
+    min-height: 39px;
+    border: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.theme-accent-picker-option:last-child {
+    border-bottom: 0;
+}
+
+.theme-accent-picker-option:is(:hover, :focus-visible, .selected) {
+    background: color-mix(in srgb, var(--links) 24%, var(--bg));
+    color: var(--fg);
+}
+
+.theme-accent-picker-button:hover,
+.color-reset-button:hover {
+    background: color-mix(in srgb, var(--links) 16%, var(--bg));
+    border-color: var(--links);
+}
+
+.color-reset-button:active {
+    transform: translateY(1px);
+}
+
+.theme-accent-picker-option:focus-visible,
+.theme-accent-picker-button:focus-visible {
+    outline: 2px solid var(--links);
+    outline-offset: 2px;
+}
+
+.color-reset-button {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin: 10px 0 0;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 14px;
+    line-height: 1.2;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
 .dropdown {
     font-family: 'MainRegular', var(--emoji-font), monospace;
     font-size: 14px;
@@ -4325,13 +4477,13 @@ hr {
     color: rgb(200, 200, 200);
 }
 
-#post-edit-feed,
+#post-edit-feed:not(.journal-post-edit),
 .guestbook-edit-btn,
 .guestbook-delete-btn,
-#post-edit-feed:hover,
+#post-edit-feed:not(.journal-post-edit):hover,
 .guestbook-edit-btn:hover,
 .guestbook-delete-btn:hover,
-#post-edit-feed:active,
+#post-edit-feed:not(.journal-post-edit):active,
 .guestbook-edit-btn:active,
 .guestbook-delete-btn:active {
     background: transparent !important;
@@ -4646,18 +4798,62 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
     color: var(--subtle);
 }
 
-.site-action-menu > summary {
+.site-action-menu > summary,
+#post-bookmark,
+#post-bookmark-feed,
+.journal-post-edit,
+#mdpaste-font-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 18px;
     height: 18px;
+    box-sizing: content-box;
+    vertical-align: middle;
     padding: 0;
     border: 0;
+    border-radius: 0;
     background: transparent;
+    box-shadow: none;
     color: var(--subtle);
+    font-size: 12px;
+    line-height: 1;
     cursor: pointer;
     list-style: none;
+    text-decoration: none;
+}
+
+.site-action-menu > summary {
+    display: flex;
+}
+
+.journal-post-edit,
+#mdpaste-font-toggle {
+    align-self: center;
+}
+
+/* Keep icon colours independent of each theme's surrounding card surface. */
+.site-action-menu > summary > i,
+#post-bookmark > i,
+#post-bookmark-feed > i,
+.journal-post-edit > i,
+#mdpaste-font-toggle > i {
+    color: var(--subtle) !important;
+}
+
+.site-action-menu > summary:hover > i,
+.site-action-menu > summary:focus-visible > i,
+.site-action-menu[open] > summary > i,
+#post-bookmark:hover > i,
+#post-bookmark:focus-visible > i,
+#post-bookmark-feed:hover > i,
+#post-bookmark-feed:focus-visible > i,
+.journal-post-edit:hover > i,
+.journal-post-edit:focus-visible > i,
+#mdpaste-font-toggle:hover > i,
+#mdpaste-font-toggle:focus-visible > i,
+#mdpaste-font-toggle[aria-pressed="true"] > i {
+    color: var(--fg) !important;
 }
 
 .site-action-menu > summary::-webkit-details-marker {
@@ -5676,6 +5872,10 @@ body.mobile-template #debug-console #show-debug-console.is-in-debug-console {
 .feed-markdown th, .feed-markdown td { padding: 8px; border: 1px solid var(--border); }
 .feed-markdown th { background: color-mix(in srgb, var(--bg) 88%, var(--fg) 12%); }
 .feed-markdown blockquote { margin: 14px 0; padding: 12px 16px; border-left: 2px solid var(--links); background: color-mix(in srgb, var(--bg) 90%, var(--fg) 10%); }
+.markdown-attributed-quote { max-width: 100%; margin: 14px 0; }
+.markdown-attributed-quote > blockquote { margin: 0; }
+.markdown-attributed-quote > figcaption { margin-top: 7px; padding-left: 16px; color: var(--subtle); font-size: 0.9em; }
+.markdown-attributed-quote cite { font-style: normal; }
 .feed-markdown :not(pre) > code {
     display: inline-block;
     padding: 1px 6px;
@@ -6608,6 +6808,9 @@ html.access-high-contrast :focus-visible {
     color: var(--chat-fg) !important;
 }
 
+.chat-view .chat-header-actions .toast-clear-chat,
+.chat-view .chat-header-actions .toast-clear-chat:hover,
+.chat-view .chat-header-actions .toast-clear-chat:active,
 .chat-view .chat-header-actions .chat-delete-form .chat-delete-button,
 .chat-view .chat-header-actions .chat-delete-form .chat-delete-button:hover,
 .chat-view .chat-header-actions .chat-delete-form .chat-delete-button:active {
@@ -8351,7 +8554,11 @@ pre code.hljs {
 .native-theme-select {
     position: absolute !important;
     width: 1px !important;
+    min-width: 0 !important;
     height: 1px !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
     opacity: 0 !important;
     pointer-events: none !important;
 }
@@ -8509,6 +8716,33 @@ pre code.hljs {
         line-height: 1;
         overflow: visible;
     }
+}
+
+/* Theme changes reload the shell because packaged themes may use different
+   templates. A fixed black veil joins the outgoing and incoming documents. */
+html.theme-switch-transition::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    pointer-events: all;
+    background: #000;
+    opacity: 0;
+    transition: opacity 220ms ease;
+}
+
+html.theme-switch-transition.theme-switch-active::after {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.theme-switch-transition::after {
+        transition-duration: 1ms;
+    }
+}
+
+html.access-reduced-motion.theme-switch-transition::after {
+    transition-duration: 1ms;
 }
 
 /* 5. Theme layers
@@ -8732,7 +8966,7 @@ body.blackprint-theme #post-date-feed,
 body.blackprint-theme #post-username,
 body.blackprint-theme #post-bookmark,
 body.blackprint-theme #post-bookmark-feed,
-body.blackprint-theme #post-edit-feed,
+body.blackprint-theme #post-edit-feed:not(.journal-post-edit),
 body.blackprint-theme .form-card p,
 body.blackprint-theme .form-field label,
 body.blackprint-theme .color-row span,
@@ -8824,36 +9058,38 @@ body.blackprint-theme .color-input:focus{
     box-shadow: 4px 4px 0 rgba(236, 231, 220, 0.18);
 }
 
+body.blackprint-theme #settings-page button:where(:not(#mdpaste-font-toggle)),
 body.blackprint-theme #search-button,
 body.blackprint-theme #form-button,
 body.blackprint-theme #lastfm-link-button,
 body.blackprint-theme #settings-save,
 body.blackprint-theme #color-reset,
 body.blackprint-theme .danger-button,
-body.blackprint-theme button,
+body.blackprint-theme button:where(:not(#mdpaste-font-toggle)),
 body.blackprint-theme #footer-button{
     background: linear-gradient(90deg, #776490, #6caaa7);
-    color: #101315;
+    color: #fff;
     border: 1px solid var(--border);
     border-radius: 0;
     box-shadow: 3px 3px 0 rgba(236, 231, 220, 0.2);
 }
 
+body.blackprint-theme #settings-page button:where(:not(#mdpaste-font-toggle)):hover,
 body.blackprint-theme #search-button:hover,
 body.blackprint-theme #form-button:hover,
 body.blackprint-theme #settings-save:hover,
 body.blackprint-theme #color-reset:hover,
-body.blackprint-theme button:hover,
+body.blackprint-theme button:where(:not(#mdpaste-font-toggle)):hover,
 body.blackprint-theme #footer-button:hover{
     background: var(--links);
-    color: #15191b;
+    color: #fff;
 }
 
 body.blackprint-theme #search-button:active,
 body.blackprint-theme #form-button:active,
 body.blackprint-theme #settings-save:active,
 body.blackprint-theme #color-reset:active,
-body.blackprint-theme button:active,
+body.blackprint-theme button:where(:not(#mdpaste-font-toggle)):active,
 body.blackprint-theme #footer-button:active,
 body.blackprint-theme .bbcode-btn:active{
     background: #15191b;
@@ -8864,20 +9100,20 @@ body.blackprint-theme .bbcode-btn:active{
 
 body.blackprint-theme #settings-save{
     background: linear-gradient(90deg, #776490, #6caaa7) !important;
-    color: #15191b !important;
+    color: #fff !important;
 }
 
 body.blackprint-theme #settings-save:hover,
 body.blackprint-theme #settings-save:active{
     background: linear-gradient(90deg, #8b73a8, #80bfbc) !important;
-    color: #15191b !important;
+    color: #fff !important;
 }
 
 body.blackprint-theme .danger-button,
 body.blackprint-theme .grid-delete-button,
 body.blackprint-theme #admin-account-delete-form button{
     background: #7b2e3b;
-    color: #15191b;
+    color: #fff;
 }
 
 body.blackprint-theme .form-button-disabled{
@@ -9926,13 +10162,13 @@ body.blackprint-theme.mobile-template #footer-buttons > a.mobile-footer-link > #
     color: #15191b !important;
 }
 
-body.blackprint-theme #post-edit-feed,
+body.blackprint-theme #post-edit-feed:not(.journal-post-edit),
 body.blackprint-theme .guestbook-edit-btn,
 body.blackprint-theme .guestbook-delete-btn,
-body.blackprint-theme #post-edit-feed:hover,
+body.blackprint-theme #post-edit-feed:not(.journal-post-edit):hover,
 body.blackprint-theme .guestbook-edit-btn:hover,
 body.blackprint-theme .guestbook-delete-btn:hover,
-body.blackprint-theme #post-edit-feed:active,
+body.blackprint-theme #post-edit-feed:not(.journal-post-edit):active,
 body.blackprint-theme .guestbook-edit-btn:active,
 body.blackprint-theme .guestbook-delete-btn:active{
     background: transparent !important;
@@ -9958,10 +10194,10 @@ body.blackprint-theme #two-buttons:hover,
 body.blackprint-theme .danger-button:hover,
 body.blackprint-theme .grid-delete-button:hover,
 body.blackprint-theme .site-popup-button:hover,
-body.blackprint-theme button:hover:not(.guestbook-delete-btn){
-    background: var(--fg) !important;
+body.blackprint-theme button:where(:not(#mdpaste-font-toggle)):hover:not(.guestbook-delete-btn){
+    background: linear-gradient(90deg, #8b73a8, #80bfbc) !important;
     border-color: var(--fg) !important;
-    color: #101315 !important;
+    color: #fff !important;
 }
 
 body.blackprint-theme #search-button:active,
@@ -9973,7 +10209,7 @@ body.blackprint-theme #two-buttons:active,
 body.blackprint-theme .danger-button:active,
 body.blackprint-theme .grid-delete-button:active,
 body.blackprint-theme .site-popup-button:active,
-body.blackprint-theme button:active:not(.guestbook-delete-btn){
+body.blackprint-theme button:where(:not(#mdpaste-font-toggle)):active:not(.guestbook-delete-btn){
     background: #15191b !important;
     color: var(--fg) !important;
 }
@@ -9991,7 +10227,7 @@ body.blackprint-theme .theme-picker-button:hover,
 body.blackprint-theme .theme-picker-option:hover,
 body.blackprint-theme .theme-picker-option.selected{
     background: linear-gradient(90deg, #776490, #6caaa7) !important;
-    color: #15191b !important;
+    color: #fff !important;
 }
 
 body.blackprint-theme .theme-picker-button:hover .theme-picker-title,
@@ -10001,7 +10237,7 @@ body.blackprint-theme .theme-picker-option:hover .theme-picker-option-title,
 body.blackprint-theme .theme-picker-option:hover .theme-picker-option-description,
 body.blackprint-theme .theme-picker-option.selected .theme-picker-option-title,
 body.blackprint-theme .theme-picker-option.selected .theme-picker-option-description{
-    color: #15191b !important;
+    color: #fff !important;
 }
 
 body.blackprint-theme #mini-player-title{
@@ -10153,7 +10389,7 @@ body.blackprint-theme #form-button,
 body.blackprint-theme #settings-save,
 body.blackprint-theme #color-reset,
 body.blackprint-theme .danger-button,
-body.blackprint-theme button{
+body.blackprint-theme button:where(:not(#mdpaste-font-toggle)){
     background: linear-gradient(90deg, #776490, #6caaa7);
     color: var(--fg);
     border-color: color-mix(in srgb, var(--border) 72%, var(--links) 28%);
@@ -10164,9 +10400,9 @@ body.blackprint-theme #form-button:hover,
 body.blackprint-theme #settings-save:hover,
 body.blackprint-theme #color-reset:hover,
 body.blackprint-theme .danger-button:hover,
-body.blackprint-theme button:hover{
+body.blackprint-theme button:where(:not(#mdpaste-font-toggle)):hover{
     background: linear-gradient(90deg, #8b73a8, #80bfbc);
-    color: #101315;
+    color: #fff;
 }
 
 body.blackprint-theme #admin-account-delete-feed-form .danger-button,
@@ -10755,3 +10991,22 @@ body .chat-view .chat-context-menu button {
 body .chat-view .chat-context-menu button + button {
     margin-top: 3px;
 }
+
+/* Toast feed generation controls share the editor's responsive width. */
+#toast-feed-generator { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--border); border-radius: 4px; background: color-mix(in srgb, var(--bg) 94%, var(--fg)); }
+#toast-feed-generator h3 { margin: 0; }
+#toast-feed-generator .radio-group { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0; }
+#toast-feed-generator .toast-feed-length-control { display: grid; grid-template-columns: auto minmax(0,1fr) 5em; align-items: center; gap: 16px; }
+#toast-feed-generator input[type="range"] { width: 100%; min-width: 0; margin: 0; }
+#toast-feed-generator output { text-align: right; }
+#toast-feed-prompt { width: 100%; box-sizing: border-box; min-height: 100px; padding: 12px; font: inherit; background: var(--bg); color: var(--fg); border: 1px solid var(--border); }
+#toast-feed-generator #form-button { margin: 0; }
+#toast-feed-generator-status { margin: 0!important; }
+#toast-feed-generator-status:empty { display: none; }
+
+#feed-reply-form > button[type="submit"], .feed-reply-edit-form button[type="submit"] { margin-top: 18px; }
+.toast-reply-generator { display: grid; gap: 12px; }
+.toast-reply-generator > button { margin: 0; padding: 10px 16px; font: inherit; }
+.toast-reply-generator p { margin: 0; color: var(--subtle); }
+.toast-reply-generator textarea { box-sizing: border-box; width: 100%; min-height: 130px; padding: 12px; font: inherit; resize: vertical; }
+.toast-reply-generator textarea[readonly] { opacity: .65; }

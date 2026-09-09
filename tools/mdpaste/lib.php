@@ -230,7 +230,7 @@ function mdp_safe_obsidian_image_url(string $target): ?string
 	return null;
 }
 
-function mdp_inline(string $text): string
+function mdp_inline(string $text, bool $allowRawHtml = false): string
 {
 	$tokens = [];
 	$protect = static function (string $html) use (&$tokens): string {
@@ -244,7 +244,18 @@ function mdp_inline(string $text): string
 	}, $text) ?? $text;
 	$text = preg_replace_callback('/<([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>/i', static fn(array $match): string => $protect('<a href="mailto:' . mdp_h($match[1]) . '">' . mdp_h($match[1]) . '</a>'), $text) ?? $text;
 	$text = preg_replace_callback('/\bmailto:([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})\b/i', static fn(array $match): string => $protect('<a href="mailto:' . mdp_h($match[1]) . '">' . mdp_h($match[1]) . '</a>'), $text) ?? $text;
-	$text = preg_replace_callback('/<\/?([a-z][a-z0-9]*)\b([^>]*)>/i', static function (array $match) use ($protect): string {
+	$text = preg_replace_callback('/<\/?([a-z][a-z0-9-]*)\b((?:[^>"\']+|"[^"]*"|\'[^\']*\')*)>/i', static function (array $match) use ($protect, $allowRawHtml): string {
+		if ($allowRawHtml) {
+			$html = $match[0];
+			if (strtolower($match[1]) === 'abbr' && !str_starts_with($html, '</')) {
+				if (preg_match('/\sdata-tooltip\s*=/i', $html)) {
+					$html = preg_replace('/\s+title\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? $html;
+				} else {
+					$html = preg_replace('/(\s)title(\s*=)/i', '$1data-tooltip$2', $html) ?? $html;
+				}
+			}
+			return $protect($html);
+		}
 		$tag = strtolower($match[1]);
 		$allowed = ['u', 'mark', 'del', 'ins', 'sub', 'sup', 'small', 'kbd', 'abbr', 'a', 'img', 'br', 'details', 'summary', 'ruby', 'rp', 'rt', 'span', 'div', 'p', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'samp', 'var'];
 		if (!in_array($tag, $allowed, true)) {
@@ -255,10 +266,13 @@ function mdp_inline(string $text): string
 		}
 		$attrs = '';
 		preg_match_all('/\b([a-z][a-z0-9-]*)\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', $match[2], $attributes, PREG_SET_ORDER);
-		$allowedAttrs = ['title', 'id', 'class', 'lang', 'dir', 'align', 'width', 'height', 'open', 'href', 'src', 'alt', 'style'];
+		$allowedAttrs = ['title', 'data-tooltip', 'id', 'class', 'lang', 'dir', 'align', 'width', 'height', 'open', 'href', 'src', 'alt', 'style'];
+		$hasAbbrTooltip = $tag === 'abbr' && preg_match('/\bdata-tooltip\s*=/i', $match[2]);
 		foreach ($attributes as $attribute) {
 			$name = strtolower($attribute[1]);
 			if (!in_array($name, $allowedAttrs, true)) continue;
+			if ($name === 'data-tooltip' && $tag !== 'abbr') continue;
+			if ($tag === 'abbr' && $name === 'title' && $hasAbbrTooltip) continue;
 			$value = trim($attribute[2], "\"'");
 			if (in_array($name, ['href', 'src'], true)) {
 				$safeUrl = mdp_safe_url(html_entity_decode($value, ENT_QUOTES, 'UTF-8'));
@@ -286,7 +300,11 @@ function mdp_inline(string $text): string
 		if ($tag === 'a' && preg_match('/\shref="https?:\/\//i', $attrs)) $attrs .= ' target="_blank" rel="noopener noreferrer"';
 		return $protect('<' . $tag . $attrs . ($tag === 'br' || $tag === 'img' ? '>' : '>'));
 	}, $text) ?? $text;
-	$text = preg_replace('/<!--.*?-->/s', '', $text) ?? $text;
+	if ($allowRawHtml) {
+		$text = preg_replace_callback('/<!--.*?-->|<\?.*?\?>|<!\[CDATA\[.*?\]\]>|<![A-Z][^>]*>/is', static fn(array $match): string => $protect($match[0]), $text) ?? $text;
+	} else {
+		$text = preg_replace('/<!--.*?-->/s', '', $text) ?? $text;
+	}
 	$text = preg_replace_callback('/\\\\([\\`*_{}\[\]()#+\-.!>|])/', static fn(array $match): string => $protect(mdp_h($match[1])), $text) ?? $text;
 	$out = mdp_h($text);
 	$out = strtr($out, ['&amp;amp;' => '&amp;', '&amp;lt;' => '&lt;', '&amp;gt;' => '&gt;', '&amp;copy;' => '&copy;', '&amp;nbsp;' => '&nbsp;']);
@@ -355,6 +373,32 @@ function mdp_inline(string $text): string
 	return $out;
 }
 
+function mdp_apply_abbreviations(string $markdown, array $abbreviations): string
+{
+	if ($abbreviations === []) return $markdown;
+
+	$protectedAttributes = [];
+	$markdown = preg_replace_callback(
+		'/\b(?:data-tooltip|title)\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i',
+		static function (array $match) use (&$protectedAttributes): string {
+			$token = "\x02MDPABBR" . count($protectedAttributes) . "\x03";
+			$protectedAttributes[$token] = $match[0];
+			return $token;
+		},
+		$markdown
+	) ?? $markdown;
+
+	$terms = array_keys($abbreviations);
+	usort($terms, static fn(string $left, string $right): int => strlen($right) <=> strlen($left));
+	$pattern = '/\b(' . implode('|', array_map(static fn(string $term): string => preg_quote($term, '/'), $terms)) . ')\b/u';
+	$markdown = preg_replace_callback($pattern, static function (array $match) use ($abbreviations): string {
+		$term = $match[1];
+		return '<abbr data-tooltip="' . mdp_h((string)$abbreviations[$term]) . '" data-markdown-abbreviation="1">' . mdp_h($term) . '</abbr>';
+	}, $markdown) ?? $markdown;
+
+	return $protectedAttributes === [] ? $markdown : strtr($markdown, $protectedAttributes);
+}
+
 function mdp_render_markdown_legacy(string $markdown, bool $hardBreaks = false): string
 {
 	$markdown = str_replace(["\r\n", "\r"], "\n", $markdown);
@@ -387,9 +431,7 @@ function mdp_render_markdown_legacy(string $markdown, bool $hardBreaks = false):
 		return isset($references[$key]) ? '[' . $match[1] . '](' . $references[$key][0] . ')' : $match[0];
 	}, $markdown) ?? $markdown;
 	$markdown = preg_replace_callback('/\[\^([^\]]+)\]/', static fn(array $match): string => '<sup><a href="#footnote-' . rawurlencode($match[1]) . '">[' . mdp_h($match[1]) . ']</a></sup>', $markdown) ?? $markdown;
-	foreach ($abbreviations as $term => $meaning) {
-		$markdown = preg_replace('/\b' . preg_quote($term, '/') . '\b/', '<abbr title="' . mdp_h($meaning) . '">' . mdp_h($term) . '</abbr>', $markdown) ?? $markdown;
-	}
+	$markdown = mdp_apply_abbreviations($markdown, $abbreviations);
 	$frontMatter = '';
 	if (preg_match('/\A---\n(.*?)\n---\n/s', $markdown, $front)) {
 		$items = [];
@@ -700,7 +742,7 @@ function mdp_render_video(string $url, string $label = 'video'): string
 		. '<button class="feed-video-control feed-video-fullscreen" type="button" aria-label="fullscreen video"><i class="fa-solid fa-expand"></i></button></div></div>';
 }
 
-function mdp_render_list_v2(array $lines, int &$index, int $baseIndent, bool $hardBreaks): string
+function mdp_render_list_v2(array $lines, int &$index, int $baseIndent, bool $hardBreaks, bool $allowRawHtml = false): string
 {
 	$first = $lines[$index] ?? '';
 	preg_match('/^(\s*)([-+*]|(\d+)\.)\s+(.*)$/', $first, $firstMatch);
@@ -739,23 +781,89 @@ function mdp_render_list_v2(array $lines, int &$index, int $baseIndent, bool $ha
 			$children[] = $next;
 			$index++;
 		}
-		$html .= '<li>' . $task . mdp_inline($item);
-		if ($children !== []) $html .= mdp_render_blocks_v2($children, $hardBreaks);
+		$html .= '<li>' . $task . mdp_inline($item, $allowRawHtml);
+		if ($children !== []) $html .= mdp_render_blocks_v2($children, $hardBreaks, $allowRawHtml);
 		$html .= '</li>';
 	}
 	return $html . '</' . $tag . '>';
 }
 
-function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
+/**
+ * Return a raw HTML block from trusted Markdown and advance past it.
+ *
+ * This deliberately performs no validation or rewriting. Callers must only
+ * enable it for repository-authored pages or journal content whose authors are
+ * already allowed to publish HTML.
+ */
+function mdp_collect_trusted_html_block(array $lines, int &$index): ?string
+{
+	$line = $lines[$index] ?? '';
+	$trimmed = ltrim($line);
+	if (!str_starts_with($trimmed, '<')) return null;
+
+	$terminator = null;
+	if (str_starts_with($trimmed, '<!--')) $terminator = '-->';
+	elseif (str_starts_with($trimmed, '<?')) $terminator = '?>';
+	elseif (str_starts_with($trimmed, '<![CDATA[')) $terminator = ']]>';
+	elseif (preg_match('/^<![A-Z]/i', $trimmed)) $terminator = '>';
+	elseif (preg_match('/^<(script|pre|style|textarea)\b/i', $trimmed, $rawTag)) $terminator = '</' . strtolower($rawTag[1]) . '>';
+
+	if ($terminator !== null) {
+		$block = [];
+		do {
+			$current = $lines[$index++] ?? '';
+			$block[] = $current;
+		} while ($index < count($lines) && stripos($current, $terminator) === false);
+		return implode("\n", $block);
+	}
+
+	// A block tag name must end before whitespace, "/>", or ">". Markdown
+	// autolinks such as <example.com> and <person@example.com> are not tags.
+	if (!preg_match('/^<\/?([a-z][a-z0-9-]*)(?=\s|\/?>)[^>]*>/i', $trimmed, $tagMatch)) return null;
+	$tag = strtolower($tagMatch[1]);
+	if (in_array($tag, ['details', 'table', 'ruby', 'audio', 'video'], true)) return null;
+	$inlineTags = ['a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'button', 'cite', 'code', 'data', 'del', 'dfn', 'em', 'i', 'img', 'input', 'ins', 'kbd', 'label', 'mark', 'q', 'rp', 'rt', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr'];
+	if (in_array($tag, $inlineTags, true)) return null;
+	$voidTags = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
+
+	if (str_starts_with($trimmed, '</') || in_array($tag, $voidTags, true) || preg_match('/\/\s*>\s*$/', $trimmed)) {
+		$index++;
+		return $line;
+	}
+	if (preg_match('/<\/' . preg_quote($tag, '/') . '>\s*$/i', $trimmed)) {
+		$index++;
+		return $line;
+	}
+
+	$countTagDepth = static function (string $htmlLine) use ($tag): int {
+		preg_match_all('/<\/?' . preg_quote($tag, '/') . '\b[^>]*>/i', $htmlLine, $matches);
+		$depth = 0;
+		foreach ($matches[0] ?? [] as $matchedTag) {
+			if (str_starts_with($matchedTag, '</')) $depth--;
+			elseif (!preg_match('/\/\s*>$/', $matchedTag)) $depth++;
+		}
+		return $depth;
+	};
+	$block = [];
+	$depth = 0;
+	do {
+		$current = $lines[$index++] ?? '';
+		$block[] = $current;
+		$depth += $countTagDepth($current);
+	} while ($index < count($lines) && $depth > 0);
+	return implode("\n", $block);
+}
+
+function mdp_render_blocks_v2(array $lines, bool $hardBreaks, bool $allowRawHtml = false): string
 {
 	$html = [];
 	$paragraph = [];
-	$flushParagraph = static function () use (&$paragraph, &$html, $hardBreaks): void {
+	$flushParagraph = static function () use (&$paragraph, &$html, $hardBreaks, $allowRawHtml): void {
 		if ($paragraph === []) return;
 		$parts = [];
 		foreach ($paragraph as $entry) {
 			$forced = str_ends_with($entry, '  ');
-			$parts[] = mdp_inline(rtrim($entry));
+			$parts[] = mdp_inline(rtrim($entry), $allowRawHtml);
 			if ($forced) $parts[] = '<br>';
 		}
 		$html[] = '<p>' . implode($hardBreaks ? '<br>' : ' ', $parts) . '</p>';
@@ -766,6 +874,17 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 		$line = $lines[$index];
 		$trimmed = trim($line);
 		if ($trimmed === '') { $flushParagraph(); $index++; continue; }
+
+		if ($allowRawHtml) {
+			$htmlBlockIndex = $index;
+			$htmlBlock = mdp_collect_trusted_html_block($lines, $htmlBlockIndex);
+			if ($htmlBlock !== null) {
+				$flushParagraph();
+				$html[] = $htmlBlock;
+				$index = $htmlBlockIndex;
+				continue;
+			}
+		}
 
 		if (preg_match('/^(```|~~~)\s*([^\s{]+)?(.*)$/', $trimmed, $fence)) {
 			$flushParagraph();
@@ -800,11 +919,16 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 		if (preg_match('/^>\s?(.*)$/', $trimmed)) {
 			$flushParagraph(); $quoted = [];
 			while ($index < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$index], $quoteMatch)) { $quoted[] = $quoteMatch[1]; $index++; }
-			if (isset($quoted[0]) && preg_match('/^\[!([A-Za-z]+)\]\s*$/', trim($quoted[0]), $alert)) {
+			if (isset($quoted[0]) && preg_match('/^\[!QUOTE\s+(.+?)\]\s*$/i', trim($quoted[0]), $attributedQuote)) {
+				array_shift($quoted);
+				$html[] = '<figure class="markdown-attributed-quote"><blockquote>'
+					. mdp_render_blocks_v2($quoted, $hardBreaks, $allowRawHtml)
+					. '</blockquote><figcaption>— <cite>' . mdp_h(trim($attributedQuote[1])) . '</cite></figcaption></figure>';
+			} elseif (isset($quoted[0]) && preg_match('/^\[!([A-Za-z]+)\]\s*$/', trim($quoted[0]), $alert)) {
 				$type = strtolower($alert[1]); array_shift($quoted);
-				$html[] = '<aside class="mdpaste-alert mdpaste-alert-' . mdp_h($type) . '"><strong class="mdpaste-alert-title">' . mdp_h(strtoupper($type)) . '</strong>' . mdp_render_blocks_v2($quoted, $hardBreaks) . '</aside>';
+				$html[] = '<aside class="mdpaste-alert mdpaste-alert-' . mdp_h($type) . '"><strong class="mdpaste-alert-title">' . mdp_h(strtoupper($type)) . '</strong>' . mdp_render_blocks_v2($quoted, $hardBreaks, $allowRawHtml) . '</aside>';
 			} else {
-				$html[] = '<blockquote>' . mdp_render_blocks_v2($quoted, $hardBreaks) . '</blockquote>';
+				$html[] = '<blockquote>' . mdp_render_blocks_v2($quoted, $hardBreaks, $allowRawHtml) . '</blockquote>';
 			}
 			continue;
 		}
@@ -812,7 +936,7 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 		if (preg_match('/^(\s*)([-+*]|\d+\.)\s+/', $line, $listMatch)) {
 			$flushParagraph();
 			$indent = strlen(str_replace("\t", '    ', $listMatch[1]));
-			$html[] = mdp_render_list_v2($lines, $index, $indent, $hardBreaks);
+			$html[] = mdp_render_list_v2($lines, $index, $indent, $hardBreaks, $allowRawHtml);
 			continue;
 		}
 
@@ -828,26 +952,26 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 
 		if (preg_match('/^<details\b([^>]*)>$/i', $trimmed, $detailsOpen)) {
 			$flushParagraph(); $index++; $summary = ''; $body = [];
-			if ($index < $count && preg_match('/^<summary>(.*?)<\/summary>$/i', trim($lines[$index]), $summaryMatch)) { $summary = mdp_inline($summaryMatch[1]); $index++; }
+			if ($index < $count && preg_match('/^<summary>(.*?)<\/summary>$/i', trim($lines[$index]), $summaryMatch)) { $summary = mdp_inline($summaryMatch[1], $allowRawHtml); $index++; }
 			while ($index < $count && !preg_match('/^<\/details>\s*$/i', trim($lines[$index]))) $body[] = $lines[$index++];
 			if ($index < $count) $index++;
 			$open = preg_match('/\bopen\b/i', $detailsOpen[1]) ? ' open' : '';
-			$html[] = '<details' . $open . '><summary>' . $summary . '</summary><div class="mdpaste-details-content">' . mdp_render_blocks_v2($body, $hardBreaks) . '</div></details>';
+			$html[] = '<details' . $open . '><summary>' . $summary . '</summary><div class="mdpaste-details-content">' . mdp_render_blocks_v2($body, $hardBreaks, $allowRawHtml) . '</div></details>';
 			continue;
 		}
 
 		if (preg_match('/^<div\b([^>]*)>$/i', $trimmed, $divOpen)) {
-			$flushParagraph(); $opening = mdp_inline($trimmed); $index++; $body = [];
+			$flushParagraph(); $opening = mdp_inline($trimmed, $allowRawHtml); $index++; $body = [];
 			while ($index < $count && !preg_match('/^<\/div>\s*$/i', trim($lines[$index]))) $body[] = $lines[$index++];
 			if ($index < $count) $index++;
-			$html[] = $opening . mdp_render_blocks_v2($body, $hardBreaks) . '</div>';
+			$html[] = $opening . mdp_render_blocks_v2($body, $hardBreaks, $allowRawHtml) . '</div>';
 			continue;
 		}
 
 		if (preg_match('/^<(table|ruby)\b/i', $trimmed, $htmlOpen)) {
 			$flushParagraph(); $tag = strtolower($htmlOpen[1]); $block = [];
 			while ($index < $count) { $block[] = trim($lines[$index]); if (preg_match('/<\/' . preg_quote($tag, '/') . '>\s*$/i', trim($lines[$index++]))) break; }
-			$renderedBlock = implode("\n", array_map('mdp_inline', $block));
+			$renderedBlock = implode("\n", array_map(static fn(string $htmlLine): string => mdp_inline($htmlLine, $allowRawHtml), $block));
 			$html[] = $tag === 'table' ? '<div class="mdpaste-table-scroll">' . $renderedBlock . '</div>' : $renderedBlock;
 			continue;
 		}
@@ -855,7 +979,7 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 		if (preg_match('/^<audio\b[\s\S]*?src=["\']([^"\']+)["\']/i', $trimmed, $audio)) {
 			$flushParagraph(); $url = mdp_safe_url($audio[1]);
 			while ($index < $count && !preg_match('/<\/audio>\s*$/i', trim($lines[$index++]))) {}
-			$html[] = $url === null ? mdp_inline($line) : mdp_render_audio($url);
+			$html[] = $url === null ? mdp_inline($line, $allowRawHtml) : mdp_render_audio($url);
 			continue;
 		}
 
@@ -865,7 +989,7 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 			$mediaBlock = implode(' ', $mediaLines);
 			preg_match('/(?:<video[^>]*\bsrc|<source[^>]*\bsrc)=["\']([^"\']+)["\']/i', $mediaBlock, $source);
 			$url = isset($source[1]) ? mdp_safe_url($source[1]) : null;
-			$html[] = $url === null ? mdp_inline($mediaBlock) : mdp_render_video($url);
+			$html[] = $url === null ? mdp_inline($mediaBlock, $allowRawHtml) : mdp_render_video($url);
 			continue;
 		}
 
@@ -874,14 +998,14 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 			$rows = [];
 			while ($index < $count && str_contains($lines[$index], '|') && trim($lines[$index]) !== '') $rows[] = mdp_split_table_row($lines[$index++]);
 			$table = '<div class="mdpaste-table-scroll"><table><thead><tr>';
-			foreach ($headers as $cellIndex => $cell) { $align = trim($aligners[$cellIndex] ?? ''); $style = str_starts_with($align, ':') && str_ends_with($align, ':') ? 'center' : (str_ends_with($align, ':') ? 'right' : 'left'); $table .= '<th style="text-align:' . $style . '">' . mdp_inline($cell) . '</th>'; }
+			foreach ($headers as $cellIndex => $cell) { $align = trim($aligners[$cellIndex] ?? ''); $style = str_starts_with($align, ':') && str_ends_with($align, ':') ? 'center' : (str_ends_with($align, ':') ? 'right' : 'left'); $table .= '<th style="text-align:' . $style . '">' . mdp_inline($cell, $allowRawHtml) . '</th>'; }
 			$table .= '</tr></thead><tbody>';
 			foreach ($rows as $row) {
 				$table .= '<tr>';
 				foreach ($headers as $cellIndex => $_) {
 					$align = trim($aligners[$cellIndex] ?? '');
 					$style = str_starts_with($align, ':') && str_ends_with($align, ':') ? 'center' : (str_ends_with($align, ':') ? 'right' : 'left');
-					$table .= '<td style="text-align:' . $style . '">' . mdp_inline($row[$cellIndex] ?? '') . '</td>';
+					$table .= '<td style="text-align:' . $style . '">' . mdp_inline($row[$cellIndex] ?? '', $allowRawHtml) . '</td>';
 				}
 				$table .= '</tr>';
 			}
@@ -893,11 +1017,11 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 			$flushParagraph(); $level = strlen($heading[1]); $attrs = '';
 			if (!empty($heading[3]) && preg_match('/#([A-Za-z][A-Za-z0-9_-]*)/', $heading[3], $id)) $attrs .= ' id="' . mdp_h($id[1]) . '"';
 			else $attrs .= ' id="' . mdp_h(mdp_heading_slug($heading[2])) . '"';
-			$html[] = '<h' . $level . $attrs . '>' . mdp_inline($heading[2]) . '</h' . $level . '>'; $index++; continue;
+			$html[] = '<h' . $level . $attrs . '>' . mdp_inline($heading[2], $allowRawHtml) . '</h' . $level . '>'; $index++; continue;
 		}
 
 		if ($index + 1 < $count && preg_match('/^\s*(=+|-+)\s*$/', $lines[$index + 1], $setext)) {
-			$flushParagraph(); $level = $setext[1][0] === '=' ? 1 : 2; $html[] = '<h' . $level . ' id="' . mdp_h(mdp_heading_slug($trimmed)) . '">' . mdp_inline($trimmed) . '</h' . $level . '>'; $index += 2; continue;
+			$flushParagraph(); $level = $setext[1][0] === '=' ? 1 : 2; $html[] = '<h' . $level . ' id="' . mdp_h(mdp_heading_slug($trimmed)) . '">' . mdp_inline($trimmed, $allowRawHtml) . '</h' . $level . '>'; $index += 2; continue;
 		}
 		if (preg_match('/^\s*(?:\*\s*){3,}$|^\s*(?:-\s*){3,}$|^\s*(?:_\s*){3,}$/', $line)) { $flushParagraph(); $html[] = '<hr>'; $index++; continue; }
 
@@ -907,10 +1031,10 @@ function mdp_render_blocks_v2(array $lines, bool $hardBreaks): string
 	return implode("\n", $html);
 }
 
-function mdp_render_markdown(string $markdown, bool $hardBreaks = false): string
+function mdp_render_markdown_internal(string $markdown, bool $hardBreaks, bool $allowRawHtml): string
 {
 	$markdown = str_replace(["\r\n", "\r"], "\n", $markdown);
-	$markdown = preg_replace('/<!--.*?-->/s', '', $markdown) ?? $markdown;
+	if (!$allowRawHtml) $markdown = preg_replace('/<!--.*?-->/s', '', $markdown) ?? $markdown;
 	$references = [];
 	$footnotes = [];
 	$abbreviations = [];
@@ -939,7 +1063,7 @@ function mdp_render_markdown(string $markdown, bool $hardBreaks = false): string
 		$footnoteRefs[$id][] = $referenceId;
 		return '<sup class="mdpaste-footnote-ref" id="' . mdp_h($referenceId) . '"><a href="#footnote-' . mdp_h(rawurlencode($id)) . '">' . mdp_h($id) . '</a></sup>';
 	}, $markdown) ?? $markdown;
-	foreach ($abbreviations as $term => $meaning) $markdown = preg_replace('/\b' . preg_quote($term, '/') . '\b/', '<abbr title="' . mdp_h($meaning) . '">' . mdp_h($term) . '</abbr>', $markdown) ?? $markdown;
+	$markdown = mdp_apply_abbreviations($markdown, $abbreviations);
 	$frontMatter = '';
 	if (preg_match('/\A---\n(.*?)\n---\n/s', $markdown, $front)) {
 		$metadata = ['tags' => []];
@@ -961,17 +1085,28 @@ function mdp_render_markdown(string $markdown, bool $hardBreaks = false): string
 		$frontMatter = '<header class="mdpaste-article-header"><h1 class="mdpaste-article-title">' . $title . '</h1>' . $description . $author . '<div class="mdpaste-article-meta">' . $date . $tags . '</div></header>';
 		$markdown = substr($markdown, strlen($front[0]));
 	}
-	$html = $frontMatter . mdp_render_blocks_v2(explode("\n", $markdown), $hardBreaks);
+	$html = $frontMatter . mdp_render_blocks_v2(explode("\n", $markdown), $hardBreaks, $allowRawHtml);
 	if ($footnotes !== []) {
 		$html .= '<section class="mdpaste-footnotes"><hr><ol>';
 		foreach ($footnotes as $id => $note) {
-			$html .= '<li id="footnote-' . mdp_h(rawurlencode((string)$id)) . '">' . mdp_render_blocks_v2(explode("\n", $note), $hardBreaks);
+			$html .= '<li id="footnote-' . mdp_h(rawurlencode((string)$id)) . '">' . mdp_render_blocks_v2(explode("\n", $note), $hardBreaks, $allowRawHtml);
 			foreach ($footnoteRefs[(string)$id] ?? [] as $referenceId) $html .= '<a class="mdpaste-footnote-backref" href="#' . mdp_h($referenceId) . '" aria-label="back to footnote reference">↩</a>';
 			$html .= '</li>';
 		}
 		$html .= '</ol></section>';
 	}
 	return $html !== '' ? $html : '<p>nothing here.</p>';
+}
+
+function mdp_render_markdown(string $markdown, bool $hardBreaks = false): string
+{
+	return mdp_render_markdown_internal($markdown, $hardBreaks, false);
+}
+
+/** Render Markdown from a repository page or journal author, including raw HTML. */
+function mdp_render_trusted_markdown(string $markdown, bool $hardBreaks = false): string
+{
+	return mdp_render_markdown_internal($markdown, $hardBreaks, true);
 }
 
 function mdp_json_response(array $payload, int $status = 200): never

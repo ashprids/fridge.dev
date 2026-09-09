@@ -253,7 +253,7 @@ if (is_dir($posts_dir)) {
         $iconClass = $isBookmarked ? 'fa-solid' : 'fa-regular';
         $actionsHtml = '<span id="journal-post-actions" style="position:absolute;top:12px;right:12px;display:inline-flex;align-items:center;gap:8px;">';
         if ($isAdmin) {
-            $actionsHtml .= '<span id="post-edit-feed" data-tooltip="edit post" data-edit-href="/journal/edit?post=' . urlencode($filename) . '" style="color: var(--subtle); font-size: 12px;"><i class="fa-solid fa-pencil"></i></span>';
+            $actionsHtml .= '<span id="post-edit-feed" class="journal-post-edit" data-tooltip="edit post" data-edit-href="/journal/edit?post=' . urlencode($filename) . '" style="color: var(--subtle); font-size: 12px;"><i class="fa-solid fa-pencil"></i></span>';
         }
         $actionsHtml .= '<span id="post-bookmark" style="position:static;top:auto;right:auto;" data-tooltip="save post" data-post-id="journal:' . $safeFilename . '"><i class="' . $iconClass . ' fa-bookmark"></i></span>';
         $actionsHtml .= '</span>';

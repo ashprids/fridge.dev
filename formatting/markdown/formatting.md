@@ -63,6 +63,15 @@ HTML entities render normally: &copy;, &amp;, and &nbsp;.
 >
 >> Nested blockquote.
 
+### Attributed quotes
+
+Put `[!QUOTE Name]` on the first quoted line to associate a speaker or source with the quote.
+
+> [!QUOTE Grace Hopper]
+> The most dangerous phrase in the language is, “We've always done it this way.”
+>
+> Attributed quotes can contain **formatting** and multiple paragraphs.
+
 ## GitHub alerts
 
 > [!NOTE]
@@ -178,7 +187,7 @@ This statement has a footnote.[^source] Repeated references return to each occur
 
 ## Abbreviations
 
-HTML and CSS gain site tooltips from abbreviation definitions.
+HTML and CSS gain the website's tooltip from abbreviation definitions. Explicit `abbr` elements are also converted to the website tooltip, so native browser title bubbles are never used for abbreviations.
 
 *[HTML]: HyperText Markup Language
 *[CSS]: Cascading Style Sheets
@@ -223,7 +232,9 @@ Regular and brand icons work too: !fa regular heart and !fa brands github.
 
 Use `!frdg` to display the fridge.dev site icon inline: !frdg
 
-## Safe HTML
+## Raw HTML
+
+Journal posts and repository-authored Markdown pages render raw HTML without filtering. Feed posts, feed comments, and mdpaste keep their restricted HTML rules.
 
 <div id="styled-block" style="color: #79b98b; background-color: #101010; text-align: center; max-width: 100%">
 
@@ -237,7 +248,12 @@ Markdown remains active inside a safe styled block.
 
 <span lang="ar" dir="rtl">مرحبا بالعالم</span>
 
-HTML comments are removed from output. <!-- hidden comment -->
+<section class="raw-html-demo" data-renderer="trusted">
+<strong>Arbitrary elements and attributes render directly.</strong>
+<button type="button" onclick="this.textContent = 'event attribute works'">test an event attribute</button>
+</section>
+
+HTML comments are preserved in the document. <!-- preserved comment -->
 
 ## Audio and video
 

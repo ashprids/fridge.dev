@@ -37,7 +37,9 @@ body.gruvbox-theme :is(
     #title,
     #title .title-letter,
     .mobile-collapsed-title,
-    .mobile-collapsed-title .title-letter
+    .mobile-collapsed-title .title-letter,
+    .title-animation-preview,
+    .title-animation-preview .title-letter
 ) {
     background-image: var(--theme-title-gradient) !important;
 }

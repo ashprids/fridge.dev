@@ -63,19 +63,19 @@ body.gruvbox-theme {
     --theme-focus-width: 2px;
 
     /* Decorative title and shared ASCII gradients. */
-    --theme-title-1: #b8bb26;
-    --theme-title-2: #83a598;
-    --theme-title-gradient: linear-gradient(90deg, #b8bb26 0%, #8ec07c 55%, #83a598 100%);
+    --theme-title-1: color-mix(in srgb, var(--theme-accent) 72%, var(--theme-canvas));
+    --theme-title-2: color-mix(in srgb, var(--theme-accent) 74%, var(--theme-ink));
+    --theme-title-gradient: linear-gradient(0deg, var(--theme-title-1) 0%, var(--theme-accent) 50%, var(--theme-title-2) 100%);
     --hero-ascii-muted: #7c6f64;
     --hero-ascii-1: #fb4934;
     --hero-ascii-2: #fe8019;
     --hero-ascii-3: #fabd2f;
-    --hero-ascii-4: #b8bb26;
+    --hero-ascii-4: var(--theme-accent);
     --hero-ascii-5: #8ec07c;
     --hero-ascii-6: #83a598;
     --hero-ascii-7: #d3869b;
     --hero-ascii-opacity: 1;
-    --resource-ascii: #b8bb26;
+    --resource-ascii: var(--theme-accent);
     --resource-label: var(--theme-muted);
     --time-ascii: #d3869b;
     --time-label: var(--theme-muted);

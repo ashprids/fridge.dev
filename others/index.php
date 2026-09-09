@@ -54,6 +54,7 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+if (fridg3_toast_is_current_user()) $content = fridg3_bot_mode_disable_links($content, ['/others/toast-discord-bot']);
 $content = fridg3_paginate_static_post_list($content, '/others', max(1, (int)($_GET['page'] ?? 1)), 10);
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

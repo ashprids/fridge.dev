@@ -1,10 +1,11 @@
-<h1>world archive | minecraft</h1>
-<h2>an archive of the minecraft worlds i've worked on throughout the past couple of years, from builds and survival to modpacks and multiplayer servers</h2>
+---
+title: "world archive | minecraft"
+description: "an archive of the minecraft worlds i've worked on throughout the past couple of years, from builds and survival to modpacks and multiplayer servers"
+---
 
 All worlds are available for download as .zip files on Google Drive.
 
 <style>
-    /* Keep links unstyled so they blend with the post card */
     #posts a {
         text-decoration: none;
         color: inherit;

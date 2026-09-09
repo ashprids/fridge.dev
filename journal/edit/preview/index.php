@@ -240,7 +240,7 @@ $contentHtml = '<p>no draft found. save a draft from the journal editor first.</
 if ($hasDraft) {
     if ($draftFormat === 'markdown') {
         $viewerTemplate = (string)file_get_contents(dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 's' . DIRECTORY_SEPARATOR . 'content.html');
-        $contentHtml = str_replace('{paste_content}', '<article class="mdpaste-markdown">' . mdp_render_markdown($draftBody) . '</article>', $viewerTemplate);
+        $contentHtml = str_replace('{paste_content}', '<article class="mdpaste-markdown">' . mdp_render_trusted_markdown($draftBody) . '</article>', $viewerTemplate);
     } elseif ($draftFormat === 'html') {
         $contentHtml = $draftBody;
     } else {

@@ -105,7 +105,9 @@ body.aero-theme #header {
 body.aero-theme #title,
 body.aero-theme #title .title-letter,
 body.aero-theme .mobile-collapsed-title,
-body.aero-theme .mobile-collapsed-title .title-letter {
+body.aero-theme .mobile-collapsed-title .title-letter,
+body.aero-theme .title-animation-preview,
+body.aero-theme .title-animation-preview .title-letter {
     background-image: linear-gradient(0deg, #0879c4, #21a6dc 44%, #74c546 48%, #1483cc 55%, #0879c4) !important;
     filter: drop-shadow(0 1px rgba(255,255,255,.9));
 }
@@ -151,7 +153,7 @@ body.aero-theme.mobile-template #content-main {
     backdrop-filter: blur(12px) saturate(1.15);
 }
 
-body.aero-theme :is(#post, .feed-post, .journal-post, .form-card, .grid-item, .notification-item, .music-album, .gallery-item, .chat-admin-card, .account-admin-card, .site-popup-dialog, .image-modal-content, .feed-reply-notice, .bbcode-editor, #bbcode-preview, table, details, .settings-section) {
+body.aero-theme :is(#post, .feed-post, .journal-post, .form-card, .grid-item, .notification-item, .music-album, .gallery-item, .chat-admin-card, .account-admin-card, .site-popup-dialog, .image-modal-content, .feed-reply-notice, .bbcode-editor, #bbcode-preview, table, details, #post-bookmark, #post-bookmark-feed, .journal-post-edit, #mdpaste-font-toggle, .settings-section) {
     background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(211,239,250,.86)) !important;
     background-image: linear-gradient(180deg, rgba(255,255,255,.94), rgba(211,239,250,.86)) !important;
     color: var(--fg) !important;
@@ -182,7 +184,7 @@ body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dro
 
 body.aero-theme :is(select, .dropdown, .bbcode-dropdown) option { background: #effaff; color: var(--fg); }
 
-body.aero-theme :is(button, #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)), #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
     background: linear-gradient(180deg, #fbfff7, #d9f2bb 48%, #79c445 51%, #a9db77) !important;
     color: #174c21 !important;
     border: 1px solid #4c9538 !important;
@@ -191,7 +193,7 @@ body.aero-theme :is(button, #search-button, #form-button, #two-buttons, .bbcode-
     text-shadow: 0 1px rgba(255,255,255,.8);
 }
 
-body.aero-theme :is(button, #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)), #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
     background: linear-gradient(180deg, #fff, #eaffd3 48%, #8ed458 51%, #c5ed9d) !important;
     color: #103d18 !important;
 }
@@ -655,7 +657,9 @@ body.aero-theme #header {
 body.aero-theme #title,
 body.aero-theme #title .title-letter,
 body.aero-theme .mobile-collapsed-title,
-body.aero-theme .mobile-collapsed-title .title-letter {
+body.aero-theme .mobile-collapsed-title .title-letter,
+body.aero-theme .title-animation-preview,
+body.aero-theme .title-animation-preview .title-letter {
     background-image: linear-gradient(0deg, #547f97, #6997a8 44%, #87a979 49%, #6991a0 56%, #547f97) !important;
 }
 
@@ -681,7 +685,7 @@ body.aero-theme.mobile-template #content-main {
     box-shadow: inset 0 1px rgba(255,255,255,.94), 0 9px 24px rgba(42,72,84,.2) !important;
 }
 
-body.aero-theme :is(#post, .feed-post, .journal-post, .form-card, .grid-item, .notification-item, .music-album, .gallery-item, .chat-admin-card, .account-admin-card, .site-popup-dialog, .image-modal-content, .feed-reply-notice, .bbcode-editor, #bbcode-preview, table, details, .settings-section) {
+body.aero-theme :is(#post, .feed-post, .journal-post, .form-card, .grid-item, .notification-item, .music-album, .gallery-item, .chat-admin-card, .account-admin-card, .site-popup-dialog, .image-modal-content, .feed-reply-notice, .bbcode-editor, #bbcode-preview, table, details, #post-bookmark, #post-bookmark-feed, .journal-post-edit, #mdpaste-font-toggle, .settings-section) {
     background: linear-gradient(180deg, rgba(250,252,251,.94), rgba(218,232,236,.9)) !important;
     border-color: #8aa5af !important;
 }
@@ -702,14 +706,14 @@ body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dro
     box-shadow: 0 0 0 3px rgba(100,141,160,.16), inset 0 1px 2px rgba(48,75,86,.08) !important;
 }
 
-body.aero-theme :is(button:not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)):not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
     background: linear-gradient(180deg, #f8faf6, #dce8d5 52%, #bfd2b7) !important;
     color: #3c5c42 !important;
     border-color: #7d9c77 !important;
     box-shadow: inset 0 1px #fff, 0 1px 2px rgba(57,87,53,.14) !important;
 }
 
-body.aero-theme :is(button:not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)):not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
     background: linear-gradient(180deg, #fff, #e6efe1 52%, #cbdcc4) !important;
     color: #34533a !important;
 }
@@ -871,7 +875,7 @@ body.aero-theme.mobile-template #sidebar #sidebar-footer {
     border: 1px solid #7899a7 !important;
     border-radius: 8px !important;
 }
-body.aero-theme.mobile-template :is(#post, .feed-post, .journal-post, .notification-item, .music-album, .gallery-item, .form-card, .grid-item, .chat-admin-card, .account-admin-card, .settings-section, details, table) {
+body.aero-theme.mobile-template :is(#post, .feed-post, .journal-post, .notification-item, .music-album, .gallery-item, .form-card, .grid-item, .chat-admin-card, .account-admin-card, .settings-section, details, #post-bookmark, #post-bookmark-feed, .journal-post-edit, #mdpaste-font-toggle, table) {
     background: linear-gradient(180deg, rgba(250,252,251,.96), rgba(218,232,236,.94)) !important;
     color: var(--fg) !important;
     border: 1px solid #8aa5af !important;

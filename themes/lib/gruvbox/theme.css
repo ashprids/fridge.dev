@@ -1,8 +1,9 @@
 /* Gruvbox theme. Imports run from broad tokens to narrow overrides. */
-@import url("./modules/tokens.css");
-@import url("./modules/shell.css");
-@import url("./modules/components.css");
-@import url("./modules/content.css");
+@import url("./modules/tokens.css?v=20260905-title-preview-1");
+@import url("./modules/shell.css?v=20260905-title-preview-1");
+@import url("./modules/components.css?v=20260905-controls-2");
+@import url("./modules/content.css?v=20260905-controls-1");
 @import url("./modules/player.css");
 @import url("./modules/mobile.css");
+@import url("./modules/accents.css");
 @import url("./modules/accessibility.css");

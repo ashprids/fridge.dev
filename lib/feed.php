@@ -1867,8 +1867,15 @@ if (!function_exists('fridg3_feed_render_v2_markdown')) {
             }
             if (str_starts_with($trimmed, '>')) {
                 $quote = [];
-                while ($i < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$i], $match)) { $quote[] = fridg3_feed_markdown_inline($match[1]); $i++; }
-                $html[] = '<blockquote>' . implode('<br>', $quote) . '</blockquote>';
+                while ($i < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$i], $match)) { $quote[] = $match[1]; $i++; }
+                if (isset($quote[0]) && preg_match('/^\[!QUOTE\s+(.+?)\]\s*$/i', trim($quote[0]), $attributedQuote)) {
+                    array_shift($quote);
+                    $body = implode('<br>', array_map('fridg3_feed_markdown_inline', $quote));
+                    $html[] = '<figure class="markdown-attributed-quote"><blockquote>' . $body
+                        . '</blockquote><figcaption>— <cite>' . htmlspecialchars(trim($attributedQuote[1]), ENT_QUOTES, 'UTF-8') . '</cite></figcaption></figure>';
+                } else {
+                    $html[] = '<blockquote>' . implode('<br>', array_map('fridg3_feed_markdown_inline', $quote)) . '</blockquote>';
+                }
                 continue;
             }
             if (preg_match('/^(\s*)([-+*]|\d+\.)\s+(.+)$/', $line, $list)) {

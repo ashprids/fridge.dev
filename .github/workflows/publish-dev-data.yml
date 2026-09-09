@@ -130,6 +130,10 @@ jobs:
                 'data/etc/hard-ban-identities.json'
                 'data/etc/access.json*'
                 'data/etc/banlists/*'
+                'data/etc/toast-chats'
+                'data/etc/toast-chats/*'
+                'data/etc/toast-chat'
+                'data/etc/toast-chat/*'
               )
               if zip -r "$archive_path" data -x "${dev_data_excludes[@]}" >"$zip_log" 2>&1; then
                 :

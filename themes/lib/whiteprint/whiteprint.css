@@ -64,7 +64,9 @@ body.whiteprint-theme #header {
 body.whiteprint-theme #title,
 body.whiteprint-theme #title .title-letter,
 body.whiteprint-theme .mobile-collapsed-title,
-body.whiteprint-theme .mobile-collapsed-title .title-letter {
+body.whiteprint-theme .mobile-collapsed-title .title-letter,
+body.whiteprint-theme .title-animation-preview,
+body.whiteprint-theme .title-animation-preview .title-letter {
     background-image: linear-gradient(0deg, #85778d, #737f82, #598d7d, #737f82, #85778d);
 }
 
@@ -152,7 +154,7 @@ body.whiteprint-theme :is(input, textarea, select, .text-input, .dropdown, .bbco
     box-shadow: none !important;
 }
 
-body.whiteprint-theme :is(button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]) {
+body.whiteprint-theme :is(button:where(:not(#mdpaste-font-toggle)), #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]) {
     background: #e9e7e2 !important;
     background-image: none !important;
     color: var(--fg) !important;
@@ -160,12 +162,12 @@ body.whiteprint-theme :is(button, #form-button, #two-buttons, .bbcode-btn, input
     box-shadow: none !important;
 }
 
-body.whiteprint-theme :is(button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]):hover {
+body.whiteprint-theme :is(button:where(:not(#mdpaste-font-toggle)), #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]):hover {
     background: #d8d5d0 !important;
     color: #302d29 !important;
 }
 
-body.whiteprint-theme :is(#post, .feed-post, .journal-post, .notification-item, .music-album, .gallery-item, table, details, .settings-section, .account-admin-card) {
+body.whiteprint-theme :is(#post, .feed-post, .journal-post, .notification-item, .music-album, .gallery-item, table, details, #post-bookmark, #post-bookmark-feed, .journal-post-edit, #mdpaste-font-toggle, .settings-section, .account-admin-card) {
     background: #e6e3de !important;
     background-image: none !important;
     color: var(--fg) !important;
@@ -196,6 +198,10 @@ body.whiteprint-theme :is(
     #bbcode-preview,
     table,
     details,
+    #post-bookmark,
+    #post-bookmark-feed,
+    .journal-post-edit,
+    #mdpaste-font-toggle,
     .settings-section
 ) {
     background: #e6e3de !important;
@@ -502,7 +508,7 @@ body.whiteprint-theme.mobile-template #sidebar #mini-player-close {
     border-color: #95888f !important;
 }
 
-body.whiteprint-theme.mobile-template :is(#post, .feed-post, .journal-post, .notification-item, .music-album, .gallery-item, .form-card, .grid-item, .chat-admin-card, .account-admin-card, .settings-section, details, table) {
+body.whiteprint-theme.mobile-template :is(#post, .feed-post, .journal-post, .notification-item, .music-album, .gallery-item, .form-card, .grid-item, .chat-admin-card, .account-admin-card, .settings-section, details, #post-bookmark, #post-bookmark-feed, .journal-post-edit, #mdpaste-font-toggle, table) {
     background: #e6e3de !important;
     background-image: none !important;
     color: var(--fg) !important;

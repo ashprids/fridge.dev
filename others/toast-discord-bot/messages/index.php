@@ -355,7 +355,7 @@ if ($accountsPath && is_file($accountsPath)) {
     }
 }
 
-if (empty($_SESSION['user']['isAdmin'])) {
+if (empty($_SESSION['user']['isAdmin']) && !fridg3_toast_is_current_user()) {
     http_response_code(403);
     echo '403 forbidden: admin access required';
     exit;
@@ -369,7 +369,10 @@ $composeMessage = '';
 $selectedUserId = trim((string) ($_GET['user'] ?? ''));
 $composeTargetValue = $selectedUserId;
 
+$_SESSION['toast_messages_csrf'] ??= bin2hex(random_bytes(32));
+$csrfInput = '<input type="hidden" name="csrf" value="' . htmlspecialchars($_SESSION['toast_messages_csrf'], ENT_QUOTES, 'UTF-8') . '">';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!is_string($_POST['csrf'] ?? null) || !hash_equals($_SESSION['toast_messages_csrf'], $_POST['csrf'])) { http_response_code(403); exit('Invalid request token.'); }
     $action = trim((string) ($_POST['action'] ?? 'send_dm'));
     $composeTargetValue = trim((string) ($_POST['discord_user_id'] ?? ''));
     $composeMessage = trim((string) ($_POST['message'] ?? ''));
@@ -510,7 +513,7 @@ if ($selectedThread !== null) {
     $selectedThreadMeta = htmlspecialchars($selectedUserId, ENT_QUOTES, 'UTF-8');
 }
 if ($selectedUserId !== '') {
-    $aiMuteButtonHtml = '<form class="toast-dm-inline-form" method="post">'
+    $aiMuteButtonHtml = '<form class="toast-dm-inline-form" method="post">' . $csrfInput
         . '<input type="hidden" name="action" value="toggle_ai_mute">'
         . '<input type="hidden" name="discord_user_id" value="' . htmlspecialchars($selectedUserId, ENT_QUOTES, 'UTF-8') . '">'
         . '<input type="hidden" name="ai_muted" value="' . ($selectedThreadAiMuted ? '0' : '1') . '">'
@@ -526,6 +529,7 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+$content = preg_replace('/<form\b[^>]*method="post"[^>]*>/i', '$0' . $csrfInput, $content);
 $content = str_replace(
     [
         '{error_style}',

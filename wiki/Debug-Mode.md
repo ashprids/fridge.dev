@@ -2,7 +2,7 @@
 
 Debug mode is the diagnostic overlay enabled from the **Accessibility** section of `/settings`. It brings browser, PHP, and site-access diagnostics into the normal fridge.dev interface so developers can inspect a problem without opening several separate tools.
 
-It is an observability feature, not a permission override. Enabling it does not grant access to admin data: ordinary users can use client logging, but only authenticated admins receive server logs and the access-log tab.
+It is an observability feature, not a permission override. Enabling it does not grant access to admin data: ordinary users can use client logging, only authenticated admins receive PHP server logs and the access-log tab, and the authenticated Toast login receives its own Python diagnostics.
 
 ## Enabling and Persistence
 
@@ -20,6 +20,7 @@ The overlay has up to three tabs:
 
 - **client** contains browser-side events and is available to everyone
 - **server** contains request-local PHP diagnostics and process-log output; non-admins see it disabled with a security explanation
+- **Python** replaces **server** when signed in as Toast; it contains the Python service’s operational diagnostics
 - **access** contains sensitive site navigation records and is omitted entirely for non-admins
 
 Every entry receives a local `[HH:MM:SS]` display timestamp. Hovering a timestamp in any desktop tab shows its full local date and time in the shared in-site tooltip; tapping it on mobile shows the same detail in an in-site popup. Timestamps are grey and bracketed source tags are light grey. Successful actions and 2xx responses are green, redirects and warnings are yellow-orange, and errors plus 4xx/5xx responses are red.
@@ -74,7 +75,7 @@ After loading `lib/render.php` or `lib/debug.php`, add a route-specific message 
 fridg3_debug_log('[PHP] formatting example page initialized');
 ```
 
-`/formatting/example_page` is the canonical working example. Values are converted to text and truncated to 2,000 characters, but callers must sanitize them before logging.
+`/formatting/example` is the canonical working example. Values are converted to text and truncated to 2,000 characters, but callers must sanitize them before logging.
 
 For rendered admin pages, `lib/render.php` embeds request-local entries as JSON in the page. SPA navigation imports that payload into the existing overlay. For admin JSON requests made while debug mode is enabled, the fetch wrapper sends `X-Fridg3-Debug: 1`; eligible responses return a base64-encoded `X-Fridg3-Debug-Logs` header. The header is capped to a small selection of recent entries so it remains within practical HTTP header limits. Non-admin responses receive neither transport.
 
@@ -97,6 +98,16 @@ Source discovery uses this order:
 5. The Apache development error log
 
 The process-log API and source discovery are admin-only. A missing or unreadable source is reported in the tab rather than exposing filesystem details to non-admins.
+
+## Python Tab (Toast)
+
+When the authenticated hardcoded Toast account enables debug mode, **Python** replaces **server** on desktop and mobile. It automatically loads recent Python diagnostics and polls every two seconds; the process toggle pauses polling. Search, warning/error filters (initially enabled), timestamps, and clearing retained browser history work as in the server tab. Python history has its own session-storage key so PHP history is never imported into this view. Access logs remain admin-only and are hidden for Toast.
+
+`/api/debug-process-logs` chooses its source from the authenticated session: Toast can read only `data/etc/toast-python-log.json`, while admins retain PHP process-log discovery. Toast cannot select arbitrary files or PHP logs. Missing/unreadable Python logs produce an unavailable notice.
+
+The bot’s `bot/diagnostics.py` writes DEBUG-level operational events as JSON lines, with UTC timestamps and severity. Events cover startup, local HTTP routes/status/duration, website chat context counts and outcomes, Discord connection/message activity, and radio reload/playback. This dedicated logger omits message contents, request bodies, credentials, upstream response bodies, and arbitrary exception text; existing general stderr logging remains separate. Files rotate at 2 MiB with two backups, all ending in `.json` so the existing Nginx private-data rule protects them. Developer-data exports exclude the current log and both backups. Clearing the browser view does not delete service logs.
+
+Restart the Python service after deploying these changes. Its service user needs write permission in `data/etc`, and PHP needs group read access to the `0640` log file. Use the project’s Python virtual environment with current `discord.py`, `aiohttp`, and `pynacl`, plus system `ffmpeg`, as described in [Toast](Toast).
 
 ## Access Tab
 

@@ -63,7 +63,7 @@ if ($post && $post_file !== null && file_exists($post_file)) {
         $subtitle = htmlspecialchars($parsedPost['description'], ENT_QUOTES, 'UTF-8');
         $description = $subtitle;
         $content_html = $parsedPost['format'] === 'v2'
-            ? mdp_render_markdown($parsedPost['markdown'])
+            ? mdp_render_trusted_markdown($parsedPost['markdown'])
             : fridg3_embed_plain_video_links_in_html($parsedPost['body']);
     }
 }
@@ -115,12 +115,10 @@ if (!$content_path) {
 $editButton = '';
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 if ($isAdmin && $post !== '') {
-    $editButton = '<a id="journal-article-edit" class="journal-mdpaste-edit" href="/journal/edit?post=' . urlencode($post) . '" data-tooltip="edit post" aria-label="edit post"><i class="fa-solid fa-pencil"></i></a>';
+    $editButton = '<a id="journal-article-edit" class="journal-post-edit" href="/journal/edit?post=' . urlencode($post) . '" data-tooltip="edit post" aria-label="edit post"><i class="fa-solid fa-pencil"></i></a>';
 }
 $isV2 = isset($parsedPost) && is_array($parsedPost) && $parsedPost['format'] === 'v2';
 $journalViewerStyles = '<style>'
-    . '.journal-mdpaste-edit{display:inline-grid;place-items:center;width:26px;height:26px;padding:0;color:var(--subtle)!important;background:transparent!important;border:0!important;font-size:12px;text-decoration:none;box-shadow:none!important}'
-    . '.journal-mdpaste-edit:hover,.journal-mdpaste-edit:focus-visible{color:var(--fg)!important;background:rgba(255,255,255,.06)!important;outline:none}'
     . '.journal-mdpaste-post .mdpaste-article-header,.journal-mdpaste-post #journal-article-header{padding-right:var(--journal-action-clearance,30px);box-sizing:border-box}'
     . '</style>';
 $sharedContent = (string)file_get_contents(dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 's' . DIRECTORY_SEPARATOR . 'content.html');

@@ -36,6 +36,11 @@ Custom linting details:
 - Inline JS in `.html` and `.php` files is syntax-checked too
 - CSS uses custom Node scripts that validate standalone CSS, inline `<style>`, and `style=""` attributes
 
+For Base16, Gruvbox, or Nord accent changes, run `php scripts/test-theme-accents.php`
+to check palette validation and first-render restoration. Run
+`node scripts/generate-theme-accents.mjs --check` to verify that generated presets
+match the shared palette catalog and Nord tokens; omit `--check` to regenerate them.
+
 This setup is simple but honestly pretty smart for a repo with lots of inline markup/script/style.
 
 ## Gotchas

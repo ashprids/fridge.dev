@@ -18,6 +18,8 @@ import shutil
 import getpass
 import asyncio
 import hashlib
+import time
+from diagnostics import configure_diagnostics
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,11 +41,12 @@ def find_config_path():
     return Path(__file__).resolve().parent.parent / 'data' / 'etc' / 'toast.json'
 
 CONFIG_PATH = find_config_path()
+diagnostics = configure_diagnostics(CONFIG_PATH.parent)
 PERSONALITY_PATH = Path(__file__).resolve().parent / 'personality.json'
 SHARED_PERSONALITY_PATH = CONFIG_PATH.parent / 'toast-personality.json'
 GROQ_CHAT_COMPLETIONS_URL = 'https://api.groq.com/openai/v1/chat/completions'
-DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant'
-DEFAULT_GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b'
+DEFAULT_GROQ_VISION_MODEL = 'qwen/qwen3.6-27b'
 DEFAULT_TOAST_PERSONALITY = (
     "You are Toast, a humanoid fridge.dev resident whose closest relative is the homosapien. "
     "You do not think of yourself as a bot, AI, assistant, agent, model, or program. "
@@ -259,11 +262,16 @@ def coerce_float(value, default: float, minimum: float = None, maximum: float = 
     return result
 
 def get_groq_config() -> dict:
-    groq_config = config.get('groq', {})
+    try:
+        fresh_config = load_config()
+    except (OSError, ValueError):
+        fresh_config = config
+    groq_config = fresh_config.get('groq', {})
     if not isinstance(groq_config, dict):
         groq_config = {}
 
     return {
+        'models': groq_config.get('models', {}) if isinstance(groq_config.get('models'), dict) else {},
         'api_key': str(groq_config.get('api_key', '')).strip(),
         'model': str(groq_config.get('model', DEFAULT_GROQ_MODEL)).strip() or DEFAULT_GROQ_MODEL,
         'vision_model': str(groq_config.get('vision_model', DEFAULT_GROQ_VISION_MODEL)).strip() or DEFAULT_GROQ_VISION_MODEL,
@@ -274,6 +282,31 @@ def get_groq_config() -> dict:
         'max_history_messages': coerce_int(groq_config.get('max_history_messages'), 12, 0, 30),
         'max_vision_images': coerce_int(groq_config.get('max_vision_images'), 5, 0, 5),
     }
+
+def scenario_model(groq_config: dict, scenario: str) -> str:
+    policy = json.loads((Path(__file__).resolve().parents[3] / 'lib/toast-model-policy.json').read_text())
+    vision = scenario.endswith('_images')
+    value = groq_config.get('models', {}).get(scenario)
+    if not isinstance(value, str) or not value.strip():
+        value = groq_config['vision_model' if vision else 'model']
+    return policy['defaults']['vision' if vision else 'text'] if value.strip() in policy['retired'] else value.strip()
+
+async def active_model_error(session, headers: dict, model: str):
+    async with session.get('https://api.groq.com/openai/v1/models', headers=headers) as response:
+        if response.status != 200:
+            return {'code': 'model_catalog_http', 'http_status': response.status}
+        try:
+            data = await response.json()
+        except (ValueError, TypeError):
+            return {'code': 'model_catalog_invalid_json'}
+        if not isinstance(data, dict) or not isinstance(data.get('data'), list):
+            return {'code': 'model_catalog_invalid_json'}
+        if not any(entry.get('id') == model and entry.get('active', True) for entry in data['data'] if isinstance(entry, dict)):
+            return {'code': 'model_inactive'}
+    return None
+
+async def verify_active_model(session, headers: dict, model: str) -> bool:
+    return await active_model_error(session, headers, model) is None
 
 def normalize_prompt_items(items) -> list:
     if not isinstance(items, list):
@@ -1232,6 +1265,7 @@ def typing_delay_seconds(text: str) -> float:
     return min(12.0, max(AI_DM_MIN_SEND_DELAY_SECONDS, length / 38))
 
 async def request_groq_dm_reply(user, current_message: str, attachments=None, current_message_ids=None) -> str:
+    diagnostics.debug('Discord AI reply requested attachments=%s', len(attachments or []))
     groq_config = get_groq_config()
     api_key = groq_config['api_key']
     if not api_key:
@@ -1239,7 +1273,7 @@ async def request_groq_dm_reply(user, current_message: str, attachments=None, cu
         return ''
 
     vision_attachments = get_vision_attachments(attachments, groq_config['max_vision_images'])
-    model = groq_config['vision_model'] if vision_attachments else groq_config['model']
+    model = scenario_model(groq_config, 'discord_images' if vision_attachments else 'discord_text')
     payload = {
         'model': model,
         'messages': build_groq_messages(
@@ -1260,10 +1294,14 @@ async def request_groq_dm_reply(user, current_message: str, attachments=None, cu
     timeout = ClientTimeout(total=groq_config['timeout_seconds'])
 
     async with ClientSession(timeout=timeout) as session:
+        if not await verify_active_model(session, headers, model):
+            logger.warning('Selected Discord model is inactive or could not be verified')
+            return ''
         async with session.post(GROQ_CHAT_COMPLETIONS_URL, headers=headers, json=payload) as response:
             response_text = await response.text()
             if response.status >= 400:
-                logger.warning(f"Groq DM reply failed: status={response.status} body={response_text[:500]}")
+                diagnostics.warning('Discord AI completion rejected HTTP %s', response.status)
+                logger.warning(f"Groq DM reply failed: status={response.status}")
                 return ''
 
             try:
@@ -1281,7 +1319,146 @@ async def request_groq_dm_reply(user, current_message: str, attachments=None, cu
     content = str(message.get('content', '')).strip() if isinstance(message, dict) else ''
     if not content:
         logger.warning("Groq response content was empty")
+    diagnostics.info('Discord AI reply completed characters=%s', len(content))
     return content
+
+def groq_daily_quota_exceeded(status: int, response_text: str) -> bool:
+    if status != 429:
+        return False
+    text = (response_text or '').lower()
+    return any(marker in text for marker in (
+        'requests per day', 'tokens per day', 'request per day', 'token per day',
+        'daily', 'rpd', 'tpd',
+    ))
+
+def website_chat_messages(payload: dict) -> tuple[list, bool]:
+    groq_config = get_groq_config()
+    raw_messages = payload.get('messages', [])
+    current_message = str(payload.get('current_message', '') or '').strip()[:4000]
+    image = str(payload.get('image', '') or '')
+    if image and (not image.startswith('data:image/jpeg;base64,') or len(image) > 720000):
+        raise ValueError('invalid image')
+
+    messages = [
+        {'role': 'system', 'content': load_personality_prompt()},
+        {'role': 'system', 'content': build_bot_purpose_context()},
+        {'role': 'system', 'content': (
+            'You are chatting on the public fridge.dev website rather than Discord. '
+            'Use the same personality and conversational style as your Discord DMs. '
+            'This website conversation has its own memory and is not connected to Discord DM history. '
+            'The exact command /clearmemory is handled by the website and should not be presented as a Discord command.'
+        )},
+    ]
+    wiki_context = build_wiki_context_for_message(current_message)
+    if wiki_context:
+        messages.append({'role': 'system', 'content': wiki_context})
+
+    history = []
+    if isinstance(raw_messages, list):
+        history_limit = groq_config['max_history_messages']
+        history_entries = raw_messages[-history_limit:] if history_limit > 0 else []
+        for entry in history_entries:
+            if not isinstance(entry, dict) or entry.get('role') not in ('user', 'assistant'):
+                continue
+            content = str(entry.get('content', '') or '').strip()[:4000]
+            if content:
+                history.append({'role': entry['role'], 'content': content})
+
+    current_history_text = current_message or '[image attached]'
+    if not history or history[-1]['role'] != 'user' or history[-1]['content'] != current_history_text:
+        history.append({'role': 'user', 'content': current_history_text})
+    if image:
+        history[-1]['content'] = [
+            {'type': 'text', 'text': (current_message + '\n\n' if current_message else '') + 'The user attached this image. Answer based on what is visible and say when something is unclear.'},
+            {'type': 'image_url', 'image_url': {'url': image}},
+        ]
+    messages.extend(history)
+    return messages, bool(image)
+
+def website_chat_failure(code, model='', http_status=0, provider_responded=False, daily=False, provider_code=''):
+    diagnostics.warning('Website chat failed code=%s HTTP=%s', code, http_status)
+    # Only structured diagnostics cross the local service boundary, never headers, keys, or prompts.
+    diagnostic = {'code': code, 'model': model, 'http_status': http_status}
+    if isinstance(provider_code, str) and re.fullmatch(r'[a-zA-Z0-9_.-]{1,80}', provider_code):
+        diagnostic['provider_code'] = provider_code
+    return web.json_response({
+        'ok': False, 'provider_responded': provider_responded, 'daily_quota_exceeded': daily,
+        'chunks': [GROQ_FALLBACK_REPLY], 'delays': [AI_DM_MIN_SEND_DELAY_SECONDS],
+        'diagnostic': diagnostic,
+    })
+
+async def website_chat_reply_handler(request):
+    if request.remote not in ('127.0.0.1', '::1'):
+        return web.json_response({'ok': False, 'error': 'forbidden'}, status=403)
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise ValueError('invalid json')
+        messages, has_image = website_chat_messages(payload)
+        diagnostics.debug('Website chat context prepared messages=%s image=%s', len(messages), has_image)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return website_chat_failure('invalid_request')
+    except Exception:
+        logger.exception('Could not build website chat context')
+        return website_chat_failure('context_failed')
+
+    groq_config = get_groq_config()
+    if not groq_config['api_key']:
+        return website_chat_failure('missing_api_key')
+    try:
+        model = scenario_model(groq_config, 'website_chat_images' if has_image else 'website_chat_text')
+    except Exception:
+        logger.exception('Could not load website chat model policy')
+        return website_chat_failure('model_config_failed')
+    request_payload = {
+        'model': model, 'messages': messages,
+        'temperature': groq_config['temperature'], 'top_p': groq_config['top_p'],
+        'max_completion_tokens': groq_config['max_completion_tokens'],
+    }
+    headers = {'Authorization': f"Bearer {groq_config['api_key']}", 'Content-Type': 'application/json'}
+    stage = 'model_catalog'
+    try:
+        timeout = ClientTimeout(total=groq_config['timeout_seconds'])
+        async with ClientSession(timeout=timeout) as session:
+            model_error = await active_model_error(session, headers, model)
+            if model_error:
+                return website_chat_failure(model_error['code'], model, model_error.get('http_status', 0))
+            stage = 'completion'
+            async with session.post(GROQ_CHAT_COMPLETIONS_URL, headers=headers, json=request_payload) as response:
+                response_text = await response.text()
+                if response.status >= 400:
+                    try:
+                        provider_code = json.loads(response_text).get('error', {}).get('code', '')
+                    except (ValueError, AttributeError):
+                        provider_code = ''
+                    logger.warning('Groq website chat rejected: HTTP %s model %s', response.status, model)
+                    return website_chat_failure('completion_http', model, response.status, True,
+                        groq_daily_quota_exceeded(response.status, response_text), provider_code)
+                try:
+                    data = json.loads(response_text)
+                except json.JSONDecodeError:
+                    return website_chat_failure('completion_invalid_json', model, response.status, True)
+    except asyncio.TimeoutError:
+        return website_chat_failure(stage + '_timeout', model)
+    except Exception:
+        logger.exception('Groq website chat request failed at %s', stage)
+        return website_chat_failure(stage + '_connection', model)
+
+    choices = data.get('choices', []) if isinstance(data, dict) else []
+    reply = ''
+    finish_reason = ''
+    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+        finish_reason = choices[0].get('finish_reason', '')
+        if isinstance(choices[0].get('message'), dict):
+            reply = str(choices[0]['message'].get('content', '') or '').strip()
+    if not reply:
+        return website_chat_failure('completion_token_limit' if finish_reason == 'length' else 'completion_empty', model, 200, True)
+    chunks = split_natural_messages(reply) or [reply]
+    diagnostics.info('Website chat reply completed chunks=%s characters=%s', len(chunks), len(reply))
+    return web.json_response({
+        'ok': True, 'provider_responded': True, 'daily_quota_exceeded': False,
+        'chunks': chunks, 'delays': [typing_delay_seconds(chunk) for chunk in chunks],
+    })
 
 def remove_completed_ai_batch(discord_user_id: str, completed_batch: list):
     pending = ai_dm_pending_batches.get(discord_user_id, [])
@@ -1955,13 +2132,32 @@ async def before_feed_notifications_monitor():
     await bot.wait_until_ready()
 
 # Local status server for PHP to query instead of reading toast.json
-status_app = web.Application()
+@web.middleware
+async def diagnostic_request_log(request, handler):
+    started = time.monotonic()
+    # Use registered route names only; omit query strings, bodies and arbitrary paths.
+    resource = getattr(request.match_info.route, 'resource', None)
+    route = getattr(resource, 'canonical', 'unmatched')
+    diagnostics.debug('Local request started method=%s route=%s', request.method, route)
+    try:
+        response = await handler(request)
+    except Exception as error:
+        diagnostics.error('Local request failed route=%s exception=%s elapsed_ms=%.1f',
+                          route, type(error).__name__, (time.monotonic() - started) * 1000)
+        raise
+    diagnostics.debug('Local request completed route=%s HTTP %s elapsed_ms=%.1f',
+                      route, response.status, (time.monotonic() - started) * 1000)
+    return response
+
+
+status_app = web.Application(middlewares=[diagnostic_request_log])
 
 @bot.event
 async def on_ready():
     """Called when the bot connects to Discord"""
     global bot_online
     bot_online = True
+    diagnostics.info('Discord connected guilds=%s', len(bot.guilds))
     logger.info(f"Bot logged in as {bot.user}")
     logger.info(f"Bot ID: {bot.user.id}")
     
@@ -1983,10 +2179,13 @@ async def on_disconnect():
     """Called when the bot disconnects from Discord"""
     global bot_online
     bot_online = False
+    diagnostics.warning('Discord disconnected')
     logger.info("Bot disconnected from Discord")
 
 @bot.event
 async def on_message(message: discord.Message):
+    diagnostics.debug('Discord message received direct=%s attachments=%s author_bot=%s',
+                      message.guild is None, len(message.attachments), message.author.bot)
     if isinstance(message.channel, discord.DMChannel) and not message.author.bot:
         dm_content = build_dm_content(message.content, message.attachments)
         append_dm_history_entry(
@@ -2077,6 +2276,7 @@ async def config_monitor():
             try:
                 old_stream_name = config.get('stream', {}).get('name', 'Unknown')
                 config = load_config()
+                diagnostics.info('Radio configuration reloaded')
                 new_stream_name = config.get('stream', {}).get('name', 'Unknown')
             except Exception as e:
                 logger.error(f"Failed to reload config: {e}")
@@ -2160,9 +2360,11 @@ async def auto_play_stream():
             after=lambda e: logger.error(f"Player error: {e}") if e else None
         )
         
+        diagnostics.info('Radio playback started')
         logger.info(f"Started playing stream: {config['stream']['name']}")
         
     except Exception as e:
+        diagnostics.error('Radio playback failed exception=%s', type(e).__name__)
         logger.error(f"Failed to play stream: {e}")
 
 @bot.tree.command(name="play", description="Start the toast radio stream")
@@ -2514,6 +2716,81 @@ async def contact_notify_handler(request):
         'message_id': str(sent_message.id),
     })
 
+async def commission_notify_handler(request):
+    if request.remote not in ('127.0.0.1', '::1'):
+        return web.json_response({'ok': False, 'error': 'forbidden'}, status=403)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return web.json_response({'ok': False, 'error': 'invalid json'}, status=400)
+
+    channel_id = str(payload.get('channel_id', '')).strip()
+    submission_id = str(payload.get('id', '')).strip()
+    sender_name = str(payload.get('name', '')).strip()
+    sender_email = str(payload.get('email', '')).strip()
+    contact_method = str(payload.get('contact_method', '')).strip()
+    description = str(payload.get('description', '')).strip()
+    budget = str(payload.get('budget', '')).strip()
+    payment_method = str(payload.get('payment_method', '')).strip()
+    signature = str(payload.get('signature', '')).strip()
+    terms_agreed = payload.get('terms_agreed') is True
+    try:
+        created_at = max(0, int(payload.get('created_at', 0)))
+    except (TypeError, ValueError):
+        created_at = 0
+    raw_website_types = payload.get('website_types', [])
+    website_types = [
+        str(value).strip()
+        for value in raw_website_types
+        if isinstance(value, str) and str(value).strip()
+    ] if isinstance(raw_website_types, list) else []
+
+    if not re.fullmatch(r'\d{17,20}', channel_id):
+        return web.json_response({'ok': False, 'error': 'invalid channel id'}, status=400)
+    if not submission_id or not sender_name or not sender_email or not description:
+        return web.json_response({'ok': False, 'error': 'missing required commission details'}, status=400)
+    if not contact_method or not website_types or not budget or not payment_method or not signature or not terms_agreed:
+        return web.json_response({'ok': False, 'error': 'incomplete commission details'}, status=400)
+
+    channel = await resolve_sendable_channel(channel_id)
+    if channel is None:
+        return web.json_response({'ok': False, 'error': 'could not fetch commission channel'}, status=404)
+
+    def field_text(value: str, limit: int = 1024) -> str:
+        normalized = value.strip() or 'not provided'
+        return normalized if len(normalized) <= limit else normalized[:limit - 3] + '...'
+
+    type_list = '\n'.join(f'• {value}' for value in website_types)
+    embed = discord.Embed(
+        title='new fridge.dev website commission',
+        description=field_text(description, 4000),
+        colour=0x3C7895,
+    )
+    embed.add_field(name='Name', value=field_text(sender_name), inline=True)
+    embed.add_field(name='Email address', value=field_text(sender_email), inline=True)
+    embed.add_field(name='Preferred contact', value=field_text(contact_method), inline=False)
+    embed.add_field(name='Website type', value=field_text(type_list), inline=False)
+    embed.add_field(name='Budget', value=field_text(budget), inline=True)
+    embed.add_field(name='Payment method', value=field_text(payment_method), inline=True)
+    embed.add_field(name='Terms', value='Agreed', inline=True)
+    embed.add_field(name='Signature', value=field_text(signature), inline=True)
+    if created_at:
+        embed.add_field(name='Submitted', value=f'<t:{created_at}:F>', inline=False)
+    embed.set_footer(text=f'Submission ID: {submission_id}')
+
+    try:
+        sent_message = await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+    except Exception as e:
+        logger.warning(f"Failed to send commission notification {submission_id} to {channel_id}: {e}")
+        return web.json_response({'ok': False, 'error': 'failed to send commission channel message'}, status=500)
+
+    return web.json_response({
+        'ok': True,
+        'channel_id': channel_id,
+        'message_id': str(sent_message.id),
+    })
+
 async def patch_notice_handler(request):
     if request.remote not in ('127.0.0.1', '::1'):
         return web.json_response({'ok': False, 'error': 'forbidden'}, status=403)
@@ -2573,16 +2850,20 @@ async def start_status_server():
     status_app.router.add_post('/messages/send', send_message_handler)
     status_app.router.add_post('/messages/ai-mute', set_ai_mute_handler)
     status_app.router.add_post('/contact/notify', contact_notify_handler)
+    status_app.router.add_post('/commission/notify', commission_notify_handler)
+    status_app.router.add_post('/website-chat/reply', website_chat_reply_handler)
     status_app.router.add_post('/patch-notice', patch_notice_handler)
     runner = web.AppRunner(status_app)
     await runner.setup()
     site = web.TCPSite(runner, '127.0.0.1', 8765)
     await site.start()
+    diagnostics.info('Local HTTP service listening port=8765')
     logger.info('Local status server started on http://127.0.0.1:8765/status')
 
 
 async def main():
     """Start the bot"""
+    diagnostics.debug('Runtime ready ffmpeg_available=%s', bool(FFMPEG_EXE))
     token = config['bot']['token']
     if token == "YOUR_DISCORD_BOT_TOKEN_HERE":
         logger.error("Bot token not set in toast.json")

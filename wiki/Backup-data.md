@@ -11,7 +11,7 @@ Each run:
 3. Compresses the `data` directory into a zip file named `DD-MM-YY_hh-mm-ss.zip`
 4. Downloads that zip file to the GitHub Actions runner
 5. Uploads the zip file into a specific Google Drive folder
-6. Keeps only the 10 newest backup files in that folder
+6. Keeps only the 10 newest backup files in that folder, permanently deleting older backups instead of moving them to the Google Drive rubbish bin
 7. Deletes the temporary zip file from both the runner and the server
 
 ## Required GitHub Secrets
@@ -102,6 +102,8 @@ To run it manually:
 4. Click `Run workflow`
 
 ## Notes
+
+Retention uses `rclone deletefile --drive-use-trash=false` so removed backups do not accumulate in the rubbish bin and consume Drive storage. This applies to future retention deletions; backups already in the rubbish bin must be permanently deleted separately.
 
 The remote server must have the `zip` command installed, because the archive is created on the server before being transferred.
 

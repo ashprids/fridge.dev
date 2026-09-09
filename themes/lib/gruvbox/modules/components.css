@@ -31,7 +31,7 @@ body.gruvbox-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-
 }
 
 body.gruvbox-theme :is(
-    button,
+    button:where(:not(#mdpaste-font-toggle)),
     #search-button,
     #form-button,
     #two-buttons,
@@ -54,7 +54,7 @@ body.gruvbox-theme :is(
 }
 
 body.gruvbox-theme :is(
-    button,
+    button:where(:not(#mdpaste-font-toggle)),
     #search-button,
     #form-button,
     #two-buttons,
@@ -63,7 +63,8 @@ body.gruvbox-theme :is(
     input[type="button"],
     #settings-save,
     #color-reset
-):is(:hover, :active) {
+):is(:hover, :active),
+body.gruvbox-theme .theme-accent-picker-option.selected {
     background: var(--theme-accent) !important;
     color: var(--theme-on-accent) !important;
     border-color: var(--theme-accent) !important;

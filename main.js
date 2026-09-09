@@ -244,6 +244,10 @@ let fridg3OriginalConsoleWarn = null;
 let fridg3DebugHistoryRestored = false;
 let fridg3ServerHistoryRestored = false;
 let fridg3ServerDebugAuthorized = false;
+let fridg3PythonDebug = document.querySelector('meta[name="fridg3-bot-mode"]')?.content === '1';
+function fridg3ServerHistoryKey() {
+    return fridg3PythonDebug ? 'fridg3DebugPythonHistory' : 'fridg3DebugServerHistory';
+}
 let fridg3DebugPersistTimer = null;
 const fridg3DeferredOutputUpdates = new Map();
 let fridg3SelectionUpdateListenerBound = false;
@@ -285,7 +289,7 @@ function fridg3PersistDebugHistory() {
     try {
         sessionStorage.setItem('fridg3DebugClientHistory', JSON.stringify(fridg3DebugLogs.client.filter(entry => !entry.transient)));
         if (fridg3ServerDebugAuthorized) {
-            sessionStorage.setItem('fridg3DebugServerHistory', JSON.stringify(fridg3DebugLogs.server));
+            sessionStorage.setItem(fridg3ServerHistoryKey(), JSON.stringify(fridg3DebugLogs.server));
         }
     } catch (_) { /* storage may be unavailable or full */ }
 }
@@ -335,7 +339,7 @@ function fridg3RestoreClientDebugHistory() {
 function fridg3RestoreServerDebugHistory() {
     if (fridg3ServerHistoryRestored) return;
     fridg3ServerHistoryRestored = true;
-    const restored = fridg3ReadDebugHistory('fridg3DebugServerHistory');
+    const restored = fridg3ReadDebugHistory(fridg3ServerHistoryKey());
     if (restored.length) {
         fridg3DebugLogs.server.unshift(...restored);
         if (fridg3DebugLogs.server.length > FRIDG3_DEBUG_LOG_LIMIT) {
@@ -344,10 +348,11 @@ function fridg3RestoreServerDebugHistory() {
     }
 }
 
-function fridg3DebugAppend(channel, value, processLog = false, transient = false) {
+function fridg3DebugAppend(channel, value, processLog = false, transient = false, createdAt = null) {
     if (!fridg3DebugEnabled) return;
     const target = channel === 'server' ? 'server' : 'client';
-    const now = new Date();
+    const suppliedDate = createdAt ? new Date(createdAt) : null;
+    const now = suppliedDate && !Number.isNaN(suppliedDate.getTime()) ? suppliedDate : new Date();
     const timestamp = [now.getHours(), now.getMinutes(), now.getSeconds()]
         .map(part => String(part).padStart(2, '0'))
         .join(':');
@@ -489,7 +494,7 @@ function fridg3CreateDebugLogLine(entry) {
     if (entry.processLog) {
         const processTag = document.createElement('span');
         processTag.className = 'debug-log-source';
-        processTag.textContent = '[PROCESS]';
+        processTag.textContent = fridg3PythonDebug ? '[Python]' : '[PROCESS]';
         line.append(processTag, document.createTextNode(' '));
     }
 
@@ -813,8 +818,8 @@ function fridg3InitDebugClearControls(panel) {
         button.addEventListener('click', async () => {
             const channel = button.dataset.debugClear;
             const confirmed = await showSitePopup({
-                title: `clear ${channel} log?`,
-                detail: `this will remove all entries from the ${channel} log.`,
+                title: `clear ${channel === 'server' && fridg3PythonDebug ? 'Python' : channel} log?`,
+                detail: `this will remove all entries from the ${channel === 'server' && fridg3PythonDebug ? 'Python' : channel} log.`,
                 okText: 'clear log',
                 cancelText: 'cancel',
             });
@@ -850,7 +855,7 @@ function fridg3InitDebugClearControls(panel) {
                 try { sessionStorage.removeItem('fridg3DebugClientHistory'); } catch (_) { /* ignore */ }
             } else {
                 fridg3ServerHistoryRestored = true;
-                try { sessionStorage.removeItem('fridg3DebugServerHistory'); } catch (_) { /* ignore */ }
+                try { sessionStorage.removeItem(fridg3ServerHistoryKey()); } catch (_) { /* ignore */ }
             }
             const output = panel.querySelector(`.debug-console-${channel}-output`);
             if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs[channel]);
@@ -1004,8 +1009,21 @@ function fridg3ScrollActiveDebugOutputToBottom(panel) {
 
 window.fridg3DebugClientLog = value => fridg3DebugAppend('client', value);
 window.fridg3DebugClientTransientLog = value => fridg3DebugAppend('client', value, false, true);
-window.fridg3DebugServerLog = value => fridg3DebugAppend('server', value);
-window.fridg3DebugProcessLog = value => fridg3DebugAppend('server', value, true);
+window.fridg3DebugServerLog = value => {
+    if (!fridg3PythonDebug) fridg3DebugAppend('server', value);
+};
+window.fridg3DebugProcessLog = value => {
+    if (fridg3PythonDebug) {
+        try {
+            const entry = JSON.parse(value);
+            if (typeof entry.message === 'string') {
+                fridg3DebugAppend('server', `[${entry.level || 'INFO'}] ${entry.message}`, true, false, entry.timestamp);
+                return;
+            }
+        } catch (_) { /* plain status messages remain readable */ }
+    }
+    fridg3DebugAppend('server', value, true);
+};
 window.fridg3SetDebugMode = fridg3SetDebugMode;
 
 function fridg3DebugWindowError(event) {
@@ -1164,7 +1182,7 @@ function fridg3StopProcessLogPolling() {
 
 async function fridg3PollProcessLogs() {
     const toggle = document.getElementById('debug-process-logs-toggle');
-    if (!toggle || !toggle.checked || fridg3ProcessLogRequestActive) return;
+    if (!fridg3DebugEnabled || !toggle || !toggle.checked || fridg3ProcessLogRequestActive) return;
     fridg3ProcessLogRequestActive = true;
     const params = new URLSearchParams();
     if (fridg3ProcessLogCursor.identity) {
@@ -1178,6 +1196,7 @@ async function fridg3PollProcessLogs() {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
         const data = await response.json();
+        if (!fridg3DebugEnabled || !toggle.checked) return;
         if (!response.ok || !data.ok) throw new Error(data.error || 'process log unavailable');
         fridg3ProcessLogCursor = { identity: data.identity || '', offset: Number(data.offset) || 0 };
         (data.lines || []).forEach(window.fridg3DebugProcessLog);
@@ -1201,7 +1220,7 @@ function fridg3StartProcessLogPolling() {
     fridg3StopProcessLogPolling();
     fridg3PollProcessLogs();
     fridg3ProcessLogTimer = window.setInterval(fridg3PollProcessLogs, 2000);
-    window.fridg3DebugClientLog('PHP process-log polling enabled');
+    window.fridg3DebugClientLog(`${fridg3PythonDebug ? 'Python' : 'PHP'} process-log polling enabled`);
 }
 
 function fridg3StopAccessLogPolling() {
@@ -1272,6 +1291,7 @@ async function fridg3PollAccessLogs() {
     if (
         !fridg3DebugEnabled
         || !fridg3ServerDebugAuthorized
+        || fridg3PythonDebug
         || !accessPanel
         || !accessPanel.classList.contains('is-active')
         || fridg3AccessLogRequestActive
@@ -1316,16 +1336,24 @@ async function fridg3InitProcessLogControl(panel) {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
         const data = await response.json();
-        if (response.status === 403 || !data.isAdmin && !data.ok) {
+        if (!fridg3DebugEnabled) return;
+        if (response.status === 403 || !data.isAdmin && !data.python && !data.ok) {
             fridg3ServerDebugAuthorized = false;
             fridg3DebugLogs.server.length = 0;
-            try { sessionStorage.removeItem('fridg3DebugServerHistory'); } catch (_) { /* ignore */ }
+            try { sessionStorage.removeItem(fridg3ServerHistoryKey()); } catch (_) { /* ignore */ }
             return;
         }
+        if (fridg3PythonDebug !== (data.python === true)) {
+            fridg3DebugLogs.server.length = 0;
+            fridg3ServerHistoryRestored = false;
+        }
+        fridg3PythonDebug = data.python === true;
         fridg3ServerDebugAuthorized = true;
         fridg3RestoreServerDebugHistory();
         fridg3ScheduleDebugHistoryPersist();
         panel.querySelectorAll('[data-admin-debug-tab]').forEach(tab => {
+            if (fridg3PythonDebug && tab.dataset.debugTab === 'access') return;
+            if (fridg3PythonDebug) tab.textContent = 'Python';
             tab.removeEventListener('mouseenter', tab._tooltipMouseEnter);
             tab.removeEventListener('mousemove', tab._tooltipMouseMove);
             tab.removeEventListener('mouseleave', tab._tooltipMouseLeave);
@@ -1334,9 +1362,20 @@ async function fridg3InitProcessLogControl(panel) {
             tab.removeAttribute('data-tooltip');
             tab.hidden = false;
         });
-        panel.querySelectorAll('.debug-admin-log-search').forEach(search => { search.hidden = false; });
+        panel.querySelectorAll('.debug-admin-log-search').forEach(search => {
+            search.hidden = fridg3PythonDebug && !!search.closest('.debug-console-access-panel');
+        });
+        if (fridg3PythonDebug) {
+            loadedToggle.closest('label').hidden = true;
+            const search = panel.querySelector('[data-debug-search="server"]');
+            search.placeholder = 'search Python log';
+            search.setAttribute('aria-label', 'search Python log');
+            const clear = panel.querySelector('[data-debug-clear="server"]');
+            clear.setAttribute('aria-label', 'clear Python log');
+            clear.setAttribute('data-tooltip', 'clear Python log');
+        }
         const accessOptions = panel.querySelector('.debug-access-log-options');
-        if (accessOptions) accessOptions.hidden = false;
+        if (accessOptions) accessOptions.hidden = fridg3PythonDebug;
         document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.remove());
         option.hidden = false;
         [
@@ -1345,7 +1384,7 @@ async function fridg3InitProcessLogControl(panel) {
         ].forEach(([selector, storageKey]) => {
             const filterToggle = panel.querySelector(selector);
             if (!filterToggle) return;
-            try { filterToggle.checked = localStorage.getItem(storageKey) === 'true'; } catch (_) { /* ignore */ }
+            try { filterToggle.checked = fridg3PythonDebug || localStorage.getItem(storageKey) === 'true'; } catch (_) { /* ignore */ }
             filterToggle.addEventListener('change', () => {
                 try { localStorage.setItem(storageKey, filterToggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
                 const output = panel.querySelector('.debug-console-server-output');
@@ -1354,7 +1393,7 @@ async function fridg3InitProcessLogControl(panel) {
         });
         let selectedTab = 'client';
         try { selectedTab = sessionStorage.getItem('fridg3DebugSelectedTab') || 'client'; } catch (_) { /* ignore */ }
-        fridg3SelectDebugTab(panel, ['server', 'access'].includes(selectedTab) ? selectedTab : 'client');
+        fridg3SelectDebugTab(panel, (fridg3PythonDebug ? ['server'] : ['server', 'access']).includes(selectedTab) ? selectedTab : 'client');
         try { loadedToggle.checked = localStorage.getItem('debugIncludeLoadedLogs') !== 'false'; } catch (_) { /* ignore */ }
         loadedToggle.addEventListener('change', () => {
             try { localStorage.setItem('debugIncludeLoadedLogs', loadedToggle.checked ? 'true' : 'false'); } catch (_) { /* ignore */ }
@@ -1372,7 +1411,7 @@ async function fridg3InitProcessLogControl(panel) {
         fridg3ProcessLogCursor = { identity: data.identity || '', offset: Number(data.offset) || 0 };
         window.fridg3DebugProcessLog(`monitoring ${data.source || 'PHP process log'}`);
         (data.lines || []).forEach(window.fridg3DebugProcessLog);
-        try { toggle.checked = localStorage.getItem('debugIncludeProcessLogs') === 'true'; } catch (_) { /* ignore */ }
+        try { toggle.checked = fridg3PythonDebug || localStorage.getItem('debugIncludeProcessLogs') === 'true'; } catch (_) { /* ignore */ }
         const renderProcessLogs = () => {
             const output = panel.querySelector('.debug-console-server-output');
             if (output) fridg3RenderDebugOutput(output, fridg3DebugLogs.server);
@@ -1384,7 +1423,7 @@ async function fridg3InitProcessLogControl(panel) {
             if (toggle.checked) fridg3StartProcessLogPolling();
             else {
                 fridg3StopProcessLogPolling();
-                window.fridg3DebugClientLog('PHP process-log polling disabled');
+                window.fridg3DebugClientLog(`${fridg3PythonDebug ? 'Python' : 'PHP'} process-log polling disabled`);
             }
             renderProcessLogs();
         });
@@ -2400,6 +2439,7 @@ function syncSpaPageAssets(doc) {
 
 const SPA_SHARED_SCRIPT_PATHS = new Set([
     '/main.js',
+    '/js/bot-mode.js',
     '/js/fruity-dance.js',
     '/js/sidebar-player.js',
     '/js/bookmarks.js',
@@ -2619,7 +2659,7 @@ function updatePageViewFooter(rawUrl) {
         if (!footerViewsEl) return;
         const path = normalizePageViewPath(rawUrl);
         if (!path || path.startsWith('/api/')) return;
-        if (path === '/chat' || path.startsWith('/chat/')) {
+        if (path === '/chat' || path.startsWith('/chat/') || path === '/others/toast-discord-bot/chat') {
             const footer = footerViewsEl.closest('#content-footer');
             if (footer) footer.style.display = 'none';
             return;
@@ -2682,6 +2722,10 @@ function loadPageIntoContent(url, addToHistory = true) {
         })
             .then(resp => {
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                if (resp.redirected && resp.url && new URL(resp.url).searchParams.has('bot_mode_blocked')) {
+                    url = resp.url;
+                    if (!addToHistory) window.history.replaceState({ spa: true, url }, '', url);
+                }
                 return resp.text();
             })
             .then(html => {
@@ -2696,6 +2740,7 @@ function loadPageIntoContent(url, addToHistory = true) {
                 syncSpaPageAssets(doc);
                 fridg3CollectServerDebugLogs(doc);
                 contentEl.innerHTML = newContent.innerHTML;
+                window.fridg3SyncBotMode?.(doc);
                 executeContentScripts(contentEl);
                 initSpaMarkdownViews(contentEl);
 
@@ -3204,6 +3249,7 @@ function bindSpaForm(form) {
                 syncSpaPageAssets(doc);
                 fridg3CollectServerDebugLogs(doc);
                 contentEl.innerHTML = newContent.innerHTML;
+                window.fridg3SyncBotMode?.(doc);
                 executeContentScripts(contentEl);
                 initSpaMarkdownViews(contentEl);
 
@@ -3720,7 +3766,9 @@ function initFeedReplyTargets() {
 
     const postPath = window.location.pathname || form.getAttribute('action') || '';
     const clearTarget = () => {
+        const changed = parentInput.value !== '';
         parentInput.value = '';
+        if (changed) form.dispatchEvent(new Event('feed-reply-target-change'));
         targetBox.hidden = true;
         targetBox.innerHTML = '';
         if (window.history && window.history.replaceState) {
@@ -3736,7 +3784,9 @@ function initFeedReplyTargets() {
             const replyId = button.getAttribute('data-feed-reply-to') || '';
             const username = button.getAttribute('data-feed-reply-user') || 'Anonymous';
             if (!replyId) return;
+            const changed = parentInput.value !== replyId;
             parentInput.value = replyId;
+            if (changed) form.dispatchEvent(new Event('feed-reply-target-change'));
             targetBox.hidden = false;
             targetBox.innerHTML = `replying to <strong>${siteEscapeHtml(username)}</strong> <a href="${siteEscapeHtml(postPath)}" data-feed-reply-cancel>cancel</a>`;
             form.scrollIntoView({ behavior: 'smooth', block: 'start' });

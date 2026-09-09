@@ -10,7 +10,7 @@ Behind that character, Toast is also the name of the integrated Python Discord s
 
 The Toast session receives two unique website tools:
 
-- A Groq-powered feed draft generator before the normal BBCode editor
+- A Groq-powered feed draft generator before the Markdown editor
 - A JSON personality editor in `/settings` for `data/etc/toast-personality.json`
 
 Toast's published posts and replies otherwise use the ordinary feed formats. Automatic replies are stored as normal replies with `username: "toast"`.
@@ -134,6 +134,16 @@ Each Discord user has one active reply task. Rapid DMs are batched into one chro
 
 Sending exactly `CLEARMEMORY` creates a memory boundary. Toast reacts to it, and future AI context includes only messages after the newest boundary; the stored history itself is not deleted.
 
+## Website Chat
+
+`/others/toast-discord-bot/chat` is a public conversation with Toast that uses the same conversation layout, replies, reactions, deletion and per-viewer hiding, emoji picker, link previews, alerts, presence, typing display, and response pacing as `/chat`. It uses Toast's Discord personality and Groq settings while keeping website memory separate from Discord DM history. Guests have one continuous chat per IP address; signed-in visitors have a separate continuous chat tied to their account. Signing in does not merge the earlier guest chat.
+
+Only JPEG, PNG, WebP, and GIF uploads are accepted. GIFs use their first frame. The server converts every accepted image to JPEG, limits both dimensions to 1000 pixels while retaining its aspect ratio, and repeatedly reduces its size and quality until it is below 500 KB. Voice notes and other file types are unavailable.
+
+Each identity can send at most 100 visitor messages per Europe/London calendar day. A second message cannot be sent until every paced chunk of Toast's current reply is visible. When Groq reports that its daily quota is exhausted, Toast appears away globally; a later request that reaches Groq without that daily error restores the online state. Sending exactly `/clearmemory` creates a website-memory boundary and receives a check-mark reaction without calling Groq.
+
+Conversations, identity values, messages, and attachments are AES-256-GCM encrypted beneath `data/etc/toast-chats`. Account and IP identifiers in filenames are keyed hashes. Nginx redirects direct requests for that tree to `/error/403`; attachments are decrypted only through an identity-authorized PHP route. Opening or polling a chat does not create storage; a conversation is saved only after the visitor sends a message. Administrators and the authenticated Toast account can search stored conversations by IP or username at `/others/toast-discord-bot/chat/history`, with ten conversations per page using feed pagination. The selected conversation appears below the list. Both can permanently delete a conversation and its images after confirmation; deletion requires CSRF verification and pending replies cannot recreate the deleted conversation.
+
 ## Notifications and Website Integration
 
 Toast scans feed activity for accounts with linked Discord IDs and `discordNotificationsEnabled` not set to false, then sends deduplicated DMs for post mentions, reply mentions, and replies to the account's own posts. The preference defaults to enabled for backward compatibility and can be changed under Settings → Notifications. Dedupe state is stored in `data/etc/toast-feed-notify-state.json`. The website independently mirrors these event categories through its in-site inbox; it does not use the browser Notification API.
@@ -141,6 +151,8 @@ Toast scans feed activity for accounts with linked Discord IDs and `discordNotif
 Account creation can ask Toast to DM invite credentials. Discord account linking asks the local service to verify that the Discord user is in the server and then assign the `registered` role. A bot-service failure does not roll back an already-created website account; the UI reports the concrete integration error.
 
 After `/contact` stores a submission, PHP calls localhost-only `POST /contact/notify` on `127.0.0.1:8765`. Toast sends the alert to Discord channel `1503931489560301609`.
+
+After `/others/fridge-builds-websites/submit` stores a website commission request, PHP calls localhost-only `POST /commission/notify` with all requested form fields, including the signed commission terms. Toast sends them as a no-mentions Discord embed to channel `1547229814321188995`. A delivery failure is recorded with the saved request so the submission itself is not lost.
 
 ## Patch Notices
 
@@ -174,9 +186,9 @@ Administrators can bypass the deploy approval flow with `/shareupdate latest` fo
   "features": { "auto_play": true, "loop": true },
   "groq": {
     "api_key": "...",
-    "model": "llama-3.1-8b-instant",
-    "website_model": "llama-3.3-70b-versatile",
-    "vision_model": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "model": "openai/gpt-oss-20b",
+    "website_model": "openai/gpt-oss-120b",
+    "vision_model": "qwen/qwen3.6-27b",
     "temperature": 0.8,
     "top_p": 0.95,
     "max_completion_tokens": 700,
@@ -195,6 +207,7 @@ Related runtime files are:
 - `data/etc/toast-feed-notify-state.json`: sent feed-notification dedupe keys
 - `data/etc/toast-patch-approvals.json`: pending and completed patch approvals
 - `data/etc/toast-dm-history.json`: DM threads, profiles, mute state, and memory boundaries
+- `data/etc/toast-chats/`: encrypted website chat histories, images, identity values, status, and encryption key
 - `data/etc/toast-personality.json`: shared Discord/feed personality
 - `others/toast-discord-bot/bot/personality.json`: legacy personality fallback
 
@@ -202,7 +215,7 @@ Toast's public-copy sanitization rules are documented on [Developer Data](Develo
 
 ## Local Service and Production Operation
 
-Toast's website integration listens only on `127.0.0.1:8765`. Its endpoints include status/control operations, manual DM operations, AI-mute changes, `/contact/notify`, and `/patch-notice`. They are internal service calls, not public `/api/*` routes.
+Toast's website integration listens only on `127.0.0.1:8765`. Its endpoints include status/control operations, manual DM operations, AI-mute changes, `/contact/notify`, `/commission/notify`, `/website-chat/reply`, and `/patch-notice`. They are internal service calls, not public `/api/*` routes. `/website-chat/reply` accepts only loopback requests and applies the Discord personality, configured text or vision model, natural reply splitting, and typing-delay calculation without reading Discord DM history.
 
 Production runs Toast as the PHP-FPM `http` user so he can update `/data`. `/etc/systemd/system/toast-discord-bot.service` links to the checked-in unit beneath the bot directory. The unit starts after the network is online, uses the bot virtualenv, sends unbuffered output to journald, disables bytecode writes in the read-only deployed tree, allows runtime writes only beneath `/data`, and automatically restarts after failures. It uses `SIGINT` when stopping so Toast can disconnect from Discord and voice cleanly.
 
@@ -211,3 +224,51 @@ The deploy user has narrowly scoped passwordless sudo access to reload systemd, 
 Initial production bootstrap is a root-only operation: link the deployed `toast-discord-bot.service` into `/etc/systemd/system/`, install `toast-discord-bot.sudoers` as `/etc/sudoers.d/fridge-toast-deploy` with mode `0440`, validate it with `visudo -cf`, then run `systemctl daemon-reload` and `systemctl enable --now toast-discord-bot.service`. Later deployments use the checked-in unit through that stable link.
 
 In development, missing `data/etc/toast.json` disables bot controls. Discord linking, notification DMs, contact alerts, and the DM inbox require the local service to be running. Create a Python virtual environment, install current `discord.py`, `aiohttp`, and `pynacl`, and install `ffmpeg` through the system package manager.
+
+## Admin Model Selection
+
+Toast’s `/settings` page provides language model controls, website chat history, and the private-message inbox alongside its personality editor. These controls are omitted from `/others/toast-discord-bot` while logged in as Toast; ordinary admins retain the existing control panel. The shared `lib/toast-management.html` and `js/toast-models.js` provide independent Groq model selectors for Discord text, Discord images, website chat text, website chat images, feed drafts, and automatic feed replies. Image scenarios require a vision-capable model. Each selector offers active Groq model IDs plus custom entry. Saving requires successful verification of every selection against Groq’s live model catalog; unavailable selections are marked disabled. Generation also checks that its model is active before requesting a completion.
+
+`/api/toast-models/` requires a refreshed admin session or the authenticated hardcoded Toast identity for both reads and writes, with CSRF verification for writes. It returns only selected model IDs, the provider model list, and a request token. Credentials stay on the server. Saves atomically update `groq.models` in `data/etc/toast.json`, using the keys `discord_text`, `discord_images`, `website_chat_text`, `website_chat_images`, `feed_drafts`, and `feed_replies`. Missing overrides inherit `model`, `vision_model`, or `website_model` (with the legacy `feed_model` fallback). Python reads configuration for each request; changes apply to new generations without restarting the service or stream.
+
+Website chat records `typingStartsAtMs` when a message is accepted, 1750 milliseconds after acceptance. Presence responses supply that deadline and `serverTimeMs`; the client schedules the remaining delay once, preserving it across polling and page refreshes. Completion and navigation cancel the reveal. Sending stays locked immediately, reply pacing stays unchanged, and `/clearmemory` does not show typing.
+
+Model defaults and known retired IDs are shared between PHP and Python in `lib/toast-model-policy.json`. Known retired overrides and legacy values resolve to current defaults: `openai/gpt-oss-20b` for text chat, `openai/gpt-oss-120b` for feed generation, and `qwen/qwen3.6-27b` for images. Review [Groq deprecations](https://console.groq.com/docs/deprecations) when maintaining this policy; the live catalog check also blocks IDs retired after the policy was last updated. Catalog failures prevent generation or saving instead of sending requests to an unverified model.
+
+## Bot mode
+
+The special Toast login automatically enables bot mode, identified by the authenticated `isHardcodedToast` session flag and username. It does not grant administrator privileges. `lib/bot-mode.php` restricts requests through the shared session bootstrap and renderer to the homepage, feed, settings, account routes, the others index, Toast’s bot page, its Discord inbox, and its website chat history. The public Toast chat is excluded. A small allowlist of APIs supports the permitted pages and radio; endpoint-specific authorization still applies. Other page requests redirect to `/?bot_mode_blocked=1`, where the normal site notice explains how to leave bot mode. Disallowed API requests return JSON with HTTP 403.
+
+The shell shows an orange “bot mode” label with a Font Awesome robot icon and a tooltip. The “chat with toast” button remains visible but disabled for Toast. Sidebar navigation other than homepage, feed, settings, logout, and others is disabled with an explanatory tooltip; only Toast’s card remains enabled in the others listing. Notification settings and the sidebar notifications button are hidden, notification polling is skipped, and feed bookmark controls are hidden. The mini player selects Toast radio on load, remains visible, and hides its close button; playback starts when the visitor presses play. Full-page loads do not restore an unrelated saved track. Desktop/mobile templates and SPA navigation share these behaviors through `js/bot-mode.js` and `css/bot-mode.css`.
+
+Toast may configure every scenario model and read/delete website conversations through the same endpoints as admins. Its Discord inbox also permits composing DMs and changing AI mute state; all inbox writes require a session CSRF token. Model saves and website-history deletion retain their existing CSRF checks.
+
+## Radio settings and chat diagnostics
+
+Toast can edit the stream URL, stream name, and online status directly in `/settings`. `lib/toast-radio-settings.html` and `js/toast-radio-settings.js` load and save through `/api/discord-bot-control/`. Radio writes require an admin or the authenticated Toast identity and a session CSRF token. They atomically merge configuration under the same lock as model saves, preserve unrelated fields, and write `.stream-update-signal` to request a reload. The existing admin control panel uses the same protection.
+
+The website chat's normal busy reply also represents service/provider failures. Admin send responses now include a separate `adminError` notice distinguishing local-service connection failures, missing/outdated endpoints, missing credentials, inactive models, catalog errors, completion rejection, timeouts, invalid JSON, and empty or token-limited answers. Diagnostics carry only controlled error codes, HTTP status, model ID, and a validated provider error code; they omit upstream bodies, credentials, and prompts. They are not stored in chat history or sent to non-admins. Restart the Python service after updating its code to enable the detailed diagnostics. For token-limit errors, remember that reasoning consumes the completion budget too; see [Groq’s API reference](https://console.groq.com/docs/api-reference).
+
+Toast's feed generator targets the Markdown editor's class rather than the removed exact BBCode wrapper. Its random/prompt choices, length control, write button, and initially locked editor/post button remain available on `/feed/create`.
+
+## Website chat visibility and credentials
+
+The public chat is rendered from `others/toast-discord-bot/chat/content.html`, with escaped values and message HTML supplied by `index.php`. It is available only when `toast.json` sets `bot.status` to `online`. Offline page visits redirect to the bot page with an explanatory notice; API/polling requests return HTTP 503 and `offline: true`, and the chat client returns to the bot page. The bot page hides its chat button while offline; an online Toast login still sees a disabled chat button. This manual availability gate is separate from the existing quota-related away status.
+
+The chat header's **clear chat** button shares the compact red styling and header alignment of private conversations’ **end chat** button. It sends an identity-scoped, CSRF-protected `clear-chat` action. It persists a `clearedMessageCount` boundary and timestamp, hides all earlier messages and attachments from the visitor, and excludes those messages from subsequent AI context. Admin history keeps the complete conversation and attachments. Clearing invalidates pending replies without resetting daily message counts, and clearing a never-used chat creates no files. The `/clearmemory` command retains its existing memory-boundary behavior.
+
+Toast settings include a password input for replacing `groq.api_key`. `/api/toast-credentials/` requires the authenticated hardcoded Toast identity and a CSRF token for writes. GET returns only whether a key is configured, never its value. Blank fields leave the stored key unchanged; successful saves refresh settings/model availability. The key is never embedded in HTML or returned in responses. Atomic key, model, and radio saves use `.json` temporary files so the existing Nginx private-data rule protects them as well as `toast.json`.
+
+Toast’s settings use a shared section layout with 40px between credentials, conversation links, language models, radio, and personality controls. Section-local margins are reset to keep desktop and mobile spacing consistent.
+
+## Manually generated feed replies
+
+When signed in as Toast, the feed post reply form shows **generate reply** and a read-only draft textbox. Generating a successful draft unlocks editing and the normal reply submit button; generation does not post automatically. Selecting a different comment or cancelling the target discards the old draft and relocks the textbox, including when an earlier generation is still in flight. Non-Toast users keep the normal Markdown reply composer. Both composers leave space above the reply button.
+
+`/api/toast-feed-reply/` requires the authenticated Toast identity, an unrestricted posting state, and the feed form’s session CSRF token. It loads the post and selected comment from server storage, never from client-provided context. Post replies include the post; comment replies include that post, the selected comment, and its visible descendants, excluding unrelated threads and banned guest replies. Context is bounded to 8,000 bytes for the post/target and 32,000 bytes or 100 descendant comments, with truncation indicated. The prompt treats thread text as data and requests a reply to the selected target using the feed personality and `feed_replies` model.
+
+Successful generation returns an editable draft and a session-bound token scoped to the post and parent comment for one hour. Reply submission validates this token and consumes it on successful posting. Pending frontend requests are invalidated on target changes so stale drafts cannot unlock the wrong thread. The service returns explicit errors for missing posts/comments, unavailable credentials/models, and provider failures without exposing keys or raw provider bodies.
+
+## Python debug logs
+
+With debug mode enabled, the authenticated Toast login sees a **Python** tab in place of **server**. It reads the bot’s rotating, private operational log with verbose HTTP, chat, Discord, and radio diagnostics. Restart the Python service to start writing the new log; see [Debug Mode](Debug-Mode#python-tab-toast) for storage, permissions, and controls.

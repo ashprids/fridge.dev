@@ -191,7 +191,11 @@ if (!$isLoggedIn) {
     $content = str_replace('<span id="user-settings">', '<span id="user-settings" style="display:none">', $content);
     $content = str_replace('<div class="checkbox-group" id="discord-notifications-setting">', '<div class="checkbox-group" id="discord-notifications-setting" style="display:none">', $content);
 }
+$content = str_replace('{toast_credentials}', $isToast ? file_get_contents(dirname(__DIR__) . '/lib/toast-credentials.html') : '', $content);
+$content = str_replace('{toast_radio}', $isToast ? file_get_contents(dirname(__DIR__) . '/lib/toast-radio-settings.html') : '', $content);
+$content = str_replace('{toast_management}', $isToast ? file_get_contents(dirname(__DIR__) . '/lib/toast-management.html') : '', $content);
 if ($isToast) {
+    $content = str_replace('<span id="notification-settings">', '<span id="notification-settings" hidden>', $content);
     $content = str_replace('<span id="user-settings">', '<span id="user-settings" style="display:none">', $content);
     $content = str_replace('<span id="appearance-settings">', '<span id="appearance-settings" style="display:none">', $content);
     $content = str_replace('<span id="toast-settings">', '<span id="toast-settings" data-toast-session="1">', $content);

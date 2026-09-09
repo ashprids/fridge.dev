@@ -1,0 +1,17 @@
+<style>
+#toast-radio-form { display: grid; gap: 12px; margin: 24px 0; }
+#toast-radio-form h3 { margin: 0; }
+#toast-radio-form label { display: grid; gap: 6px; }
+#toast-radio-form input:not([type="checkbox"]) { box-sizing: border-box; width: 100%; padding: 9px 12px; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--border); }
+#toast-radio-form .radio-status { display: flex; align-items: center; gap: 8px; }
+#toast-radio-form button { padding: 9px 12px; font: inherit; border: 1px solid var(--border); cursor: pointer; }
+</style>
+<form id="toast-radio-form" data-no-spa="1">
+<h3>toast radio</h3>
+<label>stream name<input name="name" maxlength="200" required></label>
+<label>stream URL<input name="url" type="url" maxlength="2048" placeholder="https://example.com/radio.m3u" required></label>
+<label class="radio-status"><input name="status" type="checkbox">show toast as online</label>
+<button type="submit" disabled>save radio</button>
+<span role="status" id="toast-radio-status"></span>
+</form>
+<script src="/js/toast-radio-settings.js?v=20260909-1"></script>

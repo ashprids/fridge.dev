@@ -11,8 +11,8 @@ require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPAR
 header('Content-Type: application/json');
 
 const TOAST_GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const TOAST_GROQ_DEFAULT_MODEL = 'llama-3.1-8b-instant';
-const TOAST_GROQ_DEFAULT_WEBSITE_MODEL = 'llama-3.3-70b-versatile';
+const TOAST_GROQ_DEFAULT_MODEL = 'openai/gpt-oss-20b';
+const TOAST_GROQ_DEFAULT_WEBSITE_MODEL = 'openai/gpt-oss-120b';
 const TOAST_FEED_CONTEXT_MAX_CHARS = 1800;
 const TOAST_FEED_CONTEXT_RETRY_MAX_CHARS = 700;
 const TOAST_FEED_PROMPT_CONTEXT_MAX_CHARS = 1200;
@@ -65,7 +65,7 @@ function toast_feed_load_groq_config(): array
 
     return [
         'api_key' => trim((string)($groq['api_key'] ?? '')),
-        'model' => trim((string)($groq['website_model'] ?? $groq['feed_model'] ?? TOAST_GROQ_DEFAULT_WEBSITE_MODEL)) ?: TOAST_GROQ_DEFAULT_WEBSITE_MODEL,
+        'model' => toast_model_for($groq, 'feed_drafts'),
         'temperature' => toast_feed_coerce_float($groq['temperature'] ?? null, 0.8, 0.0, 2.0),
         'top_p' => toast_feed_coerce_float($groq['top_p'] ?? null, 0.95, 0.0, 1.0),
         'max_completion_tokens' => toast_feed_coerce_int($groq['max_completion_tokens'] ?? null, 700, 1, 4096),
@@ -358,6 +358,7 @@ function toast_feed_build_payload(array $groq, string $context, string $avoidToa
 
 function toast_feed_request_groq(array $payload, array $groq): array
 {
+    if (!in_array($groq['model'], toast_active_models($groq['api_key']) ?? [], true)) return ['ok' => false, 'error' => 'model_unavailable', 'message' => 'The selected model is unavailable or could not be verified.', 'status' => 503, 'body' => '', 'headers' => []];
     $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
     if ($body === false) {
         return ['ok' => false, 'error' => 'payload_encode_failed', 'message' => 'could not encode Groq payload.', 'status' => 0, 'body' => ''];

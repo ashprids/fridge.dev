@@ -1,7 +1,9 @@
-<h1>firefox theme</h1>
-<h2>based on the blackprint theme for fridge.dev</h2>
+---
+title: "firefox theme"
+description: "based on the blackprint theme for fridge.dev"
+---
 <img src="/others/firefox-theme/preview.svg" id="post-image" alt="Blackprint for Firefox">
-<br><br>
+
 I've created a theme for Firefox based on the Blackprint theme for fridge.dev. This theme is available for download on Mozilla's themes and addons website.
-<br><br>
+
 <a style="text-decoration: none;" href="https://addons.mozilla.org/en-GB/firefox/addon/fridg3org-blackprint/" target="_blank"><button id="form-button" type="button">Download from Mozilla</button></a>

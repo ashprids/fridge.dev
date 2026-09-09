@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'theme-accents.php';
 
 if (!function_exists('fridg3_inject_server_debug_logs')) {
     function fridg3_inject_server_debug_logs($template) {
@@ -646,10 +647,10 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridg3_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/main.js' => '/main.js?v=20260817-restricted-history-links-1',
-            '/js/settings.js' => '/js/settings.js?v=20260817-moderator-users-1',
+            '/main.js' => '/main.js?v=20260909-toast-feed-reply-2',
+            '/js/settings.js' => '/js/settings.js?v=20260909-mobile-abbr-tooltips-3',
             '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260812-unlocked-track-route-94',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260817-content-action-menus-1',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260909-bot-mode-1',
             '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
             '/js/bbcode.js' => '/js/bbcode.js?v=20260810-preview-mention-tooltips-1',
         ];
@@ -678,14 +679,20 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function apply_preferred_theme_stylesheet($template, $startDir) {
         fridg3_enforce_work_in_progress($startDir);
+        require_once __DIR__ . '/session.php';
+        fridg3_start_session();
+        fridg3_enforce_bot_mode();
+        $template = fridg3_bot_mode_template($template);
 
         $template = preg_replace(
             '#(<link\b[^>]*\bhref=["\'])/style\.css(?:\?[^"\']*)?(["\'][^>]*>)#i',
-            '$1/style.css?v=admin-settings-spacing-20260817-1$2',
+            '$1/style.css?v=toast-feed-reply-20260909-6$2',
             $template
         ) ?: $template;
 
         $theme = fridg3_get_active_theme($startDir);
+        $template = fridg3_inject_theme_accents($template, $theme['id'] ?? 'default');
+        $template = fridg3_inject_shared_runtime_scripts($template);
         if ($theme === null) {
             return fridg3_replace_logged_in_discord_footer_button(
                 fridg3_apply_work_in_progress_banner(

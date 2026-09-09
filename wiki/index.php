@@ -257,7 +257,15 @@ function wiki_render_markdown($markdown) {
             return;
         }
         $content = trim(implode("\n", $blockquoteLines));
-        $html[] = '<blockquote><p>' . wiki_render_inline_markdown(str_replace("\n", '<br>', $content)) . '</p></blockquote>';
+        if (isset($blockquoteLines[0]) && preg_match('/^\[!QUOTE\s+(.+?)\]\s*$/i', trim($blockquoteLines[0]), $attributedQuote)) {
+            array_shift($blockquoteLines);
+            $content = trim(implode("\n", $blockquoteLines));
+            $html[] = '<figure class="markdown-attributed-quote"><blockquote><p>'
+                . wiki_render_inline_markdown(str_replace("\n", '<br>', $content))
+                . '</p></blockquote><figcaption>— <cite>' . wiki_escape(trim($attributedQuote[1])) . '</cite></figcaption></figure>';
+        } else {
+            $html[] = '<blockquote><p>' . wiki_render_inline_markdown(str_replace("\n", '<br>', $content)) . '</p></blockquote>';
+        }
         $blockquoteLines = [];
         $inBlockquote = false;
     };

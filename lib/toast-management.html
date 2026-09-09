@@ -1,0 +1,27 @@
+<style>
+#toast-inbox-button, #toast-chat-history-button { display: block; width: 100%; padding: 9px 12px; margin: 0 0 16px; font: inherit; color: var(--fg); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+#toast-model-form { margin: 0 0 24px; }
+#toast-model-fields { display: grid; gap: 16px; }
+#toast-model-fields label { display: block; min-width: 0; font: inherit; }
+.toast-model-select-wrap { display: block; position: relative; margin-top: 8px; }
+.toast-model-select-wrap::after { content: ''; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px; border-right: 2px solid var(--fg); border-bottom: 2px solid var(--fg); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+#toast-model-form select, #toast-model-form input { box-sizing: border-box; width: 100%; min-height: 40px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); color: var(--fg); font: inherit; box-shadow: none; }
+#toast-model-form select { appearance: none; padding-right: 38px; text-overflow: ellipsis; cursor: pointer; }
+#toast-model-form option { background: var(--bg); color: var(--fg); }
+#toast-model-form input { margin-top: 8px; }
+#toast-model-form button { cursor: pointer; width: 100%; padding: 9px 12px; font: inherit; border: 1px solid var(--border); border-radius: 3px; }
+#toast-model-form :is(select,input,button):focus-visible { outline: 2px solid var(--links); outline-offset: 2px; }
+#toast-model-form button:disabled { opacity: .5; cursor: not-allowed; }</style>
+<div class="toast-conversation-settings">
+    <button id="toast-inbox-button" type="button" onclick="window.location='/others/toast-discord-bot/messages'" data-tooltip="open toast's dm inbox">open private messages</button>
+    <button id="toast-chat-history-button" type="button" onclick="window.location='/others/toast-discord-bot/chat/history'">website chat history</button>
+
+</div>
+
+  <form id="toast-model-form" data-no-spa="1" hidden>
+      <h3>language models</h3>
+      <div id="toast-model-fields"></div>
+      <p id="toast-model-status" role="status"></p>
+      <button type="submit">save models</button>
+    </form>
+<script src="/js/toast-models.js?v=20260909-feed-replies-2"></script>

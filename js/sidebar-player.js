@@ -266,7 +266,7 @@ function initMiniPlayer() {
         const initialSrc = body.getAttribute('data-mini-player-src');
         const initialTitle = body.getAttribute('data-mini-player-title');
         const initialArt = body.getAttribute('data-mini-player-art');
-        if (initialSrc) audio.src = initialSrc;
+        if (initialSrc && !body.classList.contains('bot-mode')) audio.src = initialSrc;
         if (initialTitle) {
             setNowPlayingTitle(initialTitle, body.getAttribute('data-mini-player-artist') || '');
         }
@@ -278,7 +278,7 @@ function initMiniPlayer() {
         // Restore saved state if present (overrides default volume)
         try {
             const savedRaw = window.localStorage.getItem(PLAYER_STATE_KEY);
-            if (savedRaw) {
+            if (savedRaw && !body.classList.contains('bot-mode')) {
                 const saved = JSON.parse(savedRaw);
                 if (saved && typeof saved === 'object') {
                     const savedIsolatedTrack = isDisplayAuxDanceTrackSrc(saved.src);
@@ -551,6 +551,7 @@ function initMiniPlayer() {
         };
 
         const autoplayTrack = (track) => {
+            if (document.body.classList.contains('bot-mode')) return;
             if (!track || !track.src) return;
             const labelName = track.name || 'Untitled';
 
@@ -580,6 +581,7 @@ function initMiniPlayer() {
         };
 
         const playAlbumTrack = (track, idx, albumMeta) => {
+            if (document.body.classList.contains('bot-mode')) return;
             if (!track) return;
             const src = track.directory || track.file_directory || '';
             if (!src) return;
@@ -773,6 +775,7 @@ function initMiniPlayer() {
 
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
+                if (document.body.classList.contains('bot-mode')) return;
                 cancelVolumeFade();
                 fadeOutActive = false;
                 audio.volume = playbackVolume;
@@ -801,6 +804,7 @@ function initMiniPlayer() {
         }
 
         playBtn.addEventListener('click', () => {
+            if (!audio.src && document.body.classList.contains('bot-mode')) { playToastStreamInMiniPlayer(); return; }
             if (!audio.src) return;
             if (audio.paused || fadeOutActive) {
                 fadeInPlayback();
@@ -919,6 +923,7 @@ function initMiniPlayer() {
 
         // Album grid integration: clicking entries controls the mini player.
         const bindAlbumLinks = () => {
+            if (document.body.classList.contains('bot-mode')) return;
             const albumLinks = document.querySelectorAll('.album-link');
             if (!albumLinks.length) return;
 
@@ -1059,7 +1064,7 @@ function initMiniPlayer() {
         // Restore previous playback state (cross-page continuity)
         try {
             const rawState = window.localStorage.getItem(PLAYER_STATE_KEY);
-            if (rawState) {
+            if (rawState && !document.body.classList.contains('bot-mode')) {
                 const state = JSON.parse(rawState);
                 if (state && state.src) {
                     audio.src = state.src;
@@ -1107,6 +1112,12 @@ function initMiniPlayer() {
 
         // Ensure correct initial visibility when no track is loaded
         updateVisibility();
+        if (document.body.classList.contains('bot-mode')) {
+            setToastLiveControls(true);
+            setNowPlayingTitle('toast radio', 'toast radio');
+            initToastListenAlong();
+            playToastStreamInMiniPlayer(false);
+        }
     } catch (_) { /* no-op */ }
 }
 
@@ -1149,6 +1160,7 @@ function syncSidebarShortcutWidths() {
 }
 
 function syncActiveChatSidebarButton() {
+    if (document.body.classList.contains('bot-mode')) return;
     try {
         const sidebarEl = document.getElementById('sidebar');
         if (!sidebarEl || !window.fetch) return;
@@ -1298,7 +1310,7 @@ async function markSiteNotificationsRead(keys, csrfToken = '') {
 
 function showNextSiteNotificationToast() {
     const path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
-    if (path === '/chat' || path.startsWith('/chat/')) return;
+    if (path === '/chat' || path.startsWith('/chat/') || path === '/others/toast-discord-bot/chat') return;
     if (siteNotificationToastActive || siteNotificationToastQueue.length === 0) return;
     siteNotificationToastActive = true;
     const event = siteNotificationToastQueue.shift();
@@ -1487,6 +1499,7 @@ function updateMobileMenuNotificationBadge(unreadCount) {
 }
 
 function syncNotificationsSidebarButton(options = {}) {
+    if (document.body.classList.contains('bot-mode')) return;
     try {
         showNextSiteNotificationToast();
         const sidebarEl = document.getElementById('sidebar');
@@ -1565,6 +1578,7 @@ function syncNotificationsSidebarButton(options = {}) {
 
 window.syncNotificationsSidebarButton = syncNotificationsSidebarButton;
 async function checkNotificationRevision() {
+    if (document.body.classList.contains('bot-mode')) return;
     if (notificationRevisionRequestActive || !window.fetch) return;
     notificationRevisionRequestActive = true;
     try {
@@ -1662,7 +1676,7 @@ function initToastListenAlong() {
     }
 }
 
-async function playToastStreamInMiniPlayer() {
+async function playToastStreamInMiniPlayer(autoplay = true) {
     try {
         sidebarDebugLog('live stream playback requested');
         const response = await fetch('/api/discord-bot-status/');
@@ -1723,7 +1737,7 @@ async function playToastStreamInMiniPlayer() {
         const tryPlay = (idx) => {
             if (idx >= candidates.length) return;
             audio.src = candidates[idx];
-            audio.play().catch(() => {});
+            if (autoplay) audio.play().catch(() => {});
         };
 
         const onError = () => {
@@ -1739,15 +1753,15 @@ async function playToastStreamInMiniPlayer() {
 
         const playIcon = document.querySelector('#mini-player-play i');
         if (playIcon) {
-            playIcon.classList.remove('fa-play');
-            playIcon.classList.add('fa-pause');
+            playIcon.classList.toggle('fa-play', !autoplay);
+            playIcon.classList.toggle('fa-pause', autoplay);
         }
 
         try {
             const state = {
                 src: audio.src,
                 currentTime: 0,
-                paused: false,
+                paused: !autoplay,
                 volume: audio.volume,
                 muted: audio.muted,
                 title: titleEl ? titleEl.textContent : '',

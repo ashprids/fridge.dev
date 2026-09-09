@@ -38,7 +38,7 @@ if ($renderer === 'feed') {
     $flushSection();
     $rendered = implode("\n", $renderedParts);
 } else {
-    $rendered = mdp_render_markdown($markdown);
+    $rendered = mdp_render_trusted_markdown($markdown);
 }
 
 require_once $root . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'render.php';

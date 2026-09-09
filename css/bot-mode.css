@@ -1,0 +1,9 @@
+#bot-mode-banner { color: #eaa04b; display: block; line-height: 1.15; }
+.bot-mode .bot-mode-disabled { opacity: .4; cursor: not-allowed; }
+.bot-mode #notification-settings,
+.bot-mode #post-bookmark-feed,
+.bot-mode #sidebar a[href^="/notifications"],
+.bot-mode #mini-player-close { display: none !important; }
+.bot-mode #mini-player { display: block !important; }
+.bot-mode #mini-player-tracks { display: none !important; }
+.bot-mode #sidebar a:not([href="/feed"]):not([href="/"]):not([href="/settings"]):not([href="/account/logout"]):not([href="/account"]):not([href="/others"]) { opacity: .4; cursor: not-allowed; }

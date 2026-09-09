@@ -110,6 +110,23 @@ server {
         return 403;
     }
 
+    # Toast website chat histories contain encrypted identity and message data.
+    location = /data/etc/toast-chats {
+        return 302 /error/403;
+    }
+
+    location ^~ /data/etc/toast-chats/ {
+        return 302 /error/403;
+    }
+
+    location = /data/etc/toast-chat {
+        return 302 /error/403;
+    }
+
+    location ^~ /data/etc/toast-chat/ {
+        return 302 /error/403;
+    }
+
     # Feed clean URLs
     location ~ ^/feed/posts/[^/]+$ {
         rewrite ^/feed/posts/(.+)$ /feed/posts/index.php?post=$1 last;
@@ -212,6 +229,15 @@ server {
 
     location /chat/ {
         try_files $uri $uri/ /chat/index.php?$args;
+    }
+
+    # Toast chat routes must reach PHP directly so POST bodies survive.
+    location = /others/toast-discord-bot/chat {
+        rewrite ^ /others/toast-discord-bot/chat/index.php?$args last;
+    }
+
+    location = /others/toast-discord-bot/chat/history {
+        rewrite ^ /others/toast-discord-bot/chat/history/index.php?$args last;
     }
 
     # Never serve encrypted chat data, keys, or attachments directly
