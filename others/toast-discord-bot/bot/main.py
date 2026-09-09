@@ -19,6 +19,8 @@ import getpass
 import asyncio
 import hashlib
 import time
+import urllib.error
+import urllib.request
 from diagnostics import configure_diagnostics
 
 # Configure logging
@@ -107,6 +109,7 @@ def find_repository_root():
     return Path(__file__).resolve().parents[3]
 
 REPOSITORY_ROOT = find_repository_root()
+DEPLOYED_COMMIT_PATH = REPOSITORY_ROOT / '.deployed-commit'
 
 def find_ffmpeg_executable():
     """Locate ffmpeg executable on the system.
@@ -1828,12 +1831,71 @@ def get_repository_url() -> str:
         logger.warning(f"Could not resolve repository URL for patch notice: {e}")
         return DEFAULT_REPOSITORY_URL
 
+def get_deployed_commit_ref() -> str:
+    try:
+        commit_sha = DEPLOYED_COMMIT_PATH.read_text(encoding='utf-8').strip()
+    except OSError:
+        return 'main'
+    return commit_sha if re.fullmatch(r'[0-9a-fA-F]{40}', commit_sha) else 'main'
+
+def get_github_commit(commit_ref: str) -> dict:
+    repo_url = normalize_repository_url(DEFAULT_REPOSITORY_URL)
+    match = re.fullmatch(r'https://github\.com/([^/]+)/([^/]+)', repo_url)
+    if not match:
+        raise RuntimeError('the configured repository URL is not a GitHub repository.')
+
+    owner, repository = match.groups()
+    api_url = f'https://api.github.com/repos/{owner}/{repository}/commits/{commit_ref}'
+    request = urllib.request.Request(
+        api_url,
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'fridge.dev-toast',
+            'X-GitHub-Api-Version': '2022-11-28',
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            commit = json.load(response)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise ValueError('that commit could not be found.') from e
+        raise RuntimeError(f'GitHub returned HTTP {e.code} while resolving that commit.') from e
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise RuntimeError('GitHub could not be reached while resolving that commit.') from e
+
+    sha = str(commit.get('sha', '')).strip()
+    message = str(commit.get('commit', {}).get('message', '')).strip()
+    if not re.fullmatch(r'[0-9a-fA-F]{40}', sha) or not message:
+        raise RuntimeError('GitHub returned incomplete commit details.')
+
+    subject, _, body = message.partition('\n')
+    commit_url = str(commit.get('html_url', '')).strip() or f'{repo_url}/commit/{sha}'
+    return {
+        'branch': 'main',
+        'commit_sha': sha,
+        'commit_url': commit_url,
+        'commits': [{
+            'sha': sha,
+            'subject': ' '.join(subject.split()) or sha[:7],
+            'body': body.strip(),
+            'url': commit_url,
+        }],
+        'pr_url': '',
+        'pr_number': '',
+    }
+
 def build_manual_patch_notice_payload(commit_ref: str) -> dict:
     ref = str(commit_ref or '').strip()
     if ref.lower() == 'latest':
         ref = 'HEAD'
     elif not re.fullmatch(r'[0-9a-fA-F]{7,40}', ref):
         raise ValueError('enter `latest` or a 7-40 character commit SHA.')
+
+    if not (REPOSITORY_ROOT / '.git').exists():
+        remote_ref = get_deployed_commit_ref() if ref == 'HEAD' else ref
+        return get_github_commit(remote_ref)
 
     commit_sha = run_git_command(['rev-parse', '--verify', f'{ref}^{{commit}}'])
     raw_commit = run_git_command(['show', '--no-patch', '--format=%H%x1f%s%x1f%b%x1e', commit_sha])

@@ -50,8 +50,11 @@ jobs:
       - name: deploy with rsync
         env:
           DEPLOY_DIR: .
+          DEPLOY_COMMIT: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+
+          printf '%s\n' "$DEPLOY_COMMIT" > "$DEPLOY_DIR/.deployed-commit"
 
           rsync -az --delete \
             --filter='merge .rsyncignore' \

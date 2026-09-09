@@ -172,7 +172,7 @@ Second useful detail, if needed
 
 The subject becomes the first bullet and does not include the commit ID. Each blank-line-separated body paragraph becomes another bullet. Long notices are split across embed fields. Markdown and Discord mentions are escaped, merge commits are excluded, and the deploy payload may include the shipped commit range and a pull-request link.
 
-Administrators can bypass the deploy approval flow with `/shareupdate latest` for the deployed `HEAD`, or `/shareupdate <commit ID>` for a specific commit. Manual updates use the same formatter, destination channel, and role ping.
+Administrators can bypass the deploy approval flow with `/shareupdate latest` for the deployed commit, or `/shareupdate <commit ID>` for a specific commit. Manual updates use local Git metadata in development. Because production excludes `.git`, deployments write the deployed SHA to `.deployed-commit` and Toast resolves commit details through GitHub there. Manual updates use the same formatter, destination channel, and role ping.
 
 ## Configuration and Data
 
