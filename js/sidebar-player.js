@@ -178,7 +178,7 @@ const MINI_PLAYER_LIBRARY = {
     tracks: [],
     autoPlayedIds: new Set()
 };
-const DISPLAY_AUX_DANCE_TRACK_PATH = '/resources/images/fruity-dance/dance.mp3';
+const DISPLAY_AUX_DANCE_TRACK_PATH = '/resources/audio/dance.mp3';
 const DISPLAY_AUX_DEVICE_ART_PATH = '/resources/images/device-cover.svg';
 
 function isDisplayAuxDanceTrackSrc(src) {
@@ -1245,7 +1245,7 @@ function siteNotificationSoundDisabled() {
 function getSiteNotificationAudio() {
     if (siteNotificationSoundDisabled()) return null;
     if (!siteNotificationAudio) {
-        siteNotificationAudio = new Audio('/resources/notification.mp3');
+        siteNotificationAudio = new Audio('/resources/audio/notification.mp3');
         siteNotificationAudio.preload = 'auto';
         siteNotificationAudio.volume = SITE_NOTIFICATION_VOLUME;
     }

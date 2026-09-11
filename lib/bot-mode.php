@@ -43,7 +43,7 @@ function fridg3_bot_mode_disable_links(string $html, array $allowed): string {
 
 function fridg3_bot_mode_template(string $template): string {
     $active = fridg3_toast_is_current_user();
-    $runtime = '<meta name="fridg3-bot-mode" content="' . ($active ? '1' : '0') . '"><link rel="stylesheet" href="/css/bot-mode.css?v=20260909-2"><script defer src="/js/bot-mode.js?v=20260909-1"></script>';
+    $runtime = '<meta name="fridg3-bot-mode" content="' . ($active ? '1' : '0') . '"><script defer src="/js/bot-mode.js?v=20260909-1"></script>';
     $template = str_replace('</head>', $runtime . '</head>', $template);
     if (!$active) return $template;
     $template = fridg3_bot_mode_disable_links($template, ['/', '/feed', '/settings', '/account', '/account/logout', '/others']);

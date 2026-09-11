@@ -1781,7 +1781,7 @@ function initAsciiTime() {
 
         const loadFonts = async () => {
             try {
-                const response = await fetch('/resources/ascii-time.txt', { cache: 'no-cache' });
+                const response = await fetch('/resources/etc/ascii-time.txt', { cache: 'no-cache' });
                 if (!response.ok) throw new Error(`ASCII time font request failed with ${response.status}`);
                 fontMap = buildMap(await response.text());
                 if (!maxLines) throw new Error('No glyphs loaded');
@@ -1827,7 +1827,7 @@ function initHourlyBeep() {
     const TIMER_KEY = '__hourlyBeepTimer';
     if (window[TIMER_KEY]) return;
 
-    const audio = new Audio('/resources/beepbeep.ogg');
+    const audio = new Audio('/resources/audio/beepbeep.ogg');
     audio.preload = 'auto';
 
     const playBeep = () => {

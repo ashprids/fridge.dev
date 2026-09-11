@@ -26,7 +26,7 @@ This page showcases the formatting syntax supported in Feed posts and replies. T
 
 [Internal link](/feed)
 
-![Image description](/resources/favicon.svg)
+![Image description](/resources/icons/favicon.svg)
 
 Uploaded audio and video use the same media button and feed players as normal posts.
 

@@ -66,7 +66,7 @@ Unlike posting bans, hard bans are enforced before normal page or static-file ha
 Hard-banned clients may access only:
 
 - `/error/blacklisted` and its local files
-- Font files beneath `/resources` with `woff`, `woff2`, `ttf`, or `otf` extensions
+- Font files beneath `/resources/fonts` with `woff`, `woff2`, `ttf`, or `otf` extensions
 
 The blacklist page uses stripped desktop and mobile Blackprint templates. Direct visitors who are not actively hard-banned are redirected to `/` by PHP.
 

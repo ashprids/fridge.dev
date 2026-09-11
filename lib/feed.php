@@ -1751,7 +1751,7 @@ if (!function_exists('fridg3_feed_markdown_inline')) {
         $html = preg_replace_callback('/(?<!\S)!fa[ \t]+(solid|regular|brands)[ \t]+([a-z0-9][a-z0-9-]*)\b/i', static function (array $m) use ($protect): string {
             return $protect('<i class="fa-' . strtolower($m[1]) . ' fa-' . strtolower($m[2]) . '"></i>');
         }, $html) ?? $html;
-        $html = preg_replace_callback('/(?<!\S)!frdg\b/i', static fn(): string => $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/favicon.svg" alt="fridge.dev">'), $html) ?? $html;
+        $html = preg_replace_callback('/(?<!\S)!frdg\b/i', static fn(): string => $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/icons/favicon.svg" alt="fridge.dev">'), $html) ?? $html;
         $html = preg_replace_callback('/\[tooltip=&quot;([^&]*)&quot;\](.*?)\[\/tooltip\]/i', static function (array $m) use ($protect): string {
             $tooltip = htmlspecialchars(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
             return $protect('<span data-tooltip="' . $tooltip . '">' . $m[2] . '</span>');

@@ -15,12 +15,12 @@
 
 @font-face {
 	font-family: "MainRegular";
-	src: url("/resources/IosevkaFixedSS03-Regular.woff2");
+	src: url("/resources/fonts/IosevkaFixedSS03-Regular.woff2");
 }
 
 @font-face {
 	font-family: "MainBold";
-	src: url("/resources/IosevkaFixedSS03-Bold.woff2");
+	src: url("/resources/fonts/IosevkaFixedSS03-Bold.woff2");
 }
 
 * {

@@ -153,7 +153,7 @@ function wiki_render_inline_markdown($text) {
     }, $escaped);
 
     $escaped = preg_replace_callback('/(?<!\S)!frdg\b/i', static function () use ($protect) {
-        return $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/favicon.svg" alt="fridge.dev">');
+        return $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/icons/favicon.svg" alt="fridge.dev">');
     }, $escaped);
 
     $escaped = preg_replace_callback('/\[(.*?)\]\((.*?)\)/', function ($matches) use ($protect) {

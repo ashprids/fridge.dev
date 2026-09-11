@@ -1,6 +1,6 @@
 @font-face {
     font-family: "Aero Tahoma";
-    src: url('/themes/lib/aero/tahoma.ttf') format('truetype');
+    src: url('/resources/fonts/tahoma.ttf') format('truetype');
     font-style: normal;
     font-weight: normal;
     font-display: swap;

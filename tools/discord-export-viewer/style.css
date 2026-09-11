@@ -1,6 +1,6 @@
 @font-face {
     font-family: "ggsans-regular";
-    src: url("/tools/discord-export-viewer/gg-sans-regular.ttf") format("truetype");
+    src: url("/resources/fonts/gg-sans-regular.ttf") format("truetype");
 }
 
 #discord-export-viewer {

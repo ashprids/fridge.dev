@@ -316,7 +316,7 @@ function mdp_inline(string $text, bool $allowRawHtml = false): string
 	$out = preg_replace_callback('/(?<!\S)!fa[ \t]+(solid|regular|brands)[ \t]+([a-z0-9][a-z0-9-]*)\b/i', static function (array $match) use ($protect): string {
 		return $protect('<i class="fa-' . strtolower($match[1]) . ' fa-' . strtolower($match[2]) . '"></i>');
 	}, $out) ?? $out;
-	$out = preg_replace_callback('/(?<!\S)!frdg\b/i', static fn(): string => $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/favicon.svg" alt="fridge.dev">'), $out) ?? $out;
+	$out = preg_replace_callback('/(?<!\S)!frdg\b/i', static fn(): string => $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/icons/favicon.svg" alt="fridge.dev">'), $out) ?? $out;
 	$out = preg_replace_callback('/\[!\[([^\]]*)\]\(([^)\s]+)\)\]\(([^)\s]+)\)/', static function (array $match) use ($protect): string {
 		$imageUrl = mdp_safe_url(html_entity_decode($match[2], ENT_QUOTES, 'UTF-8'));
 		$linkUrl = mdp_safe_url(html_entity_decode($match[3], ENT_QUOTES, 'UTF-8'));

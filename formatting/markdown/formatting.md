@@ -133,7 +133,7 @@ A bare URL is linked too: https://example.com/docs.
 
 ![Sized image](https://picsum.photos/400/201){width=50%}
 
-![[/resources/favicon.svg]]
+![[/resources/icons/favicon.svg]]
 
 [reference-image]: https://picsum.photos/400/202 "Reference image"
 

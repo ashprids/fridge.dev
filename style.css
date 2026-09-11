@@ -114,37 +114,37 @@
 
 @font-face {
     font-family: 'MainRegular';
-    src: url('/resources/IosevkaFixedSS03-Regular.woff2');
+    src: url('/resources/fonts/IosevkaFixedSS03-Regular.woff2');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'MainBold';
-    src: url('/resources/IosevkaFixedSS03-Bold.woff2');
+    src: url('/resources/fonts/IosevkaFixedSS03-Bold.woff2');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'MainItalic';
-    src: url('/resources/IosevkaFixedSS03-Italic.woff2');
+    src: url('/resources/fonts/IosevkaFixedSS03-Italic.woff2');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'MainBoldItalic';
-    src: url('/resources/IosevkaFixedSS03-BoldItalic.woff2');
+    src: url('/resources/fonts/IosevkaFixedSS03-BoldItalic.woff2');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'IBM_VGA';
-    src: url('/resources/IBM_VGA.woff') format('woff');
+    src: url('/resources/fonts/IBM_VGA.woff') format('woff');
     font-display: swap;
 }
 
 @font-face {
     font-family: 'Title';
-    src: url('/resources/Streetbomber.ttf');
+    src: url('/resources/fonts/Streetbomber.ttf');
     font-display: swap;
 }
 
@@ -1241,6 +1241,37 @@ html.access-reduced-motion #title {
 #wiki-mode-banner {
     display: block;
     margin-top: 4px;
+}
+
+#bot-mode-banner {
+    display: block;
+    color: #eaa04b;
+    line-height: 1.15;
+}
+
+.bot-mode .bot-mode-disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.bot-mode #notification-settings,
+.bot-mode #post-bookmark-feed,
+.bot-mode #sidebar a[href^="/notifications"],
+.bot-mode #mini-player-close {
+    display: none !important;
+}
+
+.bot-mode #mini-player {
+    display: block !important;
+}
+
+.bot-mode #mini-player-tracks {
+    display: none !important;
+}
+
+.bot-mode #sidebar a:not([href="/feed"]):not([href="/"]):not([href="/settings"]):not([href="/account/logout"]):not([href="/account"]):not([href="/others"]) {
+    opacity: .4;
+    cursor: not-allowed;
 }
 
 .mobile-collapsed-dev-mode-banner {
