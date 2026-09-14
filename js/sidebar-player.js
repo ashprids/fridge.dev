@@ -1,5 +1,6 @@
 // Sidebar toggle functionality
 const sidebarDebugLog = message => window.fridg3DebugClientLog?.(`[sidebar/player] ${message}`);
+const TOAST_RADIO_ART = '/resources/images/toast.svg';
 const hideSidebarBtn = document.getElementById('hide-sidebar');
 const showSidebarBtn = document.getElementById('show-sidebar');
 const sidebar = document.getElementById('sidebar');
@@ -218,6 +219,7 @@ function initMiniPlayer() {
         const setLiveMode = (isLive) => {
             if (!miniPlayerEl) return;
             const isolatedTrack = isDisplayAuxDanceTrackSrc(audio?.src);
+            if (!isLive) miniPlayerEl.classList.remove('toast-radio');
             if (seekEl) seekEl.disabled = isLive || isolatedTrack;
             if (isLive) {
                 miniPlayerEl.classList.add('live-stream');
@@ -282,6 +284,7 @@ function initMiniPlayer() {
                 const saved = JSON.parse(savedRaw);
                 if (saved && typeof saved === 'object') {
                     const savedIsolatedTrack = isDisplayAuxDanceTrackSrc(saved.src);
+                    const savedToastRadio = String(saved.artist || '').toLowerCase() === 'toast radio';
                     if (savedIsolatedTrack) fallbackSelectionRequired = true;
                     if (saved.src && !savedIsolatedTrack) audio.src = saved.src;
                     if (!savedIsolatedTrack && typeof saved.currentTime === 'number' && !Number.isNaN(saved.currentTime)) {
@@ -297,8 +300,9 @@ function initMiniPlayer() {
                         setNowPlayingTitle(saved.title, saved.artist || '');
                     }
                     if (!savedIsolatedTrack && saved.art && artEl) {
-                        artEl.src = saved.art;
+                        artEl.src = savedToastRadio ? TOAST_RADIO_ART : saved.art;
                     }
+                    if (savedToastRadio) setToastLiveControls(true);
                 }
             }
         } catch (_) { /* no-op */ }
@@ -1067,6 +1071,7 @@ function initMiniPlayer() {
             if (rawState && !document.body.classList.contains('bot-mode')) {
                 const state = JSON.parse(rawState);
                 if (state && state.src) {
+                    const stateIsToastRadio = String(state.artist || '').toLowerCase() === 'toast radio';
                     audio.src = state.src;
                     if (typeof state.volume === 'number' && volumeEl) {
                         audio.volume = Math.max(0, Math.min(1, state.volume));
@@ -1087,8 +1092,9 @@ function initMiniPlayer() {
                         }
                     }
                     if (artEl && state.art) {
-                        artEl.src = state.art;
+                        artEl.src = stateIsToastRadio ? TOAST_RADIO_ART : state.art;
                     }
+                    if (stateIsToastRadio) setToastLiveControls(true);
                     if (state.title) {
                         setNowPlayingTitle(state.title, state.artist || '');
                     }
@@ -1726,7 +1732,7 @@ async function playToastStreamInMiniPlayer(autoplay = true) {
         }
 
         const artEl = document.getElementById('mini-player-art');
-        const streamArt = 'https://images-ext-1.discordapp.net/external/S3f2i3R92rowfL9Uq5RmPFJtaqtluL-J7lVley9Ps7I/%3Fsize%3D4096/https/cdn.discordapp.com/avatars/1408177993284587794/2fd48df24ed679f3450b2532fce3f80b.png';
+        const streamArt = TOAST_RADIO_ART;
         if (artEl) {
             artEl.src = streamArt;
         }
@@ -1782,6 +1788,7 @@ function setToastLiveControls(isLive) {
     const downloadBtn = document.getElementById('mini-player-download');
     if (miniPlayerEl) {
         miniPlayerEl.classList.toggle('live-stream', !!isLive);
+        miniPlayerEl.classList.toggle('toast-radio', !!isLive);
         if (isLive) miniPlayerEl.classList.remove('mini-inactive');
     }
     if (seekEl) seekEl.style.display = isLive ? 'none' : '';

@@ -650,7 +650,7 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
             '/main.js' => '/main.js?v=20260909-toast-feed-reply-2',
             '/js/settings.js' => '/js/settings.js?v=20260909-mobile-abbr-tooltips-3',
             '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260812-unlocked-track-route-94',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260909-bot-mode-1',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260914-toast-art-1',
             '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
             '/js/bbcode.js' => '/js/bbcode.js?v=20260810-preview-mention-tooltips-1',
         ];
@@ -686,7 +686,7 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
         $template = preg_replace(
             '#(<link\b[^>]*\bhref=["\'])/style\.css(?:\?[^"\']*)?(["\'][^>]*>)#i',
-            '$1/style.css?v=toast-feed-reply-20260909-6$2',
+            '$1/style.css?v=toast-art-20260914-2$2',
             $template
         ) ?: $template;
 

@@ -19,15 +19,6 @@ function initToastDiscordBotPage() {
     const statusDiv = document.getElementById('stream-update-status');
     let lastLoggedBotStatus = null;
 
-    function setLiveControls(isLive) {
-        const miniPlayerEl = document.getElementById('mini-player');
-        const seekEl = document.getElementById('mini-player-seek');
-        const downloadBtn = document.getElementById('mini-player-download');
-        if (miniPlayerEl) miniPlayerEl.classList.toggle('live-stream', !!isLive);
-        if (seekEl) seekEl.style.display = isLive ? 'none' : '';
-        if (downloadBtn) downloadBtn.style.display = isLive ? 'none' : '';
-    }
-
     function applyManualStatus(isOnline) {
         if (statusDot) statusDot.style.background = isOnline ? '#6ccf6c' : '#cf6c6c';
         if (statusText) statusText.textContent = isOnline ? 'Online' : 'Offline';
@@ -178,7 +169,6 @@ function initToastDiscordBotPage() {
     }
 
     setStatusUI(false);
-    setLiveControls(false);
     updateNowPlaying();
     if (window.__toastStatusInterval) {
         clearInterval(window.__toastStatusInterval);

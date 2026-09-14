@@ -101,7 +101,7 @@ The bot provides:
 - Admin outbound DMs and role-wide messages
 - Deployment patch-notice approvals and publishing
 
-The public website UI at `/others/toast-discord-bot` shows status, controls, and stream playback. `/js/sidebar-player.js` integrates Toast listen-along playback with the normal site mini-player. Status and playback use `/api/discord-bot-status`, `/api/discord-bot-control`, `/api/discord-bot-control/status`, and the host-restricted same-origin `/api/stream-proxy`.
+The public website UI at `/others/toast-discord-bot` shows status, controls, and stream playback. Toast's profile, DM, and radio artwork uses `/resources/images/toast.svg` on a lightened version of the active theme background so its black artwork remains distinct. `/js/sidebar-player.js` integrates Toast listen-along playback with the normal site mini-player; because the radio is a live source, its seek and download controls stay hidden. Status and playback use `/api/discord-bot-status`, `/api/discord-bot-control`, `/api/discord-bot-control/status`, and the host-restricted same-origin `/api/stream-proxy`.
 
 ### Slash Commands
 

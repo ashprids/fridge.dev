@@ -7,7 +7,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
 require_once $sessionBootstrapDir . '/lib/session.php';
 fridg3_start_session();
 
-const TOAST_AVATAR_URL = 'https://images-ext-1.discordapp.net/external/S3f2i3R92rowfL9Uq5RmPFJtaqtluL-J7lVley9Ps7I/%3Fsize%3D4096/https/cdn.discordapp.com/avatars/1408177993284587794/2fd48df24ed679f3450b2532fce3f80b.png';
+const TOAST_AVATAR_URL = '/resources/images/toast.svg';
 
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
     header('Location: /account/login');

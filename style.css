@@ -17,6 +17,7 @@
 :root {
     --bg: #000000;
     --fg: rgb(238, 238, 238);
+    --toast-art-bg: color-mix(in srgb, var(--bg) 20%, #ffffff 80%);
     --border: rgb(60, 120, 149);
     --subtle: rgb(145, 125, 170);
     --links: rgb(65, 95, 173);
@@ -11021,6 +11022,16 @@ body .chat-view .chat-context-menu button {
 
 body .chat-view .chat-context-menu button + button {
     margin-top: 3px;
+}
+
+/* Toast Radio is a live source: its artwork follows the active theme and is never downloadable. */
+#mini-player.toast-radio #mini-player-art {
+    background-color: var(--toast-art-bg) !important;
+}
+
+#mini-player.toast-radio #mini-player-download {
+    display: none !important;
+    pointer-events: none !important;
 }
 
 /* Toast feed generation controls share the editor's responsive width. */
