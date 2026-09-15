@@ -2,9 +2,9 @@
     'use strict';
     if (window.fridgeBackupRestoreLoaded) return;
     window.fridgeBackupRestoreLoaded = true;
-    const endpoint = '/api/restore-backup/index.php';
+    const endpoint = '/api/restore-backup/';
     const developmentCopyMessage = 'the operation was cancelled because you selected a copy of /data/ intended for development only.\n\ndevelopment copies cannot be used as backups because confidental information (API keys, IPs, etc.) is redacted from them for privacy and security reasons.\n\nif you\'re a developer and you\'re trying to apply a specific version of development data, you can extract the zip file\'s "data" folder into the website root.';
-    let csrf = '', busy = false, selecting = false, popup = null, uploading = false, current = null;
+    let csrf = '', busy = false, selecting = false, popup = null, uploading = false, current = null, pollTimer = 0;
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const dismissed = id => { try { return sessionStorage.getItem(`restore-dismissed-${id}`) === '1'; } catch (_) { return false; } };
     async function request(action, data, query = '') {
@@ -106,6 +106,7 @@
             const result = await request('start', { name: file.name, size: file.size, fingerprint: identity });
             current = result;
             render(result);
+            schedulePoll();
             // Persisting a large File can take several seconds. It is useful for
             // automatic resumption, but must not delay the visible progress UI or upload.
             localFile('put', { id: result.state.id, file }).catch(() => {});
@@ -215,12 +216,22 @@
         } catch (_) { /* retain progress until the connection returns */ }
         finally { busy = false; }
     }
+    function schedulePoll(delay = 1500) {
+        if (pollTimer || !current?.active) return;
+        pollTimer = window.setTimeout(async () => {
+            pollTimer = 0;
+            await poll();
+            if (current?.active) schedulePoll();
+        }, delay);
+    }
     document.addEventListener('click', event => {
         if (!event.target.closest('[data-action="restore-backup"]')) return;
         event.preventDefault(); begin();
     });
     function init() {
-        poll(); setInterval(poll, 1500);
+        // Check once when settings opens (or when PHP injects this script for
+        // an active restore). Continue polling only while a job is active.
+        poll().then(schedulePoll);
         new MutationObserver(() => { if (current?.active) lockSettings(true); }).observe(document.body, { childList: true, subtree: true });
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();

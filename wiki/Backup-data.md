@@ -134,6 +134,11 @@ The final confirmation locks maintenance and creates one persistent restore job.
 
 Job state, the uploaded archive and the maintenance lock are stored outside the web root and outside `/data`, in a private `fridg3-restore-*` directory under PHP's temporary directory. Maintenance radios are disabled and other POST actions are blocked during the operation. Admin page navigation opens settings with the shared progress dialog; already-open admin pages also display it. Non-admins remain behind the server-side maintenance gate, including while `/data/etc/wip` is missing or being replaced. There is no cancel action after confirmation.
 
+The restore browser runtime is loaded on settings pages and while a restore is
+active. It makes one status request when initialized, then polls every 1.5
+seconds only for the duration of an active job. Once the job completes or no
+job is found, polling stops instead of contacting the restore API indefinitely.
+
 The selected file begins uploading directly after final confirmation and is also saved in browser IndexedDB for resumption. The IndexedDB copy runs in the background so a large archive cannot delay creation of the restore job, its progress popup, or its upload. Closing the browser necessarily pauses unfinished upload; returning to an admin page on the same origin resumes from the last acknowledged chunk. Another browser can resume by selecting the same archive using **resume upload**. Once uploaded, the background worker continues with no open browser required. The progress dialog uses the same themed track, animated inner bar, percentage, status line, and sizing as the developer-data copy dialog. If validation, disk access or the worker fails, maintenance stays on and the progress dialog provides **retry**. A successful restore removes the temporary ZIP, writes `false` to the restored maintenance flag and removes the external maintenance lock. The progress popup then shows **ok**, linking to the homepage.
 
 Runtime requirements: PHP CLI and the PHP Zip extension, a writable PHP temporary directory, writable `/data` contents, sufficient upload/extraction space, and a browser with IndexedDB and `DecompressionStream('deflate-raw')`. The ZIP reader uses no CDN libraries. Backup password hashes are read only in browser memory during counting and are not displayed or logged.

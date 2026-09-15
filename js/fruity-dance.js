@@ -1196,7 +1196,9 @@ function triggerDisplayAuxExitFault(signalLost = false) {
         signal.textContent = 'SIGNAL LOST';
         fault.appendChild(signal);
     }
-    document.body.appendChild(fault);
+    // Keep the terminal overlay outside the rotated body. Otherwise the
+    // detached-mode 180-degree transform also turns SIGNAL LOST upside down.
+    document.documentElement.appendChild(fault);
 
     const blockInput = event => {
         event.preventDefault();
@@ -1900,10 +1902,21 @@ function startFruityDance(prefs) {
             }
 
             if (controller.trackerActive && !controller.collisionLocked && !displayAuxBlueTerminalState) {
-                const targetX = controller.shadowKeyboardX;
-                const targetY = (Number.parseFloat(controller.reflection.dataset.detachedModeBaseTop) || 0) + controller.shadowKeyboardY;
-                const differenceX = targetX - controller.trackerX;
-                const differenceY = targetY - controller.trackerY;
+                // Track the rendered actors rather than their stored layout
+                // coordinates. Custom 1's fault animation displaces it, and
+                // the whole body is rotated, so layout-only pursuit drifts
+                // away from the shadow the user actually sees.
+                const trackingShadowRect = controller.reflection.getBoundingClientRect();
+                const trackingSpriteRect = controller.sprite.getBoundingClientRect();
+                const screenDifferenceX = trackingShadowRect.left + trackingShadowRect.width / 2
+                    - (trackingSpriteRect.left + trackingSpriteRect.width / 2);
+                const screenDifferenceY = trackingShadowRect.top + trackingShadowRect.height / 2
+                    - (trackingSpriteRect.top + trackingSpriteRect.height / 2);
+                const inverseRotation = -controller.pageRotation * Math.PI / 180;
+                const cosine = Math.cos(inverseRotation);
+                const sine = Math.sin(inverseRotation);
+                const differenceX = screenDifferenceX * cosine - screenDifferenceY * sine;
+                const differenceY = screenDifferenceX * sine + screenDifferenceY * cosine;
                 const distance = Math.max(0.001, Math.hypot(differenceX, differenceY));
                 const trackerSpeed = DISPLAY_AUX_TRACKER_SPEED;
                 const desiredVelocityX = differenceX / distance * trackerSpeed;
@@ -2116,7 +2129,7 @@ function startFruityDance(prefs) {
         const maximum = displayAuxVarianceLevel() === 10
             && controller.prefs.spritesheet === FRUITY_DANCE_CUSTOM_SPRITESHEET
             && !fruityDanceCustomImage;
-        if (onReflection && maximum && displayAuxCorruptedShadowLatched && normalized.reflection === 100) {
+        if (onReflection && maximum && displayAuxCorruptedShadowLatched && controller.prefs.reflection === 100) {
             controller.rotatingPage = true;
             controller.pointerId = event.pointerId;
             const rect = el.getBoundingClientRect();

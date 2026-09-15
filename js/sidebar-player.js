@@ -1356,7 +1356,6 @@ window.addEventListener('DOMContentLoaded', syncActiveChatSidebarButton);
 window.setInterval(syncActiveChatSidebarButton, 10000);
 window.addEventListener('resize', syncSidebarShortcutWidths);
 
-let notificationRevisionPollTimer = null;
 let notificationRevisionKnown = null;
 let notificationRevisionRequestActive = false;
 let notificationStreamRefreshTimer = null;
@@ -1780,15 +1779,13 @@ async function checkNotificationRevision() {
 window.addEventListener('DOMContentLoaded', async () => {
     await checkNotificationRevision();
     syncNotificationsSidebarButton({ initialPageLoad: true });
-    if (notificationRevisionPollTimer === null) {
-        notificationRevisionPollTimer = window.setInterval(checkNotificationRevision, 10000);
-    }
 });
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
         checkNotificationRevision();
     }
 });
+window.addEventListener('focus', checkNotificationRevision);
 
 // Footer active state based on current path
 function initFooterActiveState() {
