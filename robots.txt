@@ -1,0 +1,19 @@
+User-agent: *
+# Allow crawlers to see canonical/noindex tags; never block the mobile host.
+Disallow: /api/
+Disallow: /lib/
+Disallow: /scripts/
+Disallow: /.github/
+Disallow: /.nginx/
+Disallow: /data/accounts/
+Disallow: /data/etc/
+Disallow: /data/users/
+Disallow: /data/chat/
+Disallow: /data/contact/
+Disallow: /data/feed/replies/
+Disallow: /data/journal/drafts/
+Disallow: /data/guestbook/
+Disallow: /data/mdpaste/
+Disallow: /data/upload/
+
+Sitemap: https://fridge.dev/sitemap.xml
