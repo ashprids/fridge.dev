@@ -78,7 +78,7 @@ The shared renderer injects the active site notice for either logged-in users or
 
 All clicked `http(s)` links that leave `fridge.dev`, `www.fridge.dev`, or `m.fridge.dev` automatically show a safety popup before navigation. Use `data-no-external-popup` only for a deliberately exempt link, and document why because bypassing safety popups is usually sus.
 
-Cloudflare handles legacy `fridg3.org` redirects to `fridge.dev`. The redirect must add `legacy_domain=fridg3.org` to the destination URL so `main.js` can show the one-time rebrand popup; browser referrers are not reliable for detecting a 301 hop. After showing the popup, `main.js` removes the marker with `history.replaceState()`.
+Cloudflare handles legacy `fridg3.org` redirects to `fridge.dev`. The redirect must add `legacy_domain=fridg3.org` to the destination URL. The server immediately redirects to the clean canonical URL and carries the one-time rebrand popup signal in a short-lived cookie; browser referrers are not reliable for detecting a 301 hop. `main.js` consumes and expires that cookie after showing the popup.
 
 Cloudflare dynamic redirects need two rules because the target URL expression editor supports `concat(...)` but not `if(...)`.
 

@@ -60,7 +60,7 @@ function restricted_ips_live_content(string $ip): array {
         $position = array_search(fridge_guestbook_dir() . DIRECTORY_SEPARATOR . $entryFile, $guestbookFiles, true);
         $page = $position === false ? 1 : ((int)floor($position / 10) + 1);
         $anchor = 'guestbook-entry-' . preg_replace('/[^a-zA-Z0-9_-]/', '-', pathinfo($entryFile, PATHINFO_FILENAME));
-        $items[] = ['type' => 'guestbook', 'id' => $entryFile, 'username' => (string)($entry['name'] ?? ''), 'date' => (string)($entry['timestamp'] ?? ''), 'body' => (string)($entry['message'] ?? ''), 'format' => 'plain', 'url' => '/guestbook?page=' . $page . '#' . $anchor, 'archived' => false];
+        $items[] = ['type' => 'guestbook', 'id' => $entryFile, 'username' => (string)($entry['name'] ?? ''), 'date' => (string)($entry['timestamp'] ?? ''), 'body' => (string)($entry['message'] ?? ''), 'format' => 'plain', 'url' => '/guestbook/?page=' . $page . '#' . $anchor, 'archived' => false];
     }
     return $items;
 }

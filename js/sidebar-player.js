@@ -1864,7 +1864,7 @@ async function playToastStreamInMiniPlayer(autoplay = true) {
 
         const audio = document.getElementById('mini-player-audio');
         if (!audio) {
-            window.location.href = '/music';
+            window.location.href = '/music/';
             return;
         }
 

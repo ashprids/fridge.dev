@@ -2,7 +2,7 @@
 
 ## Search appearance
 
-The homepage title is `fridge.dev`. Its longer description introduces the personal website, music, journal, feed, browser tools, Minecraft archive, and other independent projects. The homepage introduction links to the main public sections with descriptive link text, and the ASCII logo has a named level-one heading role. Decorative ASCII and live server statistics are excluded from search snippets using `data-nosnippet`.
+The homepage title is `fridge.dev`. Its longer metadata description introduces the personal website, music, journal, feed, browser tools, Minecraft archive, and other independent projects. The matching HTML paragraph is hidden and occupies no layout space, so it should not be treated as an indexing signal. The ASCII logo has a named level-one heading role. Decorative ASCII and live server statistics are excluded from search snippets using `data-nosnippet`.
 
 Google chooses sitelinks automatically from its understanding of a site's structure and the search query. No tag, sitemap field, or schema can force the two-column links shown beneath some branded results. Clear titles, useful descriptions, consistent navigation, and crawlable public pages support eligibility. See [Google's sitelink guidance](https://developers.google.com/search/docs/appearance/sitelinks).
 
@@ -27,7 +27,22 @@ Shared-domain cookies survive the host move. Host-specific browser storage, such
 
 Canonical links normalize `/index.php`, trailing-slash aliases, legacy feed `?=id` links, and journal `?post=id` links. Genuine listing page numbers retain their own canonical URLs; wiki document queries retain their identity. Tracking parameters do not create extra canonical URLs.
 
+The shared request canonicalizer permanently redirects browser requests to the
+preferred form. It removes `legacy_domain`, collapses listing `page=1`, maps
+`wiki?page=Home` to `/wiki/`, adds trailing slashes to public directory pages,
+and removes them from individual feed and journal post URLs. Nginx routes
+no-slash public aliases through this canonicalizer so several corrections are
+combined into one redirect. Internal navigation and pagination should link
+directly to these canonical forms.
+
 Redirects, canonical links, and sitemap inclusion reinforce one another. Google still makes the final canonical selection, and existing mobile results disappear only after recrawling. Do not block the old host in robots.txt: crawlers must see its redirect. See [Google's canonicalization guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls).
+
+Search Console's **Page with redirect** status is expected for an HTTP URL, a
+`www` URL, a no-slash alias, `page=1`, or a URL containing the old-domain
+marker. Google indexes the final `200` target instead of every alias. Account,
+settings, bookmarks, chats and other private pages remain intentionally
+`noindex`; they are not sitemap candidates even if Search Console has
+discovered their URLs.
 
 ## Indexing policy
 

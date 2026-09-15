@@ -632,7 +632,7 @@ if (empty($matchingIps)) {
                 $content .= '<div class="feed-reply">'
                     . '<div class="feed-reply-header">'
                     . '<span class="feed-reply-username"><em>' . $entryName . '</em></span>'
-                    . '<span class="feed-reply-date" data-exact-datetime="' . htmlspecialchars($entryDateRaw, ENT_QUOTES, 'UTF-8') . '">' . $entryDate . ' <a class="site-icon-button" href="/guestbook" data-tooltip="view post" aria-label="view post"><i class="fa-solid fa-eye"></i></a></span>'
+                    . '<span class="feed-reply-date" data-exact-datetime="' . htmlspecialchars($entryDateRaw, ENT_QUOTES, 'UTF-8') . '">' . $entryDate . ' <a class="site-icon-button" href="/guestbook/" data-tooltip="view post" aria-label="view post"><i class="fa-solid fa-eye"></i></a></span>'
                     . '</div>'
                     . '<div class="post-content feed-reply-body">' . $entryBody . '</div>'
                     . '</div>';

@@ -42,7 +42,7 @@ function render_journal_pagination(int $currentPage, int $totalPages, string $se
         return '';
     }
     $query = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
-    $pageUrl = static fn(int $page): string => '/journal?page=' . $page . $query . '#content-footer';
+    $pageUrl = static fn(int $page): string => '/journal/?page=' . $page . $query . '#content-footer';
     $items = $currentPage > 1
         ? '<a class="guestbook-page-btn pagination-arrow" href="' . $pageUrl($currentPage - 1) . '" aria-label="previous page">&lsaquo;</a>'
         : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';
@@ -64,7 +64,7 @@ function render_journal_pagination(int $currentPage, int $totalPages, string $se
     $items .= $currentPage < $totalPages
         ? '<a class="guestbook-page-btn pagination-arrow" href="' . $pageUrl($currentPage + 1) . '" aria-label="next page">&rsaquo;</a>'
         : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&rsaquo;</span>';
-    return '<nav class="guestbook-pagination content-pagination" aria-label="journal pages" data-pagination-route="/journal" data-pagination-current="' . $currentPage . '" data-pagination-total="' . $totalPages . '" data-pagination-search="' . htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') . '">' . $items . '</nav>';
+    return '<nav class="guestbook-pagination content-pagination" aria-label="journal pages" data-pagination-route="/journal/" data-pagination-current="' . $currentPage . '" data-pagination-total="' . $totalPages . '" data-pagination-search="' . htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') . '">' . $items . '</nav>';
 }
 
 
@@ -277,7 +277,7 @@ if (!$canCreateJournal) {
 }
 
 // Point search form to /journal and retain search value
-$content = preg_replace('#<form id="search"[^>]*action="/feed"#i', '<form id="search" action="/journal"', $content);
+$content = preg_replace('#<form id="search"[^>]*action="/feed"#i', '<form id="search" action="/journal/"', $content);
 $searchQueryEsc = htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8');
 $content = preg_replace('#<input id="search-box" name="q" type="text" placeholder="search\.\.\.">#i', '<input id="search-box" name="q" type="text" placeholder="search..." value="' . $searchQueryEsc . '">', $content);
 // Replace the posts grid with generated items

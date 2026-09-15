@@ -667,16 +667,16 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridge_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/main.js' => '/main.js?v=20260915-namespace-1',
-            '/js/settings.js' => '/js/settings.js?v=20260915-namespace-1',
-            '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260915-namespace-1',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260915-namespace-1',
-            '/js/bookmarks.js' => '/js/bookmarks.js?v=20260915-namespace-1',
-            '/js/bbcode.js' => '/js/bbcode.js?v=20260915-namespace-1',
+            '/main.js' => '/main.js?v=20260915-canonical-1',
+            '/js/settings.js' => '/js/settings.js?v=20260915-canonical-1',
+            '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260915-canonical-1',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260915-canonical-1',
+            '/js/bookmarks.js' => '/js/bookmarks.js?v=20260915-canonical-1',
+            '/js/bbcode.js' => '/js/bbcode.js?v=20260915-canonical-1',
         ];
 
         $missing = [];
-        if (!empty($_SESSION['user']['isAdmin'])) $scripts['/js/backup-restore.js'] = '/js/backup-restore.js?v=20260915-namespace-1';
+        if (!empty($_SESSION['user']['isAdmin'])) $scripts['/js/backup-restore.js'] = '/js/backup-restore.js?v=20260915-canonical-1';
         foreach ($scripts as $detectPath => $src) {
             $template = preg_replace(
                 '#(<scr' . 'ipt\b[^>]*\bsrc=["\'])' . preg_quote($detectPath, '#') . '(?:\?[^"\']*)?(["\'][^>]*></scr' . 'ipt>)#i',

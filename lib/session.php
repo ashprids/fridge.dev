@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
+require_once __DIR__ . '/canonical.php';
 require_once __DIR__ . '/bot-mode.php';
 require_once __DIR__ . '/backup-restore.php';
 
@@ -293,6 +294,7 @@ if (!function_exists('fridge_session_enforce_work_in_progress')) {
 if (!function_exists('fridge_start_session')) {
     function fridge_start_session(bool $enforceAccessRules = true): void
     {
+        fridge_redirect_canonical_request();
         if (session_status() === PHP_SESSION_ACTIVE) {
             if ($enforceAccessRules) fridge_enforce_bot_mode();
             return;

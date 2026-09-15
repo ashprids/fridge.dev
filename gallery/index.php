@@ -131,13 +131,13 @@ if (is_dir($imagesDir)) {
 
     if ($totalPages > 1) {
         $items = $page > 1
-            ? '<a class="guestbook-page-btn pagination-arrow" href="/gallery?page=' . ($page - 1) . '#content-footer" aria-label="previous page">&lsaquo;</a>'
+            ? '<a class="guestbook-page-btn pagination-arrow" href="/gallery/?page=' . ($page - 1) . '#content-footer" aria-label="previous page">&lsaquo;</a>'
             : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';
         $items .= '<span class="guestbook-page-btn current" aria-current="page">' . $page . '</span>';
         $items .= $page < $totalPages
-            ? '<a class="guestbook-page-btn pagination-arrow" href="/gallery?page=' . ($page + 1) . '#content-footer" aria-label="next page">&rsaquo;</a>'
+            ? '<a class="guestbook-page-btn pagination-arrow" href="/gallery/?page=' . ($page + 1) . '#content-footer" aria-label="next page">&rsaquo;</a>'
             : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&rsaquo;</span>';
-        $paginationHtml = '<nav class="guestbook-pagination content-pagination" aria-label="gallery pages" data-pagination-route="/gallery" data-pagination-current="' . $page . '" data-pagination-total="' . $totalPages . '" data-pagination-search="">' . $items . '</nav>';
+        $paginationHtml = '<nav class="guestbook-pagination content-pagination" aria-label="gallery pages" data-pagination-route="/gallery/" data-pagination-current="' . $page . '" data-pagination-total="' . $totalPages . '" data-pagination-search="">' . $items . '</nav>';
     }
 }
 

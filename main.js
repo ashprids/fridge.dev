@@ -1629,10 +1629,12 @@ function consumeLegacyDomainRedirectNotice() {
     try {
         const currentUrl = new URL(window.location.href);
         const marker = currentUrl.searchParams.get('legacy_domain');
-        if (marker !== 'fridg3.org') return;
+        const hasServerMarker = document.cookie.split(';').some(value => value.trim() === 'legacy_domain_notice=1');
+        if (marker !== 'fridg3.org' && !hasServerMarker) return;
 
         currentUrl.searchParams.delete('legacy_domain');
         window.history.replaceState(window.history.state, document.title, currentUrl.toString());
+        document.cookie = `legacy_domain_notice=; Path=/; Max-Age=0; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
 
         showSitePopup({
             title: 'heads up!',

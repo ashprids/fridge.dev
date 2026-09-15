@@ -345,7 +345,7 @@ $contactCooldownRemaining = $contactBypassesIpRestrictions ? 0 : contact_cooldow
 if (isset($_GET['dashboard'])) {
     if (!contact_user_is_admin()) {
         http_response_code(403);
-        contact_render_page('contact dashboard', 'admin-only contact submissions.', '<h1>contact dashboard</h1><h2>admin access required.</h2><br><p><a href="/contact">back to contact</a></p>');
+        contact_render_page('contact dashboard', 'admin-only contact submissions.', '<h1>contact dashboard</h1><h2>admin access required.</h2><br><p><a href="/contact/">back to contact</a></p>');
         exit;
     }
 
@@ -403,7 +403,7 @@ if (isset($_GET['dashboard'])) {
     $content = '<h1>contact dashboard</h1><h2>admin-only contact submissions.</h2><br>'
         . $notice
         . ($cards === [] ? '<p>no contact submissions... yet.</p>' : '<div class="account-admin-list">' . implode('', $cards) . '</div>')
-        . '<br><p><a href="/contact">back to contact form</a></p>';
+        . '<br><p><a href="/contact/">back to contact form</a></p>';
     contact_render_page('contact dashboard', 'admin-only contact submissions.', $content);
     exit;
 }
@@ -512,7 +512,7 @@ $sendButtonTooltip = $contactCooldownRemaining > 0
     ? 'all users are placed on a 6 hour cooldown to prevent spam'
     : 'send this contact submission';
 $adminButton = contact_user_is_admin()
-    ? '<a id="two-buttons" href="/contact?dashboard=1">open contact dashboard</a>'
+    ? '<a id="two-buttons" href="/contact/?dashboard=1">open contact dashboard</a>'
     : '';
 $notice = '';
 if (isset($_GET['sent'])) {

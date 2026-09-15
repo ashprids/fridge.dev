@@ -137,6 +137,15 @@ server {
         fastcgi_pass unix:/run/php-fpm/php-fpm.sock;
     }
 
+    # Route no-slash public aliases through the shared canonicalizer. This
+    # combines slash and query cleanup into one permanent redirect.
+    location ~ ^/(feed|gallery|guestbook|journal|merch|music|others|tools|wiki|discord)$ {
+        rewrite ^/([^/]+)$ /$1/index.php?$args last;
+    }
+    location ~ ^/(others/(?:firefox-theme|fridge-builds-websites|minecraft-archive|toast-discord-bot)|tools/(?:discord-export-viewer|upload))$ {
+        rewrite ^/(.+)$ /$1/index.php?$args last;
+    }
+
     # Feed clean URLs
     location ~ ^/feed/posts/[^/]+$ {
         rewrite ^/feed/posts/(.+)$ /feed/posts/index.php?post=$1 last;

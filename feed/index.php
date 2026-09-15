@@ -19,7 +19,7 @@ function render_feed_pagination(int $currentPage, int $totalPages, string $searc
         return '';
     }
     $query = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
-    $pageUrl = static fn(int $page): string => '/feed?page=' . $page . $query . '#content-footer';
+    $pageUrl = static fn(int $page): string => '/feed/?page=' . $page . $query . '#content-footer';
     $items = $currentPage > 1
         ? '<a class="guestbook-page-btn pagination-arrow" href="' . $pageUrl($currentPage - 1) . '" aria-label="previous page">&lsaquo;</a>'
         : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';
@@ -41,7 +41,7 @@ function render_feed_pagination(int $currentPage, int $totalPages, string $searc
     $items .= $currentPage < $totalPages
         ? '<a class="guestbook-page-btn pagination-arrow" href="' . $pageUrl($currentPage + 1) . '" aria-label="next page">&rsaquo;</a>'
         : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&rsaquo;</span>';
-    return '<nav class="guestbook-pagination content-pagination" aria-label="feed pages" data-pagination-route="/feed" data-pagination-current="' . $currentPage . '" data-pagination-total="' . $totalPages . '" data-pagination-search="' . htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') . '">' . $items . '</nav>';
+    return '<nav class="guestbook-pagination content-pagination" aria-label="feed pages" data-pagination-route="/feed/" data-pagination-current="' . $currentPage . '" data-pagination-total="' . $totalPages . '" data-pagination-search="' . htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') . '">' . $items . '</nav>';
 }
 
 

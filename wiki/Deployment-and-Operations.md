@@ -92,7 +92,7 @@ Nginx uses `client_max_body_size 0` and the repo-root `.user.ini` disables PHP's
 
 Production must provision `data/audio/uploads/` and `data/video/` as writable by the PHP-FPM `http` user. Failed mixed-media submissions call the shared media cleanup helper so successfully moved files are removed before the request redirects with an upload error.
 
-Legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled in Cloudflare, not Nginx. The redirect must append `legacy_domain=fridg3.org`; the frontend consumes that marker for the one-time rebrand popup and then removes it from the URL.
+Legacy `fridg3.org`, `www.fridg3.org`, and `m.fridg3.org` redirects are handled in Cloudflare, not Nginx. The redirect must append `legacy_domain=fridg3.org`; PHP removes it with a permanent redirect to the clean canonical URL and uses a short-lived cookie to preserve the one-time rebrand popup.
 
 ## Nginx Clean URLs
 

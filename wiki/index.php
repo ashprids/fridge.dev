@@ -131,7 +131,7 @@ function wiki_normalize_page_slug($rawValue) {
 }
 
 function wiki_slug_to_url($slug) {
-    return '/wiki?page=' . rawurlencode((string)$slug);
+    return '/wiki/?page=' . rawurlencode((string)$slug);
 }
 
 function wiki_render_inline_markdown($text) {
@@ -461,7 +461,7 @@ foreach ($pages as $page) {
     $mobilePageLinks[] = '<a class="mobile-nav-link" href="' . $href . '"><div id="tab" class="mobile-nav-button wiki-nav-button' . $activeClass . '">' . $label . '</div></a>';
 }
 
-$desktopNavigationPattern = '#(<div id="header">.*?</div>\s*)(?:<a href="/feed">.*?<a href="/others"><div id="tab".*?</div></a>)(\s*\{user_greeting\})#s';
+$desktopNavigationPattern = '#(<div id="header">.*?</div>\s*)(?:<a href="/feed/">.*?<a href="/others/"><div id="tab".*?</div></a>)(\s*\{user_greeting\})#s';
 $mobileNavigationPattern = '#<div class="mobile-nav-grid">.*?</div>\s*(\{user_greeting\})#s';
 
 if (strpos($template, 'class="mobile-nav-grid"') !== false) {

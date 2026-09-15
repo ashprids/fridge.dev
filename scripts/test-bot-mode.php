@@ -16,7 +16,7 @@ foreach (['template.html', 'template_mobile.html', 'themes/lib/nord/theme.html',
     $html = fridge_bot_mode_template(file_get_contents(dirname(__DIR__) . '/' . $file));
     botCheck(str_contains($html, 'id="bot-mode-banner"'), 'missing banner: ' . $file);
     botCheck((bool)preg_match('/<body[^>]*class="bot-mode(?: |")/', $html), 'missing mode class');
-    botCheck((bool)preg_match('~<a[^>]*href="/contact"[^>]*aria-disabled="true"~', $html), 'contact is not disabled');
-    botCheck(!(bool)preg_match('~<a[^>]*href="/feed"[^>]*aria-disabled~', $html), 'feed is disabled');
+    botCheck((bool)preg_match('~<a[^>]*href="/contact/"[^>]*aria-disabled="true"~', $html), 'contact is not disabled');
+    botCheck(!(bool)preg_match('~<a[^>]*href="/feed/"[^>]*aria-disabled~', $html), 'feed is disabled');
 }
 echo "Bot mode identity, path policy, and desktop/mobile shell checks passed.\n";
