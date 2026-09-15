@@ -158,7 +158,13 @@ function fridge_seo_template(string $template, string $root, string $uri, bool $
     $meta = fridge_seo_metadata($root, $uri);
     $indexable = $meta['public'] && !$development && (http_response_code() ?: 200) < 400;
     // Replace only shell metadata, never page-body content or user input.
-    $title = $meta['title'] === '' ? '{title} | fridge.dev' : fridge_seo_escape($meta['title'] . ($meta['path'] === '/' ? '' : ' | fridge.dev'));
+    // Keep the site's original route-generated browser titles. Richer titles
+    // remain available to social cards and structured data without replacing
+    // the familiar tab/history labels.
+    $title = $meta['path'] === '/' ? 'fridge.dev' : '{title} | fridge.dev';
+    $socialTitle = $meta['title'] === ''
+        ? '{title} | fridge.dev'
+        : fridge_seo_escape($meta['title'] . ($meta['path'] === '/' ? '' : ' | fridge.dev'));
     $description = $meta['description'] === '' ? '{description}' : fridge_seo_escape($meta['description']);
     $robots = $indexable ? 'index, follow, max-image-preview:large' : 'noindex, follow';
     $tags = '<title data-fridge-seo>' . $title . '</title>' . "\n"
@@ -166,12 +172,12 @@ function fridge_seo_template(string $template, string $root, string $uri, bool $
         . '<meta data-fridge-seo name="robots" content="' . $robots . '">' . "\n";
     if ($meta['public']) {
         $tags .= '<link data-fridge-seo rel="canonical" href="' . fridge_seo_escape($meta['canonical']) . '">' . "\n";
-        $social = ['og:site_name' => 'fridge.dev', 'og:title' => html_entity_decode($title, ENT_QUOTES, 'UTF-8'),
+        $social = ['og:site_name' => 'fridge.dev', 'og:title' => html_entity_decode($socialTitle, ENT_QUOTES, 'UTF-8'),
             'og:description' => $meta['description'], 'og:url' => $meta['canonical'],
             'og:type' => in_array($meta['type'], ['BlogPosting', 'SocialMediaPosting'], true) ? 'article' : 'website',
             'og:image' => $meta['image'], 'og:image:alt' => $meta['imageAlt'], 'og:locale' => 'en_GB'];
         foreach ($social as $property => $value) $tags .= '<meta data-fridge-seo property="' . $property . '" content="' . fridge_seo_escape($value) . '">' . "\n";
-        foreach (['card' => 'summary', 'title' => html_entity_decode($title, ENT_QUOTES, 'UTF-8'), 'description' => $meta['description'], 'image' => $meta['image'], 'image:alt' => $meta['imageAlt']] as $property => $value) {
+        foreach (['card' => 'summary', 'title' => html_entity_decode($socialTitle, ENT_QUOTES, 'UTF-8'), 'description' => $meta['description'], 'image' => $meta['image'], 'image:alt' => $meta['imageAlt']] as $property => $value) {
             $tags .= '<meta data-fridge-seo name="twitter:' . $property . '" content="' . fridge_seo_escape($value) . '">' . "\n";
         }
     }

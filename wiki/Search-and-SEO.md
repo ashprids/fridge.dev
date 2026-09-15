@@ -10,7 +10,8 @@ Google chooses sitelinks automatically from its understanding of a site's struct
 
 `lib/seo.php` is called by `apply_preferred_theme_stylesheet()` in `lib/render.php`, before route placeholders are filled. It builds metadata on the server for both mobile and desktop templates and every packaged theme:
 
-- Distinct public-page titles and descriptions, stored in `fridge_seo_page_copy()`
+- Original route-generated browser titles, including `feed | fridge.dev` and each post's existing title
+- Richer public-page social/schema titles and descriptions, stored in `fridge_seo_page_copy()`
 - Canonical URLs on `https://fridge.dev`, independent of the visitor's host
 - Open Graph and Twitter cards with absolute URLs, site identity, descriptions, and preview images
 - `WebSite`, page, and breadcrumb JSON-LD; journal posts use `BlogPosting` and feed entries use `SocialMediaPosting`

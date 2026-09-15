@@ -28,6 +28,10 @@ try {
         seo_check(str_contains($html, 'rel="canonical" href="https://fridge.dev/"'), 'home canonical incorrect');
         seo_check(!str_contains($html, 'm.fridge.dev'), 'mobile URL leaked into metadata');
     }
+    $feedHtml = fridge_seo_template($shell, $root, '/feed/');
+    $feedHtml = str_replace('{title}', 'feed', $feedHtml);
+    seo_check(str_contains($feedHtml, '<title data-fridge-seo>feed | fridge.dev</title>'), 'route title was replaced by SEO copy');
+    seo_check(str_contains($feedHtml, 'property="og:title" content="Feed: updates and conversations | fridge.dev"'), 'social title lost');
     $cases = [
         '/feed/?page=2&utm_source=test' => '/feed/?page=2',
         '/feed/index.php?page=1' => '/feed/',
