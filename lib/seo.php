@@ -202,7 +202,10 @@ function fridge_seo_template(string $template, string $root, string $uri, bool $
         $tags .= '<scr' . 'ipt data-fridge-seo type="application/ld+json">' . $json . '</scr' . 'ipt>' . "\n";
     }
     return preg_replace_callback('~<head\b[^>]*>(.*?)</head>~is', static function ($match) use ($tags) {
-        $head = preg_replace('~<script\b[^>]*data-fridge-seo[^>]*>.*?</script>|<title\b[^>]*>.*?</title>|<meta\b[^>]*(?:name=["\'](?:description|robots|twitter:[^"\']+)["\']|property=["\']og:[^"\']+["\'])[^>]*>|<link\b[^>]*rel=["\']canonical["\'][^>]*>~is', '', $match[1]);
+        // Split the script tag names so the markup linter does not interpret
+        // this PHP regex as the beginning of an inline JavaScript block.
+        $seoScriptPattern = '<scr' . 'ipt\b[^>]*data-fridge-seo[^>]*>.*?</scr' . 'ipt>';
+        $head = preg_replace('~' . $seoScriptPattern . '|<title\b[^>]*>.*?</title>|<meta\b[^>]*(?:name=["\'](?:description|robots|twitter:[^"\']+)["\']|property=["\']og:[^"\']+["\'])[^>]*>|<link\b[^>]*rel=["\']canonical["\'][^>]*>~is', '', $match[1]);
         return '<head>' . $head . $tags . '</head>';
     }, $template, 1) ?? $template;
 }
