@@ -1,12 +1,12 @@
 <?php
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
-fridg3_start_session();
+fridge_start_session();
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
-$pythonLogs = fridg3_toast_is_current_user();
+$pythonLogs = fridge_toast_is_current_user();
 $isAdmin = ($_SESSION['user']['isAdmin'] ?? false) === true;
 if (!$pythonLogs && !$isAdmin) {
     http_response_code(403);

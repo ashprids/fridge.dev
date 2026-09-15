@@ -20,6 +20,8 @@ body.gruvbox-theme :is(
     box-shadow: none !important;
 }
 
+body.gruvbox-theme button.site-action-menu-item{background:transparent!important;color:var(--fg)!important;border:0!important;border-radius:2px!important}body.gruvbox-theme button.site-action-menu-item:hover{background:color-mix(in srgb,var(--links) 22%,transparent)!important;color:var(--fg)!important}body.gruvbox-theme .site-icon-button{background:transparent!important;color:var(--subtle)!important;border:0!important}
+
 body.gruvbox-theme :is(select, .dropdown, .bbcode-dropdown) option {
     background: var(--theme-input);
     color: var(--theme-ink);
@@ -31,7 +33,7 @@ body.gruvbox-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-
 }
 
 body.gruvbox-theme :is(
-    button:where(:not(#mdpaste-font-toggle)),
+    button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)),
     #search-button,
     #form-button,
     #two-buttons,
@@ -53,8 +55,12 @@ body.gruvbox-theme :is(
         color var(--theme-transition-duration) ease;
 }
 
+body.gruvbox-theme .bbcode-btn {
+    background: var(--theme-surface) !important;
+}
+
 body.gruvbox-theme :is(
-    button:where(:not(#mdpaste-font-toggle)),
+    button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)),
     #search-button,
     #form-button,
     #two-buttons,

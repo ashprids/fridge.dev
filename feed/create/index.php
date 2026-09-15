@@ -5,10 +5,10 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
-fridg3_feed_refresh_session_user();
+fridge_feed_refresh_session_user();
 
 // Require logged-in user with permission to create posts
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -20,8 +20,8 @@ if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 $allowedPages = $_SESSION['user']['allowedPages'] ?? [];
 $canCreatePost = $isAdmin || in_array('feed', $allowedPages);
-$isToast = fridg3_toast_is_current_user();
-$postingRestricted = fridg3_current_user_posting_restricted();
+$isToast = fridge_toast_is_current_user();
+$postingRestricted = fridge_current_user_posting_restricted();
 
 if (!$canCreatePost) {
     header('Location: /feed');
@@ -38,7 +38,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && str_contains((string)($_
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
             'ok' => true,
-            'html' => fridg3_feed_render_post_body((string)($payload['markdown'] ?? ''), 'v2'),
+            'html' => fridge_feed_render_post_body((string)($payload['markdown'] ?? ''), 'v2'),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -131,24 +131,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $displayDateTime = date('Y-m-d H:i:s');
 
     $imageMap = isset($_FILES['images']) && is_array($_FILES['images'])
-        ? fridg3_feed_process_uploaded_media($_FILES['images'])
+        ? fridge_feed_process_uploaded_media($_FILES['images'])
         : [];
     $voiceMap = isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])
-        ? fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes'])
+        ? fridge_feed_process_uploaded_voice_notes($_FILES['voice_notes'])
         : [];
 
     // Build post file content
     $safeContent = $content; // store raw; renderer can sanitize/format later
-    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap, true);
-    $safeContent = fridg3_feed_replace_voice_placeholders($safeContent, $voiceMap, true);
+    $safeContent = fridge_feed_replace_media_placeholders($safeContent, $imageMap, true);
+    $safeContent = fridge_feed_replace_voice_placeholders($safeContent, $voiceMap, true);
     if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $safeContent) === 1) {
-        fridg3_feed_delete_media_files_from_content($safeContent);
+        fridge_feed_delete_media_files_from_content($safeContent);
         header('Location: /feed/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
         exit;
     }
     if (preg_match('/\[voice:\d+\]/i', $safeContent) === 1) {
         foreach ($voiceMap as $voice) {
-            fridg3_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
+            fridge_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
         }
         header('Location: /feed/create?error=' . rawurlencode('voice note failed. keep it under 2 minutes and try again.'));
         exit;
@@ -156,13 +156,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $text = 'v2' . PHP_EOL . '@' . $username . PHP_EOL . $displayDateTime . PHP_EOL . $safeContent . PHP_EOL;
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $timestampFilename . '.txt';
     $postSaved = file_put_contents($postFile, $text) !== false;
-    if ($postSaved) fridg3_notification_revision_touch();
-    if ($postSaved) fridg3_feed_record_post_ip($timestampFilename, (string)$username, fridg3_feed_client_ip());
-    fridg3_debug_submission_log('[SUBMISSION] feed post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . (count($imageMap) + count($voiceMap)));
+    if ($postSaved) fridge_notification_revision_touch();
+    if ($postSaved) fridge_feed_record_post_ip($timestampFilename, (string)$username, fridge_feed_client_ip());
+    fridge_debug_submission_log('[SUBMISSION] feed post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . (count($imageMap) + count($voiceMap)));
 
     $shouldQueueToastAutoReply = (
         strcasecmp((string)$username, 'toast') !== 0
-        && fridg3_toast_feed_mentions_toast($safeContent)
+        && fridge_toast_feed_mentions_toast($safeContent)
     );
 
     // Send Discord webhook notification
@@ -200,13 +200,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $toastReplyPostUsername = (string)$username;
         $toastReplyPostDate = $displayDateTime;
         $toastReplyPostBody = $safeContent;
-        fridg3_toast_run_auto_reply_after_response(static function () use (
+        fridge_toast_run_auto_reply_after_response(static function () use (
             $toastReplyPostId,
             $toastReplyPostUsername,
             $toastReplyPostDate,
             $toastReplyPostBody
         ): void {
-            fridg3_toast_maybe_auto_reply_to_feed(
+            fridge_toast_maybe_auto_reply_to_feed(
                 $toastReplyPostId,
                 $toastReplyPostUsername,
                 $toastReplyPostDate,
@@ -214,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [
                     'username' => $toastReplyPostUsername,
                     'body' => $toastReplyPostBody,
+                    'type' => 'post',
                 ]
             );
         });
@@ -313,8 +314,8 @@ if ($isToast) {
     $content = preg_replace('/(<div\b[^>]*class="[^"]*\bbbcode-editor\b[^"]*"[^>]*>)/', $toastGeneratorControls . '$1', $content, 1);
 }
 if ($postingRestricted) {
-    $content = fridg3_disable_composer_controls($content);
-    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
+    $content = fridge_disable_composer_controls($content);
+    $content = str_replace('<form id="create-post-form"', fridge_posting_restriction_notice() . '<form id="create-post-form"', $content);
 }
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

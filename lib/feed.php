@@ -5,87 +5,124 @@ require_once __DIR__ . '/notification-revision.php';
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
 
-if (!function_exists('fridg3_feed_find_root')) {
-    function fridg3_feed_find_root(): string
+if (!function_exists('fridge_feed_find_root')) {
+    function fridge_feed_find_root(): string
     {
         return dirname(__DIR__);
     }
 }
 
-if (!function_exists('fridg3_feed_posts_dir')) {
-    function fridg3_feed_posts_dir(): string
+if (!function_exists('fridge_feed_posts_dir')) {
+    function fridge_feed_posts_dir(): string
     {
-        return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed';
+        return fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed';
     }
 }
 
-if (!function_exists('fridg3_feed_replies_dir')) {
-    function fridg3_feed_replies_dir(): string
+if (!function_exists('fridge_feed_replies_dir')) {
+    function fridge_feed_replies_dir(): string
     {
-        return fridg3_feed_posts_dir() . DIRECTORY_SEPARATOR . 'replies';
+        return fridge_feed_posts_dir() . DIRECTORY_SEPARATOR . 'replies';
     }
 }
 
-if (!function_exists('fridg3_feed_images_dir')) {
-    function fridg3_feed_images_dir(): string
+if (!function_exists('fridge_feed_images_dir')) {
+    function fridge_feed_images_dir(): string
     {
-        return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images';
+        return fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images';
     }
 }
 
-if (!function_exists('fridg3_feed_voice_dir')) {
-    function fridg3_feed_voice_dir(): string
+if (!function_exists('fridge_feed_voice_dir')) {
+    function fridge_feed_voice_dir(): string
     {
-        return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'audio' . DIRECTORY_SEPARATOR . 'voice';
+        return fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'audio' . DIRECTORY_SEPARATOR . 'voice';
     }
 }
 
-if (!function_exists('fridg3_feed_banned_ips_path')) {
-    function fridg3_feed_banned_ips_path(): string
+if (!function_exists('fridge_feed_banned_ips_path')) {
+    function fridge_feed_banned_ips_path(): string
     {
-        return fridg3_feed_posts_dir() . DIRECTORY_SEPARATOR . 'banned_ips.json';
+        return fridge_feed_posts_dir() . DIRECTORY_SEPARATOR . 'banned_ips.json';
     }
 }
 
-function fridg3_feed_post_ips_path(): string { return fridg3_feed_posts_dir() . DIRECTORY_SEPARATOR . 'post_ips.json'; }
-function fridg3_feed_load_post_ips(): array {
-    $decoded = is_file(fridg3_feed_post_ips_path()) ? json_decode((string)@file_get_contents(fridg3_feed_post_ips_path()), true) : [];
+function fridge_feed_post_ips_path(): string { return fridge_feed_posts_dir() . DIRECTORY_SEPARATOR . 'post_ips.json'; }
+function fridge_feed_load_post_ips(): array {
+    $decoded = is_file(fridge_feed_post_ips_path()) ? json_decode((string)@file_get_contents(fridge_feed_post_ips_path()), true) : [];
     return is_array($decoded) ? $decoded : [];
 }
-function fridg3_feed_record_account_ip(string $username, string $ip): void {
+function fridge_feed_record_account_ip(string $username, string $ip): void {
     if (!filter_var($ip, FILTER_VALIDATE_IP)) return;
-    $path = fridg3_feed_accounts_path();
+    $path = fridge_feed_accounts_path();
     $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
     if (!is_array($data) || !is_array($data['accounts'] ?? null)) return;
+    $accountBanned = false;
+    $banReason = '';
+    $banBy = 'system';
     foreach ($data['accounts'] as &$account) {
         if (!is_array($account) || strcasecmp((string)($account['username'] ?? ''), ltrim($username, '@')) !== 0) continue;
         $ips = array_values(array_filter(array_map('strval', (array)($account['ips'] ?? [])), static fn(string $known): bool => filter_var($known, FILTER_VALIDATE_IP) !== false));
         if (!in_array($ip, $ips, true)) $ips[] = $ip;
         $account['ips'] = $ips;
+        $accountBanned = !empty($account['accountBanned']);
+        $banReason = (string)($account['accountBanReason'] ?? '');
+        $banBy = (string)($account['accountBannedBy'] ?? 'system');
         break;
     }
     unset($account);
     $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($encoded !== false) @file_put_contents($path, $encoded, LOCK_EX);
-}
-function fridg3_feed_record_post_ip(string $postId, string $username, string $ip): void {
-    if (!filter_var($ip, FILTER_VALIDATE_IP)) return;
-    $records = fridg3_feed_load_post_ips();
-    $records[preg_replace('/[^a-zA-Z0-9_-]/', '', basename($postId))] = ['username' => ltrim($username, '@'), 'ip' => $ip];
-    $encoded = json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    if ($encoded !== false) @file_put_contents(fridg3_feed_post_ips_path(), $encoded, LOCK_EX);
-    fridg3_feed_record_account_ip($username, $ip);
+    if (!empty($accountBanned)) fridge_feed_ban_guest_ip($ip, $banBy, ltrim($username, '@'), $banReason);
 }
 
-if (!function_exists('fridg3_feed_filters_dir')) {
-    function fridg3_feed_filters_dir(): string
+function fridge_feed_set_account_banned(string $username, bool $banned, string $actor, string $reason = ''): bool {
+    $path = fridge_feed_accounts_path();
+    $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
+    if (!is_array($data) || !is_array($data['accounts'] ?? null)) return false;
+    $ips = [];
+    $found = false;
+    foreach ($data['accounts'] as &$account) {
+        if (!is_array($account) || strcasecmp((string)($account['username'] ?? ''), ltrim($username, '@')) !== 0) continue;
+        if (!empty($account['isAdmin']) || !empty($account['isModerator'])) return false;
+        $account['accountBanned'] = $banned;
+        if ($banned) { $account['accountBannedBy'] = $actor; $account['accountBanReason'] = trim($reason); }
+        else { unset($account['accountBannedBy'], $account['accountBanReason']); }
+        $ips = array_values(array_filter(array_map('strval', (array)($account['ips'] ?? [])), static fn(string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP) !== false));
+        $found = true;
+        break;
+    }
+    unset($account);
+    if (!$found) return false;
+    $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($encoded === false || @file_put_contents($path, $encoded, LOCK_EX) === false) return false;
+    $ok = true;
+    foreach ($ips as $ip) $ok = ($banned ? fridge_feed_ban_guest_ip($ip, $actor, $username, $reason) : fridge_feed_unban_ip($ip)) && $ok;
+    return $ok;
+}
+function fridge_feed_record_post_ip(string $postId, string $username, string $ip): void {
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) return;
+    $records = fridge_feed_load_post_ips();
+    $records[preg_replace('/[^a-zA-Z0-9_-]/', '', basename($postId))] = ['username' => ltrim($username, '@'), 'ip' => $ip];
+    $encoded = json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($encoded !== false) @file_put_contents(fridge_feed_post_ips_path(), $encoded, LOCK_EX);
+    fridge_feed_record_account_ip($username, $ip);
+}
+
+function fridge_feed_write_post_ips(array $records): bool {
+    $encoded = json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    return $encoded !== false && @file_put_contents(fridge_feed_post_ips_path(), $encoded, LOCK_EX) !== false;
+}
+
+if (!function_exists('fridge_feed_filters_dir')) {
+    function fridge_feed_filters_dir(): string
     {
-        return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'feed' . DIRECTORY_SEPARATOR . 'filters';
+        return fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'feed' . DIRECTORY_SEPARATOR . 'filters';
     }
 }
 
-if (!function_exists('fridg3_feed_filter_terms')) {
-    function fridg3_feed_filter_terms(): array
+if (!function_exists('fridge_feed_filter_terms')) {
+    function fridge_feed_filter_terms(): array
     {
         static $terms = null;
         if (is_array($terms)) {
@@ -94,7 +131,7 @@ if (!function_exists('fridg3_feed_filter_terms')) {
 
         $terms = [];
         $seen = [];
-        $files = glob(fridg3_feed_filters_dir() . DIRECTORY_SEPARATOR . '*.txt');
+        $files = glob(fridge_feed_filters_dir() . DIRECTORY_SEPARATOR . '*.txt');
         if ($files === false) {
             return $terms;
         }
@@ -128,8 +165,8 @@ if (!function_exists('fridg3_feed_filter_terms')) {
     }
 }
 
-if (!function_exists('fridg3_feed_star_count')) {
-    function fridg3_feed_star_count(string $value): int
+if (!function_exists('fridge_feed_star_count')) {
+    function fridge_feed_star_count(string $value): int
     {
         if (function_exists('mb_strlen')) {
             return max(1, mb_strlen($value));
@@ -141,8 +178,8 @@ if (!function_exists('fridg3_feed_star_count')) {
     }
 }
 
-if (!function_exists('fridg3_feed_filter_term_pattern')) {
-    function fridg3_feed_filter_term_pattern(string $term): string
+if (!function_exists('fridge_feed_filter_term_pattern')) {
+    function fridge_feed_filter_term_pattern(string $term): string
     {
         $escaped = preg_quote($term, '/');
         $needsStartBoundary = preg_match('/^[\p{L}\p{N}_]/u', $term) === 1;
@@ -154,15 +191,15 @@ if (!function_exists('fridg3_feed_filter_term_pattern')) {
     }
 }
 
-if (!function_exists('fridg3_feed_filter_tooltip_text')) {
-    function fridg3_feed_filter_tooltip_text(): string
+if (!function_exists('fridge_feed_filter_tooltip_text')) {
+    function fridge_feed_filter_tooltip_text(): string
     {
         return 'this phrase was automatically filtered.';
     }
 }
 
-if (!function_exists('fridg3_feed_non_whitespace_count')) {
-    function fridg3_feed_non_whitespace_count(string $value): int
+if (!function_exists('fridge_feed_non_whitespace_count')) {
+    function fridge_feed_non_whitespace_count(string $value): int
     {
         if (preg_match_all('/\S/u', $value, $matches) !== false) {
             return count($matches[0]);
@@ -171,21 +208,21 @@ if (!function_exists('fridg3_feed_non_whitespace_count')) {
     }
 }
 
-if (!function_exists('fridg3_feed_filter_visible_text')) {
-    function fridg3_feed_filter_visible_text(string $text): string
+if (!function_exists('fridge_feed_filter_visible_text')) {
+    function fridge_feed_filter_visible_text(string $text): string
     {
         $withoutTags = preg_replace('/\[[^\]]+\]/', ' ', $text);
         return is_string($withoutTags) ? $withoutTags : $text;
     }
 }
 
-if (!function_exists('fridg3_feed_filter_stats')) {
-    function fridg3_feed_filter_stats(string $text): array
+if (!function_exists('fridge_feed_filter_stats')) {
+    function fridge_feed_filter_stats(string $text): array
     {
-        $terms = fridg3_feed_filter_terms();
-        $scanText = fridg3_feed_filter_visible_text($text);
+        $terms = fridge_feed_filter_terms();
+        $scanText = fridge_feed_filter_visible_text($text);
         $stats = [
-            'totalChars' => fridg3_feed_non_whitespace_count($scanText),
+            'totalChars' => fridge_feed_non_whitespace_count($scanText),
             'matchedChars' => 0,
             'matchedTerms' => 0,
         ];
@@ -195,12 +232,12 @@ if (!function_exists('fridg3_feed_filter_stats')) {
         }
 
         foreach ($terms as $term) {
-            $next = preg_replace_callback(fridg3_feed_filter_term_pattern($term), static function (array $match) use (&$stats): string {
+            $next = preg_replace_callback(fridge_feed_filter_term_pattern($term), static function (array $match) use (&$stats): string {
                 $prefix = (string)($match[1] ?? '');
                 $matchedTerm = (string)($match[2] ?? '');
-                $stats['matchedChars'] += fridg3_feed_non_whitespace_count($matchedTerm);
+                $stats['matchedChars'] += fridge_feed_non_whitespace_count($matchedTerm);
                 $stats['matchedTerms']++;
-                return $prefix . str_repeat('★', fridg3_feed_star_count($matchedTerm));
+                return $prefix . str_repeat('★', fridge_feed_star_count($matchedTerm));
             }, $scanText);
             if (is_string($next)) {
                 $scanText = $next;
@@ -211,10 +248,10 @@ if (!function_exists('fridg3_feed_filter_stats')) {
     }
 }
 
-if (!function_exists('fridg3_feed_guest_filter_is_mostly_filtered')) {
-    function fridg3_feed_guest_filter_is_mostly_filtered(string $text): bool
+if (!function_exists('fridge_feed_guest_filter_is_mostly_filtered')) {
+    function fridge_feed_guest_filter_is_mostly_filtered(string $text): bool
     {
-        $stats = fridg3_feed_filter_stats($text);
+        $stats = fridge_feed_filter_stats($text);
         if ($stats['totalChars'] <= 0 || $stats['matchedTerms'] <= 0) {
             return false;
         }
@@ -223,37 +260,39 @@ if (!function_exists('fridg3_feed_guest_filter_is_mostly_filtered')) {
     }
 }
 
-if (!function_exists('fridg3_feed_guest_reply_has_filtered_text')) {
-    function fridg3_feed_guest_reply_has_filtered_text(array $reply): bool
+if (!function_exists('fridge_feed_guest_reply_has_filtered_text')) {
+    function fridge_feed_guest_reply_has_filtered_text(array $reply): bool
     {
         $body = (string)($reply['body'] ?? '');
         if ($body === '') {
             return false;
         }
-        if (strpos($body, fridg3_feed_filter_tooltip_text()) !== false) {
+        if (strpos($body, fridge_feed_filter_tooltip_text()) !== false) {
             return true;
         }
 
-        return fridg3_feed_apply_guest_filter($body, true) !== $body;
+        return fridge_feed_apply_guest_filter($body, true) !== $body;
     }
 }
 
-if (!function_exists('fridg3_feed_apply_guest_filter')) {
-    function fridg3_feed_apply_guest_filter(string $text, bool $withTooltip = false): string
+if (!function_exists('fridge_feed_apply_guest_filter')) {
+    function fridge_feed_apply_guest_filter(string $text, bool $withTooltip = false, bool $revealOriginal = false): string
     {
-        $terms = fridg3_feed_filter_terms();
+        $terms = fridge_feed_filter_terms();
         if ($text === '' || empty($terms)) {
             return $text;
         }
 
         $filtered = $text;
         foreach ($terms as $term) {
-            $next = preg_replace_callback(fridg3_feed_filter_term_pattern($term), static function (array $match) use ($withTooltip): string {
+            $next = preg_replace_callback(fridge_feed_filter_term_pattern($term), static function (array $match) use ($withTooltip, $revealOriginal): string {
                 $prefix = (string)($match[1] ?? '');
                 $matchedTerm = (string)($match[2] ?? '');
-                $stars = str_repeat('★', fridg3_feed_star_count($matchedTerm));
+                $stars = str_repeat('★', fridge_feed_star_count($matchedTerm));
                 if ($withTooltip) {
-                    return $prefix . '[tooltip="' . fridg3_feed_filter_tooltip_text() . '"]' . $stars . '[/tooltip]';
+                    $context = $revealOriginal ? '[filter-original=' . base64_encode($matchedTerm) . ']' : '';
+                    $contextEnd = $revealOriginal ? '[/filter-original]' : '';
+                    return $prefix . '[tooltip="' . fridge_feed_filter_tooltip_text() . '"]' . $context . $stars . $contextEnd . '[/tooltip]';
                 }
                 return $prefix . $stars;
             }, $filtered);
@@ -266,8 +305,8 @@ if (!function_exists('fridg3_feed_apply_guest_filter')) {
     }
 }
 
-if (!function_exists('fridg3_feed_client_ip')) {
-    function fridg3_feed_client_ip(): string
+if (!function_exists('fridge_feed_client_ip')) {
+    function fridge_feed_client_ip(): string
     {
         $headerCandidates = [
             'HTTP_CF_CONNECTING_IP',
@@ -294,8 +333,8 @@ if (!function_exists('fridg3_feed_client_ip')) {
     }
 }
 
-if (!function_exists('fridg3_feed_humanize_datetime')) {
-    function fridg3_feed_humanize_datetime(string $dtStr): string
+if (!function_exists('fridge_feed_humanize_datetime')) {
+    function fridge_feed_humanize_datetime(string $dtStr): string
     {
         try {
             $dt = new DateTime($dtStr);
@@ -311,17 +350,17 @@ if (!function_exists('fridg3_feed_humanize_datetime')) {
     }
 }
 
-if (!function_exists('fridg3_feed_accounts_path')) {
-    function fridg3_feed_accounts_path(): string
+if (!function_exists('fridge_feed_accounts_path')) {
+    function fridge_feed_accounts_path(): string
     {
-        return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+        return fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
     }
 }
 
-if (!function_exists('fridg3_feed_load_accounts')) {
-    function fridg3_feed_load_accounts(): array
+if (!function_exists('fridge_feed_load_accounts')) {
+    function fridge_feed_load_accounts(): array
     {
-        $accountsPath = fridg3_feed_accounts_path();
+        $accountsPath = fridge_feed_accounts_path();
         if (!is_file($accountsPath)) {
             return ['accounts' => []];
         }
@@ -335,15 +374,15 @@ if (!function_exists('fridg3_feed_load_accounts')) {
     }
 }
 
-if (!function_exists('fridg3_feed_registered_username_exists')) {
-    function fridg3_feed_registered_username_exists(string $username): bool
+if (!function_exists('fridge_feed_registered_username_exists')) {
+    function fridge_feed_registered_username_exists(string $username): bool
     {
         $target = strtolower(ltrim(trim($username), '@'));
         if ($target === '') {
             return false;
         }
 
-        foreach (fridg3_feed_load_accounts()['accounts'] as $account) {
+        foreach (fridge_feed_load_accounts()['accounts'] as $account) {
             $accountUsername = strtolower(trim((string)($account['username'] ?? '')));
             if ($accountUsername !== '' && $accountUsername === $target) {
                 return true;
@@ -354,15 +393,15 @@ if (!function_exists('fridg3_feed_registered_username_exists')) {
     }
 }
 
-if (!function_exists('fridg3_feed_refresh_session_user')) {
-    function fridg3_feed_refresh_session_user(): void
+if (!function_exists('fridge_feed_refresh_session_user')) {
+    function fridge_feed_refresh_session_user(): void
     {
         if (!isset($_SESSION['user']['username'])) {
             return;
         }
 
         $currentUsername = (string)$_SESSION['user']['username'];
-        $accountsData = fridg3_feed_load_accounts();
+        $accountsData = fridge_feed_load_accounts();
         foreach ($accountsData['accounts'] as $account) {
             if (!isset($account['username']) || (string)$account['username'] !== $currentUsername) {
                 continue;
@@ -371,7 +410,7 @@ if (!function_exists('fridg3_feed_refresh_session_user')) {
             $_SESSION['user']['name'] = htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8');
             $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
             $_SESSION['user']['isModerator'] = (bool)($account['isModerator'] ?? false);
-            $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
+            $_SESSION['user']['postingRestricted'] = !empty($account['postingRestricted']) || !empty($account['accountBanned']);
             $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
                 return htmlspecialchars((string)$page, ENT_QUOTES, 'UTF-8');
             }, (array)($account['allowedPages'] ?? []));
@@ -380,35 +419,35 @@ if (!function_exists('fridg3_feed_refresh_session_user')) {
     }
 }
 
-if (!function_exists('fridg3_feed_account_is_admin')) {
-    function fridg3_feed_account_is_admin(string $username): bool
+if (!function_exists('fridge_feed_account_is_admin')) {
+    function fridge_feed_account_is_admin(string $username): bool
     {
         $target = strtolower(ltrim(trim($username), '@'));
         if ($target === '') return false;
-        foreach (fridg3_feed_load_accounts()['accounts'] as $account) {
+        foreach (fridge_feed_load_accounts()['accounts'] as $account) {
             if (strtolower((string)($account['username'] ?? '')) === $target) return !empty($account['isAdmin']);
         }
         return false;
     }
 }
 
-if (!function_exists('fridg3_feed_current_user_is_moderator')) {
-    function fridg3_feed_current_user_is_moderator(): bool
+if (!function_exists('fridge_feed_current_user_is_moderator')) {
+    function fridge_feed_current_user_is_moderator(): bool
     {
         return !empty($_SESSION['user']['isAdmin']) || !empty($_SESSION['user']['isModerator']);
     }
 }
 
-if (!function_exists('fridg3_feed_current_user_can_moderate_author')) {
-    function fridg3_feed_current_user_can_moderate_author(string $username): bool
+if (!function_exists('fridge_feed_current_user_can_moderate_author')) {
+    function fridge_feed_current_user_can_moderate_author(string $username): bool
     {
         if (!empty($_SESSION['user']['isAdmin'])) return true;
-        return !empty($_SESSION['user']['isModerator']) && !fridg3_feed_account_is_admin($username);
+        return !empty($_SESSION['user']['isModerator']) && !fridge_feed_account_is_admin($username);
     }
 }
 
-if (!function_exists('fridg3_feed_current_user_can_moderate_replies')) {
-    function fridg3_feed_current_user_can_moderate_replies(string $postOwnerUsername): bool
+if (!function_exists('fridge_feed_current_user_can_moderate_replies')) {
+    function fridge_feed_current_user_can_moderate_replies(string $postOwnerUsername): bool
     {
         if (!isset($_SESSION['user']['username'])) {
             return false;
@@ -424,8 +463,8 @@ if (!function_exists('fridg3_feed_current_user_can_moderate_replies')) {
     }
 }
 
-if (!function_exists('fridg3_feed_current_user_can_manage_reply')) {
-    function fridg3_feed_current_user_can_manage_reply(string $postOwnerUsername, string $replyUsername): bool
+if (!function_exists('fridge_feed_current_user_can_manage_reply')) {
+    function fridge_feed_current_user_can_manage_reply(string $postOwnerUsername, string $replyUsername): bool
     {
         if (!isset($_SESSION['user']['username'])) {
             return false;
@@ -434,16 +473,16 @@ if (!function_exists('fridg3_feed_current_user_can_manage_reply')) {
         $currentUsername = (string)$_SESSION['user']['username'];
         $allowedPages = array_map('strval', (array)($_SESSION['user']['allowedPages'] ?? []));
         if ($currentUsername === ltrim($replyUsername, '@') || !empty($_SESSION['user']['isAdmin'])) return true;
-        if (!empty($_SESSION['user']['isModerator'])) return !fridg3_feed_account_is_admin($replyUsername);
+        if (!empty($_SESSION['user']['isModerator'])) return !fridge_feed_account_is_admin($replyUsername);
         return $currentUsername === ltrim($postOwnerUsername, '@') || in_array('comments', $allowedPages, true);
     }
 }
 
-if (!function_exists('fridg3_feed_current_visitor_can_manage_reply')) {
-    function fridg3_feed_current_visitor_can_manage_reply(string $postOwnerUsername, array $reply, string $clientIp): bool
+if (!function_exists('fridge_feed_current_visitor_can_manage_reply')) {
+    function fridge_feed_current_visitor_can_manage_reply(string $postOwnerUsername, array $reply, string $clientIp): bool
     {
         if (isset($_SESSION['user']['username'])) {
-            return fridg3_feed_current_user_can_manage_reply($postOwnerUsername, (string)($reply['username'] ?? ''));
+            return fridge_feed_current_user_can_manage_reply($postOwnerUsername, (string)($reply['username'] ?? ''));
         }
 
         return ($reply['isGuest'] ?? false) === true
@@ -452,16 +491,16 @@ if (!function_exists('fridg3_feed_current_visitor_can_manage_reply')) {
     }
 }
 
-if (!function_exists('fridg3_feed_reply_fallback_id')) {
-    function fridg3_feed_reply_fallback_id(array $reply, int $index): string
+if (!function_exists('fridge_feed_reply_fallback_id')) {
+    function fridge_feed_reply_fallback_id(array $reply, int $index): string
     {
         $seed = ($reply['username'] ?? '') . '|' . ($reply['date'] ?? '') . '|' . ($reply['body'] ?? '') . '|' . $index;
         return 'legacy_' . substr(sha1($seed), 0, 16);
     }
 }
 
-if (!function_exists('fridg3_feed_reply_format')) {
-    function fridg3_feed_reply_format(array $reply): string
+if (!function_exists('fridge_feed_reply_format')) {
+    function fridge_feed_reply_format(array $reply): string
     {
         if (($reply['format'] ?? '') === 'v2') return 'v2';
         // Reply ids begin with their creation timestamp. This fallback covers a
@@ -482,15 +521,15 @@ if (!function_exists('fridg3_feed_reply_format')) {
     }
 }
 
-if (!function_exists('fridg3_feed_write_replies')) {
-    function fridg3_feed_write_replies(string $postId, array $replies): bool
+if (!function_exists('fridge_feed_write_replies')) {
+    function fridge_feed_write_replies(string $postId, array $replies): bool
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         if ($safePostId === '') {
             return false;
         }
 
-        $repliesDir = fridg3_feed_replies_dir();
+        $repliesDir = fridge_feed_replies_dir();
         if (!is_dir($repliesDir) && !@mkdir($repliesDir, 0777, true) && !is_dir($repliesDir)) {
             return false;
         }
@@ -502,15 +541,15 @@ if (!function_exists('fridg3_feed_write_replies')) {
 
         $replyFile = $repliesDir . DIRECTORY_SEPARATOR . $safePostId . '.json';
         $saved = @file_put_contents($replyFile, $payload, LOCK_EX) !== false;
-        if ($saved) fridg3_notification_revision_touch();
+        if ($saved) fridge_notification_revision_touch();
         return $saved;
     }
 }
 
-if (!function_exists('fridg3_feed_load_banned_ips')) {
-    function fridg3_feed_load_banned_ips(): array
+if (!function_exists('fridge_feed_load_banned_ips')) {
+    function fridge_feed_load_banned_ips(): array
     {
-        $path = fridg3_feed_banned_ips_path();
+        $path = fridge_feed_banned_ips_path();
         if (!is_file($path)) {
             return [];
         }
@@ -524,10 +563,10 @@ if (!function_exists('fridg3_feed_load_banned_ips')) {
     }
 }
 
-if (!function_exists('fridg3_feed_write_banned_ips')) {
-    function fridg3_feed_write_banned_ips(array $bannedIps): bool
+if (!function_exists('fridge_feed_write_banned_ips')) {
+    function fridge_feed_write_banned_ips(array $bannedIps): bool
     {
-        $path = fridg3_feed_banned_ips_path();
+        $path = fridge_feed_banned_ips_path();
         $dir = dirname($path);
         if (!is_dir($dir) && !@mkdir($dir, 0777, true) && !is_dir($dir)) {
             return false;
@@ -542,28 +581,28 @@ if (!function_exists('fridg3_feed_write_banned_ips')) {
     }
 }
 
-if (!function_exists('fridg3_feed_ban_archive_path')) {
-    function fridg3_feed_ban_archive_path(): string
+if (!function_exists('fridge_feed_ban_archive_path')) {
+    function fridge_feed_ban_archive_path(): string
     {
-        return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'banned-ip-content.json';
+        return fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'banned-ip-content.json';
     }
 }
 
-if (!function_exists('fridg3_feed_load_ban_archive')) {
-    function fridg3_feed_load_ban_archive(): array
+if (!function_exists('fridge_feed_load_ban_archive')) {
+    function fridge_feed_load_ban_archive(): array
     {
-        $path = fridg3_feed_ban_archive_path();
+        $path = fridge_feed_ban_archive_path();
         $decoded = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
         return is_array($decoded) ? $decoded : [];
     }
 }
 
-if (!function_exists('fridg3_feed_archive_ip_content')) {
-    function fridg3_feed_archive_ip_content(string $ip, string $type, string $id, array $content): bool
+if (!function_exists('fridge_feed_archive_ip_content')) {
+    function fridge_feed_archive_ip_content(string $ip, string $type, string $id, array $content): bool
     {
         $ip = trim($ip);
         if (!filter_var($ip, FILTER_VALIDATE_IP)) return true;
-        $archive = fridg3_feed_load_ban_archive();
+        $archive = fridge_feed_load_ban_archive();
         $key = hash('sha256', $type . "\0" . $id);
         $archive[$ip] = is_array($archive[$ip] ?? null) ? $archive[$ip] : [];
         $archive[$ip][$key] = array_merge($content, [
@@ -572,18 +611,18 @@ if (!function_exists('fridg3_feed_archive_ip_content')) {
             'ip' => $ip,
             'deletedAt' => date('Y-m-d H:i:s'),
         ]);
-        $path = fridg3_feed_ban_archive_path();
+        $path = fridge_feed_ban_archive_path();
         if (!is_dir(dirname($path)) && !@mkdir(dirname($path), 0775, true) && !is_dir(dirname($path))) return false;
         $encoded = json_encode($archive, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         return $encoded !== false && @file_put_contents($path, $encoded, LOCK_EX) !== false;
     }
 }
 
-if (!function_exists('fridg3_feed_banned_ip_record')) {
-    function fridg3_feed_banned_ip_record(string $ip): ?array
+if (!function_exists('fridge_feed_banned_ip_record')) {
+    function fridge_feed_banned_ip_record(string $ip): ?array
     {
         $targetIp = trim($ip);
-        foreach (fridg3_feed_load_banned_ips() as $key => $entry) {
+        foreach (fridge_feed_load_banned_ips() as $key => $entry) {
             $entryIp = is_string($key) && filter_var($key, FILTER_VALIDATE_IP)
                 ? $key
                 : (is_array($entry) ? (string)($entry['ip'] ?? '') : (is_string($entry) ? $entry : ''));
@@ -594,11 +633,14 @@ if (!function_exists('fridg3_feed_banned_ip_record')) {
     }
 }
 
-if (!function_exists('fridg3_feed_unban_ip')) {
-    function fridg3_feed_unban_ip(string $ip): bool
+if (!function_exists('fridge_feed_unban_ip')) {
+    function fridge_feed_unban_ip(string $ip): bool
     {
         $targetIp = trim($ip);
-        $bannedIps = fridg3_feed_load_banned_ips();
+        if (fridge_feed_ip_belongs_to_banned_account($targetIp)) {
+            return false;
+        }
+        $bannedIps = fridge_feed_load_banned_ips();
         $updated = [];
         $found = false;
         $wasList = array_keys($bannedIps) === range(0, count($bannedIps) - 1);
@@ -612,19 +654,32 @@ if (!function_exists('fridg3_feed_unban_ip')) {
             }
             $updated[$key] = $entry;
         }
-        return !$found || fridg3_feed_write_banned_ips($wasList ? array_values($updated) : $updated);
+        return !$found || fridge_feed_write_banned_ips($wasList ? array_values($updated) : $updated);
     }
 }
 
-if (!function_exists('fridg3_feed_is_ip_banned')) {
-    function fridg3_feed_is_ip_banned(string $ip): bool
+if (!function_exists('fridge_feed_ip_belongs_to_banned_account')) {
+    function fridge_feed_ip_belongs_to_banned_account(string $ip): bool
+    {
+        $targetIp = trim($ip);
+        if (!filter_var($targetIp, FILTER_VALIDATE_IP)) return false;
+        foreach ((array)(fridge_feed_load_accounts()['accounts'] ?? []) as $account) {
+            if (!is_array($account) || empty($account['accountBanned'])) continue;
+            if (in_array($targetIp, array_map('strval', (array)($account['ips'] ?? [])), true)) return true;
+        }
+        return false;
+    }
+}
+
+if (!function_exists('fridge_feed_is_ip_banned')) {
+    function fridge_feed_is_ip_banned(string $ip): bool
     {
         $targetIp = trim($ip);
         if ($targetIp === '') {
             return false;
         }
 
-        foreach (fridg3_feed_load_banned_ips() as $key => $entry) {
+        foreach (fridge_feed_load_banned_ips() as $key => $entry) {
             if (is_string($key) && $key === $targetIp) {
                 return true;
             }
@@ -635,20 +690,34 @@ if (!function_exists('fridg3_feed_is_ip_banned')) {
                 return true;
             }
         }
-
-        return false;
+        return fridge_feed_ip_belongs_to_banned_account($targetIp);
     }
 }
 
-if (!function_exists('fridg3_feed_ban_guest_ip')) {
-    function fridg3_feed_ban_guest_ip(string $ip, string $adminUsername, string $guestUsername, string $reason = ''): bool
+if (!function_exists('fridge_current_user_bypasses_ip_restrictions')) {
+    function fridge_current_user_bypasses_ip_restrictions(): bool
+    {
+        return !empty($_SESSION['user']['isAdmin']) || !empty($_SESSION['user']['isModerator']);
+    }
+}
+
+if (!function_exists('fridge_feed_is_current_client_ip_banned')) {
+    function fridge_feed_is_current_client_ip_banned(?string $ip = null): bool
+    {
+        if (fridge_current_user_bypasses_ip_restrictions()) return false;
+        return fridge_feed_is_ip_banned($ip ?? fridge_feed_client_ip());
+    }
+}
+
+if (!function_exists('fridge_feed_ban_guest_ip')) {
+    function fridge_feed_ban_guest_ip(string $ip, string $adminUsername, string $guestUsername, string $reason = ''): bool
     {
         $targetIp = trim($ip);
         if (!filter_var($targetIp, FILTER_VALIDATE_IP)) {
             return false;
         }
 
-        $bannedIps = fridg3_feed_load_banned_ips();
+        $bannedIps = fridge_feed_load_banned_ips();
         $existing = isset($bannedIps[$targetIp]) && is_array($bannedIps[$targetIp])
             ? $bannedIps[$targetIp]
             : [];
@@ -676,19 +745,19 @@ if (!function_exists('fridg3_feed_ban_guest_ip')) {
             'usernames' => array_keys($usernames),
         ]);
 
-        return fridg3_feed_write_banned_ips($bannedIps);
+        return fridge_feed_write_banned_ips($bannedIps);
     }
 }
 
-if (!function_exists('fridg3_feed_verify_current_admin_password')) {
-    function fridg3_feed_verify_current_admin_password(string $password): bool
+if (!function_exists('fridge_feed_verify_current_admin_password')) {
+    function fridge_feed_verify_current_admin_password(string $password): bool
     {
         $currentUsername = isset($_SESSION['user']['username']) ? (string)$_SESSION['user']['username'] : '';
         if ($currentUsername === '' || (empty($_SESSION['user']['isAdmin']) && empty($_SESSION['user']['isModerator']))) {
             return false;
         }
 
-        $accountsData = fridg3_feed_load_accounts();
+        $accountsData = fridge_feed_load_accounts();
         foreach ($accountsData['accounts'] as $account) {
             if (!isset($account['username']) || (string)$account['username'] !== $currentUsername) {
                 continue;
@@ -709,8 +778,8 @@ if (!function_exists('fridg3_feed_verify_current_admin_password')) {
     }
 }
 
-if (!function_exists('fridg3_feed_extract_voice_files')) {
-    function fridg3_feed_extract_voice_files(string $content): array
+if (!function_exists('fridge_feed_extract_voice_files')) {
+    function fridge_feed_extract_voice_files(string $content): array
     {
         preg_match_all('/\[audio=([^\]\s]+)\](?:\[name:[^\]]*\])?/i', $content, $matches);
 
@@ -734,11 +803,11 @@ if (!function_exists('fridg3_feed_extract_voice_files')) {
     }
 }
 
-if (!function_exists('fridg3_feed_delete_voice_files_from_content')) {
-    function fridg3_feed_delete_voice_files_from_content(string $content): void
+if (!function_exists('fridge_feed_delete_voice_files_from_content')) {
+    function fridge_feed_delete_voice_files_from_content(string $content): void
     {
-        $voiceDir = fridg3_feed_voice_dir();
-        foreach (fridg3_feed_extract_voice_files($content) as $filename) {
+        $voiceDir = fridge_feed_voice_dir();
+        foreach (fridge_feed_extract_voice_files($content) as $filename) {
             $path = $voiceDir . DIRECTORY_SEPARATOR . $filename;
             if (is_file($path)) {
                 @unlink($path);
@@ -762,7 +831,7 @@ if (!function_exists('fridg3_feed_delete_voice_files_from_content')) {
                 if ($relativePrefix === null) {
                     continue;
                 }
-                $directory = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR
+                $directory = fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR
                     . ($type === 'video'
                         ? 'video'
                         : 'audio' . DIRECTORY_SEPARATOR . (str_contains($relativePrefix, '/attachments/') ? 'attachments' : 'uploads'));
@@ -779,49 +848,49 @@ if (!function_exists('fridg3_feed_delete_voice_files_from_content')) {
                 $prefix = $type === 'video' ? '/data/video/' : '/data/audio/';
                 if (!str_starts_with($urlPath, $prefix)) continue;
                 $relative = ltrim(substr($urlPath, strlen('/data/')), '/');
-                $path = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+                $path = fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
                 if (is_file($path)) @unlink($path);
             }
         }
     }
 }
 
-if (!function_exists('fridg3_feed_delete_media_files_from_content')) {
+if (!function_exists('fridge_feed_delete_media_files_from_content')) {
     /**
      * Remove any successfully stored media referenced by a submission that is
      * being rejected because one or more attachment placeholders were unresolved.
      */
-    function fridg3_feed_delete_media_files_from_content(string $content): void
+    function fridge_feed_delete_media_files_from_content(string $content): void
     {
-        fridg3_feed_delete_voice_files_from_content($content);
+        fridge_feed_delete_voice_files_from_content($content);
     }
 }
 
-if (!function_exists('fridg3_feed_delete_post_voice_files')) {
-    function fridg3_feed_delete_post_voice_files(string $postId, string $postBody): void
+if (!function_exists('fridge_feed_delete_post_voice_files')) {
+    function fridge_feed_delete_post_voice_files(string $postId, string $postBody): void
     {
-        fridg3_feed_delete_voice_files_from_content($postBody);
+        fridge_feed_delete_voice_files_from_content($postBody);
 
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         if ($safePostId === '') {
             return;
         }
 
-        foreach (fridg3_feed_load_replies($safePostId) as $reply) {
-            fridg3_feed_delete_voice_files_from_content((string)($reply['body'] ?? ''));
+        foreach (fridge_feed_load_replies($safePostId) as $reply) {
+            fridge_feed_delete_voice_files_from_content((string)($reply['body'] ?? ''));
         }
     }
 }
 
-if (!function_exists('fridg3_feed_load_replies')) {
-    function fridg3_feed_load_replies(string $postId): array
+if (!function_exists('fridge_feed_load_replies')) {
+    function fridge_feed_load_replies(string $postId): array
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         if ($safePostId === '') {
             return [];
         }
 
-        $replyFile = fridg3_feed_replies_dir() . DIRECTORY_SEPARATOR . $safePostId . '.json';
+        $replyFile = fridge_feed_replies_dir() . DIRECTORY_SEPARATOR . $safePostId . '.json';
         if (!is_file($replyFile)) {
             return [];
         }
@@ -850,11 +919,11 @@ if (!function_exists('fridg3_feed_load_replies')) {
             $normalizedReply = $reply;
             $normalizedReply['id'] = isset($reply['id']) && (string)$reply['id'] !== ''
                 ? (string)$reply['id']
-                : fridg3_feed_reply_fallback_id($reply, $index);
+                : fridge_feed_reply_fallback_id($reply, $index);
             $normalizedReply['username'] = $username;
             $normalizedReply['date'] = $date;
             $normalizedReply['body'] = $body;
-            if (fridg3_feed_reply_format($reply) === 'v2') $normalizedReply['format'] = 'v2';
+            if (fridge_feed_reply_format($reply) === 'v2') $normalizedReply['format'] = 'v2';
             else unset($normalizedReply['format']);
             if (isset($reply['parentId']) && is_string($reply['parentId'])) {
                 $parentId = trim($reply['parentId']);
@@ -871,8 +940,8 @@ if (!function_exists('fridg3_feed_load_replies')) {
     }
 }
 
-if (!function_exists('fridg3_feed_reply_exists')) {
-    function fridg3_feed_reply_exists(array $replies, string $replyId): bool
+if (!function_exists('fridge_feed_reply_exists')) {
+    function fridge_feed_reply_exists(array $replies, string $replyId): bool
     {
         $targetId = trim($replyId);
         if ($targetId === '') {
@@ -889,18 +958,18 @@ if (!function_exists('fridg3_feed_reply_exists')) {
     }
 }
 
-if (!function_exists('fridg3_feed_normalize_guest_browser_id')) {
-    function fridg3_feed_normalize_guest_browser_id(string $browserId): string
+if (!function_exists('fridge_feed_normalize_guest_browser_id')) {
+    function fridge_feed_normalize_guest_browser_id(string $browserId): string
     {
         $browserId = strtolower(trim($browserId));
         return preg_match('/^[a-f0-9]{32}$/', $browserId) === 1 ? $browserId : '';
     }
 }
 
-if (!function_exists('fridg3_feed_collect_guest_usernames_by_ip')) {
-    function fridg3_feed_collect_guest_usernames_by_ip(): array
+if (!function_exists('fridge_feed_collect_guest_usernames_by_ip')) {
+    function fridge_feed_collect_guest_usernames_by_ip(): array
     {
-        $repliesDir = fridg3_feed_replies_dir();
+        $repliesDir = fridge_feed_replies_dir();
         if (!is_dir($repliesDir)) {
             return [];
         }
@@ -913,7 +982,7 @@ if (!function_exists('fridg3_feed_collect_guest_usernames_by_ip')) {
         $usernamesByIp = [];
         foreach ($files as $replyFile) {
             $postId = pathinfo(basename((string)$replyFile), PATHINFO_FILENAME);
-            foreach (fridg3_feed_load_replies($postId) as $reply) {
+            foreach (fridge_feed_load_replies($postId) as $reply) {
                 if (($reply['isGuest'] ?? false) !== true) {
                     continue;
                 }
@@ -945,10 +1014,10 @@ if (!function_exists('fridg3_feed_collect_guest_usernames_by_ip')) {
     }
 }
 
-if (!function_exists('fridg3_feed_collect_guest_replies_by_ip')) {
-    function fridg3_feed_collect_guest_replies_by_ip(): array
+if (!function_exists('fridge_feed_collect_guest_replies_by_ip')) {
+    function fridge_feed_collect_guest_replies_by_ip(): array
     {
-        $repliesDir = fridg3_feed_replies_dir();
+        $repliesDir = fridge_feed_replies_dir();
         if (!is_dir($repliesDir)) {
             return [];
         }
@@ -961,7 +1030,7 @@ if (!function_exists('fridg3_feed_collect_guest_replies_by_ip')) {
         $repliesByIp = [];
         foreach ($files as $replyFile) {
             $postId = pathinfo(basename((string)$replyFile), PATHINFO_FILENAME);
-            foreach (fridg3_feed_load_replies($postId) as $reply) {
+            foreach (fridge_feed_load_replies($postId) as $reply) {
                 if (($reply['isGuest'] ?? false) !== true) {
                     continue;
                 }
@@ -981,7 +1050,7 @@ if (!function_exists('fridg3_feed_collect_guest_replies_by_ip')) {
                     'username' => (string)($reply['username'] ?? 'Anonymous'),
                     'date' => (string)($reply['date'] ?? ''),
                     'body' => (string)($reply['body'] ?? ''),
-                    'format' => fridg3_feed_reply_format($reply),
+                    'format' => fridge_feed_reply_format($reply),
                 ];
             }
         }
@@ -998,8 +1067,8 @@ if (!function_exists('fridg3_feed_collect_guest_replies_by_ip')) {
     }
 }
 
-if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
-    function fridg3_feed_purge_guest_replies_by_ip(string $ip): array
+if (!function_exists('fridge_feed_purge_guest_replies_by_ip')) {
+    function fridge_feed_purge_guest_replies_by_ip(string $ip): array
     {
         $targetIp = trim($ip);
         $deleted = 0;
@@ -1014,7 +1083,7 @@ if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
             ];
         }
 
-        $repliesDir = fridg3_feed_replies_dir();
+        $repliesDir = fridge_feed_replies_dir();
         if (!is_dir($repliesDir)) {
             return [
                 'deleted' => 0,
@@ -1034,7 +1103,7 @@ if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
 
         foreach ($files as $replyFile) {
             $postId = pathinfo(basename((string)$replyFile), PATHINFO_FILENAME);
-            $replies = fridg3_feed_load_replies($postId);
+            $replies = fridge_feed_load_replies($postId);
             $updatedReplies = [];
             $removedReplies = [];
             $removedFromFile = 0;
@@ -1044,7 +1113,7 @@ if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
                     && (string)($reply['ip'] ?? '') === $targetIp;
 
                 if ($isTargetGuestReply) {
-                    fridg3_feed_delete_voice_files_from_content((string)($reply['body'] ?? ''));
+                    fridge_feed_delete_voice_files_from_content((string)($reply['body'] ?? ''));
                     $removedReplies[] = $reply;
                     $removedFromFile++;
                     continue;
@@ -1057,9 +1126,9 @@ if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
                 continue;
             }
 
-            if (fridg3_feed_write_replies($postId, $updatedReplies)) {
+            if (fridge_feed_write_replies($postId, $updatedReplies)) {
                 foreach ($removedReplies as $removedReply) {
-                    fridg3_feed_archive_ip_content($targetIp, 'feed_reply', $postId . ':' . (string)($removedReply['id'] ?? ''), array_merge($removedReply, ['postId' => $postId]));
+                    fridge_feed_archive_ip_content($targetIp, 'feed_reply', $postId . ':' . (string)($removedReply['id'] ?? ''), array_merge($removedReply, ['postId' => $postId]));
                 }
                 $deleted += $removedFromFile;
                 $touchedFiles++;
@@ -1076,8 +1145,50 @@ if (!function_exists('fridg3_feed_purge_guest_replies_by_ip')) {
     }
 }
 
-if (!function_exists('fridg3_feed_save_reply')) {
-    function fridg3_feed_save_reply(string $postId, string $username, string $body, string $parentId = '', string $format = 'legacy'): bool
+if (!function_exists('fridge_feed_purge_all_content_by_ip')) {
+    function fridge_feed_purge_all_content_by_ip(string $ip): array
+    {
+        $targetIp = trim($ip);
+        if (!filter_var($targetIp, FILTER_VALIDATE_IP)) return ['deleted' => 0, 'failed' => 0];
+
+        $deleted = 0;
+        $failed = 0;
+        foreach (glob(fridge_feed_replies_dir() . DIRECTORY_SEPARATOR . '*.json') ?: [] as $replyFile) {
+            $postId = pathinfo(basename($replyFile), PATHINFO_FILENAME);
+            foreach (fridge_feed_load_replies($postId) as $reply) {
+                if ((string)($reply['ip'] ?? '') !== $targetIp) continue;
+                if (fridge_feed_delete_reply($postId, (string)($reply['id'] ?? ''))) $deleted++;
+                else $failed++;
+            }
+        }
+
+        $postIps = fridge_feed_load_post_ips();
+        foreach ($postIps as $postId => $record) {
+            if (!is_array($record) || (string)($record['ip'] ?? '') !== $targetIp) continue;
+            $safeId = preg_replace('/[^a-zA-Z0-9_-]/', '', basename((string)$postId));
+            $matches = glob(fridge_feed_posts_dir() . DIRECTORY_SEPARATOR . $safeId . '.*') ?: [];
+            $postPath = null;
+            foreach ($matches as $candidate) {
+                if (is_file($candidate) && strtolower(pathinfo($candidate, PATHINFO_EXTENSION)) !== 'json') { $postPath = $candidate; break; }
+            }
+            if ($postPath === null) { unset($postIps[$postId]); continue; }
+            $parsed = fridge_feed_parse_post((string)@file_get_contents($postPath));
+            fridge_feed_delete_post_voice_files($safeId, (string)($parsed['body'] ?? ''));
+            if (@unlink($postPath)) {
+                fridge_feed_archive_ip_content($targetIp, 'feed_post', $safeId, array_merge($parsed, ['postId' => $safeId]));
+                @unlink(fridge_feed_replies_dir() . DIRECTORY_SEPARATOR . $safeId . '.json');
+                unset($postIps[$postId]);
+                $deleted++;
+            } else $failed++;
+        }
+        if (!fridge_feed_write_post_ips($postIps)) $failed++;
+        fridge_notification_revision_touch();
+        return ['deleted' => $deleted, 'failed' => $failed];
+    }
+}
+
+if (!function_exists('fridge_feed_save_reply')) {
+    function fridge_feed_save_reply(string $postId, string $username, string $body, string $parentId = '', string $format = 'legacy', ?string &$savedReplyId = null): bool
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         $safeUsername = preg_replace('/[^a-zA-Z0-9_\-]/', '', ltrim($username, '@'));
@@ -1087,23 +1198,23 @@ if (!function_exists('fridg3_feed_save_reply')) {
             return false;
         }
 
-        $repliesDir = fridg3_feed_replies_dir();
+        $repliesDir = fridge_feed_replies_dir();
         if (!is_dir($repliesDir) && !@mkdir($repliesDir, 0777, true) && !is_dir($repliesDir)) {
             return false;
         }
 
         $replyFile = $repliesDir . DIRECTORY_SEPARATOR . $safePostId . '.json';
-        $existingReplies = fridg3_feed_load_replies($safePostId);
+        $existingReplies = fridge_feed_load_replies($safePostId);
         $newReply = [
             'id' => date('YmdHis') . '_' . bin2hex(random_bytes(4)),
             'username' => $safeUsername,
             'date' => date('Y-m-d H:i:s'),
             'body' => $trimmedBody,
-            'ip' => fridg3_feed_client_ip(),
+            'ip' => fridge_feed_client_ip(),
         ];
-        fridg3_feed_record_account_ip($safeUsername, (string)$newReply['ip']);
+        fridge_feed_record_account_ip($safeUsername, (string)$newReply['ip']);
         if ($format === 'v2') $newReply['format'] = 'v2';
-        if ($parentId !== '' && fridg3_feed_reply_exists($existingReplies, $parentId)) {
+        if ($parentId !== '' && fridge_feed_reply_exists($existingReplies, $parentId)) {
             $newReply['parentId'] = $parentId;
         }
         $existingReplies[] = $newReply;
@@ -1114,13 +1225,16 @@ if (!function_exists('fridg3_feed_save_reply')) {
         }
 
         $saved = @file_put_contents($replyFile, $payload, LOCK_EX) !== false;
-        if ($saved) fridg3_notification_revision_touch();
+        if ($saved) {
+            $savedReplyId = (string)$newReply['id'];
+            fridge_notification_revision_touch();
+        }
         return $saved;
     }
 }
 
-if (!function_exists('fridg3_feed_save_guest_reply')) {
-    function fridg3_feed_save_guest_reply(string $postId, string $displayName, string $ip, string $body, string $parentId = '', string $guestBrowserId = '', string $format = 'legacy'): bool
+if (!function_exists('fridge_feed_save_guest_reply')) {
+    function fridge_feed_save_guest_reply(string $postId, string $displayName, string $ip, string $body, string $parentId = '', string $guestBrowserId = '', string $format = 'legacy', string $originalBody = '', ?string &$savedReplyId = null): bool
     {
         $safePostId = preg_replace('/[^a-zA-Z0-9_\-]/', '', basename($postId));
         $safeIp = trim($ip);
@@ -1130,17 +1244,17 @@ if (!function_exists('fridg3_feed_save_guest_reply')) {
             $name = 'Anonymous';
         }
         $name = function_exists('mb_substr') ? mb_substr($name, 0, 50) : substr($name, 0, 50);
-        if (fridg3_feed_registered_username_exists($name)) {
+        if (fridge_feed_registered_username_exists($name)) {
             return false;
         }
-        $name = fridg3_feed_apply_guest_filter($name);
-        $trimmedBody = fridg3_feed_apply_guest_filter($trimmedBody, true);
+        $name = fridge_feed_apply_guest_filter($name);
+        $trimmedBody = fridge_feed_apply_guest_filter($trimmedBody, true);
 
         if ($safePostId === '' || !filter_var($safeIp, FILTER_VALIDATE_IP) || $trimmedBody === '') {
             return false;
         }
 
-        $existingReplies = fridg3_feed_load_replies($safePostId);
+        $existingReplies = fridge_feed_load_replies($safePostId);
         $newReply = [
             'id' => date('YmdHis') . '_' . bin2hex(random_bytes(4)),
             'username' => $name,
@@ -1149,29 +1263,35 @@ if (!function_exists('fridg3_feed_save_guest_reply')) {
             'isGuest' => true,
             'ip' => $safeIp,
         ];
+        $cleanOriginalBody = trim($originalBody);
+        if ($cleanOriginalBody !== '' && $cleanOriginalBody !== $trimmedBody) {
+            $newReply['originalBody'] = $cleanOriginalBody;
+        }
         if ($format === 'v2') $newReply['format'] = 'v2';
-        if ($parentId !== '' && fridg3_feed_reply_exists($existingReplies, $parentId)) {
+        if ($parentId !== '' && fridge_feed_reply_exists($existingReplies, $parentId)) {
             $newReply['parentId'] = $parentId;
         }
-        $safeGuestBrowserId = fridg3_feed_normalize_guest_browser_id($guestBrowserId);
+        $safeGuestBrowserId = fridge_feed_normalize_guest_browser_id($guestBrowserId);
         if ($safeGuestBrowserId !== '') {
             $newReply['guestBrowserId'] = $safeGuestBrowserId;
         }
         $existingReplies[] = $newReply;
 
-        return fridg3_feed_write_replies($safePostId, $existingReplies);
+        $saved = fridge_feed_write_replies($safePostId, $existingReplies);
+        if ($saved) $savedReplyId = (string)$newReply['id'];
+        return $saved;
     }
 }
 
-if (!function_exists('fridg3_feed_update_reply')) {
-    function fridg3_feed_update_reply(string $postId, string $replyId, string $body, ?string $format = null): bool
+if (!function_exists('fridge_feed_update_reply')) {
+    function fridge_feed_update_reply(string $postId, string $replyId, string $body, ?string $format = null): bool
     {
         $trimmedBody = trim($body);
         if ($trimmedBody === '') {
             return false;
         }
 
-        $replies = fridg3_feed_load_replies($postId);
+        $replies = fridge_feed_load_replies($postId);
         foreach ($replies as $index => $reply) {
             if (($reply['id'] ?? '') !== $replyId) {
                 continue;
@@ -1179,24 +1299,24 @@ if (!function_exists('fridg3_feed_update_reply')) {
             $replies[$index]['body'] = $trimmedBody;
             if ($format === 'v2') $replies[$index]['format'] = 'v2';
             elseif ($format === 'legacy') unset($replies[$index]['format']);
-            return fridg3_feed_write_replies($postId, $replies);
+            return fridge_feed_write_replies($postId, $replies);
         }
 
         return false;
     }
 }
 
-if (!function_exists('fridg3_feed_delete_reply')) {
-    function fridg3_feed_delete_reply(string $postId, string $replyId): bool
+if (!function_exists('fridge_feed_delete_reply')) {
+    function fridge_feed_delete_reply(string $postId, string $replyId): bool
     {
-        $replies = fridg3_feed_load_replies($postId);
+        $replies = fridge_feed_load_replies($postId);
         $updatedReplies = [];
         $deleted = false;
         $deletedReply = null;
 
         foreach ($replies as $reply) {
             if (($reply['id'] ?? '') === $replyId) {
-                fridg3_feed_delete_voice_files_from_content((string)($reply['body'] ?? ''));
+                fridge_feed_delete_voice_files_from_content((string)($reply['body'] ?? ''));
                 $deleted = true;
                 $deletedReply = $reply;
                 continue;
@@ -1208,16 +1328,16 @@ if (!function_exists('fridg3_feed_delete_reply')) {
             return false;
         }
 
-        $saved = fridg3_feed_write_replies($postId, $updatedReplies);
+        $saved = fridge_feed_write_replies($postId, $updatedReplies);
         if ($saved && is_array($deletedReply)) {
-            fridg3_feed_archive_ip_content((string)($deletedReply['ip'] ?? ''), 'feed_reply', $postId . ':' . $replyId, array_merge($deletedReply, ['postId' => $postId]));
+            fridge_feed_archive_ip_content((string)($deletedReply['ip'] ?? ''), 'feed_reply', $postId . ':' . $replyId, array_merge($deletedReply, ['postId' => $postId]));
         }
         return $saved;
     }
 }
 
-if (!function_exists('fridg3_feed_probe_audio_duration')) {
-    function fridg3_feed_probe_audio_duration(string $path): ?float
+if (!function_exists('fridge_feed_probe_audio_duration')) {
+    function fridge_feed_probe_audio_duration(string $path): ?float
     {
         if (!is_file($path) || !function_exists('shell_exec')) {
             return null;
@@ -1234,8 +1354,8 @@ if (!function_exists('fridg3_feed_probe_audio_duration')) {
     }
 }
 
-if (!function_exists('fridg3_feed_transcode_voice_note')) {
-    function fridg3_feed_transcode_voice_note(string $srcPath, string $destPath): bool
+if (!function_exists('fridge_feed_transcode_voice_note')) {
+    function fridge_feed_transcode_voice_note(string $srcPath, string $destPath): bool
     {
         if (!function_exists('shell_exec')) {
             return false;
@@ -1253,7 +1373,7 @@ if (!function_exists('fridg3_feed_transcode_voice_note')) {
             return false;
         }
 
-        $duration = fridg3_feed_probe_audio_duration($tmpPath);
+        $duration = fridge_feed_probe_audio_duration($tmpPath);
         if ($duration === null || $duration > 121.0) {
             @unlink($tmpPath);
             return false;
@@ -1268,10 +1388,10 @@ if (!function_exists('fridg3_feed_transcode_voice_note')) {
     }
 }
 
-if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
-    function fridg3_feed_process_uploaded_voice_notes(array $files): array
+if (!function_exists('fridge_feed_process_uploaded_voice_notes')) {
+    function fridge_feed_process_uploaded_voice_notes(array $files): array
     {
-        $voiceDir = fridg3_feed_voice_dir();
+        $voiceDir = fridge_feed_voice_dir();
         if (!is_dir($voiceDir)) {
             @mkdir($voiceDir, 0777, true);
         }
@@ -1295,7 +1415,7 @@ if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
                 continue;
             }
 
-            $sourceDuration = fridg3_feed_probe_audio_duration($tmpPath);
+            $sourceDuration = fridge_feed_probe_audio_duration($tmpPath);
             if ($sourceDuration !== null && $sourceDuration > 121.0) {
                 continue;
             }
@@ -1303,7 +1423,7 @@ if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
             $randomName = bin2hex(random_bytes(12));
             $destName = $randomName . '.m4a';
             $destPath = $voiceDir . DIRECTORY_SEPARATOR . $destName;
-            if (!fridg3_feed_transcode_voice_note($tmpPath, $destPath)) {
+            if (!fridge_feed_transcode_voice_note($tmpPath, $destPath)) {
                 @unlink($destPath);
                 // MediaRecorder output varies by browser, and some valid browser
                 // containers cannot be remuxed by a particular ffmpeg build. Keep
@@ -1337,20 +1457,20 @@ if (!function_exists('fridg3_feed_process_uploaded_voice_notes')) {
             $voiceMap[$i] = [
                 'url' => '/data/audio/voice/' . $destName,
                 'name' => 'voice-note.' . pathinfo($destName, PATHINFO_EXTENSION),
-                'duration' => fridg3_feed_probe_audio_duration($destPath) ?? $sourceDuration ?? 0,
+                'duration' => fridge_feed_probe_audio_duration($destPath) ?? $sourceDuration ?? 0,
             ];
-            fridg3_debug_submission_log('[UPLOAD] feed/journal voice attachment saved bytes=' . (@filesize($destPath) ?: 0) . ' type=' . pathinfo($destName, PATHINFO_EXTENSION));
+            fridge_debug_submission_log('[UPLOAD] feed/journal voice attachment saved bytes=' . (@filesize($destPath) ?: 0) . ' type=' . pathinfo($destName, PATHINFO_EXTENSION));
         }
 
         $received = count(array_filter((array)($files['error'] ?? []), static fn($error) => (int)$error === UPLOAD_ERR_OK));
-        if ($received > 0) fridg3_debug_submission_log('[UPLOAD] feed/journal voice attachments processed received=' . $received . ' saved=' . count($voiceMap) . ' rejected=' . max(0, $received - count($voiceMap)));
+        if ($received > 0) fridge_debug_submission_log('[UPLOAD] feed/journal voice attachments processed received=' . $received . ' saved=' . count($voiceMap) . ' rejected=' . max(0, $received - count($voiceMap)));
 
         return $voiceMap;
     }
 }
 
-if (!function_exists('fridg3_feed_replace_voice_placeholders')) {
-    function fridg3_feed_replace_voice_placeholders(string $content, array $voiceMap, bool $markdown = false): string
+if (!function_exists('fridge_feed_replace_voice_placeholders')) {
+    function fridge_feed_replace_voice_placeholders(string $content, array $voiceMap, bool $markdown = false): string
     {
         if (empty($voiceMap)) {
             return $content;
@@ -1370,8 +1490,8 @@ if (!function_exists('fridg3_feed_replace_voice_placeholders')) {
     }
 }
 
-if (!function_exists('fridg3_feed_save_jpeg_under_limit')) {
-    function fridg3_feed_save_jpeg_with_ffmpeg(string $srcPath, string $destPath, int $maxBytes): bool
+if (!function_exists('fridge_feed_save_jpeg_under_limit')) {
+    function fridge_feed_save_jpeg_with_ffmpeg(string $srcPath, string $destPath, int $maxBytes): bool
     {
         $ffmpeg = '';
         foreach (['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg'] as $candidate) {
@@ -1425,10 +1545,10 @@ if (!function_exists('fridg3_feed_save_jpeg_under_limit')) {
         return $moved;
     }
 
-    function fridg3_feed_save_jpeg_under_limit(string $srcPath, string $mime, string $destPath, int $maxBytes = 1000000): bool
+    function fridge_feed_save_jpeg_under_limit(string $srcPath, string $mime, string $destPath, int $maxBytes = 1000000): bool
     {
         if (!function_exists('imagecreatetruecolor')) {
-            return fridg3_feed_save_jpeg_with_ffmpeg($srcPath, $destPath, $maxBytes);
+            return fridge_feed_save_jpeg_with_ffmpeg($srcPath, $destPath, $maxBytes);
         }
 
         $createMap = [
@@ -1487,10 +1607,10 @@ if (!function_exists('fridg3_feed_save_jpeg_under_limit')) {
     }
 }
 
-if (!function_exists('fridg3_feed_process_uploaded_images')) {
-    function fridg3_feed_process_uploaded_images(array $files): array
+if (!function_exists('fridge_feed_process_uploaded_images')) {
+    function fridge_feed_process_uploaded_images(array $files): array
     {
-        $imagesDir = fridg3_feed_images_dir();
+        $imagesDir = fridge_feed_images_dir();
         if (!is_dir($imagesDir)) {
             @mkdir($imagesDir, 0777, true);
         }
@@ -1512,7 +1632,7 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
             $error = $files['error'][$i] ?? UPLOAD_ERR_NO_FILE;
             if ($error !== UPLOAD_ERR_OK) {
                 if ((int)$error !== UPLOAD_ERR_NO_FILE) {
-                    fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=upload_error code=' . (int)$error);
+                    fridge_debug_submission_log('[UPLOAD] feed/journal image rejected reason=upload_error code=' . (int)$error);
                 }
                 continue;
             }
@@ -1521,14 +1641,14 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
             $origName = $files['name'][$i] ?? ('image_' . $i);
             $uploadSize = (int)($files['size'][$i] ?? 0);
             if ($tmpPath === '' || $uploadSize <= 0 || $uploadSize > 8 * 1024 * 1024) {
-                fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=size bytes=' . max(0, $uploadSize));
+                fridge_debug_submission_log('[UPLOAD] feed/journal image rejected reason=size bytes=' . max(0, $uploadSize));
                 continue;
             }
 
             $imageInfo = @getimagesize($tmpPath);
             $mime = is_array($imageInfo) && isset($imageInfo['mime']) ? $imageInfo['mime'] : '';
             if (!isset($allowed[$mime])) {
-                fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=invalid_image');
+                fridge_debug_submission_log('[UPLOAD] feed/journal image rejected reason=invalid_image');
                 continue;
             }
 
@@ -1542,7 +1662,7 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
 
             $saved = false;
             if ($mustCompress) {
-                $saved = fridg3_feed_save_jpeg_under_limit($tmpPath, $mime, $destPath, 1000000);
+                $saved = fridge_feed_save_jpeg_under_limit($tmpPath, $mime, $destPath, 1000000);
             } else {
                 $saved = @move_uploaded_file($tmpPath, $destPath);
             }
@@ -1552,7 +1672,7 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
                 @unlink($destPath);
                 $destName = $randomBase . '.jpg';
                 $destPath = $imagesDir . DIRECTORY_SEPARATOR . $destName;
-                $saved = fridg3_feed_save_jpeg_under_limit($tmpPath, $mime, $destPath, 1000000);
+                $saved = fridge_feed_save_jpeg_under_limit($tmpPath, $mime, $destPath, 1000000);
             }
 
             if ($saved) {
@@ -1560,9 +1680,9 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
                     'url' => '/data/images/' . $destName,
                     'name' => $origName ?: $destName,
                 ];
-                fridg3_debug_submission_log('[UPLOAD] feed/journal image attachment saved bytes=' . (@filesize($destPath) ?: 0) . ' type=' . $destExt);
+                fridge_debug_submission_log('[UPLOAD] feed/journal image attachment saved bytes=' . (@filesize($destPath) ?: 0) . ' type=' . $destExt);
             } else {
-                fridg3_debug_submission_log('[UPLOAD] feed/journal image rejected reason=compression_or_write_failed type=' . $ext . ' bytes=' . $sizeBytes);
+                fridge_debug_submission_log('[UPLOAD] feed/journal image rejected reason=compression_or_write_failed type=' . $ext . ' bytes=' . $sizeBytes);
             }
         }
 
@@ -1570,8 +1690,8 @@ if (!function_exists('fridg3_feed_process_uploaded_images')) {
     }
 }
 
-if (!function_exists('fridg3_feed_replace_image_placeholders')) {
-    function fridg3_feed_replace_image_placeholders(string $content, array $imageMap): string
+if (!function_exists('fridge_feed_replace_image_placeholders')) {
+    function fridge_feed_replace_image_placeholders(string $content, array $imageMap): string
     {
         if (empty($imageMap)) {
             return $content;
@@ -1588,11 +1708,11 @@ if (!function_exists('fridg3_feed_replace_image_placeholders')) {
     }
 }
 
-if (!function_exists('fridg3_feed_process_uploaded_media')) {
-    function fridg3_feed_process_uploaded_media(array $files): array
+if (!function_exists('fridge_feed_process_uploaded_media')) {
+    function fridge_feed_process_uploaded_media(array $files): array
     {
         $mediaMap = [];
-        foreach (fridg3_feed_process_uploaded_images($files) as $index => $image) {
+        foreach (fridge_feed_process_uploaded_images($files) as $index => $image) {
             $mediaMap[$index] = $image + ['type' => 'image'];
         }
         if (!isset($files['name']) || !is_array($files['name'])) {
@@ -1660,7 +1780,7 @@ if (!function_exists('fridg3_feed_process_uploaded_media')) {
                 continue;
             }
             $relativeDir = $type === 'video' ? 'video' : 'audio/uploads';
-            $directory = fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
+            $directory = fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
             if (!is_dir($directory) && !@mkdir($directory, 0777, true)) {
                 continue;
             }
@@ -1673,20 +1793,20 @@ if (!function_exists('fridg3_feed_process_uploaded_media')) {
                 'url' => '/data/' . $relativeDir . '/' . $destName,
                 'name' => (string)$originalName ?: $destName,
             ];
-            fridg3_debug_submission_log('[UPLOAD] feed/journal ' . $type . ' attachment saved bytes=' . (@filesize($directory . DIRECTORY_SEPARATOR . $destName) ?: 0) . ' type=' . $extension);
+            fridge_debug_submission_log('[UPLOAD] feed/journal ' . $type . ' attachment saved bytes=' . (@filesize($directory . DIRECTORY_SEPARATOR . $destName) ?: 0) . ' type=' . $extension);
         }
         if ($finfo) {
             finfo_close($finfo);
         }
         ksort($mediaMap);
         $received = count(array_filter((array)($files['error'] ?? []), static fn($error) => (int)$error === UPLOAD_ERR_OK));
-        if ($received > 0) fridg3_debug_submission_log('[UPLOAD] feed/journal media attachments processed received=' . $received . ' saved=' . count($mediaMap) . ' rejected=' . max(0, $received - count($mediaMap)));
+        if ($received > 0) fridge_debug_submission_log('[UPLOAD] feed/journal media attachments processed received=' . $received . ' saved=' . count($mediaMap) . ' rejected=' . max(0, $received - count($mediaMap)));
         return $mediaMap;
     }
 }
 
-if (!function_exists('fridg3_feed_replace_media_placeholders')) {
-    function fridg3_feed_replace_media_placeholders(string $content, array $mediaMap, bool $markdown = false): string
+if (!function_exists('fridge_feed_replace_media_placeholders')) {
+    function fridge_feed_replace_media_placeholders(string $content, array $mediaMap, bool $markdown = false): string
     {
         return (string)preg_replace_callback('/\[(media|img|audio|video):(\d+)\](?:\[name:([^\]]*)\])?/i', static function (array $match) use ($mediaMap, $markdown): string {
             $index = (int)$match[2];
@@ -1712,8 +1832,8 @@ if (!function_exists('fridg3_feed_replace_media_placeholders')) {
     }
 }
 
-if (!function_exists('fridg3_feed_parse_post')) {
-    function fridg3_feed_parse_post(string $raw): array
+if (!function_exists('fridge_feed_parse_post')) {
+    function fridge_feed_parse_post(string $raw): array
     {
         $lines = preg_split('/\R/', $raw) ?: [];
         $isV2 = trim((string)($lines[0] ?? '')) === 'v2';
@@ -1727,8 +1847,19 @@ if (!function_exists('fridg3_feed_parse_post')) {
     }
 }
 
-if (!function_exists('fridg3_feed_markdown_inline')) {
-    function fridg3_feed_markdown_inline(string $text): string
+if (!function_exists('fridge_feed_markdown_inline')) {
+    function fridge_feed_raw_media_type(string $value): ?string
+    {
+        $url = mdp_safe_url(html_entity_decode(trim($value), ENT_QUOTES, 'UTF-8'));
+        if ($url === null || !preg_match('#^https?://#i', $url)) return null;
+        $extension = strtolower(pathinfo((string)(parse_url($url, PHP_URL_PATH) ?? ''), PATHINFO_EXTENSION));
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'], true)) return 'image';
+        if (in_array($extension, ['mp3', 'aac', 'm4a', 'ogg', 'wav', 'flac'], true)) return 'audio';
+        if (in_array($extension, ['mp4', 'webm', 'ogv', 'mov'], true)) return 'video';
+        return null;
+    }
+
+    function fridge_feed_markdown_inline(string $text): string
     {
         $tokens = [];
         $protect = static function (string $html) use (&$tokens): string {
@@ -1740,10 +1871,11 @@ if (!function_exists('fridg3_feed_markdown_inline')) {
         $text = preg_replace_callback('/<\/?u\s*>/i', static fn(array $m): string => $protect(str_starts_with($m[0], '</') ? '</u>' : '<u>'), $text) ?? $text;
         $html = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
         $accountNames = [];
-        foreach ((array)(fridg3_feed_load_accounts()['accounts'] ?? []) as $account) {
+        foreach ((array)(fridge_feed_load_accounts()['accounts'] ?? []) as $account) {
             $username = trim((string)($account['username'] ?? ''));
             if ($username !== '') $accountNames[strtolower($username)] = $username;
         }
+        $accountNames['toast'] = 'toast';
         $html = preg_replace_callback('/(?<![a-zA-Z0-9_])@([a-zA-Z0-9_-]{1,32})\b/', static function (array $match) use ($protect, $accountNames): string {
             $key = strtolower((string)$match[1]);
             return isset($accountNames[$key]) ? $protect('<code class="feed-account-mention" data-tooltip="registered fridge.dev account">@' . htmlspecialchars($accountNames[$key], ENT_QUOTES, 'UTF-8') . '</code>') : $match[0];
@@ -1752,6 +1884,10 @@ if (!function_exists('fridg3_feed_markdown_inline')) {
             return $protect('<i class="fa-' . strtolower($m[1]) . ' fa-' . strtolower($m[2]) . '"></i>');
         }, $html) ?? $html;
         $html = preg_replace_callback('/(?<!\S)!frdg\b/i', static fn(): string => $protect('<img class="markdown-frdg-icon no-image-viewer" src="/resources/icons/favicon.svg" alt="fridge.dev">'), $html) ?? $html;
+        $html = preg_replace_callback('/\[filter-original=([a-zA-Z0-9+\/=]+)\](.*?)\[\/filter-original\]/i', static function (array $m) use ($protect): string {
+            $original = base64_decode($m[1], true);
+            return $original === false ? $m[2] : $protect('<span class="filtered-word" data-context-tooltip="original: ' . htmlspecialchars($original, ENT_QUOTES, 'UTF-8') . '">' . $m[2] . '</span>');
+        }, $html) ?? $html;
         $html = preg_replace_callback('/\[tooltip=&quot;([^&]*)&quot;\](.*?)\[\/tooltip\]/i', static function (array $m) use ($protect): string {
             $tooltip = htmlspecialchars(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
             return $protect('<span data-tooltip="' . $tooltip . '">' . $m[2] . '</span>');
@@ -1783,8 +1919,8 @@ if (!function_exists('fridg3_feed_markdown_inline')) {
     }
 }
 
-if (!function_exists('fridg3_feed_render_v2_markdown')) {
-    function fridg3_feed_markdown_split_table_row(string $row): array
+if (!function_exists('fridge_feed_render_v2_markdown')) {
+    function fridge_feed_markdown_split_table_row(string $row): array
     {
         $escapedPipe = "\x1FFEEDPIPE\x1F";
         $spoilers = [];
@@ -1802,7 +1938,7 @@ if (!function_exists('fridg3_feed_render_v2_markdown')) {
         }, explode('|', $row));
     }
 
-    function fridg3_feed_render_v2_list(array $lines, int &$index, int $baseIndent): string
+    function fridge_feed_render_v2_list(array $lines, int &$index, int $baseIndent): string
     {
         preg_match('/^(\s*)([-+*]|(\d+)\.)\s+(.+)$/', $lines[$index] ?? '', $first);
         $ordered = isset($first[3]) && $first[3] !== '';
@@ -1815,19 +1951,19 @@ if (!function_exists('fridg3_feed_render_v2_markdown')) {
             $indent = strlen(str_replace("\t", '    ', $item[1]));
             $itemOrdered = isset($item[3]) && $item[3] !== '';
             if ($indent !== $baseIndent || $itemOrdered !== $ordered) break;
-            $html .= '<li>' . fridg3_feed_markdown_inline($item[4]);
+            $html .= '<li>' . fridge_feed_markdown_inline($item[4]);
             $index++;
             while ($index < $count && preg_match('/^(\s*)([-+*]|\d+\.)\s+(.+)$/', $lines[$index], $child)) {
                 $childIndent = strlen(str_replace("\t", '    ', $child[1]));
                 if ($childIndent <= $baseIndent) break;
-                $html .= fridg3_feed_render_v2_list($lines, $index, $childIndent);
+                $html .= fridge_feed_render_v2_list($lines, $index, $childIndent);
             }
             $html .= '</li>';
         }
         return $html . '</' . $tag . '>';
     }
 
-    function fridg3_feed_render_v2_markdown(string $body): string
+    function fridge_feed_render_v2_markdown(string $body): string
     {
         $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $body));
         $html = [];
@@ -1847,21 +1983,35 @@ if (!function_exists('fridg3_feed_render_v2_markdown')) {
                 $url = mdp_safe_url(html_entity_decode($media[2], ENT_QUOTES, 'UTF-8'));
                 if ($url !== null) {
                     $html[] = strtolower($media[1]) === 'audio'
-                        ? fridg3_feed_render_audio_attachment($url, basename((string)parse_url($url, PHP_URL_PATH)))
-                        : fridg3_feed_render_video_attachment($url, basename((string)parse_url($url, PHP_URL_PATH)));
+                        ? fridge_feed_render_audio_attachment($url, basename((string)parse_url($url, PHP_URL_PATH)))
+                        : fridge_feed_render_video_attachment($url, basename((string)parse_url($url, PHP_URL_PATH)));
+                    $i++;
+                    continue;
+                }
+            }
+            $rawMediaType = fridge_feed_raw_media_type($trimmed);
+            if ($rawMediaType !== null) {
+                $rawMediaUrl = mdp_safe_url(html_entity_decode($trimmed, ENT_QUOTES, 'UTF-8'));
+                if ($rawMediaUrl !== null) {
+                    $rawMediaName = basename((string)(parse_url($rawMediaUrl, PHP_URL_PATH) ?? ''));
+                    $html[] = $rawMediaType === 'image'
+                        ? '<img src="' . mdp_h($rawMediaUrl) . '" alt="' . mdp_h($rawMediaName !== '' ? $rawMediaName : 'linked image') . '">'
+                        : ($rawMediaType === 'audio'
+                            ? fridge_feed_render_audio_attachment($rawMediaUrl, $rawMediaName)
+                            : fridge_feed_render_video_attachment($rawMediaUrl, $rawMediaName));
                     $i++;
                     continue;
                 }
             }
             if ($i + 1 < $count && str_contains($line, '|') && preg_match('/^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$/', $lines[$i + 1])) {
-                $headers = fridg3_feed_markdown_split_table_row($line);
+                $headers = fridge_feed_markdown_split_table_row($line);
                 $i += 2;
                 $rows = [];
-                while ($i < $count && trim($lines[$i]) !== '' && str_contains($lines[$i], '|')) $rows[] = fridg3_feed_markdown_split_table_row($lines[$i++]);
+                while ($i < $count && trim($lines[$i]) !== '' && str_contains($lines[$i], '|')) $rows[] = fridge_feed_markdown_split_table_row($lines[$i++]);
                 $table = '<div class="mdpaste-table-scroll"><table><thead><tr>';
-                foreach ($headers as $cell) $table .= '<th>' . fridg3_feed_markdown_inline($cell) . '</th>';
+                foreach ($headers as $cell) $table .= '<th>' . fridge_feed_markdown_inline($cell) . '</th>';
                 $table .= '</tr></thead><tbody>';
-                foreach ($rows as $row) { $table .= '<tr>'; foreach ($headers as $index => $_) $table .= '<td>' . fridg3_feed_markdown_inline((string)($row[$index] ?? '')) . '</td>'; $table .= '</tr>'; }
+                foreach ($rows as $row) { $table .= '<tr>'; foreach ($headers as $index => $_) $table .= '<td>' . fridge_feed_markdown_inline((string)($row[$index] ?? '')) . '</td>'; $table .= '</tr>'; }
                 $html[] = $table . '</tbody></table></div>';
                 continue;
             }
@@ -1870,23 +2020,23 @@ if (!function_exists('fridg3_feed_render_v2_markdown')) {
                 while ($i < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$i], $match)) { $quote[] = $match[1]; $i++; }
                 if (isset($quote[0]) && preg_match('/^\[!QUOTE\s+(.+?)\]\s*$/i', trim($quote[0]), $attributedQuote)) {
                     array_shift($quote);
-                    $body = implode('<br>', array_map('fridg3_feed_markdown_inline', $quote));
+                    $body = implode('<br>', array_map('fridge_feed_markdown_inline', $quote));
                     $html[] = '<figure class="markdown-attributed-quote"><blockquote>' . $body
                         . '</blockquote><figcaption>— <cite>' . htmlspecialchars(trim($attributedQuote[1]), ENT_QUOTES, 'UTF-8') . '</cite></figcaption></figure>';
                 } else {
-                    $html[] = '<blockquote>' . implode('<br>', array_map('fridg3_feed_markdown_inline', $quote)) . '</blockquote>';
+                    $html[] = '<blockquote>' . implode('<br>', array_map('fridge_feed_markdown_inline', $quote)) . '</blockquote>';
                 }
                 continue;
             }
             if (preg_match('/^(\s*)([-+*]|\d+\.)\s+(.+)$/', $line, $list)) {
                 $indent = strlen(str_replace("\t", '    ', $list[1]));
-                $html[] = fridg3_feed_render_v2_list($lines, $i, $indent);
+                $html[] = fridge_feed_render_v2_list($lines, $i, $indent);
                 continue;
             }
             $paragraph = [];
             while ($i < $count && trim($lines[$i]) !== '') {
                 if ($paragraph !== [] && (str_starts_with(trim($lines[$i]), '>') || str_starts_with(trim($lines[$i]), '```') || preg_match('/^\s*(?:[-+*]|\d+\.)\s+/', $lines[$i]))) break;
-                $paragraph[] = fridg3_feed_markdown_inline($lines[$i++]);
+                $paragraph[] = fridge_feed_markdown_inline($lines[$i++]);
             }
             $html[] = '<p>' . implode('<br>', $paragraph) . '</p>';
         }
@@ -1894,17 +2044,17 @@ if (!function_exists('fridg3_feed_render_v2_markdown')) {
     }
 }
 
-if (!function_exists('fridg3_feed_render_post_body')) {
-    function fridg3_feed_render_post_body(string $body, string $format): string
+if (!function_exists('fridge_feed_render_post_body')) {
+    function fridge_feed_render_post_body(string $body, string $format): string
     {
         if ($format !== 'v2') return htmlspecialchars($body, ENT_QUOTES, 'UTF-8');
         require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
-        return '<div class="feed-markdown mdpaste-markdown" data-feed-format="v2">' . fridg3_feed_render_v2_markdown($body) . '</div>';
+        return '<div class="feed-markdown mdpaste-markdown" data-feed-format="v2">' . fridge_feed_render_v2_markdown($body) . '</div>';
     }
 }
 
-if (!function_exists('fridg3_feed_render_audio_attachment')) {
-    function fridg3_feed_render_audio_attachment(string $url, string $name): string
+if (!function_exists('fridge_feed_render_audio_attachment')) {
+    function fridge_feed_render_audio_attachment(string $url, string $name): string
     {
         $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
         $path = (string)(parse_url($url, PHP_URL_PATH) ?? '');
@@ -1920,8 +2070,8 @@ if (!function_exists('fridg3_feed_render_audio_attachment')) {
     }
 }
 
-if (!function_exists('fridg3_feed_render_video_attachment')) {
-    function fridg3_feed_render_video_attachment(string $url, string $name): string
+if (!function_exists('fridge_feed_render_video_attachment')) {
+    function fridge_feed_render_video_attachment(string $url, string $name): string
     {
         $safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
         $safeName = htmlspecialchars($name !== '' ? $name : 'video', ENT_QUOTES, 'UTF-8');

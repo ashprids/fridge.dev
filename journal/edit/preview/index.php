@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'video-embeds.php';
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
@@ -87,10 +87,10 @@ function bbcode_to_html(string $text): string {
     }, $html);
 
     $html = preg_replace_callback('/\[audio=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
-        return fridg3_feed_render_audio_attachment($m[1], trim((string)($m[2] ?? 'audio')));
+        return fridge_feed_render_audio_attachment($m[1], trim((string)($m[2] ?? 'audio')));
     }, $html);
     $html = preg_replace_callback('/\[video=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
-        return fridg3_feed_render_video_attachment($m[1], trim((string)($m[2] ?? 'video')));
+        return fridge_feed_render_video_attachment($m[1], trim((string)($m[2] ?? 'video')));
     }, $html);
 
     $html = preg_replace_callback('/\[spoiler\](.*?)\[\/spoiler\]/is', function($m) {
@@ -246,7 +246,7 @@ if ($hasDraft) {
     } else {
         $contentHtml = bbcode_to_html($draftBody);
     }
-    $contentHtml = fridg3_embed_plain_video_links_in_html($contentHtml);
+    $contentHtml = fridge_embed_plain_video_links_in_html($contentHtml);
 }
 
 $render_helper_path = find_template_file('lib/render.php');

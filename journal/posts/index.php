@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'video-embeds.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
@@ -46,7 +46,7 @@ if ($post === '') {
     exit;
 }
 $journal_dir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
-$post_file = fridg3_journal_post_path($journal_dir, $post);
+$post_file = fridge_journal_post_path($journal_dir, $post);
 
 $title = 'Post not found';
 $subtitle = '';
@@ -56,7 +56,7 @@ $description = '';
 
 if ($post && $post_file !== null && file_exists($post_file)) {
     $rawPost = @file_get_contents($post_file);
-    $parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+    $parsedPost = $rawPost !== false ? fridge_journal_parse_post($rawPost) : null;
     if ($parsedPost !== null) {
         $date = htmlspecialchars($parsedPost['date'], ENT_QUOTES, 'UTF-8');
         $title = htmlspecialchars($parsedPost['title'], ENT_QUOTES, 'UTF-8');
@@ -64,10 +64,14 @@ if ($post && $post_file !== null && file_exists($post_file)) {
         $description = $subtitle;
         $content_html = $parsedPost['format'] === 'v2'
             ? mdp_render_trusted_markdown($parsedPost['markdown'])
-            : fridg3_embed_plain_video_links_in_html($parsedPost['body']);
+            : fridge_embed_plain_video_links_in_html($parsedPost['body']);
     }
 }
 
+
+if (!isset($parsedPost) || $parsedPost === null) {
+    http_response_code(404);
+}
 
 function find_template_file($filename) {
     $dir = __DIR__;

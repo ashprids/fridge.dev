@@ -8,3 +8,4 @@ sitemap.xml
 .agents
 id_ed25519
 .user.ini
+.dev-data-download-aborted

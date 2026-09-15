@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'fruity-dance.php';
 
@@ -67,7 +67,7 @@ function settings_has_admin_account(array $accountsData): bool {
 }
 
 $accountsPath = settings_accounts_path();
-$isLocalDevServer = function_exists('fridg3_is_local_dev_server') && fridg3_is_local_dev_server();
+$isLocalDevServer = function_exists('fridge_is_local_dev_server') && fridge_is_local_dev_server();
 $accountsDataForBootstrap = settings_load_accounts_data($accountsPath);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_dev_admin'])) {
@@ -150,8 +150,12 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
+if (restore_active()) {
+    $content = str_replace('class="radio-group" id="maintenance-mode-group"', 'class="radio-group backup-maintenance-locked" id="maintenance-mode-group"', $content);
+    $content = str_replace('name="maintenance-mode"', 'name="maintenance-mode" disabled', $content);
+}
 $fruityDanceOptions = '';
-foreach (fridg3_fruity_dance_spritesheets(dirname(__DIR__)) as $sheet) {
+foreach (fridge_fruity_dance_spritesheets(dirname(__DIR__)) as $sheet) {
     $fruityDanceOptions .= '<option value="' . htmlspecialchars($sheet['filename'], ENT_QUOTES, 'UTF-8') . '" data-url="'
         . htmlspecialchars($sheet['url'], ENT_QUOTES, 'UTF-8') . '" data-description="'
         . htmlspecialchars($sheet['description'], ENT_QUOTES, 'UTF-8') . '" data-animations="'
@@ -163,7 +167,7 @@ $content = str_replace('{fruity_dance_spritesheet_options}', $fruityDanceOptions
 $isLoggedIn = isset($_SESSION['user']) && isset($_SESSION['user']['username']);
 $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
 $isModerator = $isAdmin || (isset($_SESSION['user']['isModerator']) && $_SESSION['user']['isModerator'] === true);
-$isToast = $isLoggedIn && fridg3_toast_is_current_user();
+$isToast = $isLoggedIn && fridge_toast_is_current_user();
 $hasLinkedDiscord = false;
 
 if ($isLoggedIn) {
@@ -231,7 +235,7 @@ if ($hasLinkedDiscord) {
         $content
     );
 }
-if ($template_name === 'template_mobile.html') {
+if ($template_name === 'template_mobile.html' && $isLoggedIn) {
     $content = str_replace('<div class="checkbox-group" id="notification-sounds-setting">', '<div class="checkbox-group" id="notification-sounds-setting" style="display:none">', $content);
 }
 $hasAdminAccountForBootstrap = settings_has_admin_account($accountsDataForBootstrap);

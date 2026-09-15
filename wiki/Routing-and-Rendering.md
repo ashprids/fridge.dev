@@ -35,13 +35,15 @@ Admin account pages use equivalent helpers in `account/admin/helpers.php`.
 
 Typical route flow:
 
-1. Start session through `fridg3_start_session()` from `lib/session.php`
+1. Start session through `fridge_start_session()` from `lib/session.php`
 2. Optionally enforce auth/admin checks
 3. Load render helper from `lib/render.php`
 4. Choose template with `get_preferred_template_name(__DIR__)`
 5. Load local `content.html`
 6. Inject placeholders like `{content}`, `{title}`, `{description}`, `{user_greeting}`
 7. Optionally swap account footer button to logout when logged in
+
+Public metadata and indexing directives run through `lib/seo.php` for every template; see [Search and SEO](Search-and-SEO). Mobile and desktop layouts share the main HTTPS domain. The mobile-view cookie takes precedence over first-request user-agent detection, and Nginx redirects the former mobile and www hosts to the main domain.
 
 Theme selection also runs through `lib/render.php` and reads only the browser's `theme_pref` cookie; account records never participate in theme selection. `default` is Blackprint and uses the base template/style. Classic and Whiteprint are packaged selectable themes. Desktop requests for packaged themes can use a theme HTML template from `/themes/lib`; mobile requests always keep `template_mobile.html` and append the selected theme CSS after the mobile inline styles. Every package receives a `{theme-id}-theme` body class; metadata with `base: blackprint` also receives `blackprint-theme`, allowing Whiteprint to inherit Blackprint's layout and component coverage. The aliases `blackprint` and `custom` normalize to `default` and `classic` respectively.
 
@@ -104,6 +106,8 @@ The admin bypass uses the server session user `isAdmin` flag, so it still works 
 ## Local Dev Mode
 
 `lib/render.php` treats `localhost`, `127.x.x.x`, `0.0.0.0`, `::1`, `*.localhost`, `*.test`, or truthy `FRIDG3_DEV_MODE` as local development. Local renders prefix the document title with `[DEV] ` and inject a sidebar `dev mode` banner beside the maintenance banner, with a tooltip explaining that localhost-triggered developer mode can differ from production/server behavior and pointing developers to `/settings` for options. The prefix is applied idempotently before each route replaces its `{title}` placeholder, so full loads and SPA navigation produce titles such as `[DEV] feed | fridge.dev` without duplication.
+
+While developer mode is active, the browser polls the development-only `/api/dev-status/` endpoint. If the PHP server terminates, the page freezes beneath a dark blurred overlay and shows a `Server closed` popup. Its ten-second countdown is mirrored in the tab title as `closing in X...`. At zero, or when the popup button is pressed, the close routine tries the standard, current-context, and opener methods before replacing a browser-protected tab with `about:blank`.
 
 ## Page View Counting
 

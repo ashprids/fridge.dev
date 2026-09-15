@@ -3,50 +3,50 @@
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
 require_once __DIR__ . '/toast-models.php';
 
-if (!function_exists('fridg3_toast_root_dir')) {
-    function fridg3_toast_root_dir(): string
+if (!function_exists('fridge_toast_root_dir')) {
+    function fridge_toast_root_dir(): string
     {
         return dirname(__DIR__);
     }
 }
 
-if (!function_exists('fridg3_toast_accounts_path')) {
-    function fridg3_toast_accounts_path(): string
+if (!function_exists('fridge_toast_accounts_path')) {
+    function fridge_toast_accounts_path(): string
     {
-        return fridg3_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
+        return fridge_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
     }
 }
 
-if (!function_exists('fridg3_toast_etc_dir')) {
-    function fridg3_toast_etc_dir(): string
+if (!function_exists('fridge_toast_etc_dir')) {
+    function fridge_toast_etc_dir(): string
     {
-        return fridg3_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc';
+        return fridge_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc';
     }
 }
 
-if (!function_exists('fridg3_toast_personality_path')) {
-    function fridg3_toast_personality_path(): string
+if (!function_exists('fridge_toast_personality_path')) {
+    function fridge_toast_personality_path(): string
     {
-        return fridg3_toast_etc_dir() . DIRECTORY_SEPARATOR . 'toast-personality.json';
+        return fridge_toast_etc_dir() . DIRECTORY_SEPARATOR . 'toast-personality.json';
     }
 }
 
-if (!function_exists('fridg3_toast_legacy_personality_path')) {
-    function fridg3_toast_legacy_personality_path(): string
+if (!function_exists('fridge_toast_legacy_personality_path')) {
+    function fridge_toast_legacy_personality_path(): string
     {
-        return fridg3_toast_root_dir() . DIRECTORY_SEPARATOR . 'others' . DIRECTORY_SEPARATOR . 'toast-discord-bot' . DIRECTORY_SEPARATOR . 'bot' . DIRECTORY_SEPARATOR . 'personality.json';
+        return fridge_toast_root_dir() . DIRECTORY_SEPARATOR . 'others' . DIRECTORY_SEPARATOR . 'toast-discord-bot' . DIRECTORY_SEPARATOR . 'bot' . DIRECTORY_SEPARATOR . 'personality.json';
     }
 }
 
-if (!function_exists('fridg3_toast_is_reserved_username')) {
-    function fridg3_toast_is_reserved_username(string $username): bool
+if (!function_exists('fridge_toast_is_reserved_username')) {
+    function fridge_toast_is_reserved_username(string $username): bool
     {
         return strcasecmp(trim($username), 'toast') === 0;
     }
 }
 
-if (!function_exists('fridg3_toast_is_current_user')) {
-    function fridg3_toast_is_current_user(): bool
+if (!function_exists('fridge_toast_is_current_user')) {
+    function fridge_toast_is_current_user(): bool
     {
         return isset($_SESSION['user']['username'])
             && strcasecmp((string)$_SESSION['user']['username'], 'toast') === 0
@@ -54,8 +54,8 @@ if (!function_exists('fridg3_toast_is_current_user')) {
     }
 }
 
-if (!function_exists('fridg3_toast_session_user')) {
-    function fridg3_toast_session_user(): array
+if (!function_exists('fridge_toast_session_user')) {
+    function fridge_toast_session_user(): array
     {
         return [
             'username' => 'toast',
@@ -68,10 +68,10 @@ if (!function_exists('fridg3_toast_session_user')) {
     }
 }
 
-if (!function_exists('fridg3_toast_load_accounts')) {
-    function fridg3_toast_load_accounts(): array
+if (!function_exists('fridge_toast_load_accounts')) {
+    function fridge_toast_load_accounts(): array
     {
-        $accountsPath = fridg3_toast_accounts_path();
+        $accountsPath = fridge_toast_accounts_path();
         if (!is_file($accountsPath)) {
             return ['accounts' => []];
         }
@@ -85,8 +85,8 @@ if (!function_exists('fridg3_toast_load_accounts')) {
     }
 }
 
-if (!function_exists('fridg3_toast_verify_password')) {
-    function fridg3_toast_verify_password(string $submittedPassword, string $storedPassword): bool
+if (!function_exists('fridge_toast_verify_password')) {
+    function fridge_toast_verify_password(string $submittedPassword, string $storedPassword): bool
     {
         if ($storedPassword === '') {
             return $submittedPassword === '';
@@ -100,15 +100,15 @@ if (!function_exists('fridg3_toast_verify_password')) {
     }
 }
 
-if (!function_exists('fridg3_toast_verify_admin_credentials')) {
-    function fridg3_toast_verify_admin_credentials(string $username, string $password): bool
+if (!function_exists('fridge_toast_verify_admin_credentials')) {
+    function fridge_toast_verify_admin_credentials(string $username, string $password): bool
     {
         $username = trim($username);
-        if ($username === '' || fridg3_toast_is_reserved_username($username)) {
+        if ($username === '' || fridge_toast_is_reserved_username($username)) {
             return false;
         }
 
-        $accountsData = fridg3_toast_load_accounts();
+        $accountsData = fridge_toast_load_accounts();
         foreach ($accountsData['accounts'] as $account) {
             if (!isset($account['username']) || (string)$account['username'] !== $username) {
                 continue;
@@ -118,15 +118,15 @@ if (!function_exists('fridg3_toast_verify_admin_credentials')) {
                 return false;
             }
 
-            return fridg3_toast_verify_password($password, (string)($account['password'] ?? ''));
+            return fridge_toast_verify_password($password, (string)($account['password'] ?? ''));
         }
 
         return false;
     }
 }
 
-if (!function_exists('fridg3_toast_normalize_personality_block')) {
-    function fridg3_toast_normalize_personality_block($block): array
+if (!function_exists('fridge_toast_normalize_personality_block')) {
+    function fridge_toast_normalize_personality_block($block): array
     {
         if (!is_array($block)) {
             $block = [];
@@ -145,14 +145,14 @@ if (!function_exists('fridg3_toast_normalize_personality_block')) {
     }
 }
 
-if (!function_exists('fridg3_toast_default_personality_block')) {
-    function fridg3_toast_default_personality_block(): array
+if (!function_exists('fridge_toast_default_personality_block')) {
+    function fridge_toast_default_personality_block(): array
     {
-        $legacyPath = fridg3_toast_legacy_personality_path();
+        $legacyPath = fridge_toast_legacy_personality_path();
         if (is_file($legacyPath)) {
             $decoded = json_decode((string)@file_get_contents($legacyPath), true);
             if (is_array($decoded)) {
-                $normalized = fridg3_toast_normalize_personality_block($decoded);
+                $normalized = fridge_toast_normalize_personality_block($decoded);
                 if ($normalized['system_prompt'] !== '') {
                     return $normalized;
                 }
@@ -175,10 +175,10 @@ if (!function_exists('fridg3_toast_default_personality_block')) {
     }
 }
 
-if (!function_exists('fridg3_toast_default_personality_config')) {
-    function fridg3_toast_default_personality_config(): array
+if (!function_exists('fridge_toast_default_personality_config')) {
+    function fridge_toast_default_personality_config(): array
     {
-        $block = fridg3_toast_default_personality_block();
+        $block = fridge_toast_default_personality_block();
         $feedBlock = $block;
         $feedBlock['style_rules'][] = 'for feed posts and replies, keep it short like an old-style Twitter post';
         $feedBlock['style_rules'][] = 'one sharp thought is better than a helpful paragraph';
@@ -195,8 +195,8 @@ if (!function_exists('fridg3_toast_default_personality_config')) {
     }
 }
 
-if (!function_exists('fridg3_toast_validate_personality_config')) {
-    function fridg3_toast_validate_personality_config($config, ?string &$error = null): bool
+if (!function_exists('fridge_toast_validate_personality_config')) {
+    function fridge_toast_validate_personality_config($config, ?string &$error = null): bool
     {
         if (!is_array($config)) {
             $error = 'personality json must be an object.';
@@ -209,7 +209,7 @@ if (!function_exists('fridg3_toast_validate_personality_config')) {
                 return false;
             }
 
-            $block = fridg3_toast_normalize_personality_block($config[$section]);
+            $block = fridge_toast_normalize_personality_block($config[$section]);
             if ($block['system_prompt'] === '') {
                 $error = $section . ' personality needs a system_prompt.';
                 return false;
@@ -221,38 +221,38 @@ if (!function_exists('fridg3_toast_validate_personality_config')) {
     }
 }
 
-if (!function_exists('fridg3_toast_load_personality_config')) {
-    function fridg3_toast_load_personality_config(): array
+if (!function_exists('fridge_toast_load_personality_config')) {
+    function fridge_toast_load_personality_config(): array
     {
-        $path = fridg3_toast_personality_path();
+        $path = fridge_toast_personality_path();
         if (is_file($path)) {
             $decoded = json_decode((string)@file_get_contents($path), true);
             $error = null;
-            if (fridg3_toast_validate_personality_config($decoded, $error)) {
+            if (fridge_toast_validate_personality_config($decoded, $error)) {
                 return [
-                    'discord' => fridg3_toast_normalize_personality_block($decoded['discord']),
-                    'feed' => fridg3_toast_normalize_personality_block($decoded['feed']),
+                    'discord' => fridge_toast_normalize_personality_block($decoded['discord']),
+                    'feed' => fridge_toast_normalize_personality_block($decoded['feed']),
                 ];
             }
         }
 
-        return fridg3_toast_default_personality_config();
+        return fridge_toast_default_personality_config();
     }
 }
 
-if (!function_exists('fridg3_toast_save_personality_config')) {
-    function fridg3_toast_save_personality_config(array $config, ?string &$error = null): bool
+if (!function_exists('fridge_toast_save_personality_config')) {
+    function fridge_toast_save_personality_config(array $config, ?string &$error = null): bool
     {
-        if (!fridg3_toast_validate_personality_config($config, $error)) {
+        if (!fridge_toast_validate_personality_config($config, $error)) {
             return false;
         }
 
         $normalized = [
-            'discord' => fridg3_toast_normalize_personality_block($config['discord']),
-            'feed' => fridg3_toast_normalize_personality_block($config['feed']),
+            'discord' => fridge_toast_normalize_personality_block($config['discord']),
+            'feed' => fridge_toast_normalize_personality_block($config['feed']),
         ];
 
-        $etcDir = fridg3_toast_etc_dir();
+        $etcDir = fridge_toast_etc_dir();
         if (!is_dir($etcDir) && !@mkdir($etcDir, 0775, true) && !is_dir($etcDir)) {
             $error = 'could not create data/etc.';
             return false;
@@ -264,7 +264,7 @@ if (!function_exists('fridg3_toast_save_personality_config')) {
             return false;
         }
 
-        if (@file_put_contents(fridg3_toast_personality_path(), $encoded . PHP_EOL, LOCK_EX) === false) {
+        if (@file_put_contents(fridge_toast_personality_path(), $encoded . PHP_EOL, LOCK_EX) === false) {
             $error = 'could not write toast-personality.json.';
             return false;
         }
@@ -274,13 +274,13 @@ if (!function_exists('fridg3_toast_save_personality_config')) {
     }
 }
 
-if (!function_exists('fridg3_toast_personality_prompt')) {
-    function fridg3_toast_personality_prompt(string $section): string
+if (!function_exists('fridge_toast_personality_prompt')) {
+    function fridge_toast_personality_prompt(string $section): string
     {
-        $config = fridg3_toast_load_personality_config();
-        $block = fridg3_toast_normalize_personality_block($config[$section] ?? []);
+        $config = fridge_toast_load_personality_config();
+        $block = fridge_toast_normalize_personality_block($config[$section] ?? []);
         if ($block['system_prompt'] === '') {
-            $block = fridg3_toast_default_personality_block();
+            $block = fridge_toast_default_personality_block();
         }
 
         $parts = [$block['system_prompt']];
@@ -303,10 +303,10 @@ if (!function_exists('fridg3_toast_personality_prompt')) {
     }
 }
 
-if (!function_exists('fridg3_toast_load_groq_config')) {
-    function fridg3_toast_load_groq_config(): array
+if (!function_exists('fridge_toast_load_groq_config')) {
+    function fridge_toast_load_groq_config(): array
     {
-        $path = fridg3_toast_etc_dir() . DIRECTORY_SEPARATOR . 'toast.json';
+        $path = fridge_toast_etc_dir() . DIRECTORY_SEPARATOR . 'toast.json';
         $decoded = [];
         if (is_file($path)) {
             $decoded = json_decode((string)@file_get_contents($path), true);
@@ -327,8 +327,8 @@ if (!function_exists('fridg3_toast_load_groq_config')) {
     }
 }
 
-if (!function_exists('fridg3_toast_feed_plain_text')) {
-    function fridg3_toast_feed_plain_text(string $text, int $maxChars = 1400): string
+if (!function_exists('fridge_toast_feed_plain_text')) {
+    function fridge_toast_feed_plain_text(string $text, int $maxChars = 1400): string
     {
         $text = preg_replace('/\[img(?::\d+|=[^\]]+)?\](?:\[name:[^\]]*\])?/i', '', $text);
         $text = preg_replace('/\[audio=[^\]]+\](?:\[name:[^\]]*\])?/i', '[voice note]', (string)$text);
@@ -344,22 +344,22 @@ if (!function_exists('fridg3_toast_feed_plain_text')) {
     }
 }
 
-if (!function_exists('fridg3_toast_feed_mentions_toast')) {
-    function fridg3_toast_feed_mentions_toast(string $text): bool
+if (!function_exists('fridge_toast_feed_mentions_toast')) {
+    function fridge_toast_feed_mentions_toast(string $text): bool
     {
         return preg_match('/(^|[^\w])@toast\b/i', $text) === 1;
     }
 }
 
-if (!function_exists('fridg3_toast_auto_reply_delay_seconds')) {
-    function fridg3_toast_auto_reply_delay_seconds(): int
+if (!function_exists('fridge_toast_auto_reply_delay_seconds')) {
+    function fridge_toast_auto_reply_delay_seconds(): int
     {
         return 60;
     }
 }
 
-if (!function_exists('fridg3_toast_run_auto_reply_after_response')) {
-    function fridg3_toast_run_auto_reply_after_response(callable $callback): void
+if (!function_exists('fridge_toast_run_auto_reply_after_response')) {
+    function fridge_toast_run_auto_reply_after_response(callable $callback): void
     {
         ignore_user_abort(true);
 
@@ -374,13 +374,13 @@ if (!function_exists('fridg3_toast_run_auto_reply_after_response')) {
             @flush();
         }
 
-        sleep(fridg3_toast_auto_reply_delay_seconds());
+        sleep(fridge_toast_auto_reply_delay_seconds());
         $callback();
     }
 }
 
-if (!function_exists('fridg3_toast_clean_generated_feed_reply')) {
-    function fridg3_toast_clean_generated_feed_reply(string $content, string $targetUsername): string
+if (!function_exists('fridge_toast_clean_generated_feed_reply')) {
+    function fridge_toast_clean_generated_feed_reply(string $content, string $targetUsername): string
     {
         $content = trim($content);
         $content = preg_replace('/^```(?:bbcode|markdown|text)?\s*/i', '', (string)$content);
@@ -436,10 +436,10 @@ if (!function_exists('fridg3_toast_clean_generated_feed_reply')) {
     }
 }
 
-if (!function_exists('fridg3_toast_request_feed_reply')) {
-    function fridg3_toast_request_feed_reply(array $post, array $replies, array $trigger, string $reason): string
+if (!function_exists('fridge_toast_request_feed_reply')) {
+    function fridge_toast_request_feed_reply(array $post, array $replies, array $trigger, string $reason): string
     {
-        $groq = fridg3_toast_load_groq_config();
+        $groq = fridge_toast_load_groq_config();
         if ($groq['api_key'] === '' || !function_exists('curl_init')) {
             return '';
         }
@@ -453,7 +453,7 @@ if (!function_exists('fridg3_toast_request_feed_reply')) {
         $recentReplies = array_slice($replies, -8);
         foreach ($recentReplies as $reply) {
             $replyUser = ltrim((string)($reply['username'] ?? ''), '@');
-            $replyBody = fridg3_toast_feed_plain_text((string)($reply['body'] ?? ''), 700);
+            $replyBody = fridge_toast_feed_plain_text((string)($reply['body'] ?? ''), 700);
             if ($replyUser === '' || $replyBody === '') {
                 continue;
             }
@@ -462,8 +462,8 @@ if (!function_exists('fridg3_toast_request_feed_reply')) {
 
         $postAuthor = ltrim((string)($post['username'] ?? ''), '@');
         $postDate = (string)($post['date'] ?? '');
-        $postBody = fridg3_toast_feed_plain_text((string)($post['body'] ?? ''), 1800);
-        $triggerBody = fridg3_toast_feed_plain_text((string)($trigger['body'] ?? ''), 1000);
+        $postBody = fridge_toast_feed_plain_text((string)($post['body'] ?? ''), 1800);
+        $triggerBody = fridge_toast_feed_plain_text((string)($trigger['body'] ?? ''), 1000);
         $context = "Post /feed/posts/" . (string)($post['id'] ?? '') . "\n"
             . "Author: @" . $postAuthor . "\n"
             . "Date: " . $postDate . "\n"
@@ -478,7 +478,7 @@ if (!function_exists('fridg3_toast_request_feed_reply')) {
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => fridg3_toast_personality_prompt('feed'),
+                    'content' => fridge_toast_personality_prompt('feed'),
                 ],
                 [
                     'role' => 'system',
@@ -532,7 +532,7 @@ if (!function_exists('fridg3_toast_request_feed_reply')) {
         }
 
         $content = (string)($response['choices'][0]['message']['content'] ?? '');
-        $content = fridg3_toast_clean_generated_feed_reply($content, $targetUsername);
+        $content = fridge_toast_clean_generated_feed_reply($content, $targetUsername);
         if ($content === '' || strlen($content) > 4000) {
             return '';
         }
@@ -541,32 +541,53 @@ if (!function_exists('fridg3_toast_request_feed_reply')) {
     }
 }
 
-if (!function_exists('fridg3_toast_maybe_auto_reply_to_feed')) {
-    function fridg3_toast_maybe_auto_reply_to_feed(string $postId, string $postUsername, string $postDate, string $postBody, array $trigger): bool
+if (!function_exists('fridge_toast_should_auto_reply_to_feed')) {
+    function fridge_toast_should_auto_reply_to_feed(string $postUsername, array $trigger): bool
     {
-        if (!function_exists('fridg3_feed_load_replies') || !function_exists('fridg3_feed_save_reply')) {
+        $triggerUsername = preg_replace('/[^a-zA-Z0-9_\-]/', '', ltrim((string)($trigger['username'] ?? ''), '@'));
+        if ($triggerUsername === '' || strcasecmp($triggerUsername, 'toast') === 0) return false;
+
+        $mentionsToast = fridge_toast_feed_mentions_toast((string)($trigger['body'] ?? ''));
+        if (($trigger['type'] ?? 'reply') === 'post') return $mentionsToast;
+        if ($mentionsToast) return true;
+
+        $isTopLevelReply = trim((string)($trigger['parentId'] ?? '')) === '';
+        return $isTopLevelReply && strcasecmp(ltrim($postUsername, '@'), 'toast') === 0;
+    }
+}
+
+if (!function_exists('fridge_toast_feed_reply_parent_id')) {
+    function fridge_toast_feed_reply_parent_id(array $trigger): string
+    {
+        if (($trigger['type'] ?? 'reply') !== 'reply') return '';
+        return preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($trigger['id'] ?? ''));
+    }
+}
+
+if (!function_exists('fridge_toast_maybe_auto_reply_to_feed')) {
+    function fridge_toast_maybe_auto_reply_to_feed(string $postId, string $postUsername, string $postDate, string $postBody, array $trigger): bool
+    {
+        if (!function_exists('fridge_feed_load_replies') || !function_exists('fridge_feed_save_reply')) {
             return false;
         }
 
         $triggerUsername = preg_replace('/[^a-zA-Z0-9_\-]/', '', ltrim((string)($trigger['username'] ?? ''), '@'));
-        $triggerBody = (string)($trigger['body'] ?? '');
         if ($postId === '' || $triggerUsername === '' || strcasecmp($triggerUsername, 'toast') === 0) {
             return false;
         }
 
-        $postOwnedByToast = strcasecmp(ltrim($postUsername, '@'), 'toast') === 0;
-        $mentionsToast = fridg3_toast_feed_mentions_toast($triggerBody);
-        if (!$postOwnedByToast && !$mentionsToast) {
-            return false;
-        }
+        if (!fridge_toast_should_auto_reply_to_feed($postUsername, $trigger)) return false;
 
+        $triggerBody = (string)($trigger['body'] ?? '');
+        $postOwnedByToast = strcasecmp(ltrim($postUsername, '@'), 'toast') === 0;
+        $mentionsToast = fridge_toast_feed_mentions_toast($triggerBody);
         $reason = $postOwnedByToast ? 'user replied to a Toast feed post' : 'user mentioned @toast';
         if ($postOwnedByToast && $mentionsToast) {
             $reason = 'user replied to a Toast feed post and mentioned @toast';
         }
 
-        $replies = fridg3_feed_load_replies($postId);
-        $reply = fridg3_toast_request_feed_reply([
+        $replies = fridge_feed_load_replies($postId);
+        $reply = fridge_toast_request_feed_reply([
             'id' => $postId,
             'username' => $postUsername,
             'date' => $postDate,
@@ -580,6 +601,7 @@ if (!function_exists('fridg3_toast_maybe_auto_reply_to_feed')) {
             return false;
         }
 
-        return fridg3_feed_save_reply($postId, 'toast', $reply, '', 'v2');
+        $replyParentId = fridge_toast_feed_reply_parent_id($trigger);
+        return fridge_feed_save_reply($postId, 'toast', $reply, $replyParentId, 'v2');
     }
 }

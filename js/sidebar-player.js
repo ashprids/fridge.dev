@@ -1,5 +1,5 @@
 // Sidebar toggle functionality
-const sidebarDebugLog = message => window.fridg3DebugClientLog?.(`[sidebar/player] ${message}`);
+const sidebarDebugLog = message => window.fridgeDebugClientLog?.(`[sidebar/player] ${message}`);
 const TOAST_RADIO_ART = '/resources/images/toast.svg';
 const hideSidebarBtn = document.getElementById('hide-sidebar');
 const showSidebarBtn = document.getElementById('show-sidebar');
@@ -7,7 +7,126 @@ const sidebar = document.getElementById('sidebar');
 const mobileCollapsedHeader = document.getElementById('mobile-collapsed-header');
 const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
 const SIDEBAR_KEY = 'sidebarVisible';
+const MOBILE_MENU_POSITION_KEY = 'mobileMenuButtonPositionV1';
 let mobileMenuScrollY = null;
+
+function applyMobileMenuButtonPosition(position) {
+    if (!showSidebarBtn || !isMobileTemplateActive() || !position) return;
+    const margin = 8;
+    const rect = showSidebarBtn.getBoundingClientRect();
+    const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
+    let x = margin;
+    let y = margin;
+    if (position.corner) {
+        x = position.corner.includes('right') ? maxX : margin;
+        y = position.corner.includes('bottom') ? maxY : margin;
+    } else if (position.edge === 'left' || position.edge === 'right') {
+        x = position.edge === 'right' ? maxX : margin;
+        y = margin + Math.max(0, Math.min(1, Number(position.ratio) || 0)) * (maxY - margin);
+    } else {
+        y = position.edge === 'bottom' ? maxY : margin;
+        x = margin + Math.max(0, Math.min(1, Number(position.ratio) || 0)) * (maxX - margin);
+    }
+    showSidebarBtn.style.setProperty('left', `${Math.round(x)}px`, 'important');
+    showSidebarBtn.style.setProperty('top', `${Math.round(y)}px`, 'important');
+    showSidebarBtn.style.setProperty('right', 'auto', 'important');
+    showSidebarBtn.style.setProperty('bottom', 'auto', 'important');
+}
+
+function loadMobileMenuButtonPosition() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(MOBILE_MENU_POSITION_KEY) || 'null');
+        if (saved) applyMobileMenuButtonPosition(saved);
+    } catch (_) { /* no-op */ }
+}
+
+function snapMobileMenuButton(x, y) {
+    if (!showSidebarBtn) return;
+    const margin = 8;
+    const rect = showSidebarBtn.getBoundingClientRect();
+    const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
+    const clampedX = Math.max(margin, Math.min(maxX, x));
+    const clampedY = Math.max(margin, Math.min(maxY, y));
+    const nearX = clampedX - margin < 64 ? 'left' : (maxX - clampedX < 64 ? 'right' : '');
+    const nearY = clampedY - margin < 64 ? 'top' : (maxY - clampedY < 64 ? 'bottom' : '');
+    const nearHorizontalMiddle = Math.abs(clampedX - maxX / 2) < 72;
+    let position;
+    if (nearX && nearY) {
+        position = { corner: `${nearY}-${nearX}` };
+    } else if (nearY && nearHorizontalMiddle) {
+        position = { edge: nearY, ratio: 0.5 };
+    } else {
+        const distances = { left: clampedX - margin, right: maxX - clampedX, top: clampedY - margin, bottom: maxY - clampedY };
+        const edge = Object.keys(distances).reduce((nearest, candidate) => distances[candidate] < distances[nearest] ? candidate : nearest, 'left');
+        position = edge === 'left' || edge === 'right'
+            ? { edge, ratio: maxY === margin ? 0 : (clampedY - margin) / (maxY - margin) }
+            : { edge, ratio: maxX === margin ? 0 : (clampedX - margin) / (maxX - margin) };
+    }
+    try { localStorage.setItem(MOBILE_MENU_POSITION_KEY, JSON.stringify(position)); } catch (_) { /* no-op */ }
+    applyMobileMenuButtonPosition(position);
+}
+
+function initMobileMenuButtonDrag() {
+    if (!showSidebarBtn || !isMobileTemplateActive() || showSidebarBtn.dataset.dragBound === '1') return;
+    showSidebarBtn.dataset.dragBound = '1';
+    loadMobileMenuButtonPosition();
+    let state = null;
+    showSidebarBtn.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'mouse' || !event.isPrimary) return;
+        const rect = showSidebarBtn.getBoundingClientRect();
+        state = { id: event.pointerId, startX: event.clientX, startY: event.clientY, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, active: false, timer: 0 };
+        state.timer = window.setTimeout(() => {
+            if (!state) return;
+            state.active = true;
+            showSidebarBtn.classList.add('is-dragging');
+            document.body.classList.add('mobile-menu-button-is-dragging');
+            document.documentElement.classList.add('mobile-menu-button-is-dragging');
+            showSidebarBtn.setPointerCapture?.(state.id);
+            navigator.vibrate?.(8);
+        }, 250);
+    });
+    showSidebarBtn.addEventListener('pointermove', event => {
+        if (!state || event.pointerId !== state.id) return;
+        if (!state.active) {
+            if (Math.hypot(event.clientX - state.startX, event.clientY - state.startY) > 10) {
+                window.clearTimeout(state.timer);
+                state = null;
+            }
+            return;
+        }
+        event.preventDefault();
+        showSidebarBtn.style.setProperty('left', `${event.clientX - state.offsetX}px`, 'important');
+        showSidebarBtn.style.setProperty('top', `${event.clientY - state.offsetY}px`, 'important');
+        showSidebarBtn.style.setProperty('right', 'auto', 'important');
+    });
+    const finishDrag = event => {
+        if (!state || event.pointerId !== state.id) return;
+        window.clearTimeout(state.timer);
+        if (state.active) {
+            const rect = showSidebarBtn.getBoundingClientRect();
+            if (event.type === 'pointerup') showSidebarBtn.dataset.suppressNextClick = '1';
+            snapMobileMenuButton(rect.left, rect.top);
+            showSidebarBtn.classList.remove('is-dragging');
+            document.body.classList.remove('mobile-menu-button-is-dragging');
+            document.documentElement.classList.remove('mobile-menu-button-is-dragging');
+            showSidebarBtn.releasePointerCapture?.(event.pointerId);
+        }
+        state = null;
+    };
+    showSidebarBtn.addEventListener('pointerup', finishDrag);
+    showSidebarBtn.addEventListener('pointercancel', finishDrag);
+    window.addEventListener('blur', () => {
+        if (!state) return;
+        window.clearTimeout(state.timer);
+        state = null;
+        showSidebarBtn.classList.remove('is-dragging');
+        document.body.classList.remove('mobile-menu-button-is-dragging');
+        document.documentElement.classList.remove('mobile-menu-button-is-dragging');
+    });
+    window.addEventListener('resize', loadMobileMenuButtonPosition);
+}
 
 function setSidebarVisible(visible, persist = true) {
     if (isMobileTemplateActive() && visible && document.body.classList.contains('sidebar-is-hidden')) {
@@ -54,6 +173,7 @@ function closeMobileMenu() {
 // Load sidebar state, apply glow/gradient, and BBCode formatting
 function initSidebarAndBBCode() {
     if (isMobileTemplateActive()) {
+        initMobileMenuButtonDrag();
         // Mobile menus are deliberately closed on every fresh page load.
         setSidebarVisible(false, false);
     } else {
@@ -108,6 +228,10 @@ function initSidebarAndBBCode() {
 
         const targets = document.querySelectorAll('#post-content, .post-content');
         targets.forEach(el => {
+            if (el.matches('[data-rendered-content="1"]')) {
+                initInlineMediaPlayers(el);
+                return;
+            }
             const markdownContent = el.matches('[data-feed-format="v2"]')
                 ? el
                 : el.querySelector('[data-feed-format="v2"]');
@@ -233,6 +357,11 @@ function initMiniPlayer() {
         };
 
         if (!audio || !playBtn || !muteBtn || !titleContainerEl || !titleEl) return;
+
+        if (audio.dataset.firstPlayNoticeBound !== '1') {
+            audio.dataset.firstPlayNoticeBound = '1';
+            audio.addEventListener('play', showFirstMusicPlaybackNotice);
+        }
 
         const trackLibrary = MINI_PLAYER_LIBRARY;
 
@@ -1291,7 +1420,7 @@ function playSiteNotificationSound() {
 
 document.addEventListener('pointerdown', unlockSiteNotificationAudio, { passive: true });
 document.addEventListener('keydown', unlockSiteNotificationAudio);
-window.addEventListener('fridg3:new-notifications', playSiteNotificationSound);
+window.addEventListener('fridge:new-notifications', playSiteNotificationSound);
 
 async function markSiteNotificationsRead(keys, csrfToken = '') {
     const notificationKeys = Array.from(new Set((Array.isArray(keys) ? keys : []).map(String).filter(Boolean)));
@@ -1322,7 +1451,8 @@ function showNextSiteNotificationToast() {
     const event = siteNotificationToastQueue.shift();
     const toast = document.createElement('a');
     toast.className = 'site-notification-toast';
-    toast.href = '/notifications';
+    if (event.persistent) toast.classList.add('is-persistent');
+    toast.href = event.url || '/notifications';
     toast.setAttribute('role', 'status');
 
     const title = document.createElement('strong');
@@ -1370,6 +1500,7 @@ function showNextSiteNotificationToast() {
         swipePointerId = null;
         if (swipeDistance <= -32 || Math.abs(swipeDistanceX) >= 55) {
             suppressToastClick = true;
+            event.onDismiss?.();
             finish();
             return;
         }
@@ -1386,9 +1517,15 @@ function showNextSiteNotificationToast() {
             suppressToastClick = false;
             return;
         }
+        event.onDismiss?.();
         finish();
-        if (typeof loadPageIntoContent === 'function') loadPageIntoContent('/notifications', true);
-        else window.location.assign('/notifications');
+        if (typeof event.onClick === 'function') {
+            event.onClick();
+        } else if (typeof loadPageIntoContent === 'function') {
+            loadPageIntoContent(event.url || '/notifications', true);
+        } else {
+            window.location.assign(event.url || '/notifications');
+        }
     });
 
     let finished = false;
@@ -1397,6 +1534,7 @@ function showNextSiteNotificationToast() {
     let visibleCountdownRemaining = 6200;
     const syncToastVisibilityCountdown = () => {
         if (finished) return;
+        if (event.persistent) return;
         if (document.hidden) {
             toast.style.animationPlayState = 'paused';
             if (dismissTimer) {
@@ -1420,7 +1558,7 @@ function showNextSiteNotificationToast() {
         siteNotificationToastActive = false;
         showNextSiteNotificationToast();
     };
-    toast.addEventListener('animationend', finish, { once: true });
+    if (!event.persistent) toast.addEventListener('animationend', finish, { once: true });
     document.addEventListener('visibilitychange', syncToastVisibilityCountdown);
     syncToastVisibilityCountdown();
 }
@@ -1429,6 +1567,37 @@ window.showTransientSiteNotification = function(title, body, url = '/notificatio
     siteNotificationToastQueue.push({ title: title || 'notification', body: body || '', url });
     showNextSiteNotificationToast();
 };
+
+let firstMusicPlaybackNoticeQueued = false;
+function showFirstMusicPlaybackNotice() {
+    if (!isMobileTemplateActive() || firstMusicPlaybackNoticeQueued) return;
+    try {
+        if (localStorage.getItem('firstMusicPlaybackNoticeDismissed') === '1') return;
+    } catch (_) { /* no-op */ }
+    firstMusicPlaybackNoticeQueued = true;
+    const dismiss = () => {
+        try { localStorage.setItem('firstMusicPlaybackNoticeDismissed', '1'); } catch (_) { /* no-op */ }
+    };
+    siteNotificationToastQueue.push({
+        title: 'Now playing music',
+        body: "You can pause and resume in the main menu, or on your phone's lock screen.",
+        url: '#mini-player',
+        persistent: true,
+        onDismiss: dismiss,
+        onClick: () => {
+            setSidebarVisible(true);
+            window.requestAnimationFrame(() => {
+                const player = document.getElementById('mini-player');
+                if (!player) return;
+                player.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                player.classList.remove('player-notice-highlight');
+                void player.offsetWidth;
+                player.classList.add('player-notice-highlight');
+            });
+        }
+    });
+    showNextSiteNotificationToast();
+}
 
 function notificationKeysForVisitedPage(events, visitedUrl) {
     let visitedPath = '';
@@ -1536,7 +1705,7 @@ function syncNotificationsSidebarButton(options = {}) {
                     markSiteNotificationsRead(visitedKeys, data.csrfToken || '').catch(() => {});
                 }
                 const hasNewNotifications = observeNewInboxNotifications(inboxEvents);
-                if (hasNewNotifications) window.dispatchEvent(new CustomEvent('fridg3:new-notifications'));
+                if (hasNewNotifications) window.dispatchEvent(new CustomEvent('fridge:new-notifications'));
                 if (options.initialPageLoad === true && !initialUnreadSummaryShown && unreadCount > 0) {
                     initialUnreadSummaryShown = true;
                     siteNotificationToastQueue.push({
@@ -1978,6 +2147,10 @@ if (hideSidebarBtn) {
 
 if (showSidebarBtn) {
     const toggleSidebarFromMenuButton = function() {
+        if (showSidebarBtn.dataset.suppressNextClick === '1') {
+            delete showSidebarBtn.dataset.suppressNextClick;
+            return;
+        }
         if (isMobileTemplateActive()) {
             setSidebarVisible(document.body.classList.contains('sidebar-is-hidden'));
             return;

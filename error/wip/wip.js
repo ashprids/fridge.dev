@@ -1,20 +1,19 @@
 (function() {
     'use strict';
 
-    const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'y', 'on', 'enabled', 'wip']);
     const CHECK_INTERVAL_MS = 10000;
-    const debugLog = message => window.fridg3DebugClientLog?.(`[maintenance] ${message}`);
+    const debugLog = message => window.fridgeDebugClientLog?.(`[maintenance] ${message}`);
 
     async function checkMaintenanceState() {
         try {
-            const response = await fetch('/data/etc/wip', { cache: 'no-store' });
+            const response = await fetch('/api/maintenance-status/index.php', { cache: 'no-store' });
             if (!response.ok) {
                 debugLog(`state check failed with HTTP ${response.status}`);
                 return;
             }
 
-            const text = (await response.text()).trim().toLowerCase();
-            if (!TRUTHY_VALUES.has(text)) {
+            const state = await response.json();
+            if (state.enabled === false) {
                 debugLog('maintenance ended; redirecting to homepage');
                 window.location.replace('/');
             }

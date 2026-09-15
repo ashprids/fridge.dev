@@ -195,7 +195,7 @@ php -r '$v=json_decode(file_get_contents("themes/{theme-id}.json"), true); echo 
 2. Verify discovery:
 
 ```bash
-php -r 'require "lib/render.php"; echo json_encode(array_values(array_map(fn($t) => ["id" => $t["id"], "name" => $t["name"]], fridg3_list_themes(__DIR__))), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";'
+php -r 'require "lib/render.php"; echo json_encode(array_values(array_map(fn($t) => ["id" => $t["id"], "name" => $t["name"]], fridge_list_themes(__DIR__))), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";'
 ```
 
 3. Lint and check whitespace:

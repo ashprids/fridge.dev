@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $title = 'wip';
 $description = 'fridge.dev is currently undergoing maintenance.';
@@ -32,10 +32,14 @@ if ($render_helper_path) {
     require_once $render_helper_path;
 }
 
-if (function_exists('fridg3_is_work_in_progress_enabled') && !fridg3_is_work_in_progress_enabled(__DIR__)) {
+if (function_exists('fridge_is_work_in_progress_enabled') && !fridge_is_work_in_progress_enabled(__DIR__)) {
     header('Location: /', true, 302);
     exit;
 }
+
+// Tell crawlers that maintenance is temporary, not a replacement for the site.
+http_response_code(503);
+header('Retry-After: 600');
 
 $template_name = function_exists('get_preferred_template_name')
     ? get_preferred_template_name(__DIR__)

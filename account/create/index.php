@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'render.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 
@@ -54,7 +54,7 @@ $formAllowFeed = false;
 $formAllowJournal = false;
 $formAllowComments = false;
 $formAllowChat = false;
-$isLocalDevServer = function_exists('fridg3_is_local_dev_server') && fridg3_is_local_dev_server();
+$isLocalDevServer = function_exists('fridge_is_local_dev_server') && fridge_is_local_dev_server();
 $createdAccountMustResetPassword = true;
 
 function generate_random_password(int $length = 15): string {
@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($formUsername === '' || $formName === '') {
         $errorMessage = 'username and name are required.';
-    } elseif (fridg3_toast_is_reserved_username($formUsername)) {
+    } elseif (fridge_toast_is_reserved_username($formUsername)) {
         $errorMessage = 'toast is a reserved hardcoded account.';
     } elseif (!preg_match('/^[a-z0-9_-]{1,50}$/i', $formUsername)) {
         $errorMessage = 'username must be 1-50 characters (letters, numbers, underscores, hyphens).';

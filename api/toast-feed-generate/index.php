@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 
 header('Content-Type: application/json');
@@ -49,7 +49,7 @@ function toast_feed_coerce_int($value, int $default, int $min, int $max): int
 
 function toast_feed_load_groq_config(): array
 {
-    $path = fridg3_toast_etc_dir() . DIRECTORY_SEPARATOR . 'toast.json';
+    $path = fridge_toast_etc_dir() . DIRECTORY_SEPARATOR . 'toast.json';
     $decoded = [];
     if (is_file($path)) {
         $decoded = json_decode((string)@file_get_contents($path), true);
@@ -90,7 +90,7 @@ function toast_feed_compact_text(string $text, int $maxChars): string
 
 function toast_feed_context(int $maxChars = TOAST_FEED_CONTEXT_MAX_CHARS): string
 {
-    $postsDir = fridg3_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed';
+    $postsDir = fridge_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed';
     if (!is_dir($postsDir)) {
         return '';
     }
@@ -137,7 +137,7 @@ function toast_feed_context(int $maxChars = TOAST_FEED_CONTEXT_MAX_CHARS): strin
 
 function toast_feed_recent_toast_avoid_list(int $maxChars = 900): string
 {
-    $postsDir = fridg3_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed';
+    $postsDir = fridge_toast_root_dir() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'feed';
     if (!is_dir($postsDir)) {
         return '';
     }
@@ -290,7 +290,7 @@ function toast_feed_build_payload(array $groq, string $context, string $avoidToa
         'messages' => [
             [
                 'role' => 'system',
-                'content' => fridg3_toast_personality_prompt('feed'),
+                'content' => fridge_toast_personality_prompt('feed'),
             ],
             [
                 'role' => 'system',
@@ -502,7 +502,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     toast_feed_json_error(405, 'method_not_allowed', 'method not allowed');
 }
 
-if (!fridg3_toast_is_current_user()) {
+if (!fridge_toast_is_current_user()) {
     toast_feed_json_error(403, 'forbidden', 'toast only.');
 }
 

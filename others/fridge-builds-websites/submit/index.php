@@ -8,7 +8,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
 require_once $sessionBootstrapDir . '/lib/session.php';
 require_once $sessionBootstrapDir . '/lib/feed.php';
 require_once $sessionBootstrapDir . '/lib/render.php';
-fridg3_start_session();
+fridge_start_session();
 
 $title = 'website commission';
 $description = 'submit a website commission request to fridge.dev.';
@@ -286,8 +286,8 @@ function commission_render_page(string $title, string $description, string $cont
     );
 }
 
-fridg3_feed_refresh_session_user();
-fridg3_refresh_current_user_posting_restriction();
+fridge_feed_refresh_session_user();
+fridge_refresh_current_user_posting_restriction();
 $csrfToken = commission_create_csrf_token();
 $isAdmin = !empty($_SESSION['user']['isAdmin']);
 $commissionsOpen = commission_is_open($commissionSettingsPath);
@@ -326,8 +326,9 @@ if (!$commissionsOpen) {
     exit;
 }
 
-$postingRestricted = fridg3_current_user_posting_restricted();
-$ipBanned = fridg3_feed_is_ip_banned(fridg3_feed_client_ip());
+$postingRestricted = fridge_current_user_posting_restricted();
+$bypassesIpRestrictions = fridge_current_user_bypasses_ip_restrictions();
+$ipBanned = fridge_feed_is_current_client_ip_banned();
 $submissionBlocked = $postingRestricted || $ipBanned;
 $errors = [];
 $values = [
@@ -396,7 +397,7 @@ if ($requestMethod === 'POST' && commission_post_string('action') === '') {
     }
 
     if ($errors === []) {
-        $remaining = commission_claim_cooldown($rateLimitPath);
+        $remaining = $bypassesIpRestrictions ? 0 : commission_claim_cooldown($rateLimitPath);
         if ($remaining > 0) $errors[] = 'please wait ' . commission_format_cooldown($remaining) . ' before sending another commission request.';
         elseif ($remaining < 0) $errors[] = 'commission cooldown storage is unavailable. please try again later.';
     }
@@ -463,7 +464,7 @@ if (!$commissionsOpen) {
 }
 
 $challenge = commission_create_challenge();
-$cooldownRemaining = commission_cooldown_remaining($rateLimitPath);
+$cooldownRemaining = $bypassesIpRestrictions ? 0 : commission_cooldown_remaining($rateLimitPath);
 $serverDisabled = $submissionBlocked || $cooldownRemaining > 0;
 $termsAccepted = $values['terms_agreed'] === 'yes';
 $hasSignature = $values['signature'] !== '';
@@ -529,9 +530,9 @@ $replacements['{terms_agreed_no_checked}'] = $values['terms_agreed'] === 'no' ? 
 $content = strtr($content, $replacements);
 
 if ($submissionBlocked) {
-    $restriction = $postingRestricted ? fridg3_posting_restriction_notice() : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
-    $content = $restriction . fridg3_disable_composer_controls($content);
+    $restriction = $postingRestricted ? fridge_posting_restriction_notice() : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
+    $content = $restriction . fridge_disable_composer_controls($content);
 }
 
-fridg3_debug_log('[PHP] website commission form initialized');
+fridge_debug_log('[PHP] website commission form initialized');
 commission_render_page($title, $description, $content);

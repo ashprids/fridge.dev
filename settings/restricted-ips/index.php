@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 
 require_once dirname(__DIR__, 2) . '/account/admin/helpers.php';
 require_once dirname(__DIR__, 2) . '/lib/feed.php';
@@ -20,9 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ip = trim((string)($_POST['ip'] ?? ''));
     if (!hash_equals((string)$_SESSION['csrf_token'], $token) || !filter_var($ip, FILTER_VALIDATE_IP)) {
         $notice = '<div id="error">invalid request.</div><br>';
-    } elseif (fridg3_feed_unban_ip($ip)) {
+    } elseif (fridge_feed_unban_ip($ip)) {
         $notice = '<div id="result">unbanned ' . htmlspecialchars($ip, ENT_QUOTES, 'UTF-8') . '.</div><br>';
-        fridg3_moderator_audit_log('unbanned IP', ['ip' => $ip]);
+        fridge_moderator_audit_log('unbanned IP', ['ip' => $ip]);
     } else {
         $notice = '<div id="error">could not unban that IP.</div><br>';
     }
@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 function restricted_ips_rows(): array {
     $rows = [];
-    foreach (fridg3_feed_load_banned_ips() as $key => $entry) {
+    foreach (fridge_feed_load_banned_ips() as $key => $entry) {
         $ip = is_string($key) && filter_var($key, FILTER_VALIDATE_IP)
             ? $key
             : (is_array($entry) ? (string)($entry['ip'] ?? '') : (is_string($entry) ? $entry : ''));
@@ -43,21 +43,21 @@ function restricted_ips_rows(): array {
 
 function restricted_ips_live_content(string $ip): array {
     $items = [];
-    $postIps = fridg3_feed_load_post_ips();
-    foreach (glob(fridg3_feed_posts_dir() . '/*.txt') ?: [] as $path) {
+    $postIps = fridge_feed_load_post_ips();
+    foreach (glob(fridge_feed_posts_dir() . '/*.txt') ?: [] as $path) {
         $postId = pathinfo(basename($path), PATHINFO_FILENAME);
         if ((string)($postIps[$postId]['ip'] ?? '') !== $ip) continue;
-        $post = fridg3_feed_parse_post((string)@file_get_contents($path));
+        $post = fridge_feed_parse_post((string)@file_get_contents($path));
         $items[] = ['type' => 'feed_post', 'id' => $postId, 'username' => (string)($post['username'] ?? ''), 'date' => (string)($post['date'] ?? ''), 'body' => (string)($post['body'] ?? ''), 'format' => (string)($post['format'] ?? 'legacy'), 'url' => '/feed/posts/' . rawurlencode($postId), 'archived' => false];
     }
-    foreach (fridg3_feed_collect_guest_replies_by_ip()[$ip] ?? [] as $reply) {
+    foreach (fridge_feed_collect_guest_replies_by_ip()[$ip] ?? [] as $reply) {
         $items[] = ['type' => 'feed_reply', 'id' => (string)($reply['postId'] ?? '') . ':' . (string)($reply['replyId'] ?? ''), 'username' => (string)($reply['username'] ?? ''), 'date' => (string)($reply['date'] ?? ''), 'body' => (string)($reply['body'] ?? ''), 'format' => (string)($reply['format'] ?? 'legacy'), 'url' => '/feed/posts/' . rawurlencode((string)($reply['postId'] ?? '')) . '#reply-' . rawurlencode((string)($reply['replyId'] ?? '')), 'archived' => false];
     }
-    $guestbookFiles = glob(fridg3_guestbook_dir() . '/*.txt') ?: [];
+    $guestbookFiles = glob(fridge_guestbook_dir() . '/*.txt') ?: [];
     usort($guestbookFiles, static fn(string $a, string $b): int => filemtime($b) <=> filemtime($a));
-    foreach (fridg3_guestbook_collect_entries_by_ip()[$ip] ?? [] as $entry) {
+    foreach (fridge_guestbook_collect_entries_by_ip()[$ip] ?? [] as $entry) {
         $entryFile = (string)($entry['file'] ?? '');
-        $position = array_search(fridg3_guestbook_dir() . DIRECTORY_SEPARATOR . $entryFile, $guestbookFiles, true);
+        $position = array_search(fridge_guestbook_dir() . DIRECTORY_SEPARATOR . $entryFile, $guestbookFiles, true);
         $page = $position === false ? 1 : ((int)floor($position / 10) + 1);
         $anchor = 'guestbook-entry-' . preg_replace('/[^a-zA-Z0-9_-]/', '-', pathinfo($entryFile, PATHINFO_FILENAME));
         $items[] = ['type' => 'guestbook', 'id' => $entryFile, 'username' => (string)($entry['name'] ?? ''), 'date' => (string)($entry['timestamp'] ?? ''), 'body' => (string)($entry['message'] ?? ''), 'format' => 'plain', 'url' => '/guestbook?page=' . $page . '#' . $anchor, 'archived' => false];
@@ -67,7 +67,7 @@ function restricted_ips_live_content(string $ip): array {
 
 function restricted_ips_all_content(string $ip): array {
     $items = restricted_ips_live_content($ip);
-    foreach ((array)(fridg3_feed_load_ban_archive()[$ip] ?? []) as $entry) {
+    foreach ((array)(fridge_feed_load_ban_archive()[$ip] ?? []) as $entry) {
         if (!is_array($entry)) continue;
         $type = in_array((string)($entry['type'] ?? ''), ['feed_post', 'feed_reply', 'guestbook'], true)
             ? (string)$entry['type']
@@ -105,7 +105,7 @@ function restricted_ips_render_content_item(array $item): string {
             . '<span id="post-content">' . nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8')) . '</span></div>' . $close;
     }
 
-    $renderedBody = fridg3_feed_render_post_body($body, $format);
+    $renderedBody = fridge_feed_render_post_body($body, $format);
     if ($type === 'feed_reply') {
         return $open . $status
             . '<div class="feed-reply"><div class="feed-reply-header"><span class="feed-reply-username"><em>' . $safeUsername . '</em></span>'
@@ -156,7 +156,7 @@ if ($selectedIp !== '' && isset($rows[$selectedIp])) {
             . '<span>reason: ' . htmlspecialchars($reason !== '' ? $reason : 'No reason provided', ENT_QUOTES, 'UTF-8') . '</span>'
             . '<span>banned by: @' . htmlspecialchars((string)($record['bannedBy'] ?? 'unknown'), ENT_QUOTES, 'UTF-8') . '</span>'
             . '<span>banned at: ' . htmlspecialchars((string)($record['bannedAt'] ?? 'unknown'), ENT_QUOTES, 'UTF-8') . '</span>'
-            . '<div class="restricted-ip-actions"><a class="restricted-ip-view-button" href="/settings/restricted-ips/?ip=' . rawurlencode($ip) . '">view all posts</a>'
+            . '<div class="restricted-ip-actions"><a class="site-icon-button" href="/settings/restricted-ips/?ip=' . rawurlencode($ip) . '" data-tooltip="view all posts" aria-label="view all posts"><i class="fa-solid fa-eye"></i></a>'
             . '<form method="post" action="/settings/restricted-ips/" data-no-spa="1" data-site-confirm="1" data-confirm-title="unban IP?" data-confirm-detail="this allows the IP to upload feed replies and guestbook posts again." data-confirm-text="unban" data-cancel-text="cancel" style="display:inline-block;">'
             . '<input type="hidden" name="csrf_token" value="' . $csrf . '"><input type="hidden" name="ip" value="' . $safeIp . '">'
             . '<button class="danger-button" type="submit">unban</button></form></div></div>';

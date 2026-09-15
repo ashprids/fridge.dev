@@ -8,7 +8,7 @@ fridge.dev has three separate moderation layers. They solve different problems a
 
 ## Account Posting Restrictions
 
-Account restrictions are stored as the `postingRestricted` boolean on an account in `data/accounts/accounts.json`.
+Account restrictions are stored as the `postingRestricted` boolean on an account in `data/accounts/accounts.json`. Ordinary registered accounts can also carry an `accountBanned` flag set by a moderator or admin. Either flag produces the same server-enforced posting restriction.
 
 Admins can set the flag while creating an account or through the account editor. Restricting an account does not remove its `allowedPages`, admin status, ability to read pages, or authorized deletion and moderation actions. It prevents content creation and editing.
 
@@ -33,6 +33,8 @@ Posting bans are stored in `data/feed/banned_ips.json` and can be applied from c
 
 Feed-reply and guestbook post action menus resolve the associated IP's current restriction state when rendered: unrestricted IPs show `ban`, while restricted IPs show `unban`. Both actions are revalidated and applied server-side.
 
+Moderators and admins can ban an ordinary registered account from its account card or feed-post action menu; moderator and admin targets are excluded. The account flag blocks posting and prevents its associated addresses from being unbanned individually. Applying the ban also soft-bans every IP already recorded for the account, and successful future logins or registered feed activity record and soft-ban each newly associated IP. Unbanning the account clears its account flag and releases its recorded addresses from the soft posting-ban list.
+
 Successful moderator mutations—including feed and guestbook edits/deletions, IP bans and unbans, and IP-content purges—are appended to `data/etc/moderator-audit.ndjson`. Admins review this trail at `/settings/audit-log`; edit entries retain both the before and after values. The audit writer deliberately ignores admins so this remains a moderator-account accountability log.
 
 While the restriction remains active, every browser seen on that exact IP is eligible for a one-time in-site restriction popup. Each browser records the ban generation locally after showing it once; a later unban and re-ban creates a new generation. The popup shows only the restriction title and optional reason. The matching `/notifications` entry keeps the contact instructions and `mailto:ashton@fridge.dev` link, with a blank line after the bold reason label when one was supplied.
@@ -45,7 +47,9 @@ These bans do not prevent browsing the website. They block the matching client I
 - Mdpaste creation
 - Serverless upload room and signaling APIs
 
-The feed and guestbook share moderation controls. `/settings/guests` groups IP-backed feed replies and guestbook posts, supports individual deletion, and provides separate actions for banning, unbanning, and purging content. Purging deletes matching content but does not itself alter the ban list.
+Authenticated moderators and admins bypass every IP-derived restriction. This includes soft posting bans, hard bans, guestbook's per-IP submission limit, and the contact and commission cooldowns. The underlying address remains banned for guests and ordinary accounts sharing it, and raw moderation lookups still report its real status so staff can review or manage it.
+
+The feed and guestbook share moderation controls. `/settings/guests` groups IP-backed feed replies and guestbook posts and supports deletion, lookup, account/IP posting bans, and purges. Account cards open a combined feed and guestbook history, with guestbook authorship associated through recorded IPs; replies identify the parent author beside the replying username. Recorded-IP menus show the newest 100 addresses and link to the complete history. Right-clicking an address can look it up, show users who share it, purge all content recorded under it, or, for admins, hard-ban it. IPv6 labels use their final four groups while a site tooltip exposes the complete address. Purging does not itself alter either ban list.
 
 User-facing blocked notices use `your IP address has been restricted.` Account-based feed access may still bypass the guest-reply IP restriction where the route explicitly distinguishes logged-in users from guests; contact and tool handlers apply their IP checks independently.
 
@@ -87,7 +91,7 @@ Admins can disable **strict hard bans** in the admin-only section of `/settings`
 
 Admins can separately disable **hard-ban enforcement** above the strict-mode checkbox. This global setting also defaults to enabled. When disabled, the Nginx authorization subrequest returns allowed immediately, before client-IP resolution and without reading the manual list, source lists, or identity data. Hard-ban data remains stored unchanged so enforcement can be restored later.
 
-Authenticated admin sessions always bypass hard-ban enforcement. The internal authorization endpoint loads the session without applying unrelated page redirects and returns allowed before performing the client hard-ban check. Shared rendering uses a read-only evaluation of the current settings for admins; when those rules would otherwise block the admin's IP or identity, it shows the same `hard-banned client` banner used in development mode with an `admin bypass active` status. This preview never propagates an IP or updates identity data.
+Authenticated moderator and admin sessions always bypass hard-ban enforcement. The internal authorization endpoint loads the session without applying unrelated page redirects and returns allowed before performing the client hard-ban check. Shared development rendering uses a read-only evaluation of the current settings for staff; when those rules would otherwise block the staff member's IP or identity, it shows the same `hard-banned client` banner with a `staff bypass active` status. This preview never propagates an IP or updates identity data.
 
 This mechanism follows the same browser profile while either first-party storage value remains. It intentionally does not use probabilistic canvas, hardware, or font fingerprinting because collisions could hard-ban unrelated visitors.
 

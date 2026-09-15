@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'helpers.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
@@ -21,7 +21,7 @@ $cards = [];
 
 foreach ($accountsData['accounts'] as $account) {
     $username = isset($account['username']) ? (string)$account['username'] : 'unknown';
-    if (fridg3_toast_is_reserved_username($username)) {
+    if (fridge_toast_is_reserved_username($username)) {
         continue;
     }
 

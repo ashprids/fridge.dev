@@ -184,7 +184,7 @@ body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dro
 
 body.aero-theme :is(select, .dropdown, .bbcode-dropdown) option { background: #effaff; color: var(--fg); }
 
-body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)), #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)), #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
     background: linear-gradient(180deg, #fbfff7, #d9f2bb 48%, #79c445 51%, #a9db77) !important;
     color: #174c21 !important;
     border: 1px solid #4c9538 !important;
@@ -193,7 +193,7 @@ body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)), #search-button, #f
     text-shadow: 0 1px rgba(255,255,255,.8);
 }
 
-body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)), #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)), #search-button, #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
     background: linear-gradient(180deg, #fff, #eaffd3 48%, #8ed458 51%, #c5ed9d) !important;
     color: #103d18 !important;
 }
@@ -706,14 +706,14 @@ body.aero-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dro
     box-shadow: 0 0 0 3px rgba(100,141,160,.16), inset 0 1px 2px rgba(48,75,86,.08) !important;
 }
 
-body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)):not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)):not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button):not(.site-action-menu-item):not(.site-icon-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset) {
     background: linear-gradient(180deg, #f8faf6, #dce8d5 52%, #bfd2b7) !important;
     color: #3c5c42 !important;
     border-color: #7d9c77 !important;
     box-shadow: inset 0 1px #fff, 0 1px 2px rgba(57,87,53,.14) !important;
 }
 
-body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)):not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
+body.aero-theme :is(button:where(:not(#mdpaste-font-toggle)):not(#mini-player-close):not(.bbcode-btn):not(.danger-button):not(.grid-delete-button):not(.site-action-menu-item):not(.site-icon-button), #search-button, #form-button, #two-buttons, input[type="submit"], input[type="button"], #settings-save, #color-reset):hover {
     background: linear-gradient(180deg, #fff, #e6efe1 52%, #cbdcc4) !important;
     color: #34533a !important;
 }
@@ -728,7 +728,7 @@ body.aero-theme .bbcode-btn,
 body.aero-theme .feed-thread-page .bbcode-btn,
 body.aero-theme .feed-markdown-editor .bbcode-btn,
 body.aero-theme .journal-markdown-editor .bbcode-btn {
-    background: linear-gradient(180deg, #fafcfc, #dce9ed 52%, #c4d9e0) !important;
+    background: linear-gradient(180deg, #dce9ed, #c4d9e0 52%, #a9c6d0) !important;
     color: #416779 !important;
     border-color: #7b9ba8 !important;
 }
@@ -915,3 +915,4 @@ html.access-high-contrast body.aero-theme {
 @media (prefers-reduced-motion: reduce) {
     body.aero-theme .paper-grain { background-attachment: scroll; }
 }
+body.aero-theme button.site-action-menu-item{background:transparent!important;color:var(--fg)!important;border:0!important;border-radius:2px!important}body.aero-theme button.site-action-menu-item:hover{background:color-mix(in srgb,var(--links) 22%,transparent)!important;color:var(--fg)!important}body.aero-theme .site-icon-button{background:transparent!important;color:var(--subtle)!important;border:0!important}

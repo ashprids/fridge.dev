@@ -2,6 +2,8 @@
 
 This repository includes a GitHub Actions workflow at `.github/workflows/publish-dev-data.yml` that publishes a sanitized developer copy of the production `data` directory.
 
+On the first local-network visit without a complete `data/` copy, the site shows a one-time developer welcome with links to the wiki and settings. Its three paragraphs retain their intended blank-line spacing. The old recurring missing-data popup is not used. The settings bootstrap starts a background worker and reads its progress through short status requests, leaving PHP's single-process development server available for navigation and cancellation. The on-site progress dialog adds a **continue** button after installation, which refreshes the page. Refreshing, closing, or navigating away while bootstrap is active records the pending notice in the browser before navigation, immediately marks that tokenized worker as aborted, removes the partial `data/` directory and `.bootstrap` workspace, and shows a one-time **download aborted** explanation on the first page that loads. The notice remains pending until dismissed. Expected browser cancellation during this flow is excluded from development-server shutdown detection.
+
 The workflow runs daily at `00:00 UTC`, matching the private `/data` backup workflow, and it can also be run manually from GitHub Actions.
 
 ## What It Does
@@ -63,8 +65,9 @@ The sanitizer currently changes:
 - `data/etc/toast-patch-approvals.json`: clears pending and completed Discord update approvals
 - `data/etc/webhooks.json`: clears all scalar values
 - `data/guestbook/ip_index.json`: clears contents
+- `data/guestbook/filtered_originals.json`: clears moderation-only unfiltered messages
 - `data/guestbook/*.txt`: removes `IP:` metadata while retaining public messages
-- `data/feed/replies/*.json`: blanks guest IPs and removes guest browser-local inbox identities
+- `data/feed/replies/*.json`: blanks guest IPs and removes guest browser-local inbox identities and moderation-only original bodies
 - `data/feed/post_ips.json`: blanks feed-post IPs while retaining post IDs and usernames for local rendering
 - `data/feed/banned_ips.json`: clears the shared posting IP ban list
 - `data/etc/banned-ip-content.json`: clears deleted-content snapshots retained for soft-ban review
@@ -75,6 +78,7 @@ The sanitizer currently changes:
 - `data/chat/`: clears encrypted chat conversations, attachments, presence state, and local chat keys
 - `data/journal/drafts`: removes drafts and adds a harmless placeholder draft
 - `data/etc/access.json` and `data/etc/access.json.lock`: removes private access-log data and its lock file
+- `data/.development-copy.json`: identifies the privacy-redacted archive so the production backup restore flow can reject it locally before upload
 
 The sanitizer finishes with privacy assertions that require access logs to be absent and the contact directory to contain only the empty rate-limit state. The archive command also excludes these operational identity files as defense in depth:
 

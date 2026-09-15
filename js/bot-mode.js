@@ -24,9 +24,9 @@
             window.showSiteNotice?.('bot mode is active', 'you can only access certain pages while logged in as the bot. to access this page, log out of this account.');
         }
     }
-    window.fridg3RefreshBotMode = refresh;
-    window.fridg3SyncBotMode = doc => {
-        const enabled = doc.querySelector('meta[name="fridg3-bot-mode"]')?.content === '1';
+    window.fridgeRefreshBotMode = refresh;
+    window.fridgeSyncBotMode = doc => {
+        const enabled = doc.querySelector('meta[name="fridge-bot-mode"]')?.content === '1';
         // Login/logout changes require a fresh shell (including the persistent audio player).
         if (enabled !== active()) { location.reload(); return; }
         requestAnimationFrame(refresh);

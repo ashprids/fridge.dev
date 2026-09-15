@@ -20,6 +20,8 @@ Core traits:
 - Shared PHP helpers now live in `lib/render.php`, `lib/session.php`, and `lib/feed.php`
 - Runtime content lives under `/data` and is intentionally excluded from deployment sync
 
+See [Search and SEO](Search-and-SEO) for search metadata, canonical hosts, sitemap generation, and Search Console setup.
+
 ## Source of Truth
 
 Useful files:

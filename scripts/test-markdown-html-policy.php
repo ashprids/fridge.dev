@@ -82,8 +82,19 @@ check_markdown_html_policy(substr_count($legacyNestedAbbreviation, '<abbr') === 
 $protectedTooltip = mdp_render_trusted_markdown("*[JS]: A programming language\n\n<abbr title=\"Use JS here\">term</abbr>");
 check_markdown_html_policy(str_contains($protectedTooltip, '<abbr data-tooltip="Use JS here">term</abbr>'), 'Existing tooltip text was processed as abbreviation Markdown');
 
-$feed = fridg3_feed_render_post_body($markdown, 'v2');
+$feed = fridge_feed_render_post_body($markdown, 'v2');
 check_markdown_html_policy(!str_contains($feed, '<script>'), 'Feed renderer emitted a script');
 check_markdown_html_policy(!str_contains($feed, '<button type="button" ' . $onclickAttribute), 'Feed renderer retained an event attribute');
+
+$rawFeedMedia = fridge_feed_render_post_body("https://i.pinimg.com/example/photo.jpg?width=900\n\nhttps://cdn.example.com/audio/song.mp3\n\nhttps://cdn.example.com/video/clip.webm", 'v2');
+check_markdown_html_policy(str_contains($rawFeedMedia, '<img src="https://i.pinimg.com/example/photo.jpg?width=900"'), 'Feed renderer did not embed a raw image URL');
+check_markdown_html_policy(str_contains($rawFeedMedia, 'src="https://cdn.example.com/audio/song.mp3"'), 'Feed renderer did not embed a raw audio URL');
+check_markdown_html_policy(str_contains($rawFeedMedia, 'src="https://cdn.example.com/video/clip.webm"'), 'Feed renderer did not embed a raw video URL');
+
+$moderationFilter = fridge_feed_apply_guest_filter('before fuck after', true, true);
+$moderationFilterHtml = fridge_feed_render_post_body($moderationFilter, 'v2');
+check_markdown_html_policy(str_contains($moderationFilterHtml, 'data-context-tooltip="original: fuck"'), 'Feed renderer omitted the moderation-only filtered-word context');
+$publicFilterHtml = fridge_feed_render_post_body(fridge_feed_apply_guest_filter('before fuck after', true), 'v2');
+check_markdown_html_policy(!str_contains($publicFilterHtml, 'original: fuck'), 'Feed renderer exposed a filtered word in public output');
 
 echo "Markdown trusted/restricted HTML policy checks passed.\n";

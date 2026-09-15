@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 
 const TOAST_AVATAR_URL = '/resources/images/toast.svg';
 
@@ -355,7 +355,7 @@ if ($accountsPath && is_file($accountsPath)) {
     }
 }
 
-if (empty($_SESSION['user']['isAdmin']) && !fridg3_toast_is_current_user()) {
+if (empty($_SESSION['user']['isAdmin']) && !fridge_toast_is_current_user()) {
     http_response_code(403);
     echo '403 forbidden: admin access required';
     exit;

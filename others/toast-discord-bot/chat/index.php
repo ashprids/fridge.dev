@@ -8,9 +8,9 @@ require_once $root . '/lib/render.php';
 require_once $root . '/lib/video-embeds.php';
 require_once $root . '/lib/toast-chat.php';
 require_once $root . '/lib/toast-chat-errors.php';
-fridg3_start_session();
-fridg3_feed_refresh_session_user();
-fridg3_refresh_current_user_posting_restriction();
+fridge_start_session();
+fridge_feed_refresh_session_user();
+fridge_refresh_current_user_posting_restriction();
 
 const TOAST_CHAT_ROUTE = '/others/toast-discord-bot/chat';
 
@@ -74,7 +74,7 @@ $identity = toast_chat_identity(false);
 $id = (string)$identity['id'];
 $csrf = toast_chat_csrf();
 $action = (string)($_POST['action'] ?? $_GET['action'] ?? '');
-$postingRestricted = fridg3_current_user_posting_restricted();
+$postingRestricted = fridge_current_user_posting_restricted();
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $action === 'clear-chat') {
     if (!hash_equals($csrf, (string)($_POST['csrf'] ?? ''))) toast_chat_json(['ok'=>false,'error'=>'invalid request token.'],403);
@@ -238,11 +238,11 @@ $content = strtr((string)file_get_contents(__DIR__ . '/content.html'), [
     '{send_blocked}' => !empty($payload['sendBlocked']) ? '1' : '0',
     '{quota_reached}' => (int)$payload['dailyCount'] >= TOAST_CHAT_DAILY_LIMIT ? '1' : '0',
     '{posting_restricted}' => $postingRestricted ? '1' : '0',
-    '{posting_notice}' => $postingRestricted ? fridg3_posting_restriction_notice() : '',
+    '{posting_notice}' => $postingRestricted ? fridge_posting_restriction_notice() : '',
     '{disabled}' => $disabled ? ' disabled' : '', '{messages}' => toast_chat_messages_html($conversation),
 ]);
 if ($postingRestricted) {
-    $content = fridg3_disable_composer_controls($content);
+    $content = fridge_disable_composer_controls($content);
     $content = preg_replace('/(<button) disabled([^>]*class="toast-clear-chat[^"]*")/', '$1$2', $content);
 }
 toast_chat_render($content);

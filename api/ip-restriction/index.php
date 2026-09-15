@@ -3,10 +3,13 @@ declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, max-age=0');
+require_once dirname(__DIR__, 2) . '/lib/session.php';
+fridge_start_session(false);
 require_once dirname(__DIR__, 2) . '/lib/feed.php';
 
-$ip = fridg3_feed_client_ip();
-$record = fridg3_feed_banned_ip_record($ip);
+$ip = fridge_feed_client_ip();
+$bypassesIpRestrictions = !empty($_SESSION['user']['isAdmin']) || !empty($_SESSION['user']['isModerator']);
+$record = $bypassesIpRestrictions ? null : fridge_feed_banned_ip_record($ip);
 if ($record === null) {
     echo json_encode(['ok' => true, 'restricted' => false]);
     exit;

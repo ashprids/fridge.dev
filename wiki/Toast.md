@@ -6,7 +6,7 @@ Behind that character, Toast is also the name of the integrated Python Discord s
 
 ## Website Identity
 
-`toast` is a reserved virtual username and cannot be created as an ordinary account. Logging in as `toast` asks for administrator credentials, then creates a non-admin Toast session with fixed `feed` and `comments` permissions. This lets an authorized operator write as Toast without giving the virtual identity general administrative access.
+`toast` is a reserved virtual username and cannot be created as an ordinary account. Logging in as `toast` asks for administrator credentials, then creates a non-admin Toast session with fixed `feed` and `comments` permissions. While that credential popup is open, the underlying login page's username and password fields are read-only. This lets an authorized operator write as Toast without giving the virtual identity general administrative access.
 
 The Toast session receives two unique website tools:
 
@@ -81,10 +81,10 @@ The response is `{ ok: true, content: "generated post body" }`. The settings UI 
 Toast can respond automatically when:
 
 - A non-Toast feed post mentions `@toast`
-- A non-Toast user replies to a Toast-owned post
+- A non-Toast user posts a top-level reply to a Toast-owned post
 - A non-Toast reply mentions `@toast`
 
-The response is delayed by one minute and is stored through the normal reply system. Reply generation uses the relevant post/reply as context, begins by mentioning the triggering user where appropriate, uses the feed personality and website model, and applies a strict short-output cleanup cap so a failed prompt instruction cannot produce a long moderator-style answer.
+Nested replies on a Toast-owned post do not trigger Toast merely because the root post belongs to him; they must mention `@toast`. The response is delayed by one minute and is stored as a direct child of the triggering comment through the normal reply system, so its layout and `replying to` label match user replies. Reply generation uses the relevant post/reply as context, begins by mentioning the triggering user where appropriate, uses the feed personality and website model, and applies a strict short-output cleanup cap so a failed prompt instruction cannot produce a long moderator-style answer.
 
 ## Discord Service
 

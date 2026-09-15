@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $title = 'toast - discord bot';
 $description = 'a discord bot providing 24/7 radio in the fridge.dev discord server';
@@ -54,11 +54,11 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
-$content = str_replace('{toast_management}', fridg3_toast_is_current_user() ? '' : file_get_contents($sessionBootstrapDir . '/lib/toast-management.html'), $content);
+$content = str_replace('{toast_management}', fridge_toast_is_current_user() ? '' : file_get_contents($sessionBootstrapDir . '/lib/toast-management.html'), $content);
 require_once $sessionBootstrapDir . '/lib/toast-chat.php';
 if (!toast_chat_is_online()) $content = str_replace('id="chat-with-toast-button"', 'id="chat-with-toast-button" hidden', $content);
 if (isset($_GET['chat_offline'])) $content = '<p role="status">Toast is offline. Chat will be available when Toast is online again.</p>' . $content;
-if (fridg3_toast_is_current_user()) $content = str_replace('id="chat-with-toast-button"', 'id="chat-with-toast-button" disabled aria-disabled="true" style="opacity:.4;cursor:not-allowed"', $content);
+if (fridge_toast_is_current_user()) $content = str_replace('id="chat-with-toast-button"', 'id="chat-with-toast-button" disabled aria-disabled="true" style="opacity:.4;cursor:not-allowed"', $content);
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

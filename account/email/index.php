@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $title = 'email';
 $description = 'how to access your fridge.dev email address.';
@@ -56,11 +56,11 @@ if (!$content_path) {
 $content = file_get_contents($content_path);
 $emailAccountNotice = '';
 if (
-    function_exists('fridg3_current_user_email_address')
-    && function_exists('fridg3_user_has_email_account')
-    && fridg3_user_has_email_account(__DIR__)
+    function_exists('fridge_current_user_email_address')
+    && function_exists('fridge_user_has_email_account')
+    && fridge_user_has_email_account(__DIR__)
 ) {
-    $emailAddress = fridg3_current_user_email_address(__DIR__);
+    $emailAddress = fridge_current_user_email_address(__DIR__);
     $safeEmailAddress = htmlspecialchars($emailAddress, ENT_QUOTES, 'UTF-8');
     $emailAccountNotice = '<div class="email-account-notice"><span>your fridge.dev email</span><strong>' . $safeEmailAddress . '</strong></div><br>';
 }

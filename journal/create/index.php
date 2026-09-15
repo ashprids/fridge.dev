@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
@@ -39,7 +39,7 @@ if ($currentUsername !== null) {
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 $allowedPages = $_SESSION['user']['allowedPages'] ?? [];
 $canCreatePost = $isAdmin || in_array('journal', $allowedPages);
-$postingRestricted = fridg3_current_user_posting_restricted();
+$postingRestricted = fridge_current_user_posting_restricted();
 
 if (!$canCreatePost) {
     header('Location: /journal');
@@ -175,10 +175,10 @@ function bbcode_to_html(string $text): string {
     }, $html);
 
     $html = preg_replace_callback('/\[audio=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
-        return fridg3_feed_render_audio_attachment($m[1], trim((string)($m[2] ?? 'audio')));
+        return fridge_feed_render_audio_attachment($m[1], trim((string)($m[2] ?? 'audio')));
     }, $html);
     $html = preg_replace_callback('/\[video=([^\]]+)\](?:\[name:([^\]]*)\])?/i', function($m) {
-        return fridg3_feed_render_video_attachment($m[1], trim((string)($m[2] ?? 'video')));
+        return fridge_feed_render_video_attachment($m[1], trim((string)($m[2] ?? 'video')));
     }, $html);
 
     // Handle spoiler tags [spoiler]...[/spoiler]
@@ -309,10 +309,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Process uploaded images, audio, and video for both posts and drafts.
     $imageMap = isset($_FILES['images']) && is_array($_FILES['images'])
-        ? fridg3_feed_process_uploaded_media($_FILES['images'])
+        ? fridge_feed_process_uploaded_media($_FILES['images'])
         : [];
     $voiceMap = isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])
-        ? fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes'])
+        ? fridge_feed_process_uploaded_voice_notes($_FILES['voice_notes'])
         : [];
 
     // Save draft: /data/journal/drafts/[title_with_underscores].txt
@@ -333,10 +333,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // For drafts, update BBCode media placeholders to point at uploaded files
         $draftContent = $content;
-        $draftContent = fridg3_feed_replace_media_placeholders($draftContent, $imageMap, true);
-        $draftContent = fridg3_feed_replace_voice_placeholders($draftContent, $voiceMap, true);
+        $draftContent = fridge_feed_replace_media_placeholders($draftContent, $imageMap, true);
+        $draftContent = fridge_feed_replace_voice_placeholders($draftContent, $voiceMap, true);
         if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $draftContent) === 1) {
-            fridg3_feed_delete_media_files_from_content($draftContent);
+            fridge_feed_delete_media_files_from_content($draftContent);
             header('Location: /journal/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
             exit;
         }
@@ -384,10 +384,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Build post file content
     $safeContent = $content; // store raw; renderer can sanitize/format later
-    $safeContent = fridg3_feed_replace_media_placeholders($safeContent, $imageMap, true);
-    $safeContent = fridg3_feed_replace_voice_placeholders($safeContent, $voiceMap, true);
+    $safeContent = fridge_feed_replace_media_placeholders($safeContent, $imageMap, true);
+    $safeContent = fridge_feed_replace_voice_placeholders($safeContent, $voiceMap, true);
     if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $safeContent) === 1) {
-        fridg3_feed_delete_media_files_from_content($safeContent);
+        fridge_feed_delete_media_files_from_content($safeContent);
         header('Location: /journal/create?error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
         exit;
     }
@@ -396,14 +396,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     $cardImageUpload = isset($_FILES['card_image']) && is_array($_FILES['card_image'])
-        ? fridg3_journal_process_card_image($_FILES['card_image'])
+        ? fridge_journal_process_card_image($_FILES['card_image'])
         : ['provided' => false, 'url' => ''];
     if ($cardImageUpload['provided'] && $cardImageUpload['url'] === '') {
-        fridg3_feed_delete_media_files_from_content($safeContent);
+        fridge_feed_delete_media_files_from_content($safeContent);
         header('Location: /journal/create?error=' . rawurlencode('card image upload failed. use a supported image no larger than 8 MB.'));
         exit;
     }
-    $text = fridg3_journal_build_v2_post(
+    $text = fridge_journal_build_v2_post(
         $postDate,
         $title,
         $description,
@@ -413,7 +413,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postFile = $postsDir . DIRECTORY_SEPARATOR . $postFilename;
     $postSaved = file_put_contents($postFile, $text) !== false;
     $savedAttachmentCount = count($imageMap) + count($voiceMap) + ($cardImageUpload['url'] !== '' ? 1 : 0);
-    fridg3_debug_submission_log('[SUBMISSION] journal post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . $savedAttachmentCount);
+    fridge_debug_submission_log('[SUBMISSION] journal post save ' . ($postSaved ? 'succeeded' : 'failed') . ' attachments=' . $savedAttachmentCount);
 
     header('Location: /journal/posts/' . rawurlencode((string)$nextNum));
     exit;
@@ -541,8 +541,8 @@ $content = str_replace('{markdown_editor}', $markdownEditor, $content);
 // Replace {drafts} placeholder with rendered draft list
 $content = str_replace('{drafts}', $draftItems, $content);
 if ($postingRestricted) {
-    $content = fridg3_disable_composer_controls($content);
-    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
+    $content = fridge_disable_composer_controls($content);
+    $content = str_replace('<form id="create-post-form"', fridge_posting_restriction_notice() . '<form id="create-post-form"', $content);
 }
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

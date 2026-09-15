@@ -76,7 +76,7 @@ PATCH_NOTICE_EMBED_COLOR = 0x3C7895
 PATCH_NOTICE_APPROVAL_EMOJI = '✅'
 DEFAULT_REPOSITORY_URL = 'https://github.com/ashprids/fridge.dev'
 WIKI_CONTEXT_TRIGGER_TERMS = {
-    'fridg3', 'site', 'website', 'page', 'pages', 'feature', 'features', 'account', 'accounts',
+    'fridge', 'site', 'website', 'page', 'pages', 'feature', 'features', 'account', 'accounts',
     'login', 'password', 'settings', 'feed', 'post', 'posts', 'reply', 'journal', 'guestbook',
     'music', 'gallery', 'bookmark', 'bookmarks', 'chat', 'contact', 'discord', 'toast',
     'bot', 'tool', 'tools', 'mdpaste', 'paste', 'wiki', 'merch',

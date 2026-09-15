@@ -2,21 +2,23 @@
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'theme-accents.php';
+require_once __DIR__ . '/backup-restore.php';
+require_once __DIR__ . '/seo.php';
 
-if (!function_exists('fridg3_inject_server_debug_logs')) {
-    function fridg3_inject_server_debug_logs($template) {
-        if (!fridg3_debug_current_user_is_admin()) return $template;
-        fridg3_debug_import_pending_submission_logs();
-        fridg3_debug_complete_submission();
-        fridg3_debug_capture_included_files();
-        fridg3_debug_log('[PHP] request completed with HTTP ' . http_response_code());
-        $serverLogs = $GLOBALS['fridg3_debug_server_logs'] ?? [];
-        if (empty($serverLogs) || stripos($template, 'data-fridg3-server-debug-logs') !== false) return $template;
+if (!function_exists('fridge_inject_server_debug_logs')) {
+    function fridge_inject_server_debug_logs($template) {
+        if (!fridge_debug_current_user_is_admin()) return $template;
+        fridge_debug_import_pending_submission_logs();
+        fridge_debug_complete_submission();
+        fridge_debug_capture_included_files();
+        fridge_debug_log('[PHP] request completed with HTTP ' . http_response_code());
+        $serverLogs = $GLOBALS['fridge_debug_server_logs'] ?? [];
+        if (empty($serverLogs) || stripos($template, 'data-fridge-server-debug-logs') !== false) return $template;
         $payload = json_encode(array_values($serverLogs), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
         if ($payload === false) return $template;
         // Split the tag name so the markup JavaScript linter does not parse this
         // PHP-built application/json payload as an executable inline script.
-        $block = "\n    <scr" . "ipt type=\"application/json\" data-fridg3-server-debug-logs>"
+        $block = "\n    <scr" . "ipt type=\"application/json\" data-fridge-server-debug-logs>"
             . $payload . '</scr' . 'ipt>' . "\n";
         if (stripos($template, '</body>') !== false) {
             return preg_replace('/<\/body>/i', $block . '</body>', $template, 1) ?: ($template . $block);
@@ -25,8 +27,8 @@ if (!function_exists('fridg3_inject_server_debug_logs')) {
     }
 }
 
-if (!function_exists('fridg3_find_relative_upward')) {
-    function fridg3_find_relative_upward($startDir, $relativePath) {
+if (!function_exists('fridge_find_relative_upward')) {
+    function fridge_find_relative_upward($startDir, $relativePath) {
         $dir = $startDir;
         $prevDir = '';
 
@@ -43,8 +45,8 @@ if (!function_exists('fridg3_find_relative_upward')) {
     }
 }
 
-if (!function_exists('fridg3_is_truthy_value')) {
-    function fridg3_is_truthy_value($value) {
+if (!function_exists('fridge_is_truthy_value')) {
+    function fridge_is_truthy_value($value) {
         if (is_bool($value)) {
             return $value;
         }
@@ -57,12 +59,12 @@ if (!function_exists('fridg3_is_truthy_value')) {
     }
 }
 
-if (!function_exists('fridg3_is_local_dev_server')) {
-    function fridg3_is_local_dev_server(): bool {
-        if (isset($_ENV['FRIDG3_DEV_MODE']) && fridg3_is_truthy_value($_ENV['FRIDG3_DEV_MODE'])) {
+if (!function_exists('fridge_is_local_dev_server')) {
+    function fridge_is_local_dev_server(): bool {
+        if (isset($_ENV['FRIDG3_DEV_MODE']) && fridge_is_truthy_value($_ENV['FRIDG3_DEV_MODE'])) {
             return true;
         }
-        if (isset($_SERVER['FRIDG3_DEV_MODE']) && fridg3_is_truthy_value($_SERVER['FRIDG3_DEV_MODE'])) {
+        if (isset($_SERVER['FRIDG3_DEV_MODE']) && fridge_is_truthy_value($_SERVER['FRIDG3_DEV_MODE'])) {
             return true;
         }
 
@@ -110,8 +112,8 @@ if (!function_exists('fridg3_is_local_dev_server')) {
     }
 }
 
-if (!function_exists('fridg3_dev_data_copy_is_missing')) {
-    function fridg3_dev_data_copy_is_missing($startDir): bool {
+if (!function_exists('fridge_dev_data_copy_is_missing')) {
+    function fridge_dev_data_copy_is_missing($startDir): bool {
         $rootDir = dirname(__DIR__);
         $dataDir = $rootDir . DIRECTORY_SEPARATOR . 'data';
         if (!is_dir($dataDir)) {
@@ -133,9 +135,10 @@ if (!function_exists('fridg3_dev_data_copy_is_missing')) {
     }
 }
 
-if (!function_exists('fridg3_is_work_in_progress_enabled')) {
-    function fridg3_is_work_in_progress_enabled($startDir): bool {
-        $wipPath = fridg3_find_relative_upward($startDir, 'data/etc/wip');
+if (!function_exists('fridge_is_work_in_progress_enabled')) {
+    function fridge_is_work_in_progress_enabled($startDir): bool {
+        if (restore_active()) return true;
+        $wipPath = fridge_find_relative_upward($startDir, 'data/etc/wip');
         if (!$wipPath || !is_file($wipPath)) {
             return false;
         }
@@ -145,12 +148,12 @@ if (!function_exists('fridg3_is_work_in_progress_enabled')) {
             return false;
         }
 
-        return fridg3_is_truthy_value($raw) || strtolower(trim((string)$raw)) === 'wip';
+        return fridge_is_truthy_value($raw) || strtolower(trim((string)$raw)) === 'wip';
     }
 }
 
-if (!function_exists('fridg3_get_request_path')) {
-    function fridg3_get_request_path(): string {
+if (!function_exists('fridge_get_request_path')) {
+    function fridge_get_request_path(): string {
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
         $path = is_string($path) ? $path : '/';
         $path = rtrim($path, '/');
@@ -158,15 +161,15 @@ if (!function_exists('fridg3_get_request_path')) {
     }
 }
 
-if (!function_exists('fridg3_is_settings_request_path')) {
-    function fridg3_is_settings_request_path(): bool {
-        $path = fridg3_get_request_path();
+if (!function_exists('fridge_is_settings_request_path')) {
+    function fridge_is_settings_request_path(): bool {
+        $path = fridge_get_request_path();
         return $path === '/settings' || str_starts_with($path, '/settings/');
     }
 }
 
-if (!function_exists('fridg3_is_wip_allowed_path')) {
-    function fridg3_is_wip_allowed_path(string $path): bool {
+if (!function_exists('fridge_is_wip_allowed_path')) {
+    function fridge_is_wip_allowed_path(string $path): bool {
         $path = rtrim($path, '/');
         $path = $path === '' ? '/' : $path;
 
@@ -180,14 +183,14 @@ if (!function_exists('fridg3_is_wip_allowed_path')) {
     }
 }
 
-if (!function_exists('fridg3_current_user_is_admin')) {
-    function fridg3_current_user_is_admin(): bool {
+if (!function_exists('fridge_current_user_is_admin')) {
+    function fridge_current_user_is_admin(): bool {
         if (session_status() !== PHP_SESSION_ACTIVE) {
             $sessionPath = __DIR__ . DIRECTORY_SEPARATOR . 'session.php';
             if (is_file($sessionPath)) {
                 require_once $sessionPath;
-                if (function_exists('fridg3_start_session')) {
-                    fridg3_start_session();
+                if (function_exists('fridge_start_session')) {
+                    fridge_start_session();
                 }
             }
         }
@@ -196,18 +199,18 @@ if (!function_exists('fridg3_current_user_is_admin')) {
     }
 }
 
-if (!function_exists('fridg3_enforce_work_in_progress')) {
-    function fridg3_enforce_work_in_progress($startDir): void {
-        if (PHP_SAPI === 'cli' || !fridg3_is_work_in_progress_enabled($startDir)) {
+if (!function_exists('fridge_enforce_work_in_progress')) {
+    function fridge_enforce_work_in_progress($startDir): void {
+        if (PHP_SAPI === 'cli' || !fridge_is_work_in_progress_enabled($startDir)) {
             return;
         }
 
-        if (fridg3_current_user_is_admin()) {
+        if (fridge_current_user_is_admin()) {
             return;
         }
 
-        $path = fridg3_get_request_path();
-        if (fridg3_is_wip_allowed_path($path)) {
+        $path = fridge_get_request_path();
+        if (fridge_is_wip_allowed_path($path)) {
             return;
         }
 
@@ -218,9 +221,9 @@ if (!function_exists('fridg3_enforce_work_in_progress')) {
     }
 }
 
-if (!function_exists('fridg3_apply_work_in_progress_banner')) {
-    function fridg3_apply_work_in_progress_banner($template, $startDir) {
-        if (!fridg3_is_work_in_progress_enabled($startDir)) {
+if (!function_exists('fridge_apply_work_in_progress_banner')) {
+    function fridge_apply_work_in_progress_banner($template, $startDir) {
+        if (!fridge_is_work_in_progress_enabled($startDir)) {
             return $template;
         }
 
@@ -243,8 +246,8 @@ if (!function_exists('fridg3_apply_work_in_progress_banner')) {
     }
 }
 
-if (!function_exists('fridg3_get_mobile_cookie_domain')) {
-    function fridg3_get_mobile_cookie_domain() {
+if (!function_exists('fridge_get_mobile_cookie_domain')) {
+    function fridge_get_mobile_cookie_domain() {
         $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
         $host = preg_replace('/:\d+$/', '', $host);
         $isSubdomain = strlen($host) > strlen('.fridge.dev') && substr($host, -strlen('.fridge.dev')) === '.fridge.dev';
@@ -255,8 +258,8 @@ if (!function_exists('fridg3_get_mobile_cookie_domain')) {
     }
 }
 
-if (!function_exists('fridg3_normalize_theme_id')) {
-    function fridg3_normalize_theme_id($theme) {
+if (!function_exists('fridge_normalize_theme_id')) {
+    function fridge_normalize_theme_id($theme) {
         $theme = strtolower(trim((string)$theme));
         if ($theme === '' || $theme === 'default') {
             return 'default';
@@ -274,8 +277,8 @@ if (!function_exists('fridg3_normalize_theme_id')) {
     }
 }
 
-if (!function_exists('fridg3_list_themes')) {
-    function fridg3_normalize_theme_asset_path($path) {
+if (!function_exists('fridge_list_themes')) {
+    function fridge_normalize_theme_asset_path($path) {
         $path = trim(str_replace('\\', '/', (string)$path));
         if ($path === '' || $path[0] === '/' || strpos($path, "\0") !== false) {
             return null;
@@ -295,15 +298,15 @@ if (!function_exists('fridg3_list_themes')) {
         return implode('/', $parts);
     }
 
-    function fridg3_theme_asset_href($relativePath) {
+    function fridge_theme_asset_href($relativePath) {
         $parts = explode('/', $relativePath);
         $encoded = array_map('rawurlencode', $parts);
         return '/themes/lib/' . implode('/', $encoded);
     }
 
-    function fridg3_list_themes($startDir) {
-        $themesDir = fridg3_find_relative_upward($startDir, 'themes');
-        $themesLibDir = fridg3_find_relative_upward($startDir, 'themes/lib');
+    function fridge_list_themes($startDir) {
+        $themesDir = fridge_find_relative_upward($startDir, 'themes');
+        $themesLibDir = fridge_find_relative_upward($startDir, 'themes/lib');
         if (!$themesDir || !$themesLibDir || !is_dir($themesDir) || !is_dir($themesLibDir)) {
             return [];
         }
@@ -315,7 +318,7 @@ if (!function_exists('fridg3_list_themes')) {
         }
 
         foreach ($files as $file) {
-            $id = fridg3_normalize_theme_id(pathinfo($file, PATHINFO_FILENAME));
+            $id = fridge_normalize_theme_id(pathinfo($file, PATHINFO_FILENAME));
             if ($id === 'default' || $id === 'custom') {
                 continue;
             }
@@ -336,9 +339,9 @@ if (!function_exists('fridg3_list_themes')) {
             if ($base !== '' && $base !== 'blackprint') {
                 continue;
             }
-            $html = fridg3_normalize_theme_asset_path($meta['html'] ?? '');
-            $css = fridg3_normalize_theme_asset_path($meta['css'] ?? '');
-            $thumbnail = fridg3_normalize_theme_asset_path($meta['thumbnail'] ?? '');
+            $html = fridge_normalize_theme_asset_path($meta['html'] ?? '');
+            $css = fridge_normalize_theme_asset_path($meta['css'] ?? '');
+            $thumbnail = fridge_normalize_theme_asset_path($meta['thumbnail'] ?? '');
             if ($thumbnail === null) {
                 $thumbnail = '';
             }
@@ -373,7 +376,7 @@ if (!function_exists('fridg3_list_themes')) {
                 'htmlPath' => $htmlPath,
                 'cssPath' => $cssPath,
                 'htmlTemplate' => 'themes/lib/' . $html,
-                'cssHref' => fridg3_theme_asset_href($css) . '?v=' . (string)filemtime($cssPath),
+                'cssHref' => fridge_theme_asset_href($css) . '?v=' . (string)filemtime($cssPath),
                 'thumbnailHref' => $thumbnail !== '' ? '/themes/' . implode('/', array_map('rawurlencode', explode('/', $thumbnail))) : '',
             ];
         }
@@ -394,8 +397,8 @@ if (!function_exists('fridg3_list_themes')) {
     }
 }
 
-if (!function_exists('fridg3_paginate_static_post_list')) {
-    function fridg3_paginate_static_post_list(string $content, string $route, int $currentPage, int $perPage = 10): string {
+if (!function_exists('fridge_paginate_static_post_list')) {
+    function fridge_paginate_static_post_list(string $content, string $route, int $currentPage, int $perPage = 10): string {
         if ($perPage < 1 || preg_match('#(<div\b[^>]*\bid=([' . "\"'" . '])posts\2[^>]*>)([\s\S]*)(</div>)#i', $content, $wrapper) !== 1) {
             return $content;
         }
@@ -424,8 +427,8 @@ if (!function_exists('fridg3_paginate_static_post_list')) {
     }
 }
 
-if (!function_exists('fridg3_get_theme_cookie_options')) {
-    function fridg3_get_theme_cookie_options() {
+if (!function_exists('fridge_get_theme_cookie_options')) {
+    function fridge_get_theme_cookie_options() {
         $options = [
             'expires' => time() + (86400 * 365),
             'path' => '/',
@@ -434,7 +437,7 @@ if (!function_exists('fridg3_get_theme_cookie_options')) {
             'samesite' => 'Lax',
         ];
 
-        $domain = fridg3_get_mobile_cookie_domain();
+        $domain = fridge_get_mobile_cookie_domain();
         if ($domain !== null) {
             $options['domain'] = $domain;
         }
@@ -443,24 +446,24 @@ if (!function_exists('fridg3_get_theme_cookie_options')) {
     }
 }
 
-if (!function_exists('fridg3_get_preferred_theme_id')) {
-    function fridg3_get_preferred_theme_id($startDir) {
+if (!function_exists('fridge_get_preferred_theme_id')) {
+    function fridge_get_preferred_theme_id($startDir) {
         if (isset($_COOKIE['theme_pref'])) {
-            return fridg3_normalize_theme_id($_COOKIE['theme_pref']);
+            return fridge_normalize_theme_id($_COOKIE['theme_pref']);
         }
 
         return 'default';
     }
 }
 
-if (!function_exists('fridg3_get_active_theme')) {
-    function fridg3_get_active_theme($startDir) {
-        $themeId = fridg3_get_preferred_theme_id($startDir);
+if (!function_exists('fridge_get_active_theme')) {
+    function fridge_get_active_theme($startDir) {
+        $themeId = fridge_get_preferred_theme_id($startDir);
         if ($themeId === 'default') {
             return null;
         }
 
-        $themes = fridg3_list_themes($startDir);
+        $themes = fridge_list_themes($startDir);
         return $themes[$themeId] ?? null;
     }
 }
@@ -473,11 +476,11 @@ if (!function_exists('should_use_mobile_template')) {
             return true;
         }
 
-        if (isset($_COOKIE['mobile_friendly_view']) && fridg3_is_truthy_value($_COOKIE['mobile_friendly_view'])) {
-            return true;
+        if (isset($_COOKIE['mobile_friendly_view'])) {
+            return fridge_is_truthy_value($_COOKIE['mobile_friendly_view']);
         }
 
-        return false;
+        return preg_match('/android|webos|iphone|ipad|ipod|blackberry|bb10|iemobile|opera mini|mobile/i', (string)($_SERVER['HTTP_USER_AGENT'] ?? '')) === 1;
     }
 }
 
@@ -487,7 +490,7 @@ if (!function_exists('get_preferred_template_name')) {
             return 'template_mobile.html';
         }
 
-        $theme = fridg3_get_active_theme($startDir);
+        $theme = fridge_get_active_theme($startDir);
         if ($theme !== null) {
             return $theme['htmlTemplate'];
         }
@@ -497,7 +500,7 @@ if (!function_exists('get_preferred_template_name')) {
 }
 
 if (!function_exists('apply_preferred_theme_stylesheet')) {
-    function fridg3_apply_body_theme_class($template, $className) {
+    function fridge_apply_body_theme_class($template, $className) {
         $className = trim((string)$className);
         if ($className === '' || !preg_match('/^[a-z0-9_-]+$/', $className)) {
             return $template;
@@ -518,13 +521,13 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         return preg_replace('/<body\b/i', '<body class="' . $className . '"', $template, 1);
     }
 
-    function fridg3_current_user_email_address($startDir): string {
+    function fridge_current_user_email_address($startDir): string {
         if (!isset($_SESSION['user']['username'])) {
             return '';
         }
 
         $username = (string)$_SESSION['user']['username'];
-        $accountsPath = fridg3_find_relative_upward($startDir, 'data/accounts/accounts.json');
+        $accountsPath = fridge_find_relative_upward($startDir, 'data/accounts/accounts.json');
         if ($accountsPath && is_file($accountsPath)) {
             $raw = @file_get_contents($accountsPath);
             $data = json_decode((string)$raw, true);
@@ -545,24 +548,24 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         return '';
     }
 
-    function fridg3_user_has_email_account($startDir): bool {
-        $emailAddress = fridg3_current_user_email_address($startDir);
+    function fridge_user_has_email_account($startDir): bool {
+        $emailAddress = fridge_current_user_email_address($startDir);
         return $emailAddress !== ''
             && filter_var($emailAddress, FILTER_VALIDATE_EMAIL) !== false
             && str_ends_with(strtolower($emailAddress), '@fridge.dev');
     }
 
-    function fridg3_inject_site_notices($template, $startDir) {
+    function fridge_inject_site_notices($template, $startDir) {
         $noticesHelper = __DIR__ . DIRECTORY_SEPARATOR . 'site-notices.php';
         if (!is_file($noticesHelper)) {
             return $template;
         }
         require_once $noticesHelper;
 
-        $allNotices = fridg3_site_notices_load($startDir);
+        $allNotices = fridge_site_notices_load($startDir);
         $audience = isset($_SESSION['user']['username']) ? 'users' : 'guests';
         $requestUri = (string)($_SERVER['REQUEST_URI'] ?? '/');
-        $notices = fridg3_site_notices_for_request($allNotices, $audience, $requestUri);
+        $notices = fridge_site_notices_for_request($allNotices, $audience, $requestUri);
         $banner = is_array($notices['banner'] ?? null) ? $notices['banner'] : null;
         $popup = is_array($notices['popup'] ?? null) ? $notices['popup'] : null;
         $bannerHtml = '<div id="site-notice-banner-region"></div>';
@@ -593,21 +596,38 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         return $injection . $template;
     }
 
-    function fridg3_inject_missing_dev_data_popup($template, $startDir) {
-        if (!fridg3_is_local_dev_server() || !fridg3_dev_data_copy_is_missing($startDir) || fridg3_is_settings_request_path()) {
+    function fridge_inject_missing_dev_data_popup($template, $startDir) {
+        if (!fridge_is_local_dev_server()) {
             return $template;
         }
         if (stripos($template, 'id="missing-dev-data-runtime"') !== false) {
             return $template;
         }
 
-        $payload = [
-            'id' => 'missing-dev-data-v1',
-            'title' => 'dev data is missing',
-            'message' => 'this local developer-mode site does not have the downloaded data copy yet. open settings and use the dev bootstrap button to download the latest dev data.',
-            'buttonLabel' => 'open settings',
-            'buttonUrl' => '/settings',
-        ];
+        $abortNoticePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.dev-data-download-aborted';
+        if (is_file($abortNoticePath)) {
+            $payload = [
+                'id' => 'dev-data-download-aborted-' . (string)@filemtime($abortNoticePath),
+                'title' => 'download aborted',
+                'message' => "the data download was aborted because you left the page during the process.\n\nthe data directory was cleared to prevent issues.",
+                'okLabel' => 'ok',
+            ];
+            @unlink($abortNoticePath);
+        } elseif (fridge_dev_data_copy_is_missing($startDir)) {
+            $payload = [
+                'id' => 'welcome-developer-v1',
+                'persistent' => true,
+                'title' => 'welcome, developer!',
+                'message' => "developer mode has been initialized because you're viewing the page from an IP on the local network.\n\nGo to settings to download a developer copy of the \"data\" directory, which will populate the site with the latest content and resources.\n\nCheck out the wiki for more information!",
+                'buttonLabel' => 'go to wiki',
+                'buttonUrl' => '/wiki',
+                'secondaryButtonLabel' => 'go to settings',
+                'secondaryButtonUrl' => '/settings',
+                'okLabel' => 'ok',
+            ];
+        } else {
+            return $template;
+        }
         $json = json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             return $template;
@@ -621,11 +641,11 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         return $template . $runtime;
     }
 
-    function fridg3_replace_logged_in_discord_footer_button($template, $startDir) {
-        $template = fridg3_inject_site_notices($template, $startDir);
-        $template = fridg3_inject_missing_dev_data_popup($template, $startDir);
-        $template = fridg3_inject_server_debug_logs($template);
-        if (!fridg3_user_has_email_account($startDir)) {
+    function fridge_replace_logged_in_discord_footer_button($template, $startDir) {
+        $template = fridge_inject_site_notices($template, $startDir);
+        $template = fridge_inject_missing_dev_data_popup($template, $startDir);
+        $template = fridge_inject_server_debug_logs($template);
+        if (!fridge_user_has_email_account($startDir)) {
             return $template;
         }
 
@@ -645,17 +665,18 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
         );
     }
 
-    function fridg3_inject_shared_runtime_scripts($template) {
+    function fridge_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/main.js' => '/main.js?v=20260909-toast-feed-reply-2',
-            '/js/settings.js' => '/js/settings.js?v=20260909-mobile-abbr-tooltips-3',
-            '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260812-unlocked-track-route-94',
-            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260914-toast-art-1',
-            '/js/bookmarks.js' => '/js/bookmarks.js?v=20260723-debug-logging-1',
-            '/js/bbcode.js' => '/js/bbcode.js?v=20260810-preview-mention-tooltips-1',
+            '/main.js' => '/main.js?v=20260915-namespace-1',
+            '/js/settings.js' => '/js/settings.js?v=20260915-namespace-1',
+            '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260915-namespace-1',
+            '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260915-namespace-1',
+            '/js/bookmarks.js' => '/js/bookmarks.js?v=20260915-namespace-1',
+            '/js/bbcode.js' => '/js/bbcode.js?v=20260915-namespace-1',
         ];
 
         $missing = [];
+        if (!empty($_SESSION['user']['isAdmin'])) $scripts['/js/backup-restore.js'] = '/js/backup-restore.js?v=20260915-namespace-1';
         foreach ($scripts as $detectPath => $src) {
             $template = preg_replace(
                 '#(<scr' . 'ipt\b[^>]*\bsrc=["\'])' . preg_quote($detectPath, '#') . '(?:\?[^"\']*)?(["\'][^>]*></scr' . 'ipt>)#i',
@@ -678,50 +699,56 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
     }
 
     function apply_preferred_theme_stylesheet($template, $startDir) {
-        fridg3_enforce_work_in_progress($startDir);
+        if (!headers_sent()) {
+            // Both layouts share a URL; intermediaries must respect the device
+            // and explicit layout/theme preferences when caching a response.
+            header('Vary: User-Agent, Cookie', false);
+        }
+        fridge_enforce_work_in_progress($startDir);
         require_once __DIR__ . '/session.php';
-        fridg3_start_session();
-        fridg3_enforce_bot_mode();
-        $template = fridg3_bot_mode_template($template);
+        fridge_start_session();
+        fridge_enforce_bot_mode();
+        $template = fridge_bot_mode_template($template);
+        $template = fridge_seo_template($template, dirname(__DIR__), (string)($_SERVER['REQUEST_URI'] ?? '/'), fridge_is_local_dev_server() || !in_array(strtolower((string)($_SERVER['HTTP_HOST'] ?? '')), ['fridge.dev', 'www.fridge.dev', 'm.fridge.dev'], true));
 
         $template = preg_replace(
             '#(<link\b[^>]*\bhref=["\'])/style\.css(?:\?[^"\']*)?(["\'][^>]*>)#i',
-            '$1/style.css?v=toast-art-20260914-2$2',
+            '$1/style.css?v=backup-restore-20260915-1$2',
             $template
         ) ?: $template;
 
-        $theme = fridg3_get_active_theme($startDir);
-        $template = fridg3_inject_theme_accents($template, $theme['id'] ?? 'default');
-        $template = fridg3_inject_shared_runtime_scripts($template);
+        $theme = fridge_get_active_theme($startDir);
+        $template = fridge_inject_theme_accents($template, $theme['id'] ?? 'default');
+        $template = fridge_inject_shared_runtime_scripts($template);
         if ($theme === null) {
-            return fridg3_replace_logged_in_discord_footer_button(
-                fridg3_apply_work_in_progress_banner(
-                    fridg3_inject_dev_mode_banner(fridg3_apply_body_theme_class($template, 'blackprint-theme')),
+            return fridge_replace_logged_in_discord_footer_button(
+                fridge_apply_work_in_progress_banner(
+                    fridge_inject_dev_mode_banner(fridge_apply_body_theme_class($template, 'blackprint-theme')),
                     $startDir
                 ),
                 $startDir
             );
         }
 
-        $template = fridg3_apply_body_theme_class($template, $theme['id'] . '-theme');
+        $template = fridge_apply_body_theme_class($template, $theme['id'] . '-theme');
         if (($theme['base'] ?? '') === 'blackprint') {
-            $template = fridg3_apply_body_theme_class($template, 'blackprint-theme');
+            $template = fridge_apply_body_theme_class($template, 'blackprint-theme');
         }
 
         $href = htmlspecialchars($theme['cssHref'], ENT_QUOTES, 'UTF-8');
         if (strpos($template, 'href="' . $href . '"') !== false || strpos($template, "href='" . $href . "'") !== false) {
-            return fridg3_replace_logged_in_discord_footer_button(
-                fridg3_apply_work_in_progress_banner(fridg3_inject_dev_mode_banner($template), $startDir),
+            return fridge_replace_logged_in_discord_footer_button(
+                fridge_apply_work_in_progress_banner(fridge_inject_dev_mode_banner($template), $startDir),
                 $startDir
             );
         }
 
         $themeLink = '    <link rel="stylesheet" href="' . $href . '">' . "\n";
         if (stripos($template, '</head>') !== false) {
-            return fridg3_replace_logged_in_discord_footer_button(
-                fridg3_apply_work_in_progress_banner(
-                    fridg3_inject_dev_mode_banner(
-                        fridg3_inject_shared_runtime_scripts(
+            return fridge_replace_logged_in_discord_footer_button(
+                fridge_apply_work_in_progress_banner(
+                    fridge_inject_dev_mode_banner(
+                        fridge_inject_shared_runtime_scripts(
                             preg_replace('/<\/head>/i', $themeLink . '</head>', $template, 1)
                         )
                     ),
@@ -731,10 +758,10 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
             );
         }
 
-        return fridg3_replace_logged_in_discord_footer_button(
-            fridg3_apply_work_in_progress_banner(
-                fridg3_inject_dev_mode_banner(
-                    fridg3_inject_shared_runtime_scripts($themeLink . $template)
+        return fridge_replace_logged_in_discord_footer_button(
+            fridge_apply_work_in_progress_banner(
+                fridge_inject_dev_mode_banner(
+                    fridge_inject_shared_runtime_scripts($themeLink . $template)
                 ),
                 $startDir
             ),
@@ -743,16 +770,16 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
     }
 }
 
-if (!function_exists('fridg3_inject_dev_mode_banner')) {
-    function fridg3_inject_dev_mode_banner($template) {
-        $isLocalDevServer = fridg3_is_local_dev_server();
+if (!function_exists('fridge_inject_dev_mode_banner')) {
+    function fridge_inject_dev_mode_banner($template) {
+        $isLocalDevServer = fridge_is_local_dev_server();
         $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
         if (!$isLocalDevServer && !$isAdmin) {
             return $template;
         }
 
         if ($isLocalDevServer) {
-            $template = preg_replace('/<title>(?!\s*\[DEV\]\s*)/i', '<title>[DEV] ', $template, 1) ?: $template;
+            $template = preg_replace('/(<title\b[^>]*>)(?!\s*\[DEV\]\s*)/i', '$1[DEV] ', $template, 1) ?: $template;
         }
 
         if ($isLocalDevServer && strpos($template, 'id="dev-mode-banner"') === false) {
@@ -793,22 +820,23 @@ if (!function_exists('fridg3_inject_dev_mode_banner')) {
         }
         require_once $hardBanHelper;
 
-        $clientIp = fridg3_hard_ban_client_ip();
-        $identifier = (string)($_COOKIE[FRIDG3_HARD_BAN_COOKIE] ?? '');
-        $isHardBanned = $isAdmin
-            ? fridg3_hard_ban_would_block_client($clientIp, $identifier)
-            : fridg3_hard_ban_check_client($clientIp, $identifier);
+        $clientIp = fridge_hard_ban_client_ip();
+        $identifier = (string)($_COOKIE[FRIDGE_HARD_BAN_COOKIE] ?? '');
+        $bypassesHardBan = $isAdmin || !empty($_SESSION['user']['isModerator']);
+        $isHardBanned = $bypassesHardBan
+            ? fridge_hard_ban_would_block_client($clientIp, $identifier)
+            : fridge_hard_ban_check_client($clientIp, $identifier);
         if (!$isHardBanned) {
             return $template;
         }
 
-        $hardBanStatus = $isAdmin ? 'admin bypass active' : 'access termination active';
+        $hardBanStatus = $bypassesHardBan ? 'staff bypass active' : 'access termination active';
         $hardBanBanner = '<span id="hard-ban-dev-banner"><i class="fa-solid fa-skull-crossbones"></i> <b>hard-banned client</b><small>' . $hardBanStatus . '</small></span>';
         if (strpos($template, 'id="dev-mode-banner"') !== false) {
             return preg_replace('/(<span id="dev-mode-banner"[^>]*>.*?<\/span>)/is', '$1' . $hardBanBanner, $template, 1) ?: $template;
         }
 
-        if ($isAdmin && strpos($template, 'id="title"') !== false) {
+        if ($bypassesHardBan && strpos($template, 'id="title"') !== false) {
             return preg_replace('/(<span id="title">.*?<\/span>)/is', '$1<br>' . $hardBanBanner, $template, 1) ?: $template;
         }
 

@@ -2,23 +2,24 @@
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
 require_once __DIR__ . '/bot-mode.php';
+require_once __DIR__ . '/backup-restore.php';
 
-if (!function_exists('fridg3_get_persistent_login_lifetime')) {
-    function fridg3_get_persistent_login_lifetime(): int
+if (!function_exists('fridge_get_persistent_login_lifetime')) {
+    function fridge_get_persistent_login_lifetime(): int
     {
         return 60 * 60 * 24 * 90;
     }
 }
 
-if (!function_exists('fridg3_session_cookie_name')) {
-    function fridg3_session_cookie_name(): string
+if (!function_exists('fridge_session_cookie_name')) {
+    function fridge_session_cookie_name(): string
     {
         return 'fridg3_session';
     }
 }
 
-if (!function_exists('fridg3_session_is_secure_request')) {
-    function fridg3_session_is_secure_request(): bool
+if (!function_exists('fridge_session_is_secure_request')) {
+    function fridge_session_is_secure_request(): bool
     {
         if (isset($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) === 'on') {
             return true;
@@ -33,8 +34,8 @@ if (!function_exists('fridg3_session_is_secure_request')) {
     }
 }
 
-if (!function_exists('fridg3_session_cookie_domain')) {
-    function fridg3_session_cookie_domain(): string
+if (!function_exists('fridge_session_cookie_domain')) {
+    function fridge_session_cookie_domain(): string
     {
         $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
         $host = preg_replace('/:\d+$/', '', $host);
@@ -48,12 +49,12 @@ if (!function_exists('fridg3_session_cookie_domain')) {
     }
 }
 
-if (!function_exists('fridg3_session_cookie_options')) {
-    function fridg3_session_cookie_options(?int $expires = null, bool $httpOnly = true): array
+if (!function_exists('fridge_session_cookie_options')) {
+    function fridge_session_cookie_options(?int $expires = null, bool $httpOnly = true): array
     {
         $options = [
             'path' => '/',
-            'secure' => fridg3_session_is_secure_request(),
+            'secure' => fridge_session_is_secure_request(),
             'httponly' => $httpOnly,
             'samesite' => 'Lax',
         ];
@@ -62,7 +63,7 @@ if (!function_exists('fridg3_session_cookie_options')) {
             $options['expires'] = $expires;
         }
 
-        $domain = fridg3_session_cookie_domain();
+        $domain = fridge_session_cookie_domain();
         if ($domain !== '') {
             $options['domain'] = $domain;
         }
@@ -71,10 +72,10 @@ if (!function_exists('fridg3_session_cookie_options')) {
     }
 }
 
-if (!function_exists('fridg3_expire_cookie')) {
-    function fridg3_expire_cookie(string $name, bool $httpOnly = true): void
+if (!function_exists('fridge_expire_cookie')) {
+    function fridge_expire_cookie(string $name, bool $httpOnly = true): void
     {
-        $expiredOptions = fridg3_session_cookie_options(time() - 3600, $httpOnly);
+        $expiredOptions = fridge_session_cookie_options(time() - 3600, $httpOnly);
         setcookie($name, '', $expiredOptions);
 
         if (!empty($expiredOptions['domain'])) {
@@ -84,15 +85,15 @@ if (!function_exists('fridg3_expire_cookie')) {
     }
 }
 
-if (!function_exists('fridg3_clear_legacy_session_cookie')) {
-    function fridg3_clear_legacy_session_cookie(): void
+if (!function_exists('fridge_clear_legacy_session_cookie')) {
+    function fridge_clear_legacy_session_cookie(): void
     {
-        fridg3_expire_cookie('PHPSESSID', true);
+        fridge_expire_cookie('PHPSESSID', true);
     }
 }
 
-if (!function_exists('fridg3_session_truthy_value')) {
-    function fridg3_session_truthy_value($value): bool
+if (!function_exists('fridge_session_truthy_value')) {
+    function fridge_session_truthy_value($value): bool
     {
         if (is_bool($value)) {
             return $value;
@@ -106,22 +107,22 @@ if (!function_exists('fridg3_session_truthy_value')) {
     }
 }
 
-if (!function_exists('fridg3_current_user_posting_restricted')) {
-    function fridg3_current_user_posting_restricted(): bool
+if (!function_exists('fridge_current_user_posting_restricted')) {
+    function fridge_current_user_posting_restricted(): bool
     {
         return isset($_SESSION['user']) && !empty($_SESSION['user']['postingRestricted']);
     }
 }
 
-if (!function_exists('fridg3_refresh_current_user_posting_restriction')) {
-    function fridg3_refresh_current_user_posting_restriction(): void
+if (!function_exists('fridge_refresh_current_user_posting_restriction')) {
+    function fridge_refresh_current_user_posting_restriction(): void
     {
         if (!isset($_SESSION['user']['username'])) {
             return;
         }
 
         $startDir = $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__);
-        $accountsPath = fridg3_session_find_relative_upward((string)$startDir, 'data/accounts/accounts.json');
+        $accountsPath = fridge_session_find_relative_upward((string)$startDir, 'data/accounts/accounts.json');
         if ($accountsPath === null || !is_file($accountsPath)) {
             return;
         }
@@ -137,21 +138,21 @@ if (!function_exists('fridg3_refresh_current_user_posting_restriction')) {
                 continue;
             }
 
-            $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
+            $_SESSION['user']['postingRestricted'] = !empty($account['postingRestricted']) || !empty($account['accountBanned']);
             return;
         }
     }
 }
 
-if (!function_exists('fridg3_posting_restriction_notice')) {
-    function fridg3_posting_restriction_notice(): string
+if (!function_exists('fridge_posting_restriction_notice')) {
+    function fridge_posting_restriction_notice(): string
     {
         return '<p class="posting-restriction-message">your account has been restricted.</p>';
     }
 }
 
-if (!function_exists('fridg3_disable_composer_controls')) {
-    function fridg3_disable_composer_controls(string $html): string
+if (!function_exists('fridge_disable_composer_controls')) {
+    function fridge_disable_composer_controls(string $html): string
     {
         return (string)preg_replace_callback(
             '/<(button|input|select|textarea)\b([^>]*)>/i',
@@ -170,8 +171,8 @@ if (!function_exists('fridg3_disable_composer_controls')) {
     }
 }
 
-if (!function_exists('fridg3_session_extract_save_path_dir')) {
-    function fridg3_session_extract_save_path_dir(string $savePath): ?string
+if (!function_exists('fridge_session_extract_save_path_dir')) {
+    function fridge_session_extract_save_path_dir(string $savePath): ?string
     {
         $savePath = trim($savePath);
         if ($savePath === '') {
@@ -188,8 +189,8 @@ if (!function_exists('fridg3_session_extract_save_path_dir')) {
     }
 }
 
-if (!function_exists('fridg3_session_prepare_local_save_path')) {
-    function fridg3_session_prepare_local_save_path(): ?string
+if (!function_exists('fridge_session_prepare_local_save_path')) {
+    function fridge_session_prepare_local_save_path(): ?string
     {
         $effectiveUser = function_exists('posix_geteuid') ? (string)posix_geteuid() : get_current_user();
         $siteRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__)) ?: dirname(__DIR__);
@@ -203,8 +204,8 @@ if (!function_exists('fridg3_session_prepare_local_save_path')) {
     }
 }
 
-if (!function_exists('fridg3_session_find_relative_upward')) {
-    function fridg3_session_find_relative_upward(string $startDir, string $relativePath): ?string
+if (!function_exists('fridge_session_find_relative_upward')) {
+    function fridge_session_find_relative_upward(string $startDir, string $relativePath): ?string
     {
         $dir = $startDir;
         $prevDir = '';
@@ -222,8 +223,8 @@ if (!function_exists('fridg3_session_find_relative_upward')) {
     }
 }
 
-if (!function_exists('fridg3_session_request_path')) {
-    function fridg3_session_request_path(): string
+if (!function_exists('fridge_session_request_path')) {
+    function fridge_session_request_path(): string
     {
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
         $path = is_string($path) ? $path : '/';
@@ -232,8 +233,8 @@ if (!function_exists('fridg3_session_request_path')) {
     }
 }
 
-if (!function_exists('fridg3_session_is_wip_allowed_path')) {
-    function fridg3_session_is_wip_allowed_path(string $path): bool
+if (!function_exists('fridge_session_is_wip_allowed_path')) {
+    function fridge_session_is_wip_allowed_path(string $path): bool
     {
         $path = rtrim($path, '/');
         $path = $path === '' ? '/' : $path;
@@ -248,11 +249,12 @@ if (!function_exists('fridg3_session_is_wip_allowed_path')) {
     }
 }
 
-if (!function_exists('fridg3_session_work_in_progress_enabled')) {
-    function fridg3_session_work_in_progress_enabled(): bool
+if (!function_exists('fridge_session_work_in_progress_enabled')) {
+    function fridge_session_work_in_progress_enabled(): bool
     {
+        if (restore_active()) return true;
         $startDir = $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__);
-        $wipPath = fridg3_session_find_relative_upward((string)$startDir, 'data/etc/wip');
+        $wipPath = fridge_session_find_relative_upward((string)$startDir, 'data/etc/wip');
         if (!$wipPath || !is_file($wipPath)) {
             return false;
         }
@@ -262,14 +264,14 @@ if (!function_exists('fridg3_session_work_in_progress_enabled')) {
             return false;
         }
 
-        return fridg3_session_truthy_value($raw);
+        return fridge_session_truthy_value($raw);
     }
 }
 
-if (!function_exists('fridg3_session_enforce_work_in_progress')) {
-    function fridg3_session_enforce_work_in_progress(): void
+if (!function_exists('fridge_session_enforce_work_in_progress')) {
+    function fridge_session_enforce_work_in_progress(): void
     {
-        if (PHP_SAPI === 'cli' || !fridg3_session_work_in_progress_enabled()) {
+        if (PHP_SAPI === 'cli' || !fridge_session_work_in_progress_enabled()) {
             return;
         }
 
@@ -277,7 +279,7 @@ if (!function_exists('fridg3_session_enforce_work_in_progress')) {
             return;
         }
 
-        if (fridg3_session_is_wip_allowed_path(fridg3_session_request_path())) {
+        if (fridge_session_is_wip_allowed_path(fridge_session_request_path())) {
             return;
         }
 
@@ -288,21 +290,21 @@ if (!function_exists('fridg3_session_enforce_work_in_progress')) {
     }
 }
 
-if (!function_exists('fridg3_start_session')) {
-    function fridg3_start_session(bool $enforceAccessRules = true): void
+if (!function_exists('fridge_start_session')) {
+    function fridge_start_session(bool $enforceAccessRules = true): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
-            if ($enforceAccessRules) fridg3_enforce_bot_mode();
+            if ($enforceAccessRules) fridge_enforce_bot_mode();
             return;
         }
 
-        $persistentLoginLifetime = fridg3_get_persistent_login_lifetime();
+        $persistentLoginLifetime = fridge_get_persistent_login_lifetime();
 
-        session_name(fridg3_session_cookie_name());
+        session_name(fridge_session_cookie_name());
 
-        $currentSavePath = fridg3_session_extract_save_path_dir((string)ini_get('session.save_path'));
+        $currentSavePath = fridge_session_extract_save_path_dir((string)ini_get('session.save_path'));
         if ($currentSavePath === null || !is_dir($currentSavePath) || !is_writable($currentSavePath)) {
-            $fallbackSavePath = fridg3_session_prepare_local_save_path();
+            $fallbackSavePath = fridge_session_prepare_local_save_path();
             if ($fallbackSavePath !== null) {
                 session_save_path($fallbackSavePath);
             }
@@ -314,7 +316,7 @@ if (!function_exists('fridg3_start_session')) {
         ini_set('session.gc_maxlifetime', (string)$persistentLoginLifetime);
 
         session_set_cookie_params(array_merge(
-            fridg3_session_cookie_options(null, true),
+            fridge_session_cookie_options(null, true),
             ['lifetime' => $persistentLoginLifetime]
         ));
 
@@ -350,18 +352,33 @@ if (!function_exists('fridg3_start_session')) {
             }
         }
 
-        fridg3_enforce_bot_mode();
-        fridg3_session_enforce_work_in_progress();
+        fridge_enforce_bot_mode();
+        fridge_session_enforce_work_in_progress();
+        if (restore_active() && !empty($_SESSION['user']['isAdmin']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+            $restorePath = fridge_session_request_path();
+            if (!str_starts_with($restorePath, '/api/') && !in_array(rtrim($restorePath, '/'), ['/settings', '/settings/index.php'], true)) {
+                header('Location: /settings/?restore=1', true, 303);
+                exit;
+            }
+        }
+        if (restore_active() && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET'
+            && !str_starts_with(fridge_session_request_path(), '/api/restore-backup')
+            && !str_starts_with(fridge_session_request_path(), '/account/login')) {
+            http_response_code(423);
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => false, 'error' => 'backup restoration is in progress; maintenance is locked']);
+            exit;
+        }
     }
 }
 
-if (!function_exists('fridg3_refresh_is_admin_cookie')) {
-    function fridg3_refresh_is_admin_cookie(bool $isAdmin): void
+if (!function_exists('fridge_refresh_is_admin_cookie')) {
+    function fridge_refresh_is_admin_cookie(bool $isAdmin): void
     {
         setcookie(
             'is_admin',
             $isAdmin ? '1' : '0',
-            fridg3_session_cookie_options(time() + fridg3_get_persistent_login_lifetime(), false)
+            fridge_session_cookie_options(time() + fridge_get_persistent_login_lifetime(), false)
         );
     }
 }

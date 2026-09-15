@@ -1,5 +1,5 @@
 (function() {
-    const debugLog = message => window.fridg3DebugClientLog?.(`[music upload] ${message}`);
+    const debugLog = message => window.fridgeDebugClientLog?.(`[music upload] ${message}`);
     const form = document.querySelector('[data-music-upload-form]');
     if (!form || form.dataset.musicUploadBound === '1') return;
     form.dataset.musicUploadBound = '1';

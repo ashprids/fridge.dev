@@ -1,6 +1,6 @@
 // BBCode formatting state (media + file list) is global so that
 // it can be reused when the editor is loaded via SPA navigation.
-const bbcodeDebugLog = message => window.fridg3DebugClientLog?.(`[editor/media] ${message}`);
+const bbcodeDebugLog = message => window.fridgeDebugClientLog?.(`[editor/media] ${message}`);
 const bbcodeImages = new Map();
 const bbcodeMedia = new Map();
 const bbcodeVoiceNotes = new Map();
@@ -28,8 +28,8 @@ function submitSeparateMarkdownPreview(editor) {
     else form.submit();
 }
 
-if (!window.fridg3SeparateMarkdownPreviewBound) {
-    window.fridg3SeparateMarkdownPreviewBound = true;
+if (!window.fridgeSeparateMarkdownPreviewBound) {
+    window.fridgeSeparateMarkdownPreviewBound = true;
     document.addEventListener('click', event => {
         const button = event.target.closest('#bbcode-preview-toggle');
         const editor = button?.closest('.bbcode-editor[data-separate-preview="true"]');
@@ -39,7 +39,7 @@ if (!window.fridg3SeparateMarkdownPreviewBound) {
     });
 }
 
-window.fridg3AppendBBCodeUploadFiles = function(formData, form) {
+window.fridgeAppendBBCodeUploadFiles = function(formData, form) {
     if (!formData || !form || !form.querySelector('#bbcode-textbox')) return;
     if (mediaFileStore.files.length > 0) {
         formData.delete('images[]');
@@ -56,7 +56,7 @@ const VOICE_NOTE_AUDIO_CONSTRAINTS = {
     autoGainControl: { ideal: true }
 };
 
-function fridg3VoiceMimeType() {
+function fridgeVoiceMimeType() {
     if (!window.MediaRecorder) return '';
     const candidates = [
         'audio/mp4',
@@ -73,7 +73,7 @@ function fridg3VoiceMimeType() {
     }) || '';
 }
 
-function fridg3VoiceExtension(mimeType) {
+function fridgeVoiceExtension(mimeType) {
     const value = String(mimeType || '').toLowerCase();
     if (value.includes('mp4')) return 'm4a';
     if (value.includes('ogg')) return 'ogg';
@@ -81,7 +81,7 @@ function fridg3VoiceExtension(mimeType) {
     return 'webm';
 }
 
-function fridg3CreateVoiceRecorder(container, onReady) {
+function fridgeCreateVoiceRecorder(container, onReady) {
     if (!container || container.dataset.voiceRecorderBound === '1') return null;
     container.dataset.voiceRecorderBound = '1';
     container.innerHTML = [
@@ -186,7 +186,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
                 setText('voice recording is not supported in this browser');
                 return;
             }
-            currentMime = fridg3VoiceMimeType();
+            currentMime = fridgeVoiceMimeType();
             if (!currentMime) {
                 setText('no supported audio recorder found');
                 return;
@@ -285,7 +285,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
         acceptBtn.addEventListener('click', () => {
             if (!currentBlob) return;
             const mime = currentBlob.type || currentMime || 'audio/webm';
-            const ext = fridg3VoiceExtension(mime);
+            const ext = fridgeVoiceExtension(mime);
             const file = new File([currentBlob], 'voice-note.' + ext, { type: mime });
             if (typeof onReady === 'function') onReady(file, currentUrl);
             clearPreview();
@@ -299,7 +299,7 @@ function fridg3CreateVoiceRecorder(container, onReady) {
     return { reset, clearPreview };
 }
 
-window.fridg3CreateVoiceRecorder = fridg3CreateVoiceRecorder;
+window.fridgeCreateVoiceRecorder = fridgeCreateVoiceRecorder;
 
 function renderChatStyleAudio(url, fileName, mode = 'feed') {
     const escapeAttr = (value) => String(value || '')
@@ -661,7 +661,7 @@ async function compressImageToJpegUnder1MB(file, maxBytes = 1000000) {
         img.src = url;
     });
 }
-window.fridg3CompressImageToJpegUnder1MB = compressImageToJpegUnder1MB;
+window.fridgeCompressImageToJpegUnder1MB = compressImageToJpegUnder1MB;
 
 function replaceQueuedMediaFile(index, replacement) {
     const files = Array.from(mediaFileStore.files);
@@ -891,7 +891,7 @@ function initBBCodeEditor() {
                     return voice ? renderChatStyleAudio(voice.url, name || voice.name || 'voice note') : _match;
                 });
                 bbcodePreview.innerHTML = html;
-                if (typeof window.fridg3RenderMdpasteEnhancements === 'function') await window.fridg3RenderMdpasteEnhancements(bbcodePreview);
+                if (typeof window.fridgeRenderMdpasteEnhancements === 'function') await window.fridgeRenderMdpasteEnhancements(bbcodePreview);
                 if (typeof window.initTooltips === 'function') window.initTooltips();
             } catch (error) {
                 bbcodePreview.textContent = error.message || 'could not render preview';
@@ -1292,7 +1292,7 @@ function initBBCodeEditor() {
     }
 
     if (bbcodeVoiceBtn && bbcodeVoiceInput && bbcodeVoiceRecorder && !bbcodeTextbox.disabled) {
-        fridg3CreateVoiceRecorder(bbcodeVoiceRecorder, function(file) {
+        fridgeCreateVoiceRecorder(bbcodeVoiceRecorder, function(file) {
             const fileIndex = voiceFileStore.files.length;
             voiceFileStore.items.add(file);
             bbcodeVoiceInput.files = voiceFileStore.files;
@@ -1675,6 +1675,39 @@ function createExternalVideoEmbed(video) {
     return wrapper;
 }
 
+function createPlainMediaEmbed(rawUrl) {
+    let parsed;
+    try {
+        parsed = new URL(rawUrl);
+    } catch (_) {
+        return null;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    const extension = (parsed.pathname.split('.').pop() || '').toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(extension)) {
+        const image = document.createElement('img');
+        image.src = rawUrl;
+        image.alt = parsed.pathname.split('/').pop() || 'linked image';
+        return image;
+    }
+    if (['mp3', 'aac', 'm4a', 'ogg', 'wav', 'flac'].includes(extension)) {
+        const audio = document.createElement('audio');
+        audio.src = rawUrl;
+        audio.controls = true;
+        audio.preload = 'metadata';
+        return audio;
+    }
+    if (['mp4', 'webm', 'ogv', 'mov'].includes(extension)) {
+        const video = document.createElement('video');
+        video.src = rawUrl;
+        video.controls = true;
+        video.preload = 'metadata';
+        video.playsInline = true;
+        return video;
+    }
+    return null;
+}
+
 function embedPlainVideoLinks(html) {
     if (typeof document === 'undefined' || !html) return html;
     const template = document.createElement('template');
@@ -1693,10 +1726,11 @@ function embedPlainVideoLinks(html) {
             const url = candidate.replace(/[.,!?;:)]*$/, '');
             const suffix = candidate.slice(url.length);
             const video = externalVideoEmbedData(url);
-            if (!video) continue;
+            const media = createPlainMediaEmbed(url);
+            if (!video && !media) continue;
 
             fragment.append(document.createTextNode(text.slice(cursor, match.index)));
-            fragment.append(createExternalVideoEmbed(video));
+            fragment.append(video ? createExternalVideoEmbed(video) : media);
             if (suffix) fragment.append(document.createTextNode(suffix));
             cursor = match.index + candidate.length;
             replaced = true;

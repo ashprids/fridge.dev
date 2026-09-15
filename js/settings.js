@@ -1,5 +1,5 @@
 // Toggleable glow settings
-const settingsDebugLog = message => window.fridg3DebugClientLog?.(`[settings] ${message}`);
+const settingsDebugLog = message => window.fridgeDebugClientLog?.(`[settings] ${message}`);
 const GLOW_DEFAULT_INTENSITY = 'none';
 const GLOW_INTENSITY_KEY = 'glowIntensity';
 const GLOW_RADIUS_DEFAULT = '8px';
@@ -185,11 +185,11 @@ function runSlotMachineRoll(container) {
     container._slotMachineTimers = [];
     const glyphs = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const rareRoll = Math.random();
-    const rareFridg3 = rareRoll < 0.05;
+    const rareFridge = rareRoll < 0.05;
     const rareFreezer = rareRoll >= 0.05 && rareRoll < 0.10;
     const targets = rareFreezer
         ? ['f', 'r', 'e', 'e', 'z', 'e', 'r']
-        : ['f', 'r', 'i', 'd', 'g', rareFridg3 ? '3' : 'e'];
+        : ['f', 'r', 'i', 'd', 'g', rareFridge ? '3' : 'e'];
     const rollLeadInMs = 760;
     const reelLockStepMs = 145;
     const rollSettlePaddingMs = 270;
@@ -227,7 +227,7 @@ function runSlotMachineRoll(container) {
     const settleTimer = window.setTimeout(() => {
         if (container._slotMachineInterval) window.clearInterval(container._slotMachineInterval);
         container._slotMachineInterval = null;
-        if (!rareFridg3 && !rareFreezer) {
+        if (!rareFridge && !rareFreezer) {
             reels.forEach(reel => reel.classList.remove('slot-machine-reel'));
             container.classList.remove('slot-machine-rolling');
             container._slotMachineRunning = false;
@@ -286,7 +286,7 @@ function runSlotMachineRoll(container) {
     }, rollLeadInMs
         + (reels.length - 1) * reelLockStepMs
         + rollSettlePaddingMs
-        + ((rareFridg3 || rareFreezer) ? easterEggHoldMs : 0));
+        + ((rareFridge || rareFreezer) ? easterEggHoldMs : 0));
     container._slotMachineTimers.push(settleTimer);
 }
 
@@ -479,7 +479,7 @@ function saveThemeAccentPrefs(values) {
     try {
         localStorage.setItem(THEME_ACCENT_PREFS_KEY, JSON.stringify(prefs));
     } catch (_) { /* Cookies also retain the selected accents. */ }
-    const domain = shouldUseSharedFridg3CookieDomain() ? `; Domain=${MOBILE_VIEW_DOMAIN}` : '';
+    const domain = shouldUseSharedFridgeCookieDomain() ? `; Domain=${MOBILE_VIEW_DOMAIN}` : '';
     const secure = window.location.protocol === 'https:' ? '; Secure' : '';
     Object.entries(prefs).forEach(([theme, accent]) => {
         document.cookie = `theme_accent_${theme}=${encodeURIComponent(accent)}; Max-Age=31536000; Path=/; SameSite=Lax${domain}${secure}`;
@@ -595,7 +595,7 @@ function getCookie(name) {
     return null;
 }
 
-function shouldUseSharedFridg3CookieDomain() {
+function shouldUseSharedFridgeCookieDomain() {
     const host = ((window.location && window.location.hostname) ? window.location.hostname : '').toLowerCase();
     return host === 'fridge.dev' || host === 'm.fridge.dev' || host.endsWith('.fridge.dev');
 }
@@ -605,7 +605,7 @@ function setMobileViewCookie(enabled) {
         const maxAge = 60 * 60 * 24 * 365;
         const value = enabled ? '1' : '0';
         const secure = (window.location && window.location.protocol === 'https:') ? '; Secure' : '';
-        const domain = shouldUseSharedFridg3CookieDomain() ? `; Domain=${MOBILE_VIEW_DOMAIN}` : '';
+        const domain = shouldUseSharedFridgeCookieDomain() ? `; Domain=${MOBILE_VIEW_DOMAIN}` : '';
         document.cookie = `${MOBILE_VIEW_COOKIE}=${value}; Max-Age=${maxAge}; Path=/; SameSite=Lax${domain}${secure}`;
     } catch (_) { /* ignore */ }
 }
@@ -712,8 +712,8 @@ function applyAccessibilityPrefs(prefs, opts = {}) {
     const root = document.documentElement;
     root.classList.toggle('access-reduced-motion', normalized.reduceMotion);
     root.classList.remove('access-high-contrast');
-    if (typeof window.fridg3SetDebugMode === 'function') window.fridg3SetDebugMode(normalized.debugMode);
-    window.dispatchEvent(new CustomEvent('fridg3:accessibility-change', { detail: normalized }));
+    if (typeof window.fridgeSetDebugMode === 'function') window.fridgeSetDebugMode(normalized.debugMode);
+    window.dispatchEvent(new CustomEvent('fridge:accessibility-change', { detail: normalized }));
     settingsDebugLog(`accessibility preferences applied (reduced motion ${normalized.reduceMotion ? 'on' : 'off'}, debug ${normalized.debugMode ? 'on' : 'off'})`);
     if (opts.persistLocal !== false) {
         saveLocalAccessibilityPrefs(normalized);
@@ -906,7 +906,7 @@ function setThemeCookie(theme) {
         const maxAge = 60 * 60 * 24 * 365;
         const value = encodeURIComponent(normalizeTheme(theme));
         const secure = (window.location && window.location.protocol === 'https:') ? '; Secure' : '';
-        const domain = shouldUseSharedFridg3CookieDomain() ? `; Domain=${MOBILE_VIEW_DOMAIN}` : '';
+        const domain = shouldUseSharedFridgeCookieDomain() ? `; Domain=${MOBILE_VIEW_DOMAIN}` : '';
         document.cookie = `${THEME_COOKIE}=${value}; Max-Age=${maxAge}; Path=/; SameSite=Lax${domain}${secure}`;
     } catch (_) { /* ignore */ }
 }
@@ -1138,6 +1138,7 @@ function fitTooltipToWrappedText(tooltip) {
 
 function initTooltips() {
     clearTooltips();
+    initDateTimeTooltips();
     document.querySelectorAll('abbr[title]').forEach(element => {
         if (!element.hasAttribute('data-tooltip')) {
             element.setAttribute('data-tooltip', element.getAttribute('title') || '');
@@ -1146,9 +1147,127 @@ function initTooltips() {
     });
     document.querySelectorAll('[data-tooltip]').forEach(bindSiteTooltip);
     initContextTooltips();
+    initGuestIpActionMenus();
+}
+
+function initDateTimeTooltips() {
+    const ordinal = day => {
+        const mod100 = day % 100;
+        if (mod100 >= 11 && mod100 <= 13) return `${day}th`;
+        return `${day}${day % 10 === 1 ? 'st' : day % 10 === 2 ? 'nd' : day % 10 === 3 ? 'rd' : 'th'}`;
+    };
+    const parseDate = value => {
+        const raw = String(value || '').trim();
+        if (/T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+            const zoned = new Date(raw);
+            if (!Number.isNaN(zoned.getTime())) return zoned;
+        }
+        const match = raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4] || 0), Number(match[5] || 0), Number(match[6] || 0));
+        const parsed = new Date(raw);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+    document.querySelectorAll('[data-exact-datetime], time[datetime], #post-date-feed, .feed-reply-date, .notification-card-date, .chat-message-meta > span, .discord-timestamp').forEach(element => {
+        if (element.closest('.journal-post, .journal-post-link, [data-journal-post]') || element.id === 'journal-article-date') return;
+        const value = element.dataset.exactDatetime || element.getAttribute('datetime') || element.getAttribute('title') || '';
+        const date = parseDate(value);
+        if (!date) return;
+        const month = date.toLocaleString('en-GB', { month: 'long' });
+        const time = [date.getHours(), date.getMinutes(), date.getSeconds()].map(part => String(part).padStart(2, '0')).join(':');
+        element.dataset.tooltip = `${ordinal(date.getDate())} ${month} ${date.getFullYear()} | ${time}`;
+        element.removeAttribute('title');
+    });
 }
 
 window.bindSiteTooltip = bindSiteTooltip;
+
+function initGuestIpActionMenus() {
+    const config = document.querySelector('[data-guest-ip-menu-config]');
+    if (!config) return;
+    const close = () => document.querySelectorAll('.guest-ip-context-menu').forEach(menu => menu.remove());
+    const open = (trigger, x, y) => {
+        close();
+        const ip = trigger.dataset.ip || '';
+        if (!ip) return;
+        const menu = document.createElement('div');
+        menu.className = 'site-action-menu guest-ip-context-menu';
+        menu.setAttribute('role', 'menu');
+        const addLink = (label, href, icon, external = false) => {
+            const link = document.createElement('a');
+            link.className = 'site-action-menu-item';
+            link.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i><span>${label}</span>`;
+            link.href = href;
+            if (external) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+            menu.appendChild(link);
+        };
+        const addAction = (label, action, title, detail, icon) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'site-action-menu-item';
+            button.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i><span>${label}</span>`;
+            button.addEventListener('click', () => {
+                const form = document.createElement('form');
+                form.method = 'post';
+                form.action = '/settings/guests/';
+                form.dataset.noSpa = '1';
+                form.dataset.siteConfirm = '1';
+                form.dataset.confirmTitle = title;
+                form.dataset.confirmDetail = detail;
+                form.dataset.confirmText = label;
+                form.dataset.cancelText = 'cancel';
+                if (action === 'purge_all_ip_content') {
+                    form.dataset.adminPasswordConfirm = '1';
+                    form.dataset.passwordTitle = 'confirm IP purge';
+                    form.dataset.passwordDetail = 'enter your password to purge all content posted from this IP.';
+                }
+                [['csrf_token', config.dataset.csrf || ''], ['action', action], ['ip', ip]].forEach(([name, value]) => {
+                    const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; form.appendChild(input);
+                });
+                document.body.appendChild(form);
+                close();
+                form.requestSubmit();
+            });
+            menu.appendChild(button);
+        };
+        addLink('lookup', `https://whatismyipaddress.com/ip/${encodeURIComponent(ip)}`, 'fa-magnifying-glass', true);
+        addLink('view shared users', `/settings/guests/?shared_ip=${encodeURIComponent(ip)}`, 'fa-users');
+        addAction('purge all IP content', 'purge_all_ip_content', 'purge all content from this IP?', 'this permanently removes feed and guestbook content recorded under this IP.', 'fa-eraser');
+        if (trigger.dataset.ipAdmin === '1') addAction('hard-ban IP', 'hard_ban', 'hard-ban IP?', 'this adds the address to the site-wide hard-ban system.', 'fa-ban');
+        document.body.appendChild(menu);
+        const rect = menu.getBoundingClientRect();
+        menu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+        menu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+        menu.querySelector('a,button')?.focus();
+    };
+    document.querySelectorAll('[data-guest-ip-actions]').forEach(trigger => {
+        if (trigger.dataset.ipActionsBound === '1') return;
+        trigger.dataset.ipActionsBound = '1';
+        trigger.addEventListener('contextmenu', event => { event.preventDefault(); open(trigger, event.clientX, event.clientY); });
+        trigger.addEventListener('keydown', event => {
+            if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+            event.preventDefault(); const rect = trigger.getBoundingClientRect(); open(trigger, rect.left, rect.bottom + 4);
+        });
+    });
+    document.querySelectorAll('.guest-account-card[data-account-href]').forEach(card => {
+        if (card.dataset.accountCardBound === '1') return;
+        card.dataset.accountCardBound = '1';
+        card.addEventListener('click', event => {
+            if (event.target.closest('a, button, details, summary, [data-guest-ip-actions]')) return;
+            window.location.href = card.dataset.accountHref;
+        });
+        card.addEventListener('keydown', event => {
+            if ((event.key === 'Enter' || event.key === ' ') && event.target === card) {
+                event.preventDefault();
+                window.location.href = card.dataset.accountHref;
+            }
+        });
+    });
+    if (document.documentElement.dataset.guestIpDismissBound !== '1') {
+        document.documentElement.dataset.guestIpDismissBound = '1';
+        document.addEventListener('pointerdown', event => { if (!event.target.closest('.guest-ip-context-menu')) close(); });
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+    }
+}
 
 function initContextTooltips() {
     document.querySelectorAll('[data-context-tooltip]').forEach(element => {
@@ -1254,7 +1373,7 @@ function showMobileContextIpPopup(element) {
     const ipMatch = contextText.match(/^IP:\s*(.+)$/);
     showSitePopup({
         className: 'site-ip-popup',
-        title: 'IP address',
+        title: ipMatch ? 'IP address' : 'filtered word',
         detail: ipMatch ? ipMatch[1] : contextText,
         customText: ipMatch ? 'copy' : '',
         customAction: ipMatch ? async button => {
@@ -1618,11 +1737,10 @@ function initSettingsPage() {
         const loadMaintenanceState = async () => {
             if (!maintenanceRadios.length) return;
             try {
-                const res = await fetch('/data/etc/wip', { cache: 'no-store' });
+                const res = await fetch('/api/maintenance-status/index.php', { cache: 'no-store' });
                 if (!res.ok) return;
-                const txt = (await res.text()).trim().toLowerCase();
-                const truthy = new Set(['1', 'true', 'yes', 'y', 'on', 'enabled', 'wip']);
-                selectMaintenance(truthy.has(txt) ? 'on' : 'off');
+                const state = await res.json();
+                selectMaintenance(state.enabled ? 'on' : 'off');
             } catch (_) {
                 /* ignore */
             }
@@ -2066,10 +2184,10 @@ function initSettingsPage() {
         };
 
         const devBootstrapServerLog = message => {
-            if (typeof window.fridg3DebugServerLog !== 'function') return;
+            if (typeof window.fridgeDebugServerLog !== 'function') return;
             let safeMessage = String(message || '').replace(/https?:\/\/\S+/gi, '[url omitted]').replace(/\s+/g, ' ').trim();
             if (!safeMessage.startsWith('[BOOTSTRAP]')) safeMessage = '[BOOTSTRAP] ' + safeMessage;
-            window.fridg3DebugServerLog(safeMessage.slice(0, 2000));
+            window.fridgeDebugServerLog(safeMessage.slice(0, 2000));
         };
 
         const showDevBootstrapProgressPopup = () => {
@@ -2124,6 +2242,18 @@ function initSettingsPage() {
                 finish(message, isError = false) {
                     this.setProgress(100, message, isError, isError ? 'failed: ' + message : 'done: ' + message);
                     devBootstrapServerLog(`popup finished state=${isError ? 'error' : 'success'} popup_text="${message || ''}"`);
+                    if (!isError && !dialog.querySelector('.dev-bootstrap-continue')) {
+                        const actions = document.createElement('div');
+                        actions.className = 'site-popup-actions';
+                        const continueButton = document.createElement('button');
+                        continueButton.type = 'button';
+                        continueButton.className = 'site-popup-button site-popup-ok dev-bootstrap-continue';
+                        continueButton.textContent = 'continue';
+                        continueButton.addEventListener('click', () => window.location.reload());
+                        actions.appendChild(continueButton);
+                        dialog.appendChild(actions);
+                        continueButton.focus();
+                    }
                 },
             };
         };
@@ -2144,17 +2274,61 @@ function initSettingsPage() {
                     return;
                 }
                 devBootstrapServerLog('bootstrap confirmed; disabling trigger button and opening progress popup');
+                window.fridgeDevBootstrapActive = true;
 
                 const originalText = devDataBootstrapBtn.textContent;
                 devDataBootstrapBtn.disabled = true;
                 devDataBootstrapBtn.textContent = 'bootstrapping...';
                 const progressPopup = showDevBootstrapProgressPopup();
+                const tokenBytes = new Uint8Array(16);
+                crypto.getRandomValues(tokenBytes);
+                const bootstrapToken = Array.from(tokenBytes, value => value.toString(16).padStart(2, '0')).join('');
+                const bootstrapController = new AbortController();
+                let bootstrapCompleted = false;
+                const abortBootstrapOnLeave = () => {
+                    if (bootstrapCompleted) return;
+                    try {
+                        sessionStorage.setItem('fridg3_dev_data_abort_pending', '1');
+                    } catch (_) {
+                        /* storage can be unavailable */
+                    }
+                    bootstrapController.abort();
+                    const abortUrl = `/api/dev-bootstrap/?abort=1&token=${encodeURIComponent(bootstrapToken)}`;
+                    if (navigator.sendBeacon) navigator.sendBeacon(abortUrl, new Blob([''], { type: 'text/plain' }));
+                    else fetch(abortUrl, { method: 'POST', credentials: 'same-origin', keepalive: true }).catch(() => {});
+                };
+                window.addEventListener('pagehide', abortBootstrapOnLeave);
 
                 try {
                     const res = await fetch('/api/dev-bootstrap/', {
                         method: 'POST',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-Fridge-Bootstrap-Token': bootstrapToken },
+                        signal: bootstrapController.signal,
                     });
+
+                    if ((res.headers.get('content-type') || '').includes('application/json')) {
+                        const started = await res.json();
+                        if (!res.ok || !started || started.jobStarted !== true) {
+                            throw new Error(started && started.message ? started.message : 'bootstrap failed');
+                        }
+                        while (true) {
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            const statusRes = await fetch(`/api/dev-bootstrap/?status=1&token=${encodeURIComponent(bootstrapToken)}`, {
+                                credentials: 'same-origin',
+                                cache: 'no-store',
+                                signal: bootstrapController.signal,
+                            });
+                            const event = await statusRes.json();
+                            if (event.debug) devBootstrapServerLog(event.debug);
+                            progressPopup.setProgress(event.progress, event.message || '', event.ok === false, event.log || ((event.stage ? event.stage + ': ' : '') + (event.message || '')));
+                            if (event.finished !== true) continue;
+                            if (event.ok === false) throw new Error(event.message || 'bootstrap failed');
+                            progressPopup.finish(event.message || 'dev data installed.');
+                            bootstrapCompleted = true;
+                            break;
+                        }
+                        return;
+                    }
 
                     if (!res.body || !res.body.getReader) {
                         const text = await res.text();
@@ -2168,6 +2342,7 @@ function initSettingsPage() {
                             throw new Error(last && last.message ? last.message : 'bootstrap failed');
                         }
                         progressPopup.finish(last.message || 'dev data installed.');
+                        bootstrapCompleted = true;
                         return;
                     }
 
@@ -2206,10 +2381,16 @@ function initSettingsPage() {
                         throw new Error(failedMessage || 'bootstrap failed');
                     }
                     progressPopup.finish(lastMessage || 'dev data installed.');
+                    bootstrapCompleted = true;
                 } catch (err) {
+                    if (bootstrapController.signal.aborted) return;
+                    bootstrapCompleted = true;
+                    window.fridgeDevBootstrapActive = false;
                     devBootstrapServerLog(`client stream handling failed popup_text="${(err && err.message) ? err.message : 'bootstrap failed.'}"`);
                     progressPopup.finish((err && err.message) ? err.message : 'bootstrap failed.', true);
                 } finally {
+                    if (bootstrapCompleted) window.removeEventListener('pagehide', abortBootstrapOnLeave);
+                    if (bootstrapCompleted) window.fridgeDevBootstrapActive = false;
                     devDataBootstrapBtn.textContent = originalText;
                     devDataBootstrapBtn.disabled = false;
                     devBootstrapServerLog('bootstrap trigger button restored and enabled');

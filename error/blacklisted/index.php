@@ -4,19 +4,19 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
 
-if (!fridg3_hard_ban_enforcement_enabled()) {
+if (!fridge_hard_ban_enforcement_enabled()) {
     header('Location: /', true, 302);
     exit;
 }
-fridg3_start_session(false);
-if (isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true) {
+fridge_start_session(false);
+if (!empty($_SESSION['user']['isAdmin']) || !empty($_SESSION['user']['isModerator'])) {
     header('Location: /', true, 302);
     exit;
 }
 
-$clientIp = fridg3_hard_ban_client_ip();
-$identifier = (string)($_COOKIE[FRIDG3_HARD_BAN_COOKIE] ?? '');
-if (!fridg3_hard_ban_check_client($clientIp, $identifier)) {
+$clientIp = fridge_hard_ban_client_ip();
+$identifier = (string)($_COOKIE[FRIDGE_HARD_BAN_COOKIE] ?? '');
+if (!fridge_hard_ban_check_client($clientIp, $identifier)) {
     header('Location: /', true, 302);
     exit;
 }
@@ -24,11 +24,11 @@ if (!fridg3_hard_ban_check_client($clientIp, $identifier)) {
 http_response_code(403);
 header('Cache-Control: no-store, private');
 
-if (fridg3_hard_ban_contains($clientIp)) {
-    if (!fridg3_hard_ban_valid_identifier($identifier)) {
+if (fridge_hard_ban_contains($clientIp)) {
+    if (!fridge_hard_ban_valid_identifier($identifier)) {
         $identifier = bin2hex(random_bytes(32));
     }
-    fridg3_hard_ban_register_identifier($clientIp, $identifier);
+    fridge_hard_ban_register_identifier($clientIp, $identifier);
 
     $cookieOptions = [
         'expires' => time() + (86400 * 365 * 5),
@@ -42,7 +42,7 @@ if (fridg3_hard_ban_contains($clientIp)) {
             $cookieOptions['domain'] = '.fridge.dev';
         }
     }
-    setcookie(FRIDG3_HARD_BAN_COOKIE, $identifier, $cookieOptions);
+    setcookie(FRIDGE_HARD_BAN_COOKIE, $identifier, $cookieOptions);
 }
 
 $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
@@ -59,7 +59,7 @@ if (!is_file($templatePath) || !is_file($contentPath)) {
 
 $html = (string)file_get_contents($templatePath);
 $content = (string)file_get_contents($contentPath);
-$explanation = fridg3_hard_ban_strict_enabled()
+$explanation = fridge_hard_ban_strict_enabled()
     ? 'your IP address has been blacklisted from this website, and as a result, any identifiable information has also been flagged.'
     : 'your current IP address has been blacklisted. disable your VPN, proxy, or anything else masking your IP address, then try again.';
 $content = str_replace('{hard_ban_explanation}', htmlspecialchars($explanation, ENT_QUOTES, 'UTF-8'), $content);

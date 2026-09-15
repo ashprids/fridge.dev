@@ -1,7 +1,7 @@
 <?php
 
-if (!function_exists('fridg3_image_thumbnail_path')) {
-    function fridg3_image_thumbnail_path(string $sourcePath, string $thumbnailDir): ?string
+if (!function_exists('fridge_image_thumbnail_path')) {
+    function fridge_image_thumbnail_path(string $sourcePath, string $thumbnailDir): ?string
     {
         if (!is_dir($thumbnailDir) && !@mkdir($thumbnailDir, 0777, true)) return null;
         $thumbnailName = hash('sha256', basename($sourcePath)) . '.jpg';
@@ -56,8 +56,8 @@ if (!function_exists('fridg3_image_thumbnail_path')) {
     }
 }
 
-if (!function_exists('fridg3_local_image_thumbnail_url')) {
-    function fridg3_local_image_thumbnail_url(string $imageUrl, string $rootDir): string
+if (!function_exists('fridge_local_image_thumbnail_url')) {
+    function fridge_local_image_thumbnail_url(string $imageUrl, string $rootDir): string
     {
         $urlPath = parse_url($imageUrl, PHP_URL_PATH);
         if (!is_string($urlPath) || !preg_match('#^/data/images/([^/]+)$#', $urlPath, $matches)) {
@@ -75,7 +75,7 @@ if (!function_exists('fridg3_local_image_thumbnail_url')) {
             return $imageUrl;
         }
 
-        $thumbnailPath = fridg3_image_thumbnail_path(
+        $thumbnailPath = fridge_image_thumbnail_path(
             $sourcePath,
             $imagesDir . DIRECTORY_SEPARATOR . 'thumbnails'
         );

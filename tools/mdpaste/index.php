@@ -2,13 +2,13 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
-fridg3_start_session();
-fridg3_refresh_current_user_posting_restriction();
+fridge_start_session();
+fridge_refresh_current_user_posting_restriction();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'lib.php';
 
-$postingRestricted = fridg3_current_user_posting_restricted();
-$ipBanned = fridg3_feed_is_ip_banned(fridg3_feed_client_ip());
+$postingRestricted = fridge_current_user_posting_restricted();
+$ipBanned = fridge_feed_is_current_client_ip_banned();
 $pasteCreationBlocked = $postingRestricted || $ipBanned;
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
@@ -95,9 +95,9 @@ if (!is_file($contentPath) || !is_readable($contentPath)) {
 $content = (string)file_get_contents($contentPath);
 if ($pasteCreationBlocked) {
     $restrictionNotice = $postingRestricted
-        ? fridg3_posting_restriction_notice()
+        ? fridge_posting_restriction_notice()
         : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
-    $content = fridg3_disable_composer_controls($content);
+    $content = fridge_disable_composer_controls($content);
     $content = str_replace(
         'contenteditable="true"',
         'contenteditable="false" aria-disabled="true"',

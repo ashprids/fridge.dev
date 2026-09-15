@@ -40,9 +40,28 @@ All API routes live under `/api/*` and are handled by PHP.
 
 - Developer-mode-only route used by `/settings`
 - Allowed for admin sessions, or for local setups with no admin account yet
-- Streams newline-delimited JSON progress while it finds the latest sanitized Google Drive developer data zip, downloads it, extracts it, deletes existing local `data/`, and installs the new copy
+- Starts a background job that finds the latest sanitized Google Drive developer data zip, downloads it, extracts it, deletes existing local `data/`, and installs the new copy; the browser reads progress through short tokenized status requests so PHP's development server remains responsive
 - Progress events may include a `log` field for the settings popup; download logs show byte counts/percentages, and extraction logs include entry counts/percentages
 - Bootstrap-stream diagnostics and their sanitization rules are documented on [Debug Mode](Debug-Mode#bootstrap-diagnostics)
+
+### `/api/dev-status`
+
+`GET`
+
+- Returns `{ ok: true, developerMode: true }` only from a locally detected development server
+- Returns `404` outside local developer mode
+- Supplies the lightweight browser heartbeat used to detect when the PHP development server terminates
+
+### `/api/restore-backup/index.php`
+
+- Admin-only restore endpoint; `GET ?action=status` returns the current job, maintenance-lock status and a session CSRF token.
+- All POST actions require `X-Restore-CSRF`. `authenticate` verifies the current account password and grants a five-minute, single-use authorization. `start` consumes that authorization and locks maintenance. `chunk&id=…&offset=…` stores up to 2 MiB with offset checking; `retry&id=…` restarts a failed worker. No cancel endpoint exists.
+- Archive inspection and counts run locally before uploading; the server validates the complete upload before deleting live data. See [Backup Data](Backup-data#restore-from-settings).
+
+### `/api/maintenance-status/index.php`
+
+- Public, uncached `GET` returns `{ enabled: boolean }`, combining the usual `/data/etc/wip` value with the restore lock outside `/data`.
+- Used by settings and the maintenance landing page so restoring `/data` cannot temporarily bypass maintenance.
 
 ### `/api/themes`
 
@@ -132,8 +151,9 @@ The Toast-only feed generation API is documented on [Toast](Toast#ai-feed-posts)
 ### `/api/sitemap`
 
 - Admin-only sitemap generator
-- Scans routes and content files
-- Writes `/sitemap.xml`
+- Includes only explicitly reviewed, indexable routes available to logged-out guests; authenticated, moderator/admin, private, and parameter-only routes are excluded instead of being discovered from the filesystem
+- Adds published feed and journal posts and public wiki documents while excluding reply records, malformed journal files, and drafts
+- Writes a `/sitemap.xml` disk snapshot using the same generator as the fresh public sitemap handler; see [Search and SEO](Search-and-SEO)
 - Writes a two-line XML comment immediately after the declaration containing `This sitemap was automatically generated.` and the generation time in `DD/MM/YY HH:MM:SS` format
 
 ## Toast APIs

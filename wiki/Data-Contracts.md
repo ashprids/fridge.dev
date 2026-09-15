@@ -32,6 +32,7 @@ Expected top-level shape:
       "isAdmin": true,
       "isModerator": false,
       "postingRestricted": false,
+      "accountBanned": false,
       "mustResetPassword": false,
       "discordUserId": "optional discord snowflake string",
       "emailAddress": "optional @fridge.dev email address",
@@ -99,6 +100,7 @@ Notes:
 - Legacy `browserNotificationsEnabled` and `journalBrowserNotificationsEnabled` keys may remain in older account records as unknown preserved fields, but the application no longer reads, writes, or exposes them and does not use the browser Notification API
 - `mustResetPassword` is used by the shared session bootstrap to force first-login password changes
 - `postingRestricted` is an admin-managed account boolean; when enabled, server handlers reject new or edited feed posts, journal posts/drafts, feed replies, chat conversations/messages, guestbook entries, contact submissions, mdpaste creation, and upload room/signaling use, while matching composer notices keep text fields, formatting controls, uploads, and submit controls disabled
+- `accountBanned` is a moderator/admin-managed posting ban for ordinary registered accounts. Optional `accountBannedBy` and `accountBanReason` fields record who applied it and why. The effective session restriction is the union of `postingRestricted` and `accountBanned`; banning also adds every recorded account IP to the soft posting-ban list, and newly recorded IPs inherit the ban until the account is unbanned
 - `isModerator` is an admin-managed account boolean. Moderators can access the moderator-settings routes and edit, delete, ban, purge, or inspect IP metadata for content whose author is not an admin; it does not grant account administration, hard-ban configuration, or authority over admin-authored content
 - `discordUserId` links a site account to a Discord member for bot DMs and notifications
 - `discordNotificationsEnabled` controls automated Toast feed-notification DMs and defaults to `true` when absent; it has no effect until `discordUserId` is linked
@@ -239,7 +241,7 @@ Notes:
 - Replies to individual comments are stored in the same flat array with optional `parentId`; older top-level replies simply omit it
 - Guest replies may include `guestBrowserId`, a random browser-local identity used only so guests can receive in-site inbox notifications when someone replies to their comments from another browser/account
 - V2 reply bodies store uploaded images as Markdown and uploaded audio/video or voice notes as the renderer's supported safe media HTML; legacy replies retain their existing media BBCode
-- Guest replies include `isGuest: true` plus a plaintext `ip`; guest display names are stored in `username`, default to `Anonymous`, cannot match a registered account username case-insensitively, and are filtered with guest reply bodies through `/feed/filters/*.txt` before storage; matching body text becomes tooltip-wrapped `★` text explaining `this phrase was automatically filtered.`; guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text are locked from later guest edits; admin moderation can purge all guest replies with a matching IP without changing the IP ban list
+- Guest replies include `isGuest: true` plus a plaintext `ip`; guest display names are stored in `username`, default to `Anonymous`, cannot match a registered account username case-insensitively, and are filtered with guest reply bodies through `/feed/filters/*.txt` before storage. Matching body text becomes tooltip-wrapped `★` text explaining `this phrase was automatically filtered.`; newly filtered records retain the submitted text in moderation-only `originalBody` metadata so moderators and admins can reveal individual phrases by right-clicking them. Guest replies that are mostly filter-list terms are rejected, and guest replies containing filtered text are locked from later guest edits while retaining guest deletion; admin moderation can purge all guest replies with a matching IP without changing the IP ban list
 - Toast-authored reply storage and automatic reply behavior are documented on [Toast](Toast#automatic-feed-replies)
 
 ### `data/feed/banned_ips.json`
@@ -316,6 +318,7 @@ Entry format:
 Plus:
 
 - `ip_index.json` for one-post-per-IP ownership tracking
+- `filtered_originals.json` maps entries containing automatically filtered words to their original message. It is used only to reveal censored phrases to moderators/admins and to enforce the guest edit lock; guests retain deletion access
 - Successful entry creation adds one targeted in-site notification per admin account to `data/etc/targeted-notifications.json`
 - Nginx blocks direct client access to `/data/guestbook` and its descendants; entries are exposed only through the PHP guestbook and admin moderation views
 

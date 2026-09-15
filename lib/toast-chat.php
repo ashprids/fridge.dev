@@ -60,8 +60,8 @@ function toast_chat_key(): string {
 function toast_chat_client_ip(): string {
     $remote = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
     if (filter_var($remote, FILTER_VALIDATE_IP)) return $remote;
-    if (function_exists('fridg3_feed_client_ip')) {
-        $fallback = trim(fridg3_feed_client_ip());
+    if (function_exists('fridge_feed_client_ip')) {
+        $fallback = trim(fridge_feed_client_ip());
         if (filter_var($fallback, FILTER_VALIDATE_IP)) return $fallback;
     }
     return '0.0.0.0';
@@ -303,11 +303,11 @@ function toast_chat_link_embeds_html(string $body, array $metadata = []): string
         $host = strtolower((string)($parts['host'] ?? 'link'));
         $path = (string)($parts['path'] ?? '');
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        $video = function_exists('fridg3_external_video_embed_data') ? fridg3_external_video_embed_data($url) : null;
+        $video = function_exists('fridge_external_video_embed_data') ? fridge_external_video_embed_data($url) : null;
         $giphy = toast_chat_giphy_embed_url($url);
         $meta = is_array($metadata[$url] ?? null) ? $metadata[$url] : [];
-        if (is_array($video) && function_exists('fridg3_external_video_embed_html')) {
-            $html .= '<div class="chat-link-embed chat-link-video">' . fridg3_external_video_embed_html($video) . '</div>';
+        if (is_array($video) && function_exists('fridge_external_video_embed_html')) {
+            $html .= '<div class="chat-link-embed chat-link-video">' . fridge_external_video_embed_html($video) . '</div>';
         } elseif ($giphy !== null) {
             $html .= '<div class="chat-link-embed chat-link-video chat-link-giphy"><iframe src="' . toast_chat_h($giphy) . '" title="Giphy animation" loading="lazy" allowfullscreen></iframe></div>';
         } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'], true)) {

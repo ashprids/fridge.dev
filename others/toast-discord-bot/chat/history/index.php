@@ -7,10 +7,10 @@ require_once $root . '/lib/feed.php';
 require_once $root . '/lib/render.php';
 require_once $root . '/lib/video-embeds.php';
 require_once $root . '/lib/toast-chat.php';
-fridg3_start_session();
-fridg3_feed_refresh_session_user();
+fridge_start_session();
+fridge_feed_refresh_session_user();
 
-if (!fridg3_current_user_is_admin() && !fridg3_toast_is_current_user()) {
+if (!fridge_current_user_is_admin() && !fridge_toast_is_current_user()) {
     header('Location: /error/403', true, 302);
     exit;
 }

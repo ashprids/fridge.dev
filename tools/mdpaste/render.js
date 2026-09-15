@@ -132,13 +132,13 @@ function initPasteActions(root = document) {
     }
 }
 
-window.fridg3RenderMdpasteEnhancements = enhanceMdpaste;
-window.fridg3InitMdpasteView = async function (root = document) {
+window.fridgeRenderMdpasteEnhancements = enhanceMdpaste;
+window.fridgeInitMdpasteView = async function (root = document) {
     initPasteActions(root);
     highlightRawMarkdown(root);
     await enhanceMdpaste(root);
 };
-window.fridg3InitMdpasteView(document);
+window.fridgeInitMdpasteView(document);
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => highlightRawMarkdown(document), { once: true });
 }

@@ -4,13 +4,13 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
-fridg3_feed_refresh_session_user();
+fridge_feed_refresh_session_user();
 require_once dirname(__DIR__, 2) . '/lib/toast-feed-reply.php';
-$isToast = fridg3_toast_is_current_user();
+$isToast = fridge_toast_is_current_user();
 
 function find_template_file($filename) {
     $dir = __DIR__;
@@ -28,7 +28,7 @@ function find_template_file($filename) {
     return null;
 }
 
-function fridg3_feed_reply_markdown_editor(string $value, bool $allowUploads): string {
+function fridge_feed_reply_markdown_editor(string $value, bool $allowUploads): string {
     $editorPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'markdown-editor.html';
     $editor = (string)@file_get_contents($editorPath);
     $voiceControls = $allowUploads
@@ -43,7 +43,7 @@ function fridg3_feed_reply_markdown_editor(string $value, bool $allowUploads): s
     if (!$allowUploads) {
         $editor = preg_replace('/\s*<button type="button" id="bbcode-image-btn".*?<\/button>/s', '', $editor, 1) ?: $editor;
         $editor = preg_replace('/\s*<input id="bbcode-image-input"[^>]*>/s', '', $editor, 1) ?: $editor;
-        $filterJson = json_encode(fridg3_feed_filter_terms(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+        $filterJson = json_encode(fridge_feed_filter_terms(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
         $filterScript = '<script type="application/json" data-feed-guest-filter-terms>' . (is_string($filterJson) ? $filterJson : '[]') . '</script>';
         $editor = preg_replace_callback(
             '/(<div class="bbcode-editor feed-markdown-editor"[^>]*>)/',
@@ -97,7 +97,7 @@ if (!$postFilename) {
 }
 
 // Load the post file
-$postsDir = fridg3_feed_posts_dir();
+$postsDir = fridge_feed_posts_dir();
 $postPath = $postsDir . DIRECTORY_SEPARATOR . $postFilename;
 if (!file_exists($postPath) || !preg_match('/\.txt$/', $postFilename)) {
     header('Location: /feed');
@@ -110,7 +110,7 @@ if ($raw === false) {
     exit;
 }
 
-$parsedPost = fridg3_feed_parse_post($raw);
+$parsedPost = fridge_feed_parse_post($raw);
 $postFormat = $parsedPost['format'];
 $username = $parsedPost['username'];
 $dateLine = $parsedPost['date'];
@@ -120,26 +120,27 @@ if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-$clientIp = fridg3_feed_client_ip();
+$clientIp = fridge_feed_client_ip();
 $isLoggedIn = isset($_SESSION['user']) && isset($_SESSION['user']['username']);
-$postingRestricted = $isLoggedIn && fridg3_current_user_posting_restricted();
-$isClientIpBanned = fridg3_feed_is_ip_banned($clientIp);
+$postingRestricted = $isLoggedIn && fridge_current_user_posting_restricted();
+$isClientIpBanned = fridge_feed_is_current_client_ip_banned($clientIp);
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && str_contains((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
     $previewPayload = json_decode((string)file_get_contents('php://input'), true);
     if (is_array($previewPayload) && ($previewPayload['action'] ?? '') === 'preview') {
         $previewMarkdown = (string)($previewPayload['markdown'] ?? '');
-        if (!$isLoggedIn) $previewMarkdown = fridg3_feed_apply_guest_filter($previewMarkdown, true);
+        if (!$isLoggedIn) $previewMarkdown = fridge_feed_apply_guest_filter($previewMarkdown, true);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
             'ok' => true,
-            'html' => fridg3_feed_render_post_body($previewMarkdown, 'v2'),
+            'html' => fridge_feed_render_post_body($previewMarkdown, 'v2'),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $savedReplyId = null;
     $submittedToken = (string)($_POST['csrf_token'] ?? '');
     $replyBody = trim((string)($_POST['reply_content'] ?? ''));
     $replyAction = (string)($_POST['reply_action'] ?? 'create');
@@ -154,31 +155,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $imageMap = [];
     $voiceMap = [];
     if ($isLoggedIn && !$postingRestricted && isset($_FILES['images']) && is_array($_FILES['images'])) {
-        $imageMap = fridg3_feed_process_uploaded_media($_FILES['images']);
-        $replyBody = fridg3_feed_replace_media_placeholders($replyBody, $imageMap, $replyUsesMarkdown);
+        $imageMap = fridge_feed_process_uploaded_media($_FILES['images']);
+        $replyBody = fridge_feed_replace_media_placeholders($replyBody, $imageMap, $replyUsesMarkdown);
         if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $replyBody) === 1) {
-            fridg3_feed_delete_media_files_from_content($replyBody);
+            fridge_feed_delete_media_files_from_content($replyBody);
             $replyBody = '';
             $replyError = 'media upload failed. files must be supported and no larger than 8 MB.';
         }
     }
     if ($isLoggedIn && !$postingRestricted && in_array($replyAction, ['create', 'update'], true) && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])) {
-        $voiceMap = fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes']);
-        $replyBody = fridg3_feed_replace_voice_placeholders($replyBody, $voiceMap, $replyUsesMarkdown);
+        $voiceMap = fridge_feed_process_uploaded_voice_notes($_FILES['voice_notes']);
+        $replyBody = fridge_feed_replace_voice_placeholders($replyBody, $voiceMap, $replyUsesMarkdown);
         if (preg_match('/\[voice:\d+\]/i', $replyBody) === 1) {
             foreach ($voiceMap as $voice) {
-                fridg3_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
+                fridge_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
             }
             $replyBody = '';
             $replyError = 'voice note failed. keep it under 2 minutes and try again.';
         }
     }
     if (!$isLoggedIn && $replyAction === 'create') {
-        $guestDisplayNameForSave = fridg3_feed_apply_guest_filter($guestDisplayNameForSave);
-        $replyBodyForSave = fridg3_feed_apply_guest_filter($replyBodyForSave, true);
+        $guestDisplayNameForSave = fridge_feed_apply_guest_filter($guestDisplayNameForSave);
+        $replyBodyForSave = fridge_feed_apply_guest_filter($replyBodyForSave, true);
     }
-    $canModerateReplies = fridg3_feed_current_user_can_moderate_replies($username);
-    $existingReplies = fridg3_feed_load_replies((string)$postIdNoExt);
+    $canModerateReplies = fridge_feed_current_user_can_moderate_replies($username);
+    $existingReplies = fridge_feed_load_replies((string)$postIdNoExt);
     $targetReply = null;
     $parentReply = null;
     foreach ($existingReplies as $existingReply) {
@@ -190,11 +191,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     $canManageTargetReply = $targetReply !== null
-        && fridg3_feed_current_visitor_can_manage_reply($username, $targetReply, $clientIp);
+        && fridge_feed_current_visitor_can_manage_reply($username, $targetReply, $clientIp);
 
     if (!hash_equals((string)$_SESSION['csrf_token'], $submittedToken)) {
         foreach ($voiceMap as $voice) {
-            fridg3_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
+            fridge_feed_delete_voice_files_from_content('[audio=' . ($voice['url'] ?? '') . ']');
         }
         $replyError = 'invalid request. try again.';
     } elseif ($isToast && $replyAction === 'create' && !toast_reply_token_valid((string)$postIdNoExt, $parentReplyId, (string)($_POST['toast_reply_token'] ?? ''))) {
@@ -209,53 +210,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif (!$isLoggedIn && $isClientIpBanned) {
         $replyError = 'your IP address has been restricted.';
-    } elseif (!$isLoggedIn && $replyAction === 'create' && $guestDisplayName !== '' && fridg3_feed_registered_username_exists($guestDisplayName)) {
+    } elseif (!$isLoggedIn && $replyAction === 'create' && $guestDisplayName !== '' && fridge_feed_registered_username_exists($guestDisplayName)) {
         $replyError = 'that username belongs to a registered account. please choose another name or log in.';
-    } elseif (!$isLoggedIn && $replyAction === 'create' && fridg3_feed_guest_filter_is_mostly_filtered($replyBody)) {
+    } elseif (!$isLoggedIn && $replyAction === 'create' && fridge_feed_guest_filter_is_mostly_filtered($replyBody)) {
         $replyError = 'that reply is mostly filtered words. please rewrite it.';
     } elseif (!$isLoggedIn && preg_match('/\[(?:img|voice):\d+\]/i', $replyBody) === 1) {
         $replyError = 'Guest replies can link images, but cannot upload files.';
     } elseif ($replyError !== '' && $replyAction === 'create') {
         // Keep the validation error set above.
     } elseif ($replyAction === 'ban_ip') {
-        if (!fridg3_feed_current_user_is_moderator()) {
+        if (!fridge_feed_current_user_is_moderator()) {
             $replyEditError = 'you do not have permission to ban IP addresses.';
         } elseif ($targetReply === null || ($targetReply['isGuest'] ?? false) !== true || !filter_var((string)($targetReply['ip'] ?? ''), FILTER_VALIDATE_IP)) {
             $replyEditError = 'could not find a guest IP to ban.';
-        } elseif (!fridg3_feed_ban_guest_ip((string)$targetReply['ip'], (string)$_SESSION['user']['username'], (string)($targetReply['username'] ?? 'Anonymous'), (string)($_POST['ban_reason'] ?? ''))) {
+        } elseif (!fridge_feed_ban_guest_ip((string)$targetReply['ip'], (string)$_SESSION['user']['username'], (string)($targetReply['username'] ?? 'Anonymous'), (string)($_POST['ban_reason'] ?? ''))) {
             $replyEditError = 'failed to ban IP.';
         } else {
-            fridg3_moderator_audit_log('banned IP', ['ip' => (string)$targetReply['ip'], 'username' => (string)($targetReply['username'] ?? 'Anonymous'), 'reason' => (string)($_POST['ban_reason'] ?? '')]);
+            fridge_moderator_audit_log('banned IP', ['ip' => (string)$targetReply['ip'], 'username' => (string)($targetReply['username'] ?? 'Anonymous'), 'reason' => (string)($_POST['ban_reason'] ?? '')]);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_banned=1');
             exit;
         }
     } elseif ($replyAction === 'unban_ip') {
-        if (!fridg3_feed_current_user_is_moderator()) {
+        if (!fridge_feed_current_user_is_moderator()) {
             $replyEditError = 'you do not have permission to unban IP addresses.';
         } elseif ($targetReply === null || ($targetReply['isGuest'] ?? false) !== true || !filter_var((string)($targetReply['ip'] ?? ''), FILTER_VALIDATE_IP)) {
             $replyEditError = 'could not find a guest IP to unban.';
-        } elseif (!fridg3_feed_unban_ip((string)$targetReply['ip'])) {
+        } elseif (!fridge_feed_unban_ip((string)$targetReply['ip'])) {
             $replyEditError = 'failed to unban IP.';
         } else {
-            fridg3_moderator_audit_log('unbanned IP', ['ip' => (string)$targetReply['ip'], 'username' => (string)($targetReply['username'] ?? 'Anonymous')]);
+            fridge_moderator_audit_log('unbanned IP', ['ip' => (string)$targetReply['ip'], 'username' => (string)($targetReply['username'] ?? 'Anonymous')]);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_unbanned=1');
             exit;
         }
     } elseif ($replyAction === 'purge_ip_replies') {
-        if (!fridg3_feed_current_user_is_moderator()) {
+        if (!fridge_feed_current_user_is_moderator()) {
             $replyEditError = 'you do not have permission to purge guest content.';
-        } elseif (!fridg3_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
+        } elseif (!fridge_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
             $replyEditError = 'password did not match. purge cancelled.';
         } elseif ($targetReply === null || ($targetReply['isGuest'] ?? false) !== true || !filter_var((string)($targetReply['ip'] ?? ''), FILTER_VALIDATE_IP)) {
             $replyEditError = 'could not find a guest IP to purge.';
         } else {
-            $purgeResult = fridg3_feed_purge_guest_replies_by_ip((string)$targetReply['ip']);
-            $guestbookPurgeResult = fridg3_guestbook_purge_entries_by_ip((string)$targetReply['ip']);
+            $purgeResult = fridge_feed_purge_guest_replies_by_ip((string)$targetReply['ip']);
+            $guestbookPurgeResult = fridge_guestbook_purge_entries_by_ip((string)$targetReply['ip']);
             $purgedCount = (int)$purgeResult['deleted'] + (int)$guestbookPurgeResult['deleted'];
             $failedCount = (int)$purgeResult['failed'] + (int)$guestbookPurgeResult['failed'];
-            fridg3_moderator_audit_log('purged IP content', ['ip' => (string)$targetReply['ip'], 'deleted' => $purgedCount, 'failed' => $failedCount]);
+            fridge_moderator_audit_log('purged IP content', ['ip' => (string)$targetReply['ip'], 'deleted' => $purgedCount, 'failed' => $failedCount]);
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?ip_purged=' . rawurlencode((string)$purgedCount) . '&ip_purge_failed=' . rawurlencode((string)$failedCount));
             exit;
@@ -263,10 +264,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($replyAction === 'delete') {
         if (!$canManageTargetReply) {
             $replyEditError = 'you do not have permission to delete replies.';
-        } elseif ($replyId === '' || !fridg3_feed_delete_reply((string)$postIdNoExt, $replyId)) {
+        } elseif ($replyId === '' || !fridge_feed_delete_reply((string)$postIdNoExt, $replyId)) {
             $replyEditError = 'failed to delete reply.';
         } else {
-            fridg3_moderator_audit_log('deleted feed reply', ['postId' => (string)$postIdNoExt, 'replyId' => $replyId, 'author' => (string)($targetReply['username'] ?? '')], [
+            fridge_moderator_audit_log('deleted feed reply', ['postId' => (string)$postIdNoExt, 'replyId' => $replyId, 'author' => (string)($targetReply['username'] ?? '')], [
                 'body' => (string)($targetReply['body'] ?? ''),
                 'format' => (string)($targetReply['format'] ?? 'legacy'),
             ]);
@@ -277,16 +278,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($replyAction === 'update') {
         if (!$canManageTargetReply) {
             $replyEditError = 'you do not have permission to edit replies.';
-        } elseif (!$isLoggedIn && $targetReply !== null && ($targetReply['isGuest'] ?? false) === true && fridg3_feed_guest_reply_has_filtered_text($targetReply)) {
+        } elseif (!$isLoggedIn && $targetReply !== null && ($targetReply['isGuest'] ?? false) === true && fridge_feed_guest_reply_has_filtered_text($targetReply)) {
             $replyEditError = 'guest replies with filtered words cannot be edited.';
         } elseif ($replyBody === '') {
             $replyEditError = 'reply cannot be empty.';
         } elseif (strlen($replyBody) > 4000) {
             $replyEditError = 'reply is too long.';
-        } elseif ($replyId === '' || !fridg3_feed_update_reply((string)$postIdNoExt, $replyId, $replyBody, $submittedReplyFormat)) {
+        } elseif ($replyId === '' || !fridge_feed_update_reply((string)$postIdNoExt, $replyId, $replyBody, $submittedReplyFormat)) {
             $replyEditError = 'failed to update reply.';
         } else {
-            fridg3_moderator_audit_log('edited feed reply', ['postId' => (string)$postIdNoExt, 'replyId' => $replyId, 'author' => (string)($targetReply['username'] ?? '')], [
+            fridge_moderator_audit_log('edited feed reply', ['postId' => (string)$postIdNoExt, 'replyId' => $replyId, 'author' => (string)($targetReply['username'] ?? '')], [
                 'body' => (string)($targetReply['body'] ?? ''),
                 'format' => (string)($targetReply['format'] ?? 'legacy'),
             ], [
@@ -303,9 +304,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $replyError = 'reply is too long.';
     } elseif ($parentReplyId !== '' && $parentReply === null) {
         $replyError = 'could not find the comment you are replying to.';
-    } elseif ($isLoggedIn && !fridg3_feed_save_reply($postIdNoExt ?? '', (string)$_SESSION['user']['username'], $replyBody, $parentReplyId, 'v2')) {
+    } elseif ($isLoggedIn && !fridge_feed_save_reply($postIdNoExt ?? '', (string)$_SESSION['user']['username'], $replyBody, $parentReplyId, 'v2', $savedReplyId)) {
         $replyError = 'failed to save reply.';
-    } elseif (!$isLoggedIn && !fridg3_feed_save_guest_reply($postIdNoExt ?? '', $guestDisplayNameForSave, $clientIp, $replyBodyForSave, $parentReplyId, $guestBrowserId, 'v2')) {
+    } elseif (!$isLoggedIn && !fridge_feed_save_guest_reply($postIdNoExt ?? '', $guestDisplayNameForSave, $clientIp, $replyBodyForSave, $parentReplyId, $guestBrowserId, 'v2', $replyBody, $savedReplyId)) {
         $replyError = 'failed to save reply.';
     } else {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -313,7 +314,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /feed/posts/' . rawurlencode((string)$postIdNoExt) . '?reply_posted=1');
         $triggerUsername = $isLoggedIn ? (string)$_SESSION['user']['username'] : ($guestDisplayNameForSave !== '' ? $guestDisplayNameForSave : 'Anonymous');
         $shouldQueueToastAutoReply = strcasecmp($triggerUsername, 'toast') !== 0
-            && (strcasecmp(ltrim($username, '@'), 'toast') === 0 || fridg3_toast_feed_mentions_toast($replyBody));
+            && (fridge_toast_feed_mentions_toast($replyBody)
+                || ($parentReplyId === '' && strcasecmp(ltrim($username, '@'), 'toast') === 0));
         if ($shouldQueueToastAutoReply) {
             $toastReplyPostId = (string)($postIdNoExt ?? '');
             $toastReplyPostUsername = $username;
@@ -321,15 +323,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $toastReplyPostBody = $body;
             $toastReplyTriggerUsername = $triggerUsername;
             $toastReplyTriggerBody = $isLoggedIn ? $replyBody : $replyBodyForSave;
-            fridg3_toast_run_auto_reply_after_response(static function () use (
+            fridge_toast_run_auto_reply_after_response(static function () use (
                 $toastReplyPostId,
                 $toastReplyPostUsername,
                 $toastReplyPostDate,
                 $toastReplyPostBody,
                 $toastReplyTriggerUsername,
-                $toastReplyTriggerBody
+                $toastReplyTriggerBody,
+                $savedReplyId,
+                $parentReplyId
             ): void {
-                fridg3_toast_maybe_auto_reply_to_feed(
+                fridge_toast_maybe_auto_reply_to_feed(
                     $toastReplyPostId,
                     $toastReplyPostUsername,
                     $toastReplyPostDate,
@@ -337,6 +341,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     [
                         'username' => $toastReplyTriggerUsername,
                         'body' => $toastReplyTriggerBody,
+                        'id' => (string)$savedReplyId,
+                        'parentId' => $parentReplyId,
+                        'type' => 'reply',
                     ]
                 );
             });
@@ -346,9 +353,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $safeUser = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
-$humanizedDate = fridg3_feed_humanize_datetime($dateLine);
+$humanizedDate = fridge_feed_humanize_datetime($dateLine);
 $safeDate = htmlspecialchars($humanizedDate, ENT_QUOTES, 'UTF-8');
-$safeBody = fridg3_feed_render_post_body($body, $postFormat);
+$safeBody = fridge_feed_render_post_body($body, $postFormat);
 $replySuccess = isset($_GET['reply_posted']) && $_GET['reply_posted'] === '1';
 $replyUpdated = isset($_GET['reply_updated']) && $_GET['reply_updated'] === '1';
 $replyDeleted = isset($_GET['reply_deleted']) && $_GET['reply_deleted'] === '1';
@@ -357,7 +364,7 @@ $ipPurged = isset($_GET['ip_purged']) ? max(0, (int)$_GET['ip_purged']) : null;
 $ipPurgeFailed = isset($_GET['ip_purge_failed']) ? max(0, (int)$_GET['ip_purge_failed']) : 0;
 $replyFormValue = isset($_POST['reply_content']) ? htmlspecialchars((string)$_POST['reply_content'], ENT_QUOTES, 'UTF-8') : '';
 $guestUsernameValue = isset($_POST['guest_username']) ? htmlspecialchars((string)$_POST['guest_username'], ENT_QUOTES, 'UTF-8') : '';
-$replies = fridg3_feed_load_replies((string)$postIdNoExt);
+$replies = fridge_feed_load_replies((string)$postIdNoExt);
 $replyParentId = trim((string)($_POST['parent_reply_id'] ?? $_GET['reply_to'] ?? ''));
 $repliesById = [];
 foreach ($replies as $reply) {
@@ -369,35 +376,17 @@ foreach ($replies as $reply) {
 if ($replyParentId !== '' && !isset($repliesById[$replyParentId])) {
     $replyParentId = '';
 }
-$canModerateReplies = fridg3_feed_current_user_can_moderate_replies($username);
-$postIpRecords = fridg3_feed_load_post_ips();
+$canModerateReplies = fridge_feed_current_user_can_moderate_replies($username);
+$postIpRecords = fridge_feed_load_post_ips();
 $postAuthorIp = (string)($postIpRecords[(string)$postIdNoExt]['ip'] ?? '');
 $editReplyBodyValue = '';
 if ($replyEditTargetId !== '' && isset($_POST['reply_action']) && (string)$_POST['reply_action'] === 'update') {
     $editReplyBodyValue = (string)($_POST['reply_content'] ?? '');
 }
 
-// Extract first image from body for og:image metadata
-$imageUrl = null;
-if ($postFormat === 'v2' && preg_match('/!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/', $body, $matches)) {
-    $imageUrl = $matches[1];
-} elseif (preg_match('/\[img=([^\]\s]+)\]/', $body, $matches)) {
-    $imageUrl = $matches[1];
-}
-
-// Remove BBCode from description
-$plainBody = $body;
-$plainBody = preg_replace('/!\[([^\]]*)\]\([^)]+\)/', '$1', $plainBody);
-$plainBody = preg_replace('/[`*_~=#>|-]+/', ' ', $plainBody);
-$plainBody = preg_replace('/\[img[^\]]*\](?:\[name:[^\]]*\])?/i', '', $plainBody); // Remove images
-$plainBody = preg_replace('/\[[^\]]*\][^\[]*\[\/[^\]]*\]/s', '', $plainBody); // Remove other BBCode tags
-$plainBody = preg_replace('/\[([a-z]+)[^\]]*\]/i', '', $plainBody); // Remove remaining opening tags
-$plainBody = trim($plainBody);
-// Limit description to 160 chars for metadata
-$shortDescription = substr($plainBody, 0, 160);
-if (strlen($plainBody) > 160) {
-    $shortDescription .= '...';
-}
+// Share Unicode-safe plain-text snippets with the metadata renderer.
+require_once dirname(__DIR__, 2) . '/lib/seo.php';
+$shortDescription = fridge_seo_text($body);
 
 // Update title and description
 $title = 'feed post by @' . $safeUser;
@@ -423,12 +412,6 @@ if (!$template_path) {
 $template = file_get_contents($template_path);
 if (function_exists('apply_preferred_theme_stylesheet')) {
     $template = apply_preferred_theme_stylesheet($template, __DIR__);
-}
-
-// Inject og:image meta tag if post has an image
-if ($imageUrl) {
-    $ogImageTag = '<meta property="og:image" content="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '">';
-    $template = str_replace('</head>', $ogImageTag . "\n</head>", $template);
 }
 
 // Generate user greeting if logged in
@@ -465,20 +448,34 @@ if (isset($_SESSION['user'])) {
     $currentUser = $_SESSION['user']['username'] ?? '';
     $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
     $canEdit = ($currentUser === $username) || $isAdmin
-        || (!empty($_SESSION['user']['isModerator']) && !fridg3_feed_account_is_admin($username));
+        || (!empty($_SESSION['user']['isModerator']) && !fridge_feed_account_is_admin($username));
 }
 
 // Build edit icon if allowed
 $editIcon = '';
-if ($canEdit || (fridg3_feed_current_user_can_moderate_author($username) && filter_var($postAuthorIp, FILTER_VALIDATE_IP))) {
+$postAuthorAccount = null;
+foreach (fridge_feed_load_accounts()['accounts'] as $candidateAccount) if (strcasecmp((string)($candidateAccount['username'] ?? ''), ltrim($username, '@')) === 0) { $postAuthorAccount = $candidateAccount; break; }
+$canViewAuthorContent = $postAuthorAccount !== null && (!empty($_SESSION['user']['isAdmin']) || !empty($_SESSION['user']['isModerator']));
+$canBanAuthorAccount = $canViewAuthorContent && empty($postAuthorAccount['isAdmin']) && empty($postAuthorAccount['isModerator']);
+if ($canEdit || (fridge_feed_current_user_can_moderate_author($username) && filter_var($postAuthorIp, FILTER_VALIDATE_IP)) || $canViewAuthorContent) {
     $postId = urlencode($postFilename);
     $editIcon = '<details class="site-action-menu"><summary data-tooltip="post actions" aria-label="post actions"><i class="fa-solid fa-ellipsis"></i></summary>'
         . '<div class="site-action-menu-dropdown">';
     if ($canEdit) {
         $editIcon .= '<a class="site-action-menu-item" href="/feed/edit?post=' . $postId . '"><i class="fa-solid fa-pencil"></i><span>edit</span></a>';
     }
-    if (fridg3_feed_current_user_can_moderate_author($username) && filter_var($postAuthorIp, FILTER_VALIDATE_IP)) {
+    if (fridge_feed_current_user_can_moderate_author($username) && filter_var($postAuthorIp, FILTER_VALIDATE_IP)) {
         $editIcon .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($postAuthorIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
+    }
+    if (!empty($_SESSION['user']['isAdmin']) && $postAuthorAccount !== null) {
+        $editIcon .= '<a class="site-action-menu-item" href="/account/admin/edit?username=' . rawurlencode((string)$postAuthorAccount['username']) . '"><i class="fa-solid fa-user-gear"></i><span>manage account</span></a>';
+    }
+    if ($canViewAuthorContent) {
+        $editIcon .= '<a class="site-action-menu-item" href="/settings/guests/?account=' . rawurlencode((string)$postAuthorAccount['username']) . '"><i class="fa-solid fa-layer-group"></i><span>view all user content</span></a>';
+    }
+    if ($canBanAuthorAccount) {
+        $alreadyBanned = !empty($postAuthorAccount['accountBanned']);
+        $editIcon .= '<form class="site-action-menu-form" method="post" action="/settings/guests/" data-no-spa="1" data-site-confirm="1" ' . (!$alreadyBanned ? 'data-ban-reason-prompt="1" ' : '') . 'data-confirm-title="' . ($alreadyBanned ? 'unban' : 'ban') . ' account?" data-confirm-detail="this updates the account and all associated IP addresses." data-confirm-text="' . ($alreadyBanned ? 'unban' : 'ban') . '" data-cancel-text="cancel"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="action" value="' . ($alreadyBanned ? 'unban_account' : 'ban_account') . '"><input type="hidden" name="username" value="' . htmlspecialchars((string)$postAuthorAccount['username'], ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="site-action-menu-item"><i class="fa-solid fa-ban"></i><span>' . ($alreadyBanned ? 'unban' : 'ban') . '</span></button></form>';
     }
     if ($canEdit) {
         $editIcon .= '<form class="site-action-menu-form" method="post" action="/feed/edit?post=' . $postId . '" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete feed post?" data-confirm-detail="this removes the feed post, attached media, voice notes, and replies." data-confirm-text="delete" data-cancel-text="cancel">'
@@ -498,7 +495,7 @@ $postMeta .= $bookmarkIcon;
 
 // Replace placeholders in content
 $content = str_replace('{username}', $safeUser, $content);
-$postUserIpAttribute = fridg3_feed_current_user_can_moderate_author($username)
+$postUserIpAttribute = fridge_feed_current_user_can_moderate_author($username)
     ? ' data-context-tooltip="' . (filter_var($postAuthorIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($postAuthorIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
     : '';
 $content = str_replace('<span id="post-username">@' . $safeUser . '</span>', '<span id="post-username"' . $postUserIpAttribute . '>@' . $safeUser . '</span>', $content);
@@ -507,6 +504,7 @@ $content = $postFormat === 'v2'
     : $content;
 $content = str_replace('{content}', $safeBody, $content);
 $content = str_replace('{post_meta}', $postMeta, $content);
+$content = str_replace('<span id="post-date-feed">', '<span id="post-date-feed" data-exact-datetime="' . htmlspecialchars((string)$dateLine, ENT_QUOTES, 'UTF-8') . '">', $content);
 $content = str_replace('{reply_form_value}', $replyFormValue, $content);
 $content = str_replace('{reply_csrf_token}', htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'), $content);
 
@@ -550,8 +548,8 @@ if ($replyParentId !== '' && isset($repliesById[$replyParentId])) {
 } else {
     $replyTargetHtml = '<div class="feed-reply-target" data-feed-reply-target hidden></div>';
 }
-if (!$isClientIpBanned || $isLoggedIn) {
-    $replyEditor = fridg3_feed_reply_markdown_editor('{reply_form_value}', $isLoggedIn);
+if (!$postingRestricted && (!$isClientIpBanned || $isLoggedIn)) {
+    $replyEditor = fridge_feed_reply_markdown_editor('{reply_form_value}', $isLoggedIn);
     $toastReady = false;
     if ($isToast) {
         $draftToken = (string)($_POST['toast_reply_token'] ?? '');
@@ -575,21 +573,20 @@ if (!$isClientIpBanned || $isLoggedIn) {
         . '<button id="form-button" type="submit"' . ($isToast && !$toastReady ? ' disabled' : '') . '>reply</button>'
         . '</form>'
         . ($isToast ? '<script src="/js/toast-feed-reply.js?v=20260909-1"></script>' : '');
-    if ($postingRestricted) {
-        $replyFormHtml = fridg3_posting_restriction_notice() . fridg3_disable_composer_controls($replyFormHtml);
-    }
+} elseif ($postingRestricted) {
+    $replyNotice = fridge_posting_restriction_notice();
 } elseif (!$isLoggedIn && $isClientIpBanned) {
     $replyNotice = '<div class="feed-reply-notice error">your IP address has been restricted.</div>';
 }
 
-$canCreateReply = !$isClientIpBanned || $isLoggedIn;
+$canCreateReply = !$postingRestricted && (!$isClientIpBanned || $isLoggedIn);
 $visibleReplies = [];
 $visibleRepliesById = [];
 foreach ($replies as $reply) {
     $replyId = (string)($reply['id'] ?? '');
     $isGuestReply = ($reply['isGuest'] ?? false) === true;
     $replyIp = (string)($reply['ip'] ?? '');
-    $replyIpBanned = $isGuestReply && $replyIp !== '' && fridg3_feed_is_ip_banned($replyIp);
+    $replyIpBanned = $isGuestReply && $replyIp !== '' && fridge_feed_is_ip_banned($replyIp);
     if (!$canModerateReplies && $replyIpBanned) {
         continue;
     }
@@ -631,20 +628,25 @@ $renderReply = function (array $reply, int $depth = 0) use (
     $postIdNoExt
 ): string {
     $replyUser = htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8');
-    $replyDate = htmlspecialchars(fridg3_feed_humanize_datetime((string)$reply['date']), ENT_QUOTES, 'UTF-8');
-    $replyFormat = fridg3_feed_reply_format($reply);
+    $replyDate = htmlspecialchars(fridge_feed_humanize_datetime((string)$reply['date']), ENT_QUOTES, 'UTF-8');
+    $replyFormat = fridge_feed_reply_format($reply);
+    $storedReplyBody = (string)$reply['body'];
+    $moderationOriginalBody = $canModerateReplies ? trim((string)($reply['originalBody'] ?? '')) : '';
+    $displayReplyBody = $moderationOriginalBody !== ''
+        ? fridge_feed_apply_guest_filter($moderationOriginalBody, true, true)
+        : $storedReplyBody;
     $replyBody = $replyFormat === 'v2'
-        ? fridg3_feed_render_post_body((string)$reply['body'], 'v2')
-        : htmlspecialchars((string)$reply['body'], ENT_QUOTES, 'UTF-8');
+        ? fridge_feed_render_post_body($displayReplyBody, 'v2')
+        : htmlspecialchars($displayReplyBody, ENT_QUOTES, 'UTF-8');
     $replyId = (string)($reply['id'] ?? '');
     $isGuestReply = ($reply['isGuest'] ?? false) === true;
     $replyIp = (string)($reply['ip'] ?? '');
-    $canManageThisReply = fridg3_feed_current_visitor_can_manage_reply($username, $reply, $clientIp);
-    $guestFilteredEditLocked = !$isLoggedIn && $isGuestReply && fridg3_feed_guest_reply_has_filtered_text($reply);
-    $canEditThisReply = $canManageThisReply && !$guestFilteredEditLocked;
+    $canManageThisReply = fridge_feed_current_visitor_can_manage_reply($username, $reply, $clientIp);
+    $guestFilteredEditLocked = !$isLoggedIn && $isGuestReply && fridge_feed_guest_reply_has_filtered_text($reply);
+    $canEditThisReply = $canCreateReply && $canManageThisReply && !$guestFilteredEditLocked;
     $isEditingReply = $canEditThisReply && $replyEditTargetId !== '' && $replyId === $replyEditTargetId;
     $replyActionsHtml = '';
-    if ($replyId !== '' && ($canCreateReply || $canManageThisReply || (fridg3_feed_current_user_is_moderator() && $isGuestReply && $replyIp !== ''))) {
+    if ($replyId !== '' && ($canCreateReply || $canManageThisReply || (fridge_feed_current_user_is_moderator() && $isGuestReply && $replyIp !== ''))) {
         $replyActionsHtml = '<span class="feed-reply-actions">';
         if ($canCreateReply) {
             $replyActionsHtml .= '<a class="feed-reply-action-link feed-reply-target-button" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?reply_to=' . rawurlencode($replyId) . '#feed-reply-form" data-feed-reply-to="' . htmlspecialchars($replyId, ENT_QUOTES, 'UTF-8') . '" data-feed-reply-user="' . htmlspecialchars((string)$reply['username'], ENT_QUOTES, 'UTF-8') . '" data-tooltip="reply to comment"><i class="fa-solid fa-reply"></i></a>';
@@ -653,9 +655,9 @@ $renderReply = function (array $reply, int $depth = 0) use (
         if ($canEditThisReply) {
             $replyMenuItems .= '<a class="site-action-menu-item" href="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '?edit_reply=' . rawurlencode($replyId) . '"><i class="fa-solid fa-pencil"></i><span>edit</span></a>';
         }
-        if (fridg3_feed_current_user_is_moderator() && $isGuestReply && filter_var($replyIp, FILTER_VALIDATE_IP)) {
+        if (fridge_feed_current_user_is_moderator() && $isGuestReply && filter_var($replyIp, FILTER_VALIDATE_IP)) {
             $replyMenuItems .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($replyIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
-            if (fridg3_feed_is_ip_banned($replyIp)) {
+            if (fridge_feed_is_ip_banned($replyIp)) {
                 $replyMenuItems .= '<form class="site-action-menu-form" method="post" action="/feed/posts/' . rawurlencode((string)$postIdNoExt) . '" data-site-confirm="1" data-confirm-title="unban IP?" data-confirm-detail="this allows new feed replies and guestbook posts from this IP." data-confirm-text="unban" data-cancel-text="cancel">'
                 . '<input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">'
                 . '<input type="hidden" name="reply_action" value="unban_ip">'
@@ -740,7 +742,7 @@ $renderReply = function (array $reply, int $depth = 0) use (
             . '</form>'
             . '</div>';
         if ($replyFormat === 'v2') {
-            $markdownEditEditor = fridg3_feed_reply_markdown_editor($currentEditValue, $isLoggedIn);
+            $markdownEditEditor = fridge_feed_reply_markdown_editor($currentEditValue, $isLoggedIn);
             $replyEditFormHtml = preg_replace(
                 '/<div class="bbcode-editor">.*?(?=<button id="form-button" type="submit">save reply<\/button>)/s',
                 $markdownEditEditor,
@@ -748,13 +750,8 @@ $renderReply = function (array $reply, int $depth = 0) use (
                 1
             ) ?: $replyEditFormHtml;
         }
-        if ($postingRestricted) {
-            $replyEditFormHtml = '<div class="feed-reply-box feed-reply-edit-box">'
-                . fridg3_posting_restriction_notice()
-                . fridg3_disable_composer_controls(substr($replyEditFormHtml, strlen('<div class="feed-reply-box feed-reply-edit-box">')));
-        }
     }
-    $guestIpAttribute = fridg3_feed_current_user_can_moderate_author((string)($reply['username'] ?? ''))
+    $guestIpAttribute = fridge_feed_current_user_can_moderate_author((string)($reply['username'] ?? ''))
         ? ' data-context-tooltip="' . (filter_var($replyIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($replyIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
         : '';
     $replyUserHtml = $isGuestReply
@@ -763,7 +760,7 @@ $renderReply = function (array $reply, int $depth = 0) use (
     $bannedVisibilityMarker = $canModerateReplies
         && $isGuestReply
         && filter_var($replyIp, FILTER_VALIDATE_IP)
-        && fridg3_feed_is_ip_banned($replyIp)
+        && fridge_feed_is_ip_banned($replyIp)
             ? ' <em data-tooltip="this post is only visible to admins because the user was banned">(banned)</em>'
             : '';
     $parentReferenceHtml = '';
@@ -781,7 +778,7 @@ $renderReply = function (array $reply, int $depth = 0) use (
     $replyHtml = '<div class="' . $replyClasses . '"' . $replyAnchorId . '>'
         . '<div class="feed-reply-header">'
         . '<span class="feed-reply-username">' . $replyUserHtml . $bannedVisibilityMarker . '</span>'
-        . '<span class="feed-reply-date">' . $replyDate . $replyActionsHtml . '</span>'
+        . '<span class="feed-reply-date" data-exact-datetime="' . htmlspecialchars((string)($reply['date'] ?? ''), ENT_QUOTES, 'UTF-8') . '">' . $replyDate . $replyActionsHtml . '</span>'
         . '</div>'
         . $parentReferenceHtml
         . '<div class="post-content feed-reply-body">' . $replyBody . '</div>'

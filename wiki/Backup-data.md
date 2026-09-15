@@ -122,6 +122,26 @@ The archive contains the `data` directory from:
 /var/www/fridge.dev/data
 ```
 
+## Restore From Settings
+
+Administrators can use **settings → admin settings → site management → restore backup**, directly below **manage notices**. The flow shows the ZIP-selection notice, a local archive summary, a password prompt, then a final red confirmation button. Paragraph breaks in the dialogs are preserved.
+
+Before confirmation, the browser reads the ZIP central directory and the compressed accounts/reply JSON entries in memory. It neither uploads the ZIP nor unpacks files onto disk. The date comes from the workflow's `DD-MM-YY_hh-mm-ss.zip` filename; counts include accounts, top-level feed posts, individual replies, published journal posts, guestbook entries, private chat thread records, original images, and mdpaste records. Drafts, thumbnails, IP indexes and presence sidecars are excluded. ZIP64 directories are supported; oversized metadata, unsafe paths, encrypted archives and malformed records are rejected.
+
+Sanitized developer-data archives are rejected on the device before authentication or upload. Newly published archives carry `data/.development-copy.json`; the reader also recognizes older developer copies from the sanitizer's empty account list and placeholder draft. The server repeats this validation before it can replace live data.
+
+The final confirmation locks maintenance and creates one persistent restore job. The browser first uploads in resumable 2 MiB chunks. A PHP CLI worker then validates archive paths and every file's checksum, removes the current `/data` contents, and restores the archive there. The outer directory and its inherited permissions are retained because the production PHP user cannot write to the application root. Uploading and validation happen before deleting live content. The existing data is not retained as a rollback copy.
+
+Job state, the uploaded archive and the maintenance lock are stored outside the web root and outside `/data`, in a private `fridg3-restore-*` directory under PHP's temporary directory. Maintenance radios are disabled and other POST actions are blocked during the operation. Admin page navigation opens settings with the shared progress dialog; already-open admin pages also display it. Non-admins remain behind the server-side maintenance gate, including while `/data/etc/wip` is missing or being replaced. There is no cancel action after confirmation.
+
+The selected file begins uploading directly after final confirmation and is also saved in browser IndexedDB for resumption. The IndexedDB copy runs in the background so a large archive cannot delay creation of the restore job, its progress popup, or its upload. Closing the browser necessarily pauses unfinished upload; returning to an admin page on the same origin resumes from the last acknowledged chunk. Another browser can resume by selecting the same archive using **resume upload**. Once uploaded, the background worker continues with no open browser required. The progress dialog uses the same themed track, animated inner bar, percentage, status line, and sizing as the developer-data copy dialog. If validation, disk access or the worker fails, maintenance stays on and the progress dialog provides **retry**. A successful restore removes the temporary ZIP, writes `false` to the restored maintenance flag and removes the external maintenance lock. The progress popup then shows **ok**, linking to the homepage.
+
+Runtime requirements: PHP CLI and the PHP Zip extension, a writable PHP temporary directory, writable `/data` contents, sufficient upload/extraction space, and a browser with IndexedDB and `DecompressionStream('deflate-raw')`. The ZIP reader uses no CDN libraries. Backup password hashes are read only in browser memory during counting and are not displayed or logged.
+
+### Restore checks
+
+Run `php scripts/test-backup-restore.php` and `node scripts/test-backup-archive.mjs` for isolated replacement and local summary fixtures. API denial cases are checked with `php scripts/test-backup-access.php guest`, `moderator`, `csrf`, `no-password`, and `maintenance-conflict`.
+
 ## Troubleshooting
 
 If the workflow fails during SSH setup:

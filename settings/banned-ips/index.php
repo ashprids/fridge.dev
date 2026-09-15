@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'account' . DIRECTORY_SEPARATOR . 'admin' . DIRECTORY_SEPARATOR . 'helpers.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
 
@@ -13,7 +13,7 @@ if (empty($_SESSION['hard_ban_csrf']) || !is_string($_SESSION['hard_ban_csrf']))
 }
 
 $notice = '';
-$editorValue = implode(PHP_EOL, fridg3_hard_ban_load());
+$editorValue = implode(PHP_EOL, fridge_hard_ban_load());
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $submittedToken = (string)($_POST['csrf_token'] ?? '');
@@ -24,21 +24,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'save_settings') {
         $enforcementEnabled = isset($_POST['enforce_hard_bans']);
         $strictEnabled = isset($_POST['strict_hard_bans']);
-        if (!fridg3_hard_ban_set_strict_enabled($strictEnabled) || !fridg3_hard_ban_set_enforcement_enabled($enforcementEnabled)) {
+        if (!fridge_hard_ban_set_strict_enabled($strictEnabled) || !fridge_hard_ban_set_enforcement_enabled($enforcementEnabled)) {
             $notice = '<div id="error">the hard-ban settings could not be updated.</div><br>';
         } else {
             $notice = '<div id="result">hard-ban settings saved.</div><br>';
         }
     } else {
         $editorValue = (string)($_POST['hard_banned_ips'] ?? '');
-        $parsed = fridg3_hard_ban_parse($editorValue);
+        $parsed = fridge_hard_ban_parse($editorValue);
         if ($parsed['invalid'] !== []) {
             $invalid = htmlspecialchars(implode(', ', $parsed['invalid']), ENT_QUOTES, 'UTF-8');
             $notice = '<div id="error">invalid IP address' . (count($parsed['invalid']) === 1 ? '' : 'es') . ': ' . $invalid . '</div><br>';
-        } elseif (!fridg3_hard_ban_admin_save($parsed['ips'])) {
+        } elseif (!fridge_hard_ban_admin_save($parsed['ips'])) {
             $notice = '<div id="error">could not save the hard-ban list. check data directory permissions.</div><br>';
         } else {
-            $editorValue = implode(PHP_EOL, fridg3_hard_ban_load());
+            $editorValue = implode(PHP_EOL, fridge_hard_ban_load());
             $notice = '<div id="result">hard-ban list saved.</div><br>';
         }
     }
@@ -46,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $safeValue = htmlspecialchars($editorValue, ENT_QUOTES, 'UTF-8');
 $safeCsrf = htmlspecialchars((string)$_SESSION['hard_ban_csrf'], ENT_QUOTES, 'UTF-8');
-$enforcementChecked = fridg3_hard_ban_enforcement_enabled() ? ' checked' : '';
-$strictChecked = fridg3_hard_ban_strict_enabled() ? ' checked' : '';
+$enforcementChecked = fridge_hard_ban_enforcement_enabled() ? ' checked' : '';
+$strictChecked = fridge_hard_ban_strict_enabled() ? ' checked' : '';
 $content = '<style>'
     . '.hard-ban-editor{width:100%;min-height:55vh;resize:vertical;box-sizing:border-box;font:inherit;line-height:1.45;background:var(--bg);color:var(--fg);border:1px solid var(--border);padding:12px;}'
     . '.hard-ban-note{max-width:760px;color:var(--subtle);}'

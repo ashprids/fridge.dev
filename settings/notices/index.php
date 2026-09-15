@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . '/account/admin/helpers.php';
 require_once dirname(__DIR__, 2) . '/lib/render.php';
 require_once dirname(__DIR__, 2) . '/lib/site-notices.php';
@@ -16,8 +16,8 @@ if (empty($_SESSION['site_notices_csrf']) || !is_string($_SESSION['site_notices_
 $csrf = (string)$_SESSION['site_notices_csrf'];
 $notice = '';
 $targetedResponse = null;
-$notices = fridg3_site_notices_load(__DIR__);
-$targetedNotifications = fridg3_targeted_notifications_load();
+$notices = fridge_site_notices_load(__DIR__);
+$targetedNotifications = fridge_targeted_notifications_load();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = (string)($_POST['csrf_token'] ?? '');
@@ -35,11 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'targeted_save') {
         $targetMode = (string)($_POST['target_mode'] ?? 'users');
         $rawTargets = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($_POST['target'] ?? ''))))));
-        $message = fridg3_site_notices_text($_POST['target_message'] ?? '', 2000);
-        $titleValue = fridg3_site_notices_text($_POST['target_title'] ?? '', 120);
-        $urlValue = fridg3_site_notices_url($_POST['target_url'] ?? '');
+        $message = fridge_site_notices_text($_POST['target_message'] ?? '', 2000);
+        $titleValue = fridge_site_notices_text($_POST['target_title'] ?? '', 120);
+        $urlValue = fridge_site_notices_url($_POST['target_url'] ?? '');
         $accountNames = [];
-        foreach ((array)(fridg3_feed_load_accounts()['accounts'] ?? []) as $account) {
+        foreach ((array)(fridge_feed_load_accounts()['accounts'] ?? []) as $account) {
             $accountNames[strtolower((string)($account['username'] ?? ''))] = true;
         }
         $targets = [];
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $targetedResponse = ['ok' => false, 'message' => 'choose an audience and provide valid comma-separated recipients where required.'];
         } else {
             foreach ($targets as $targetRecord) $targetedNotifications[] = ['id' => bin2hex(random_bytes(12)), 'targetType' => $targetRecord['targetType'], 'target' => $targetRecord['target'], 'title' => $titleValue ?: 'notification', 'message' => $message, 'url' => $urlValue ?: '/notifications', 'date' => date('Y-m-d H:i:s')];
-            $saved = fridg3_targeted_notifications_save($targetedNotifications);
+            $saved = fridge_targeted_notifications_save($targetedNotifications);
             $notice = $saved ? '<div id="result">targeted notification sent.</div><br>' : '<div id="error">could not save targeted notification.</div><br>';
             $targetedResponse = ['ok' => $saved, 'message' => $saved ? 'targeted notification sent.' : 'could not save targeted notification.'];
         }
@@ -72,20 +72,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         || !in_array($type, ['banner', 'popup'], true) || !in_array($action, ['save', 'clear'], true)) {
         $notice = '<div id="error">invalid notice request.</div><br>';
     } else {
-        $message = fridg3_site_notices_text($_POST['message'] ?? '', $type === 'banner' ? 1000 : 2000);
+        $message = fridge_site_notices_text($_POST['message'] ?? '', $type === 'banner' ? 1000 : 2000);
         $record = [
             'id' => bin2hex(random_bytes(16)), 'type' => $type, 'message' => $message,
         ];
         if ($type === 'banner') {
             $record['dismissible'] = !empty($_POST['dismissible']);
         } else {
-            $label = fridg3_site_notices_text($_POST['button_label'] ?? '', 80);
-            $url = fridg3_site_notices_url($_POST['button_url'] ?? '');
+            $label = fridge_site_notices_text($_POST['button_label'] ?? '', 80);
+            $url = fridge_site_notices_url($_POST['button_url'] ?? '');
             if (($label === '') !== ($url === '')) {
                 $notice = '<div id="error">the popup custom button needs both a label and a site-relative URL.</div><br>';
             }
             $record += [
-                'title' => fridg3_site_notices_text($_POST['title'] ?? '', 120) ?: 'notice',
+                'title' => fridge_site_notices_text($_POST['title'] ?? '', 120) ?: 'notice',
                 'buttonLabel' => $label, 'buttonUrl' => $url,
             ];
         }
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $notices[$audience][$type] = $action === 'clear' || $message === '' ? null : $record;
         } elseif ($notice === '') {
             $recordId = (string)($_POST['notice_id'] ?? '');
-            $path = fridg3_site_notices_page_path($_POST['page_path'] ?? '');
+            $path = fridge_site_notices_page_path($_POST['page_path'] ?? '');
             $notices['pages'] = array_values(array_filter($notices['pages'] ?? [], static fn($item) => ($item['id'] ?? '') !== $recordId));
             if ($action === 'save') {
                 if ($path === '' || $message === '') {
@@ -109,8 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         if ($notice === '') {
-            if (fridg3_site_notices_save(__DIR__, $notices)) {
-                $notices = fridg3_site_notices_load(__DIR__);
+            if (fridge_site_notices_save(__DIR__, $notices)) {
+                $notices = fridge_site_notices_load(__DIR__);
                 $notice = '<div id="result">' . ($action === 'clear' ? 'notice cleared.' : 'notice saved. visitors will see this new revision.') . '</div><br>';
             } else {
                 $notice = '<div id="error">could not save notices. check data directory permissions.</div><br>';

@@ -1,5 +1,5 @@
 (function() {
-const debugLog = message => window.fridg3DebugClientLog?.(`[toast controls] ${message}`);
+const debugLog = message => window.fridgeDebugClientLog?.(`[toast controls] ${message}`);
 function initToastDiscordBotPage() {
     const root = document.getElementById('control-panel-container');
     const listenButton = document.getElementById('listen-along-button');
@@ -177,6 +177,6 @@ function initToastDiscordBotPage() {
     debugLog('page controls initialized');
 }
 
-window.fridg3InitToastDiscordBotPage = initToastDiscordBotPage;
+window.fridgeInitToastDiscordBotPage = initToastDiscordBotPage;
 initToastDiscordBotPage();
 })();

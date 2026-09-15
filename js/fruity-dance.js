@@ -1,7 +1,7 @@
 // Fruity Dance preferences, settings controls, and optional display runtime
 (() => {
 'use strict';
-const settingsDebugLog = message => window.fridg3DebugClientLog?.(`[fruity-dance] ${message}`);
+const settingsDebugLog = message => window.fridgeDebugClientLog?.(`[fruity-dance] ${message}`);
 const ACCESSIBILITY_PREFS_KEY = 'accessibilityPrefs';
 
 function readLocalAccessibilityPrefs() {
@@ -302,7 +302,7 @@ function showDisplayAuxContactNotification() {
         playDisplayAuxContactFlash(notification);
     }, { once: true });
     document.body.appendChild(notification);
-    window.dispatchEvent(new CustomEvent('fridg3:new-notifications'));
+    window.dispatchEvent(new CustomEvent('fridge:new-notifications'));
 }
 
 function syncDisplayAuxContactTimer(showingCustomPlaceholder, fruityDanceEnabled) {
@@ -452,7 +452,7 @@ function showDisplayAuxDiagnosticsNotification(controller) {
     }, { once: true });
     document.body.appendChild(notification);
     controller.cleanups.add(() => notification.remove());
-    window.dispatchEvent(new CustomEvent('fridg3:new-notifications'));
+    window.dispatchEvent(new CustomEvent('fridge:new-notifications'));
 }
 
 function displayAuxDiagnosticsWaitForFeed(controller) {
@@ -500,7 +500,7 @@ function displayAuxDiagnosticsWaitForShadow(controller) {
         const blockClick = event => {
             event.preventDefault();
             event.stopImmediatePropagation();
-            window.fridg3DebugClientTransientLog?.('[?] > Nothing here.');
+            window.fridgeDebugClientTransientLog?.('[?] > Nothing here.');
             const sprite = fruityDanceController?.sprite?.getBoundingClientRect();
             const shadow = fruityDanceController?.reflection?.getBoundingClientRect();
             if (!sprite || !shadow) return;
@@ -551,7 +551,7 @@ async function runDisplayAuxDebugDiagnostics(controller) {
                     text = 'Okay, okay. Uh, if you can hear me... use the text box to talk to me.';
                 }
                 text = text.replace(/#+/g, hashes => displayAuxDiagnosticsGarbledText(hashes.length));
-                window.fridg3DebugClientTransientLog?.(`[?] > ${text}`);
+                window.fridgeDebugClientTransientLog?.(`[?] > ${text}`);
             }
         }
     } catch (_) { /* the hidden diagnostics fails closed */ }
@@ -1158,8 +1158,8 @@ function disableDisplayAuxDebugModeAfterReset() {
     } catch (_) { /* storage can be unavailable in hardened browser contexts */ }
     const debugToggle = document.getElementById('debug-mode-toggle');
     if (debugToggle) debugToggle.checked = false;
-    window.fridg3SetDebugMode?.(false);
-    window.dispatchEvent(new CustomEvent('fridg3:accessibility-change', {
+    window.fridgeSetDebugMode?.(false);
+    window.dispatchEvent(new CustomEvent('fridge:accessibility-change', {
         detail: { debugMode: false },
     }));
     if (!document.getElementById('user-greeting') || !window.fetch) return;
@@ -2681,12 +2681,12 @@ function initFruityDanceSettings() {
 
 }
 
-window.addEventListener('fridg3:accessibility-change', event => {
+window.addEventListener('fridge:accessibility-change', event => {
     syncDisplayAuxDebugDiagnostics(displayAuxCustomPlaceholderSelected(), event.detail?.debugMode === true);
     enforceDisplayAuxDebugDismissal();
 });
-window.fridg3InitFruityDanceSettings = initFruityDanceSettings;
-window.fridg3SyncFruityDancePage = syncDisplayAuxDanceTrackEntryForCurrentPage;
+window.fridgeInitFruityDanceSettings = initFruityDanceSettings;
+window.fridgeSyncFruityDancePage = syncDisplayAuxDanceTrackEntryForCurrentPage;
 bindDisplayAuxDanceTrackMonitor();
 window.addEventListener('DOMContentLoaded', syncFruityDancePreference);
 window.addEventListener('DOMContentLoaded', bindDisplayAuxDanceTrackMonitor);

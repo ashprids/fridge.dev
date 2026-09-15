@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 
@@ -49,14 +49,14 @@ if ($postId === '') {
 }
 
 $journalDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'journal';
-$postFile = fridg3_journal_post_path($journalDir, $postId);
+$postFile = fridge_journal_post_path($journalDir, $postId);
 if ($postFile === null || !is_file($postFile)) {
     header('Location: /journal');
     exit;
 }
 
 $rawPost = @file_get_contents($postFile);
-$parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+$parsedPost = $rawPost !== false ? fridge_journal_parse_post($rawPost) : null;
 if ($parsedPost === null) {
     header('Location: /journal');
     exit;
@@ -68,7 +68,7 @@ $postSubtitle = $parsedPost['description'];
 $postHtml = $parsedPost['body'];
 $postCardImage = $parsedPost['cardImage'];
 $postFormat = $parsedPost['format'];
-$postingRestricted = fridg3_current_user_posting_restricted();
+$postingRestricted = fridge_current_user_posting_restricted();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $postingRestricted && !isset($_POST['delete'])) {
     header('Location: /journal/edit?post=' . rawurlencode($postId) . '&posting_restricted=1');
@@ -118,19 +118,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $postHtml = $newContent;
     } else {
         $imageMap = $postFormat === 'v2' && isset($_FILES['images']) && is_array($_FILES['images'])
-            ? fridg3_feed_process_uploaded_media($_FILES['images']) : [];
+            ? fridge_feed_process_uploaded_media($_FILES['images']) : [];
         $voiceMap = $postFormat === 'v2' && isset($_FILES['voice_notes']) && is_array($_FILES['voice_notes'])
-            ? fridg3_feed_process_uploaded_voice_notes($_FILES['voice_notes']) : [];
+            ? fridge_feed_process_uploaded_voice_notes($_FILES['voice_notes']) : [];
         if ($postFormat === 'v2') {
-            $newContent = fridg3_feed_replace_media_placeholders($newContent, $imageMap, true);
-            $newContent = fridg3_feed_replace_voice_placeholders($newContent, $voiceMap, true);
+            $newContent = fridge_feed_replace_media_placeholders($newContent, $imageMap, true);
+            $newContent = fridge_feed_replace_voice_placeholders($newContent, $voiceMap, true);
             if (preg_match('/\[(?:media|img|audio|video|voice):\d+\]/i', $newContent) === 1) {
                 header('Location: /journal/edit?post=' . rawurlencode($postId) . '&error=' . rawurlencode('one or more media uploads failed.'));
                 exit;
             }
         }
         $cardImageUpload = isset($_FILES['card_image']) && is_array($_FILES['card_image'])
-            ? fridg3_journal_process_card_image($_FILES['card_image'])
+            ? fridge_journal_process_card_image($_FILES['card_image'])
             : ['provided' => false, 'url' => ''];
         if ($cardImageUpload['provided'] && $cardImageUpload['url'] === '') {
             header('Location: /journal/edit?post=' . rawurlencode($postId) . '&error=' . rawurlencode('card image upload failed. use a supported image no larger than 8 MB.'));
@@ -144,8 +144,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $newCardImage = $cardImageUpload['url'];
         }
         $text = $postFormat === 'v2'
-            ? fridg3_journal_build_v2_post(date('Y-m-d'), $newTitle, $newDescription, $newContent, $newCardImage)
-            : fridg3_journal_build_post($postDate, $newTitle, $newDescription, $newContent, $newCardImage);
+            ? fridge_journal_build_v2_post(date('Y-m-d'), $newTitle, $newDescription, $newContent, $newCardImage)
+            : fridge_journal_build_post($postDate, $newTitle, $newDescription, $newContent, $newCardImage);
         @file_put_contents($postFile, $text);
         header('Location: /journal/posts/' . urlencode($postId));
         exit;
@@ -225,13 +225,13 @@ if ($postFormat === 'v2') {
 }
 if ($postingRestricted) {
     $deleteButton = '<button id="two-buttons" type="submit" form="delete-journal-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>';
-    $content = fridg3_disable_composer_controls($content);
+    $content = fridge_disable_composer_controls($content);
     $content = str_replace(
         '<button disabled id="two-buttons" type="submit" form="delete-journal-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>',
         $deleteButton,
         $content
     );
-    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
+    $content = str_replace('<form id="create-post-form"', fridge_posting_restriction_notice() . '<form id="create-post-form"', $content);
 }
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

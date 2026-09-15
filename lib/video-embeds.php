@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
 
-function fridg3_external_video_embed_data(string $rawUrl): ?array
+function fridge_external_video_embed_data(string $rawUrl): ?array
 {
     $url = html_entity_decode(trim($rawUrl), ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $parts = parse_url($url);
@@ -57,25 +57,25 @@ function fridg3_external_video_embed_data(string $rawUrl): ?array
     return null;
 }
 
-function fridg3_external_video_embed_html(array $video): string
+function fridge_external_video_embed_html(array $video): string
 {
     return '<div class="external-video-embed" data-video-provider="' . htmlspecialchars((string)$video['provider'], ENT_QUOTES, 'UTF-8') . '">'
         . '<iframe src="' . htmlspecialchars((string)$video['url'], ENT_QUOTES, 'UTF-8') . '" title="' . htmlspecialchars((string)$video['title'], ENT_QUOTES, 'UTF-8') . '" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>'
         . '</div>';
 }
 
-function fridg3_embed_plain_video_urls_in_text(string $text): string
+function fridge_embed_plain_video_urls_in_text(string $text): string
 {
     return preg_replace_callback('~https?://[^\s<]+~iu', static function (array $match): string {
         $candidate = (string)$match[0];
         $url = rtrim($candidate, '.,!?;:)');
         $suffix = substr($candidate, strlen($url));
-        $video = fridg3_external_video_embed_data($url);
-        return $video === null ? $candidate : fridg3_external_video_embed_html($video) . $suffix;
+        $video = fridge_external_video_embed_data($url);
+        return $video === null ? $candidate : fridge_external_video_embed_html($video) . $suffix;
     }, $text) ?? $text;
 }
 
-function fridg3_embed_plain_video_links_in_html(string $html): string
+function fridge_embed_plain_video_links_in_html(string $html): string
 {
     $parts = preg_split('/(<[^>]+>)/s', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
     if (!is_array($parts)) {
@@ -87,7 +87,7 @@ function fridg3_embed_plain_video_links_in_html(string $html): string
     foreach ($parts as $index => $part) {
         if ($part === '' || $part[0] !== '<') {
             if ($depth === 0) {
-                $parts[$index] = fridg3_embed_plain_video_urls_in_text($part);
+                $parts[$index] = fridge_embed_plain_video_urls_in_text($part);
             }
             continue;
         }

@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/toast.php';
 
-function fridg3_bot_mode_path_allowed(string $path): bool {
+function fridge_bot_mode_path_allowed(string $path): bool {
     $path = rawurldecode(explode('?', $path, 2)[0]);
     $parts = [];
     foreach (explode('/', $path) as $part) {
@@ -18,8 +18,8 @@ function fridg3_bot_mode_path_allowed(string $path): bool {
     return in_array($path, ['/api/debug-process-logs', '/api/settings', '/api/toast-credentials', '/api/toast-models', '/api/toast-feed-generate', '/api/toast-feed-reply', '/api/feed-post', '/api/feed-usernames', '/api/page-view', '/api/themes', '/api/account/is-admin', '/api/discord-bot-status', '/api/stream-proxy', '/api/ip-restriction', '/api/hard-ban-check', '/api/discord-bot-control', '/api/discord-bot-control/status'], true);
 }
 
-function fridg3_enforce_bot_mode(): void {
-    if (!fridg3_toast_is_current_user() || fridg3_bot_mode_path_allowed((string)($_SERVER['REQUEST_URI'] ?? '/'))) return;
+function fridge_enforce_bot_mode(): void {
+    if (!fridge_toast_is_current_user() || fridge_bot_mode_path_allowed((string)($_SERVER['REQUEST_URI'] ?? '/'))) return;
     header('Cache-Control: no-store');
     if (str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/api/')) {
         http_response_code(403);
@@ -31,7 +31,7 @@ function fridg3_enforce_bot_mode(): void {
     exit;
 }
 
-function fridg3_bot_mode_disable_links(string $html, array $allowed): string {
+function fridge_bot_mode_disable_links(string $html, array $allowed): string {
     return preg_replace_callback('~<a\b([^>]*href="([^"]+)"[^>]*)>(.*?)</a>~is', static function(array $m) use ($allowed): string {
         $path = rtrim((string)parse_url(html_entity_decode($m[2]), PHP_URL_PATH), '/') ?: '/';
         if (in_array($path, $allowed, true)) return $m[0];
@@ -41,12 +41,12 @@ function fridg3_bot_mode_disable_links(string $html, array $allowed): string {
     }, $html);
 }
 
-function fridg3_bot_mode_template(string $template): string {
-    $active = fridg3_toast_is_current_user();
-    $runtime = '<meta name="fridg3-bot-mode" content="' . ($active ? '1' : '0') . '"><script defer src="/js/bot-mode.js?v=20260909-1"></script>';
+function fridge_bot_mode_template(string $template): string {
+    $active = fridge_toast_is_current_user();
+    $runtime = '<meta name="fridge-bot-mode" content="' . ($active ? '1' : '0') . '"><script defer src="/js/bot-mode.js?v=20260915-namespace-1"></script>';
     $template = str_replace('</head>', $runtime . '</head>', $template);
     if (!$active) return $template;
-    $template = fridg3_bot_mode_disable_links($template, ['/', '/feed', '/settings', '/account', '/account/logout', '/others']);
+    $template = fridge_bot_mode_disable_links($template, ['/', '/feed', '/settings', '/account', '/account/logout', '/others']);
     if (preg_match('/<body\b[^>]*\bclass=["\']/', $template)) {
         $template = preg_replace('/(<body\b[^>]*\bclass=["\'])/', '$1bot-mode ', $template, 1);
     } else {

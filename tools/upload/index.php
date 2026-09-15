@@ -5,12 +5,12 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
-fridg3_refresh_current_user_posting_restriction();
+fridge_start_session();
+fridge_refresh_current_user_posting_restriction();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 
-$uploadPostingRestricted = fridg3_current_user_posting_restricted();
-$uploadIpBanned = fridg3_feed_is_ip_banned(fridg3_feed_client_ip());
+$uploadPostingRestricted = fridge_current_user_posting_restricted();
+$uploadIpBanned = fridge_feed_is_current_client_ip_banned();
 $uploadAccessBlocked = $uploadPostingRestricted || $uploadIpBanned;
 
 const UPLOAD_ROOM_TTL_SECONDS = 86400;
@@ -418,9 +418,9 @@ if (!$content_path) {
 $content = file_get_contents($content_path);
 if ($uploadAccessBlocked) {
     $restrictionNotice = $uploadPostingRestricted
-        ? fridg3_posting_restriction_notice()
+        ? fridge_posting_restriction_notice()
         : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
-    $content = fridg3_disable_composer_controls($content);
+    $content = fridge_disable_composer_controls($content);
     $content = str_replace('<div class="upload-app" data-upload-app>', $restrictionNotice . '<div class="upload-app" data-upload-app data-access-blocked>', $content);
     $content = preg_replace('/<script>.*?<\/script>/s', '', $content) ?? $content;
 }

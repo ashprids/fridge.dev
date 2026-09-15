@@ -1,26 +1,26 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/notification-revision.php';
-function fridg3_targeted_notifications_path(): string { return dirname(__DIR__) . '/data/etc/targeted-notifications.json'; }
-function fridg3_targeted_notifications_load(): array {
-    $path = fridg3_targeted_notifications_path();
+function fridge_targeted_notifications_path(): string { return dirname(__DIR__) . '/data/etc/targeted-notifications.json'; }
+function fridge_targeted_notifications_load(): array {
+    $path = fridge_targeted_notifications_path();
     $decoded = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
     return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
 }
-function fridg3_targeted_notifications_save(array $records): bool {
-    $path = fridg3_targeted_notifications_path();
+function fridge_targeted_notifications_save(array $records): bool {
+    $path = fridge_targeted_notifications_path();
     if (!is_dir(dirname($path))) @mkdir(dirname($path), 0775, true);
     $encoded = json_encode(array_values($records), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $saved = $encoded !== false && @file_put_contents($path, $encoded, LOCK_EX) !== false;
-    if ($saved) fridg3_notification_revision_touch();
+    if ($saved) fridge_notification_revision_touch();
     return $saved;
 }
 
-function fridg3_targeted_notifications_notify_admins(string $title, string $message, string $url, string $date, string $idSeed): bool {
+function fridge_targeted_notifications_notify_admins(string $title, string $message, string $url, string $date, string $idSeed): bool {
     $accountsPath = dirname(__DIR__) . '/data/accounts/accounts.json';
     $accountsData = is_file($accountsPath) ? json_decode((string)@file_get_contents($accountsPath), true) : [];
     $accounts = is_array($accountsData) ? (array)($accountsData['accounts'] ?? []) : [];
-    $records = fridg3_targeted_notifications_load();
+    $records = fridge_targeted_notifications_load();
     $adminCount = 0;
     foreach ($accounts as $account) {
         if (!is_array($account) || !filter_var($account['isAdmin'] ?? false, FILTER_VALIDATE_BOOLEAN)) continue;
@@ -29,13 +29,13 @@ function fridg3_targeted_notifications_notify_admins(string $title, string $mess
         $records[] = ['id' => $idSeed . '-' . substr(hash('sha256', $username), 0, 12), 'targetType' => 'user', 'target' => $username, 'title' => $title, 'message' => $message, 'url' => $url, 'date' => $date];
         $adminCount++;
     }
-    return $adminCount === 0 || fridg3_targeted_notifications_save($records);
+    return $adminCount === 0 || fridge_targeted_notifications_save($records);
 }
 
-function fridg3_targeted_notifications_notify_user(string $username, string $title, string $message, string $url, string $date, string $idSeed): bool {
+function fridge_targeted_notifications_notify_user(string $username, string $title, string $message, string $url, string $date, string $idSeed): bool {
     $username = strtolower(ltrim(trim($username), '@'));
     if ($username === '') return false;
-    $records = fridg3_targeted_notifications_load();
+    $records = fridge_targeted_notifications_load();
     $id = $idSeed . '-' . substr(hash('sha256', $username), 0, 12);
     foreach ($records as $record) {
         if ((string)($record['id'] ?? '') === $id) return true;
@@ -49,14 +49,14 @@ function fridg3_targeted_notifications_notify_user(string $username, string $tit
         'url' => $url,
         'date' => $date,
     ];
-    return fridg3_targeted_notifications_save($records);
+    return fridge_targeted_notifications_save($records);
 }
 
-function fridg3_targeted_notifications_replace_user_group(string $username, string $group, string $title, string $message, string $url, string $date, string $idSeed): bool {
+function fridge_targeted_notifications_replace_user_group(string $username, string $group, string $title, string $message, string $url, string $date, string $idSeed): bool {
     $username = strtolower(ltrim(trim($username), '@'));
     $group = trim($group);
     if ($username === '' || $group === '') return false;
-    $records = array_values(array_filter(fridg3_targeted_notifications_load(), static function (array $record) use ($username, $group): bool {
+    $records = array_values(array_filter(fridge_targeted_notifications_load(), static function (array $record) use ($username, $group): bool {
         return !(
             (string)($record['targetType'] ?? '') === 'user'
             && strtolower((string)($record['target'] ?? '')) === $username
@@ -80,10 +80,10 @@ function fridg3_targeted_notifications_replace_user_group(string $username, stri
         'url' => $url,
         'date' => $date,
     ];
-    return fridg3_targeted_notifications_save($records);
+    return fridge_targeted_notifications_save($records);
 }
 
-function fridg3_targeted_notifications_replace_admin_group(string $group, string $title, string $message, string $url, string $date, string $idSeed): bool {
+function fridge_targeted_notifications_replace_admin_group(string $group, string $title, string $message, string $url, string $date, string $idSeed): bool {
     $accountsPath = dirname(__DIR__) . '/data/accounts/accounts.json';
     $accountsData = is_file($accountsPath) ? json_decode((string)@file_get_contents($accountsPath), true) : [];
     $accounts = is_array($accountsData) ? (array)($accountsData['accounts'] ?? []) : [];
@@ -92,7 +92,7 @@ function fridg3_targeted_notifications_replace_admin_group(string $group, string
         if (!is_array($account) || !filter_var($account['isAdmin'] ?? false, FILTER_VALIDATE_BOOLEAN)) continue;
         $username = (string)($account['username'] ?? '');
         if ($username === '') continue;
-        $ok = fridg3_targeted_notifications_replace_user_group($username, $group, $title, $message, $url, $date, $idSeed) && $ok;
+        $ok = fridge_targeted_notifications_replace_user_group($username, $group, $title, $message, $url, $date, $idSeed) && $ok;
     }
     return $ok;
 }

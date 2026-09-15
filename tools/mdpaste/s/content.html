@@ -103,7 +103,7 @@
         right: 0;
     }
 
-    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle)) {
+    body .mdpaste-paste-actions :is(#mdpaste-font-toggle, #mdpaste-format-toggle) {
         width: 26px;
         height: 26px;
         padding: 0;
@@ -115,9 +115,9 @@
         cursor: pointer;
     }
 
-    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle)):hover,
-    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle)):focus-visible,
-    .mdpaste-paste-actions button:where(:not(#mdpaste-font-toggle))[aria-pressed="true"] {
+    body .mdpaste-paste-actions :is(#mdpaste-font-toggle, #mdpaste-format-toggle):hover,
+    body .mdpaste-paste-actions :is(#mdpaste-font-toggle, #mdpaste-format-toggle):focus-visible,
+    body .mdpaste-paste-actions :is(#mdpaste-font-toggle, #mdpaste-format-toggle)[aria-pressed="true"] {
         background: rgba(255, 255, 255, 0.06) !important;
         color: var(--fg) !important;
         outline: none;
@@ -338,4 +338,4 @@
     {paste_content}
 </div>
 
-<script src="/tools/mdpaste/render.js?v=20260811-markdown-front-matter-highlighting-1"></script>
+<script src="/tools/mdpaste/render.js?v=20260915-namespace-1"></script>

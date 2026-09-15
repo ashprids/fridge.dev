@@ -1,10 +1,10 @@
 <?php
 
-function fridg3_default_fruity_dance_animations(): array {
+function fridge_default_fruity_dance_animations(): array {
     return ['waiting', 'stepping', 'jumping', 'zombie', 'waving', 'hula', 'windmill', 'zitabata', 'dervish', 'held'];
 }
 
-function fridg3_fruity_dance_spritesheets(?string $root = null): array {
+function fridge_fruity_dance_spritesheets(?string $root = null): array {
     $root ??= dirname(__DIR__);
     $directory = $root . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . 'fruity-dance';
     if (!is_dir($directory)) return [];
@@ -17,7 +17,7 @@ function fridg3_fruity_dance_spritesheets(?string $root = null): array {
         $label = pathinfo($filename, PATHINFO_FILENAME);
         $label = trim(preg_replace('/[_-]+/', ' ', $label));
         $description = 'idle animation preview';
-        $animations = fridg3_default_fruity_dance_animations();
+        $animations = fridge_default_fruity_dance_animations();
         $metaPath = $directory . DIRECTORY_SEPARATOR . pathinfo($filename, PATHINFO_FILENAME) . '.txt';
         if (is_file($metaPath)) {
             $lines = preg_split('/\R/', (string)file_get_contents($metaPath));
@@ -40,14 +40,14 @@ function fridg3_fruity_dance_spritesheets(?string $root = null): array {
     return $sheets;
 }
 
-function fridg3_default_fruity_dance_spritesheet(?string $root = null): string {
-    $sheets = fridg3_fruity_dance_spritesheets($root);
+function fridge_default_fruity_dance_spritesheet(?string $root = null): string {
+    $sheets = fridge_fruity_dance_spritesheets($root);
     if (isset($sheets['fl_chan.png'])) return 'fl_chan.png';
     return (string)(array_key_first($sheets) ?? 'fl_chan.png');
 }
 
-function fridg3_normalize_fruity_dance_spritesheet($value, ?string $root = null): string {
+function fridge_normalize_fruity_dance_spritesheet($value, ?string $root = null): string {
     $filename = basename((string)$value);
-    $sheets = fridg3_fruity_dance_spritesheets($root);
-    return isset($sheets[$filename]) ? $filename : fridg3_default_fruity_dance_spritesheet($root);
+    $sheets = fridge_fruity_dance_spritesheets($root);
+    return isset($sheets[$filename]) ? $filename : fridge_default_fruity_dance_spritesheet($root);
 }

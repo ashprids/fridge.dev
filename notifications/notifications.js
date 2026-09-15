@@ -79,7 +79,7 @@
         if (parsedDate) {
             date.dateTime = parsedDate.toISOString();
             date.textContent = notificationDateLabel(parsedDate);
-            date.dataset.tooltip = parsedDate.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'medium' });
+            date.dataset.exactDatetime = parsedDate.toISOString();
         } else {
             date.textContent = event.date || '';
         }
@@ -369,7 +369,7 @@
     window.initNotificationsPage = initNotificationsPage;
     if (!window.__notificationsRealtimePageBound) {
         window.__notificationsRealtimePageBound = true;
-        window.addEventListener('fridg3:new-notifications', () => {
+        window.addEventListener('fridge:new-notifications', () => {
             if (!window.location.pathname.startsWith('/notifications')) return;
             if (typeof loadPageIntoContent === 'function') {
                 loadPageIntoContent(window.location.pathname + window.location.search, false);

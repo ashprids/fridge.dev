@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'fruity-dance.php';
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
     $username = (string)$_SESSION['user']['username'];
-    $isToast = fridg3_toast_is_current_user();
+    $isToast = fridge_toast_is_current_user();
     $accountsPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'accounts' . DIRECTORY_SEPARATOR . 'accounts.json';
     $data = $isToast ? ['accounts' => []] : load_accounts_data($accountsPath);
     if ($data === null) {
@@ -62,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode(['ok' => false, 'error' => 'accounts_invalid']);
         exit;
     }
-    $defaultFruityDanceSheet = fridg3_default_fruity_dance_spritesheet(dirname(__DIR__, 2));
-    $fruityDanceSheets = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2));
+    $defaultFruityDanceSheet = fridge_default_fruity_dance_spritesheet(dirname(__DIR__, 2));
+    $fruityDanceSheets = fridge_fruity_dance_spritesheets(dirname(__DIR__, 2));
     $result = [
         'ok' => true,
         'settings' => [
@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'onekoEnabled' => null,
             'fruityDanceEnabled' => false,
             'fruityDanceSpritesheet' => $defaultFruityDanceSheet,
-            'fruityDanceAnimations' => $fruityDanceSheets[$defaultFruityDanceSheet]['animations'] ?? fridg3_default_fruity_dance_animations(),
+            'fruityDanceAnimations' => $fruityDanceSheets[$defaultFruityDanceSheet]['animations'] ?? fridge_default_fruity_dance_animations(),
             'fruityDanceLoop' => 0,
             'fruityDanceSpeed' => 100,
             'fruityDanceReflection' => 30,
@@ -86,11 +86,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         ],
     ];
     if (isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true) {
-        $result['settings']['enforceHardBans'] = fridg3_hard_ban_enforcement_enabled();
-        $result['settings']['strictHardBans'] = fridg3_hard_ban_strict_enabled();
+        $result['settings']['enforceHardBans'] = fridge_hard_ban_enforcement_enabled();
+        $result['settings']['strictHardBans'] = fridge_hard_ban_strict_enabled();
     }
     if ($isToast) {
-        $personality = fridg3_toast_load_personality_config();
+        $personality = fridge_toast_load_personality_config();
         $result['settings']['toastPersonalityJson'] = json_encode($personality, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
     foreach ($data['accounts'] as $account) {
@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             if (isset($account['colors']) && is_array($account['colors'])) {
                 $result['settings']['colors'] = $account['colors'];
             }
-            $result['settings']['themeAccents'] = (object)fridg3_normalize_theme_accents($account['themeAccents'] ?? []);
+            $result['settings']['themeAccents'] = (object)fridge_normalize_theme_accents($account['themeAccents'] ?? []);
             if (array_key_exists('onekoEnabled', $account)) {
                 $result['settings']['onekoEnabled'] = is_truthy_setting($account['onekoEnabled']);
             }
@@ -109,12 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 $result['settings']['fruityDanceEnabled'] = is_truthy_setting($account['fruityDanceEnabled']);
             }
             if (isset($account['fruityDanceSpritesheet'])) {
-                $result['settings']['fruityDanceSpritesheet'] = fridg3_normalize_fruity_dance_spritesheet($account['fruityDanceSpritesheet'], dirname(__DIR__, 2));
-                $sheets = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2));
-                $result['settings']['fruityDanceAnimations'] = $sheets[$result['settings']['fruityDanceSpritesheet']]['animations'] ?? fridg3_default_fruity_dance_animations();
+                $result['settings']['fruityDanceSpritesheet'] = fridge_normalize_fruity_dance_spritesheet($account['fruityDanceSpritesheet'], dirname(__DIR__, 2));
+                $sheets = fridge_fruity_dance_spritesheets(dirname(__DIR__, 2));
+                $result['settings']['fruityDanceAnimations'] = $sheets[$result['settings']['fruityDanceSpritesheet']]['animations'] ?? fridge_default_fruity_dance_animations();
             }
             if (isset($account['fruityDanceLoop']) && is_numeric($account['fruityDanceLoop'])) {
-                $animationCount = count($result['settings']['fruityDanceAnimations'] ?? fridg3_default_fruity_dance_animations());
+                $animationCount = count($result['settings']['fruityDanceAnimations'] ?? fridge_default_fruity_dance_animations());
                 $result['settings']['fruityDanceLoop'] = max(0, min(max(0, $animationCount - 1), (int)$account['fruityDanceLoop']));
             }
             if (isset($account['fruityDanceSpeed']) && is_numeric($account['fruityDanceSpeed'])) {
@@ -178,7 +178,7 @@ if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
 
 $username = (string)$_SESSION['user']['username'];
 $isAdmin = isset($_SESSION['user']['isAdmin']) && $_SESSION['user']['isAdmin'] === true;
-$isToast = fridg3_toast_is_current_user();
+$isToast = fridge_toast_is_current_user();
 
 $intensityProvided = array_key_exists('glowIntensity', $_POST);
 $intensity = $intensityProvided ? strtolower(trim((string)$_POST['glowIntensity'])) : null;
@@ -234,7 +234,7 @@ $toastPersonalityProvided = array_key_exists('toastPersonalityJson', $_POST);
 $toastPersonalityRaw = $toastPersonalityProvided ? (string)$_POST['toastPersonalityJson'] : null;
 
 $allowedIntensity = ['none', 'medium'];
-$availableThemes = function_exists('fridg3_list_themes') ? fridg3_list_themes(dirname(__DIR__, 2)) : [];
+$availableThemes = function_exists('fridge_list_themes') ? fridge_list_themes(dirname(__DIR__, 2)) : [];
 $allowedThemes = array_merge(['default'], array_keys($availableThemes));
 $colorFields = ['bg', 'fg', 'border', 'subtle', 'links'];
 $themeColorFields = [
@@ -251,7 +251,7 @@ if ($themeAccentsProvided) {
     $rawAccents = $_POST['themeAccents'];
     $accentObject = is_string($rawAccents) ? json_decode($rawAccents) : null;
     $accentValues = is_object($accentObject) ? (array)$accentObject : [];
-    $validThemeAccents = fridg3_normalize_theme_accents($accentValues);
+    $validThemeAccents = fridge_normalize_theme_accents($accentValues);
     if (!$accentValues || count($validThemeAccents) !== count($accentValues)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'invalid_theme_accents']);
@@ -274,7 +274,7 @@ if ($toastPersonalityProvided) {
     }
 
     $personalityError = null;
-    if (!fridg3_toast_save_personality_config($decoded, $personalityError)) {
+    if (!fridge_toast_save_personality_config($decoded, $personalityError)) {
         http_response_code(400);
         echo json_encode([
             'ok' => false,
@@ -340,7 +340,7 @@ if ($fruityDanceEnabledProvided || $fruityDanceSpritesheetProvided || $fruityDan
         $fruityDanceValues['fruityDanceEnabled'] = in_array($lower, $truthy, true);
     }
     if ($fruityDanceSpritesheetProvided) {
-        $availableSpritesheets = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2));
+        $availableSpritesheets = fridge_fruity_dance_spritesheets(dirname(__DIR__, 2));
         if (!isset($availableSpritesheets[$fruityDanceSpritesheetRaw])) {
             http_response_code(400);
             echo json_encode(['ok' => false, 'error' => 'invalid_fruity_dance_spritesheet']);
@@ -350,7 +350,7 @@ if ($fruityDanceEnabledProvided || $fruityDanceSpritesheetProvided || $fruityDan
     }
     $fruityDanceLoopMaximum = 255;
     if ($fruityDanceSpritesheetProvided) {
-        $requestedSheet = fridg3_fruity_dance_spritesheets(dirname(__DIR__, 2))[$fruityDanceSpritesheetRaw] ?? null;
+        $requestedSheet = fridge_fruity_dance_spritesheets(dirname(__DIR__, 2))[$fruityDanceSpritesheetRaw] ?? null;
         if ($requestedSheet) $fruityDanceLoopMaximum = max(0, count($requestedSheet['animations']) - 1);
     }
     $integerInputs = [
@@ -550,15 +550,15 @@ if ($titleAnimationProvided || $titleAnimationAlwaysProvided || $titleAnimationD
 // Theme selection is device-local. Keep accepting this field for older clients,
 // but never read or write accounts.json for it.
 if ($themeProvided) {
-    $theme = function_exists('fridg3_normalize_theme_id') ? fridg3_normalize_theme_id($theme) : (string)$theme;
+    $theme = function_exists('fridge_normalize_theme_id') ? fridge_normalize_theme_id($theme) : (string)$theme;
     if (!in_array($theme, $allowedThemes, true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'invalid_theme']);
         exit;
     }
 
-    if (function_exists('fridg3_get_theme_cookie_options')) {
-        setcookie('theme_pref', $theme, fridg3_get_theme_cookie_options());
+    if (function_exists('fridge_get_theme_cookie_options')) {
+        setcookie('theme_pref', $theme, fridge_get_theme_cookie_options());
         $_COOKIE['theme_pref'] = $theme;
     }
     $didWork = true;
@@ -618,8 +618,8 @@ if (!empty($_POST['colors']) && is_array($_POST['colors'])) {
 if (!empty($colors)) {
     $colorTheme = $themeProvided ? $theme : null;
     if ($colorTheme === null && isset($_COOKIE['theme_pref'])) {
-        $colorTheme = function_exists('fridg3_normalize_theme_id')
-            ? fridg3_normalize_theme_id($_COOKIE['theme_pref'])
+        $colorTheme = function_exists('fridge_normalize_theme_id')
+            ? fridge_normalize_theme_id($_COOKIE['theme_pref'])
             : (string)$_COOKIE['theme_pref'];
     }
 }
@@ -679,7 +679,7 @@ if ($themeAccentsProvided) {
     foreach ($data['accounts'] as &$account) {
         if (($account['username'] ?? null) !== $username) continue;
         $account['themeAccents'] = array_merge(
-            fridg3_normalize_theme_accents($account['themeAccents'] ?? []),
+            fridge_normalize_theme_accents($account['themeAccents'] ?? []),
             $validThemeAccents
         );
         $updated = true;
@@ -740,7 +740,7 @@ if ($enforceHardBansProvided) {
         echo json_encode(['ok' => false, 'error' => 'invalid_enforce_hard_bans_value']);
         exit;
     }
-    if (!fridg3_hard_ban_set_enforcement_enabled(in_array($lower, $truthy, true))) {
+    if (!fridge_hard_ban_set_enforcement_enabled(in_array($lower, $truthy, true))) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => 'hard_ban_settings_write_failed']);
         exit;
@@ -763,7 +763,7 @@ if ($strictHardBansProvided) {
         echo json_encode(['ok' => false, 'error' => 'invalid_strict_hard_bans_value']);
         exit;
     }
-    if (!fridg3_hard_ban_set_strict_enabled(in_array($lower, $truthy, true))) {
+    if (!fridge_hard_ban_set_strict_enabled(in_array($lower, $truthy, true))) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => 'hard_ban_settings_write_failed']);
         exit;

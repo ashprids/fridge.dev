@@ -5,7 +5,7 @@ $root = dirname(__DIR__, 2);
 require_once $root . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
 require_once $root . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once $root . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mdpaste' . DIRECTORY_SEPARATOR . 'lib.php';
-fridg3_start_session();
+fridge_start_session();
 
 $pageTitle = isset($markdownPageTitle) ? (string)$markdownPageTitle : 'Markdown formatting';
 $pageDescription = isset($markdownPageDescription) ? (string)$markdownPageDescription : 'Markdown formatting supported by fridge.dev.';
@@ -23,7 +23,7 @@ if ($renderer === 'feed') {
     $flushSection = static function () use (&$renderedParts, &$sectionLines): void {
         if ($sectionLines === []) return;
         $section = trim(implode("\n", $sectionLines));
-        if ($section !== '') $renderedParts[] = fridg3_feed_render_post_body($section, 'v2');
+        if ($section !== '') $renderedParts[] = fridge_feed_render_post_body($section, 'v2');
         $sectionLines = [];
     };
     foreach (explode("\n", str_replace(["\r\n", "\r"], "\n", $markdown)) as $line) {

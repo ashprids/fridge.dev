@@ -4,13 +4,15 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
-fridg3_feed_refresh_session_user();
+fridge_feed_refresh_session_user();
 
 $title = 'feed';
 $description = 'short snippets and updates.';
 $pageSizeDefault = 10;
+if (!isset($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$accountsData = fridge_feed_load_accounts();
 
 function render_feed_pagination(int $currentPage, int $totalPages, string $searchQuery): string {
     if ($totalPages <= 1) {
@@ -111,7 +113,7 @@ $postsDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATO
 $postsHtml = '';
 $paginationHtml = '';
 $postsData = [];
-$feedPostIps = fridg3_feed_load_post_ips();
+$feedPostIps = fridge_feed_load_post_ips();
 $viewerIsAdmin = !empty($_SESSION['user']['isAdmin']);
 $viewerIsModerator = !empty($_SESSION['user']['isModerator']);
 
@@ -163,7 +165,7 @@ if (is_dir($postsDir)) {
     foreach ($files as $file) {
         $raw = @file_get_contents($file);
         if ($raw === false) continue;
-        $parsedPost = fridg3_feed_parse_post($raw);
+        $parsedPost = fridge_feed_parse_post($raw);
         $username = $parsedPost['username'];
         $dateLine = $parsedPost['date'];
         $body = $parsedPost['body'];
@@ -223,10 +225,10 @@ if (is_dir($postsDir)) {
         $body = $p['body'];
 
         $safeUser = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
-        $ago = fridg3_feed_humanize_datetime($dateLine);
+        $ago = fridge_feed_humanize_datetime($dateLine);
         $safeAgo = htmlspecialchars($ago, ENT_QUOTES, 'UTF-8');
         // Escape body so browser treats it as text; BBCode parser will transform later
-        $safeBody = fridg3_feed_render_post_body($body, (string)($p['format'] ?? 'legacy'));
+        $safeBody = fridge_feed_render_post_body($body, (string)($p['format'] ?? 'legacy'));
 
         // Determine if current user can edit this post (owner or admin)
         $canEdit = false;
@@ -234,23 +236,27 @@ if (is_dir($postsDir)) {
             $currentUser = $_SESSION['user']['username'] ?? '';
             $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
             $canEdit = ($currentUser === $username) || $isAdmin
-                || ($viewerIsModerator && !fridg3_feed_account_is_admin($username));
+                || ($viewerIsModerator && !fridge_feed_account_is_admin($username));
         }
 
         // Build edit icon if allowed
         $editIcon = '';
         $postId = urlencode(basename($p['file'], '.txt'));
         $postIdRaw = basename($p['file'], '.txt');
-        $replyCount = count(fridg3_feed_load_replies($postIdRaw));
+        $replyCount = count(fridge_feed_load_replies($postIdRaw));
         $replyMeta = '<span class="feed-reply-count"><i class="fa-regular fa-comment"></i> ' . $replyCount . '</span>';
 
         // Determine if this post is bookmarked for the current user
         $isBookmarked = in_array($postIdRaw, $userBookmarks, true);
         $bookmarkIconClass = $isBookmarked ? 'fa-solid' : 'fa-regular';
         $postIp = (string)($feedPostIps[$postIdRaw]['ip'] ?? '');
-        $canModeratePostAuthor = $viewerIsAdmin || ($viewerIsModerator && !fridg3_feed_account_is_admin($username));
+        $canModeratePostAuthor = $viewerIsAdmin || ($viewerIsModerator && !fridge_feed_account_is_admin($username));
         $hasManageablePostIp = $canModeratePostAuthor && filter_var($postIp, FILTER_VALIDATE_IP);
-        if ($canEdit || $hasManageablePostIp) {
+        $postAuthorAccount = null;
+        foreach ($accountsData['accounts'] ?? [] as $candidateAccount) if (strcasecmp((string)($candidateAccount['username'] ?? ''), ltrim($username, '@')) === 0) { $postAuthorAccount = $candidateAccount; break; }
+        $canViewAuthorContent = $postAuthorAccount !== null && ($viewerIsAdmin || $viewerIsModerator);
+        $canBanAuthorAccount = $canViewAuthorContent && empty($postAuthorAccount['isAdmin']) && empty($postAuthorAccount['isModerator']);
+        if ($canEdit || $hasManageablePostIp || $canViewAuthorContent) {
             // Use a span with a data-edit-href attribute instead of a nested
             // anchor so we don't produce invalid <a><a> markup inside the
             // outer feed-post link. JS will handle navigation.
@@ -261,6 +267,12 @@ if (is_dir($postsDir)) {
             }
             if ($hasManageablePostIp) {
                 $editIcon .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($postIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
+            }
+            if ($viewerIsAdmin && $postAuthorAccount !== null) $editIcon .= '<a class="site-action-menu-item" href="/account/admin/edit?username=' . rawurlencode((string)$postAuthorAccount['username']) . '"><i class="fa-solid fa-user-gear"></i><span>manage account</span></a>';
+            if ($canViewAuthorContent) $editIcon .= '<a class="site-action-menu-item" href="/settings/guests/?account=' . rawurlencode((string)$postAuthorAccount['username']) . '"><i class="fa-solid fa-layer-group"></i><span>view all user content</span></a>';
+            if ($canBanAuthorAccount) {
+                $alreadyBanned = !empty($postAuthorAccount['accountBanned']);
+                $editIcon .= '<form class="site-action-menu-form" method="post" action="/settings/guests/" data-no-spa="1" data-site-confirm="1" ' . (!$alreadyBanned ? 'data-ban-reason-prompt="1" ' : '') . 'data-confirm-title="' . ($alreadyBanned ? 'unban' : 'ban') . ' account?" data-confirm-detail="this updates the account and all associated IP addresses." data-confirm-text="' . ($alreadyBanned ? 'unban' : 'ban') . '" data-cancel-text="cancel"><input type="hidden" name="csrf_token" value="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '"><input type="hidden" name="action" value="' . ($alreadyBanned ? 'unban_account' : 'ban_account') . '"><input type="hidden" name="username" value="' . htmlspecialchars((string)$postAuthorAccount['username'], ENT_QUOTES, 'UTF-8') . '"><button type="submit" class="site-action-menu-item"><i class="fa-solid fa-ban"></i><span>' . ($alreadyBanned ? 'unban' : 'ban') . '</span></button></form>';
             }
             if ($canEdit) {
                 $editIcon .= '<form class="site-action-menu-form" method="post" action="/feed/edit?post=' . $postId . '.txt" data-no-spa="1" data-site-confirm="1" data-confirm-title="delete feed post?" data-confirm-detail="this removes the feed post, attached media, voice notes, and replies." data-confirm-text="delete" data-cancel-text="cancel">'
@@ -283,7 +295,7 @@ if (is_dir($postsDir)) {
             . '<div id="post" style="cursor: pointer;">'
             . '<div id="post-header">'
             . '<span id="post-username"' . $postUserIpAttribute . '>@' . $safeUser . '</span>'
-            . '<span id="post-date-feed">' . $safeAgo . ' • ' . $replyMeta . ' • ' . $editIcon . '<span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="' . $bookmarkIconClass . ' fa-bookmark"></i></span></span>'
+            . '<span id="post-date-feed" data-exact-datetime="' . htmlspecialchars((string)$p['date'], ENT_QUOTES, 'UTF-8') . '">' . $safeAgo . ' • ' . $replyMeta . ' • ' . $editIcon . '<span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="' . $bookmarkIconClass . ' fa-bookmark"></i></span></span>'
             . '</div>'
             . (($p['format'] ?? 'legacy') === 'v2' ? $safeBody : '<span id="post-content">' . $safeBody . '</span>')
             . '</div>'

@@ -1938,7 +1938,7 @@ hr {
 }
 
 .bbcode-btn {
-    background-color: transparent;
+    background-color: color-mix(in srgb, var(--bg) 82%, #000);
     color: var(--fg);
     border: 1px solid var(--border);
     padding: 6px 10px;
@@ -3466,3 +3466,4 @@ body.mobile-template #footer-buttons {
         color-mix(in srgb, var(--bg) 88%, var(--fg) 12%) !important;
 }
 body.classic-theme .content-pagination .guestbook-page-btn { border-radius: 0; }
+body.classic-theme button.site-action-menu-item{background:transparent!important;color:var(--fg)!important;border:0!important;border-radius:2px!important}body.classic-theme button.site-action-menu-item:hover{background:color-mix(in srgb,var(--links) 22%,transparent)!important;color:var(--fg)!important}body.classic-theme .site-icon-button{background:transparent!important;color:var(--subtle)!important;border:0!important}

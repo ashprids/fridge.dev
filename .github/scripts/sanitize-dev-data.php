@@ -171,7 +171,7 @@ function sanitizeFeedReplies(string $root): void
 
                 if (!empty($reply['isGuest'])) {
                     $reply['ip'] = '';
-                    unset($reply['guestBrowserId']);
+                    unset($reply['guestBrowserId'], $reply['originalBody']);
                 }
 
                 $reply = scrubIpValues($reply);
@@ -302,6 +302,7 @@ $webhooks = readJsonObject($root, 'etc/webhooks.json');
 writeJson($root, 'etc/webhooks.json', blankScalarValues($webhooks));
 
 writeJson($root, 'guestbook/ip_index.json', new stdClass());
+writeJson($root, 'guestbook/filtered_originals.json', new stdClass());
 sanitizeGuestbookEntries($root);
 writeJson($root, 'feed/banned_ips.json', []);
 writeJson($root, 'etc/banned-ip-content.json', []);
@@ -335,6 +336,13 @@ file_put_contents(
     "USER:admin\nDevelopment placeholder draft\nThis draft exists so local journal draft views have harmless sample content.\nFORMAT:html\n<p>This is placeholder development content.</p>\n",
     LOCK_EX
 );
+
+// Restore tooling uses this marker to reject privacy-redacted developer data
+// before it can be mistaken for a complete production backup.
+writeJson($root, '.development-copy.json', [
+    'type' => 'fridge.dev-development-data',
+    'version' => 1,
+]);
 
 // Fail closed if a privacy rule above is accidentally weakened later.
 assertPathAbsent($root, 'etc/access.json');

@@ -6,7 +6,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 
 $renderHelperPath = null;
 $searchDir = __DIR__;
@@ -230,7 +230,7 @@ function sysinfo_collect_environment(): array
             'https' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
         ],
         'website' => [
-            'maintenance_enabled' => is_file($wipPath) ? fridg3_is_truthy_value((string)@file_get_contents($wipPath)) : false,
+            'maintenance_enabled' => is_file($wipPath) ? fridge_is_truthy_value((string)@file_get_contents($wipPath)) : false,
             'data_writable' => is_dir($rootDir . DIRECTORY_SEPARATOR . 'data') ? (is_writable($rootDir . DIRECTORY_SEPARATOR . 'data') ? 'yes' : 'no') : 'missing',
             'sitemap_exists' => is_file($rootDir . DIRECTORY_SEPARATOR . 'sitemap.xml'),
             'toast' => is_array($toastData) ? $toastData : null,

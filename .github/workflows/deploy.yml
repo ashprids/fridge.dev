@@ -112,7 +112,7 @@ jobs:
           if ! sudo -n -u "$RUNTIME_USER" php -d memory_limit=128M -r '
           $root = $argv[1];
           require $root . "/lib/hard-ban.php";
-          $index = fridg3_hard_ban_source_index();
+          $index = fridge_hard_ban_source_index();
           if ($index === null) {
               fwrite(STDERR, "hard-ban source index could not be built\n");
               exit(1);

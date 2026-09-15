@@ -154,7 +154,7 @@ body.whiteprint-theme :is(input, textarea, select, .text-input, .dropdown, .bbco
     box-shadow: none !important;
 }
 
-body.whiteprint-theme :is(button:where(:not(#mdpaste-font-toggle)), #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]) {
+body.whiteprint-theme :is(button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)), #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]) {
     background: #e9e7e2 !important;
     background-image: none !important;
     color: var(--fg) !important;
@@ -162,7 +162,11 @@ body.whiteprint-theme :is(button:where(:not(#mdpaste-font-toggle)), #form-button
     box-shadow: none !important;
 }
 
-body.whiteprint-theme :is(button:where(:not(#mdpaste-font-toggle)), #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]):hover {
+body.whiteprint-theme .bbcode-btn {
+    background: #d8d5d0 !important;
+}
+
+body.whiteprint-theme :is(button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)), #form-button, #two-buttons, .bbcode-btn, input[type="submit"], input[type="button"]):hover {
     background: #d8d5d0 !important;
     color: #302d29 !important;
 }
@@ -550,3 +554,4 @@ html.access-high-contrast body.whiteprint-theme {
     --subtle: #333333 !important;
     --links: #004f47 !important;
 }
+body.whiteprint-theme button.site-action-menu-item{background:transparent!important;color:var(--fg)!important;border:0!important;border-radius:2px!important}body.whiteprint-theme button.site-action-menu-item:hover{background:color-mix(in srgb,var(--links) 22%,transparent)!important;color:var(--fg)!important}body.whiteprint-theme .site-icon-button{background:transparent!important;color:var(--subtle)!important;border:0!important}

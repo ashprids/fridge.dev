@@ -67,6 +67,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function showToastAdminLoginPopup() {
         return new Promise(function(resolve) {
+            const lockedInputs = [usernameInput, passwordInput].filter(Boolean);
+            const inputStates = lockedInputs.map(function(input) {
+                const state = { input: input, readOnly: input.readOnly, ariaReadOnly: input.getAttribute('aria-readonly') };
+                input.readOnly = true;
+                input.setAttribute('aria-readonly', 'true');
+                return state;
+            });
             const overlay = document.createElement('div');
             overlay.className = 'site-popup-overlay';
             overlay.setAttribute('role', 'dialog');
@@ -114,6 +121,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const close = function(value) {
                 document.removeEventListener('keydown', onKeydown);
+                inputStates.forEach(function(state) {
+                    state.input.readOnly = state.readOnly;
+                    if (state.ariaReadOnly === null) state.input.removeAttribute('aria-readonly');
+                    else state.input.setAttribute('aria-readonly', state.ariaReadOnly);
+                });
                 overlay.classList.add('is-closing');
                 window.setTimeout(function() { overlay.remove(); }, 160);
                 resolve(value);

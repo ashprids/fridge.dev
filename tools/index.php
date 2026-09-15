@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $title = 'tools';
 $description = 'some tools and utilities developed for various purposes.';
@@ -54,7 +54,7 @@ if (!$content_path) {
 }
 
 $content = file_get_contents($content_path);
-$content = fridg3_paginate_static_post_list($content, '/tools', max(1, (int)($_GET['page'] ?? 1)), 10);
+$content = fridge_paginate_static_post_list($content, '/tools', max(1, (int)($_GET['page'] ?? 1)), 10);
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);
 $html = str_replace('{description}', $description, $html);

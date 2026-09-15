@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
     header('Location: /account/login');
@@ -145,7 +145,7 @@ function music_upload_cover_art(array $upload, string $albumName, string $images
         return null;
     }
     if ((int)($upload['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-        fridg3_debug_submission_log('[UPLOAD] music cover attachment rejected upload_error=' . (int)($upload['error'] ?? UPLOAD_ERR_OK));
+        fridge_debug_submission_log('[UPLOAD] music cover attachment rejected upload_error=' . (int)($upload['error'] ?? UPLOAD_ERR_OK));
         $error = 'the cover art upload failed.';
         return null;
     }
@@ -159,23 +159,23 @@ function music_upload_cover_art(array $upload, string $albumName, string $images
     }
     $allowedExtensions = ['jpg', 'png', 'gif', 'webp'];
     if ($tmpPath === '' || $size <= 0 || $size > 12000000 || !is_uploaded_file($tmpPath)) {
-        fridg3_debug_submission_log('[UPLOAD] music cover attachment rejected bytes=' . $size . ' reason=invalid_or_too_large');
+        fridge_debug_submission_log('[UPLOAD] music cover attachment rejected bytes=' . $size . ' reason=invalid_or_too_large');
         $error = 'the cover art file is invalid or too large.';
         return null;
     }
     if (!in_array($extension, $allowedExtensions, true) || @getimagesize($tmpPath) === false) {
-        fridg3_debug_submission_log('[UPLOAD] music cover attachment rejected bytes=' . $size . ' reason=unsupported_type');
+        fridge_debug_submission_log('[UPLOAD] music cover attachment rejected bytes=' . $size . ' reason=unsupported_type');
         $error = 'cover art must be jpg, png, gif, or webp.';
         return null;
     }
 
     $coverPath = music_upload_unique_path($imagesDir, $albumName . '-cover', $extension);
     if (!move_uploaded_file($tmpPath, $coverPath)) {
-        fridg3_debug_submission_log('[UPLOAD] music cover attachment failed while saving bytes=' . $size);
+        fridge_debug_submission_log('[UPLOAD] music cover attachment failed while saving bytes=' . $size);
         $error = 'could not save the uploaded cover art.';
         return null;
     }
-    fridg3_debug_submission_log('[UPLOAD] music cover attachment saved bytes=' . (@filesize($coverPath) ?: $size) . ' type=' . $extension);
+    fridge_debug_submission_log('[UPLOAD] music cover attachment saved bytes=' . (@filesize($coverPath) ?: $size) . ' type=' . $extension);
 
     return [
         'path' => $coverPath,
@@ -337,7 +337,7 @@ function music_upload_handle(array $artists, array $releaseTypes, string &$error
             break;
         }
 
-        fridg3_debug_submission_log('[UPLOAD] music track attachment saved track=' . ($i + 1) . ' bytes=' . (@filesize($audioPath) ?: $size) . ' type=' . $extension);
+        fridge_debug_submission_log('[UPLOAD] music track attachment saved track=' . ($i + 1) . ' bytes=' . (@filesize($audioPath) ?: $size) . ' type=' . $extension);
 
         $savedPaths[] = $audioPath;
         $songs[] = [
@@ -347,7 +347,7 @@ function music_upload_handle(array $artists, array $releaseTypes, string &$error
     }
 
     if ($error !== '') {
-        fridg3_debug_submission_log('[UPLOAD] music release upload rolled back saved_tracks=' . count($savedPaths));
+        fridge_debug_submission_log('[UPLOAD] music release upload rolled back saved_tracks=' . count($savedPaths));
         foreach ($savedPaths as $path) {
             @unlink($path);
         }
@@ -374,7 +374,7 @@ function music_upload_handle(array $artists, array $releaseTypes, string &$error
 
     $json = json_encode($release, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
     if (@file_put_contents($jsonPath, $json, LOCK_EX) === false) {
-        fridg3_debug_submission_log('[UPLOAD] music release metadata save failed tracks=' . count($songs));
+        fridge_debug_submission_log('[UPLOAD] music release metadata save failed tracks=' . count($songs));
         foreach ($savedPaths as $path) {
             @unlink($path);
         }
@@ -385,7 +385,7 @@ function music_upload_handle(array $artists, array $releaseTypes, string &$error
         return;
     }
 
-    fridg3_debug_submission_log('[UPLOAD] music release saved tracks=' . count($songs) . ' cover=' . ($savedCoverPath !== '' ? 'yes' : 'no'));
+    fridge_debug_submission_log('[UPLOAD] music release saved tracks=' . count($songs) . ' cover=' . ($savedCoverPath !== '' ? 'yes' : 'no'));
 
     header('Location: /music?uploaded=' . rawurlencode($artistKey));
     exit;

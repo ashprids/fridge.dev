@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 // Clear all session data
 $_SESSION = [];
@@ -32,14 +32,14 @@ if (ini_get('session.use_cookies')) {
         ]);
     }
 
-    if (function_exists('fridg3_clear_legacy_session_cookie')) {
-        fridg3_clear_legacy_session_cookie();
+    if (function_exists('fridge_clear_legacy_session_cookie')) {
+        fridge_clear_legacy_session_cookie();
     }
 }
 
 // Clear admin flag cookie
-$expiredAdminCookie = function_exists('fridg3_session_cookie_options')
-    ? fridg3_session_cookie_options(time() - 3600, false)
+$expiredAdminCookie = function_exists('fridge_session_cookie_options')
+    ? fridge_session_cookie_options(time() - 3600, false)
     : [
         'expires' => time() - 3600,
         'path' => '/',

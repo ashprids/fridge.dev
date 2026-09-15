@@ -38,13 +38,13 @@ with tempfile.TemporaryDirectory() as directory:
     (sandbox / 'lib/toast.php').write_text('<?php require ' + json.dumps(str(root / 'lib/toast.php')) + ';')
     (sandbox / 'lib/session.php').write_text('''<?php
 require __DIR__ . '/toast.php';
-function fridg3_start_session() { $_SESSION['user'] = json_decode(getenv('TEST_USER'), true); }
+function fridge_start_session() { $_SESSION['user'] = json_decode(getenv('TEST_USER'), true); }
 ''')
     php_log = sandbox / 'php.log'
     php_log.write_text('PHP_ONLY\n')
     import os
     def request(user):
-        env = dict(os.environ, TEST_USER=json.dumps(user), FRIDG3_PHP_PROCESS_LOG=str(php_log))
+        env = dict(os.environ, TEST_USER=json.dumps(user), **{'FRIDG3_PHP_PROCESS_LOG': str(php_log)})
         result = subprocess.run(['php', str(endpoint)], env=env, capture_output=True, text=True, check=True)
         assert not result.stderr, result.stderr
         return json.loads(result.stdout)

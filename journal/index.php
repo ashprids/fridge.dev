@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'image-thumbnails.php';
 
@@ -127,7 +127,7 @@ if (!$content_path) {
 
 function journal_first_image_src(string $body): string {
     if (preg_match('/!\[[^\]]*\]\(([^)\s]+)(?:\s+["\'][^"\']*["\'])?\)/', $body, $markdownImage)) {
-        return fridg3_journal_valid_image_src(html_entity_decode($markdownImage[1], ENT_QUOTES, 'UTF-8'));
+        return fridge_journal_valid_image_src(html_entity_decode($markdownImage[1], ENT_QUOTES, 'UTF-8'));
     }
     if (!preg_match(
         '~<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))~i',
@@ -148,7 +148,7 @@ function journal_first_image_src(string $body): string {
         return '';
     }
 
-    return fridg3_journal_valid_image_src($src);
+    return fridge_journal_valid_image_src($src);
 }
 
 
@@ -178,13 +178,13 @@ if (isset($_SESSION['user']) && !empty($_SESSION['user']['username'])) {
 $post_items = '';
 $paginationHtml = '';
 if (is_dir($posts_dir)) {
-    $post_files = fridg3_journal_post_files($posts_dir);
+    $post_files = fridge_journal_post_files($posts_dir);
     $posts = [];
 
     // Load basic metadata (date, title, description) for each post
     foreach ($post_files as $pf) {
         $rawPost = @file_get_contents($pf);
-        $parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+        $parsedPost = $rawPost !== false ? fridge_journal_parse_post($rawPost) : null;
         if ($parsedPost === null) {
             continue;
         }
@@ -195,7 +195,7 @@ if (is_dir($posts_dir)) {
             ? $parsedPost['cardImage']
             : journal_first_image_src($parsedPost['body']);
         if ($firstImageSrc !== '') {
-            $firstImageSrc = fridg3_local_image_thumbnail_url($firstImageSrc, dirname(__DIR__));
+            $firstImageSrc = fridge_local_image_thumbnail_url($firstImageSrc, dirname(__DIR__));
         }
         $ts = strtotime($dateStr);
         if ($ts === false) {

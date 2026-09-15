@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 // Shared by server rendering, settings validation, and the browser's palette picker.
-function fridg3_theme_accent_palettes(): array
+function fridge_theme_accent_palettes(): array
 {
     static $palettes = null;
     return $palettes ??= json_decode(
@@ -11,11 +11,11 @@ function fridg3_theme_accent_palettes(): array
     );
 }
 
-function fridg3_normalize_theme_accents($values): array
+function fridge_normalize_theme_accents($values): array
 {
     if (!is_array($values)) return [];
     $normalized = [];
-    foreach (fridg3_theme_accent_palettes() as $theme => $palette) {
+    foreach (fridge_theme_accent_palettes() as $theme => $palette) {
         $value = $values[$theme] ?? null;
         if (is_string($value) && isset($palette['colors'][$value])) {
             $normalized[$theme] = $value;
@@ -24,10 +24,10 @@ function fridg3_normalize_theme_accents($values): array
     return $normalized;
 }
 
-function fridg3_inject_theme_accents(string $template, string $theme): string
+function fridge_inject_theme_accents(string $template, string $theme): string
 {
-    $palettes = fridg3_theme_accent_palettes();
-    $saved = fridg3_normalize_theme_accents([$theme => $_COOKIE['theme_accent_' . $theme] ?? null]);
+    $palettes = fridge_theme_accent_palettes();
+    $saved = fridge_normalize_theme_accents([$theme => $_COOKIE['theme_accent_' . $theme] ?? null]);
     $accent = $saved[$theme] ?? ($palettes[$theme]['default'] ?? null);
     $template = preg_replace_callback('/<html\b([^>]*)>/i', static function ($match) use ($accent) {
         $attributes = preg_replace('/\s+data-theme-accent=(["\']).*?\1/i', '', $match[1]);

@@ -3,14 +3,14 @@ declare(strict_types=1);
 require_once dirname(__DIR__, 2) . '/lib/session.php';
 require_once dirname(__DIR__, 2) . '/lib/feed.php';
 require_once dirname(__DIR__, 2) . '/lib/toast-models.php';
-fridg3_start_session();
-fridg3_feed_refresh_session_user();
+fridge_start_session();
+fridge_feed_refresh_session_user();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 function toast_models_response(array $data, int $status = 200): never {
     http_response_code($status); echo json_encode($data, JSON_UNESCAPED_SLASHES); exit;
 }
-if (empty($_SESSION['user']['isAdmin']) && !fridg3_toast_is_current_user()) toast_models_response(['error' => 'Admin access required.'], 403);
+if (empty($_SESSION['user']['isAdmin']) && !fridge_toast_is_current_user()) toast_models_response(['error' => 'Admin access required.'], 403);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if (!in_array($method, ['GET', 'POST'], true)) toast_models_response(['error' => 'Method not allowed.'], 405);
 $_SESSION['toast_models_csrf'] ??= bin2hex(random_bytes(32));

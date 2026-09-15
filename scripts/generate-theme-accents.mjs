@@ -40,7 +40,7 @@ for (const [theme, palette] of Object.entries(palettes)) {
         if (name === palette.default) continue;
         css += `\nhtml[data-theme-accent="${name}"]:not(.access-high-contrast) body.${theme}-theme {\n`;
         if (theme === 'base16') {
-            let ink = contrast(color, '#1D1F21') >= contrast(color, '#FFFFFF') ? '#1D1F21' : '#FFFFFF';
+            let ink = contrast(color, '#1F1F1F') >= contrast(color, '#FFFFFF') ? '#1F1F1F' : '#FFFFFF';
             if (contrast(color, ink) < 4.5) ink = '#000000';
             css += `    --base0D: ${color};\n    --base-accent-ink: ${ink};\n`;
         } else if (theme === 'gruvbox') {

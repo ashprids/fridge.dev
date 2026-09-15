@@ -124,5 +124,5 @@ function initWebsiteCommissionForm() {
     updateSubmitState();
 }
 
-window.fridg3InitWebsiteCommissionForm = initWebsiteCommissionForm;
+window.fridgeInitWebsiteCommissionForm = initWebsiteCommissionForm;
 initWebsiteCommissionForm();

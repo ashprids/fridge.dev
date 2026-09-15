@@ -1,7 +1,7 @@
 <?php
 
-if (!function_exists('fridg3_journal_valid_image_src')) {
-    function fridg3_journal_valid_image_src(string $src): string
+if (!function_exists('fridge_journal_valid_image_src')) {
+    function fridge_journal_valid_image_src(string $src): string
     {
         $src = trim($src);
         if ($src !== '' && ($src[0] === '/' || preg_match('~^https?://~i', $src))) {
@@ -12,8 +12,8 @@ if (!function_exists('fridg3_journal_valid_image_src')) {
     }
 }
 
-if (!function_exists('fridg3_journal_parse_post')) {
-    function fridg3_journal_parse_post(string $raw): ?array
+if (!function_exists('fridge_journal_parse_post')) {
+    function fridge_journal_parse_post(string $raw): ?array
     {
         $normalized = str_replace(["\r\n", "\r"], "\n", $raw);
         if (str_starts_with($normalized, "v2\n")) {
@@ -31,7 +31,7 @@ if (!function_exists('fridg3_journal_parse_post')) {
                 'date' => (string)($metadata['date'] ?? ''),
                 'title' => (string)($metadata['title'] ?? ''),
                 'description' => (string)($metadata['description'] ?? $metadata['author'] ?? ''),
-                'cardImage' => fridg3_journal_valid_image_src((string)($metadata['card_image'] ?? '')),
+                'cardImage' => fridge_journal_valid_image_src((string)($metadata['card_image'] ?? '')),
                 'body' => substr($markdown, strlen($front[0])),
                 'markdown' => $markdown,
             ];
@@ -44,7 +44,7 @@ if (!function_exists('fridg3_journal_parse_post')) {
         $bodyOffset = 3;
         $cardImage = '';
         if (isset($lines[$bodyOffset]) && strncmp((string)$lines[$bodyOffset], 'CARD_IMAGE:', 11) === 0) {
-            $cardImage = fridg3_journal_valid_image_src(substr((string)$lines[$bodyOffset], 11));
+            $cardImage = fridge_journal_valid_image_src(substr((string)$lines[$bodyOffset], 11));
             $bodyOffset++;
         }
 
@@ -60,30 +60,30 @@ if (!function_exists('fridg3_journal_parse_post')) {
     }
 }
 
-if (!function_exists('fridg3_journal_yaml_value')) {
-    function fridg3_journal_yaml_value(string $value): string
+if (!function_exists('fridge_journal_yaml_value')) {
+    function fridge_journal_yaml_value(string $value): string
     {
         return '"' . str_replace(["\\", '"', "\r", "\n"], ["\\\\", '\\"', '', ' '], trim($value)) . '"';
     }
 }
 
-if (!function_exists('fridg3_journal_build_v2_post')) {
-    function fridg3_journal_build_v2_post(string $date, string $title, string $description, string $body, string $cardImage = ''): string
+if (!function_exists('fridge_journal_build_v2_post')) {
+    function fridge_journal_build_v2_post(string $date, string $title, string $description, string $body, string $cardImage = ''): string
     {
         $metadata = [
             '---',
-            'title: ' . fridg3_journal_yaml_value($title),
-            'description: ' . fridg3_journal_yaml_value($description),
+            'title: ' . fridge_journal_yaml_value($title),
+            'description: ' . fridge_journal_yaml_value($description),
             'date: ' . $date,
         ];
-        if ($cardImage !== '') $metadata[] = 'card_image: ' . fridg3_journal_yaml_value($cardImage);
+        if ($cardImage !== '') $metadata[] = 'card_image: ' . fridge_journal_yaml_value($cardImage);
         $metadata[] = '---';
         return "v2\n" . implode("\n", $metadata) . "\n\n" . trim($body) . "\n";
     }
 }
 
-if (!function_exists('fridg3_journal_post_files')) {
-    function fridg3_journal_post_files(string $directory): array
+if (!function_exists('fridge_journal_post_files')) {
+    function fridge_journal_post_files(string $directory): array
     {
         $posts = [];
         foreach (array_merge(glob($directory . DIRECTORY_SEPARATOR . '*.txt') ?: [], glob($directory . DIRECTORY_SEPARATOR . '*.md') ?: []) as $path) {
@@ -93,8 +93,8 @@ if (!function_exists('fridg3_journal_post_files')) {
     }
 }
 
-if (!function_exists('fridg3_journal_post_path')) {
-    function fridg3_journal_post_path(string $directory, string $postId): ?string
+if (!function_exists('fridge_journal_post_path')) {
+    function fridge_journal_post_path(string $directory, string $postId): ?string
     {
         foreach (['md', 'txt'] as $extension) {
             $path = $directory . DIRECTORY_SEPARATOR . $postId . '.' . $extension;
@@ -104,8 +104,8 @@ if (!function_exists('fridg3_journal_post_path')) {
     }
 }
 
-if (!function_exists('fridg3_journal_build_post')) {
-    function fridg3_journal_build_post(
+if (!function_exists('fridge_journal_build_post')) {
+    function fridge_journal_build_post(
         string $date,
         string $title,
         string $description,
@@ -122,8 +122,8 @@ if (!function_exists('fridg3_journal_build_post')) {
     }
 }
 
-if (!function_exists('fridg3_journal_process_card_image')) {
-    function fridg3_journal_process_card_image(array $file): array
+if (!function_exists('fridge_journal_process_card_image')) {
+    function fridge_journal_process_card_image(array $file): array
     {
         $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
         if ($error === UPLOAD_ERR_NO_FILE) {
@@ -140,7 +140,7 @@ if (!function_exists('fridg3_journal_process_card_image')) {
             'error' => [$error],
             'size' => [(int)($file['size'] ?? 0)],
         ];
-        $images = fridg3_feed_process_uploaded_images($files);
+        $images = fridge_feed_process_uploaded_images($files);
 
         return [
             'provided' => true,

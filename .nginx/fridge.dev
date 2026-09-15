@@ -7,6 +7,9 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
+    # One public host for desktop and mobile; 308 preserves POST request bodies.
+    if ($host != fridge.dev) { return 308 https://fridge.dev$request_uri; }
+
     root /var/www/fridge.dev;
     index index.html index.php;
     # Application handlers enforce per-file limits where appropriate.
@@ -125,6 +128,13 @@ server {
 
     location ^~ /data/etc/toast-chat/ {
         return 302 /error/403;
+    }
+
+    # Fresh public content URLs; the admin button also writes a disk snapshot.
+    location = /sitemap.xml {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root/sitemap/index.php;
+        fastcgi_pass unix:/run/php-fpm/php-fpm.sock;
     }
 
     # Feed clean URLs
@@ -266,12 +276,12 @@ server {
 
 server {
     if ($host = m.fridge.dev) {
-        return 301 https://$host$request_uri;
+        return 308 https://fridge.dev$request_uri;
     } # managed by Certbot
 
     listen 80;
     server_name fridge.dev www.fridge.dev m.fridge.dev;
-    if ($host = www.fridge.dev) { return 301 https://$host$request_uri; }
-    if ($host = fridge.dev)     { return 301 https://$host$request_uri; }
+    if ($host = www.fridge.dev) { return 308 https://fridge.dev$request_uri; }
+    if ($host = fridge.dev)     { return 308 https://fridge.dev$request_uri; }
     return 404; # managed by Certbot
 }

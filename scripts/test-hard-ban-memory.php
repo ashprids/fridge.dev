@@ -1,32 +1,32 @@
 <?php
 declare(strict_types=1);
 
-$testRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'fridg3-hard-ban-' . bin2hex(random_bytes(8));
+$testRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'fridge-hard-ban-' . bin2hex(random_bytes(8));
 $sourceRoot = $testRoot . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'banlists';
 $nestedSourceRoot = $sourceRoot . DIRECTORY_SEPARATOR . 'nested';
 mkdir($nestedSourceRoot, 0700, true);
 
-function fridg3_hard_ban_path(): string
+function fridge_hard_ban_path(): string
 {
     return $GLOBALS['testRoot'] . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-banned-ips.txt';
 }
 
-function fridg3_hard_ban_identity_path(): string
+function fridge_hard_ban_identity_path(): string
 {
     return $GLOBALS['testRoot'] . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-ban-identities.json';
 }
 
-function fridg3_hard_ban_settings_path(): string
+function fridge_hard_ban_settings_path(): string
 {
     return $GLOBALS['testRoot'] . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-ban-settings.json';
 }
 
-function fridg3_hard_ban_source_directory(): string
+function fridge_hard_ban_source_directory(): string
 {
     return $GLOBALS['sourceRoot'];
 }
 
-function fridg3_hard_ban_index_cache_directory(): string
+function fridge_hard_ban_index_cache_directory(): string
 {
     return $GLOBALS['sourceRoot'] . DIRECTORY_SEPARATOR . 'index';
 }
@@ -86,8 +86,8 @@ function assertHardBanIndexIsSorted(string $indexDirectory): void
 }
 
 try {
-    file_put_contents(fridg3_hard_ban_path(), "198.51.100.8\n");
-    file_put_contents(fridg3_hard_ban_identity_path(), "{\"identities\":{}}\n");
+    file_put_contents(fridge_hard_ban_path(), "198.51.100.8\n");
+    file_put_contents(fridge_hard_ban_identity_path(), "{\"identities\":{}}\n");
     file_put_contents(
         $nestedSourceRoot . DIRECTORY_SEPARATOR . 'small.txt',
         "invalid-entry\n64.0.0.0/7\n203.0.113.0/24\n2000::/7\n2001:db8:abcd::/48\n"
@@ -98,89 +98,89 @@ try {
 
     require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
 
-    assertHardBanResult(fridg3_hard_ban_contains('198.51.100.8'), 'manual exact IP was not matched');
-    assertHardBanResult(fridg3_hard_ban_contains('65.255.255.255'), 'cross-bucket IPv4 CIDR was not matched');
+    assertHardBanResult(fridge_hard_ban_contains('198.51.100.8'), 'manual exact IP was not matched');
+    assertHardBanResult(fridge_hard_ban_contains('65.255.255.255'), 'cross-bucket IPv4 CIDR was not matched');
     assertHardBanResult(!is_dir($interruptedBuild), 'interrupted index build was not cleaned');
-    assertHardBanResult(!fridg3_hard_ban_contains('66.0.0.0'), 'address above cross-bucket IPv4 CIDR was matched');
-    assertHardBanResult(fridg3_hard_ban_contains('203.0.113.91'), 'source IPv4 CIDR was not matched');
-    assertHardBanResult(fridg3_hard_ban_contains('21ff:ffff::1'), 'cross-bucket IPv6 CIDR was not matched');
-    assertHardBanResult(!fridg3_hard_ban_contains('2200::1'), 'address above cross-bucket IPv6 CIDR was matched');
-    assertHardBanResult(fridg3_hard_ban_contains('2001:db8:abcd::42'), 'source IPv6 CIDR was not matched');
-    assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.1'), 'unlisted IP was matched');
-    assertHardBanResult(fridg3_hard_ban_whitelist_write(['198.51.100.8', '203.0.113.91']), 'could not write hard-ban whitelist');
-    assertHardBanResult(!fridg3_hard_ban_contains('198.51.100.8'), 'whitelist did not override a manual hard ban');
-    assertHardBanResult(!fridg3_hard_ban_contains('203.0.113.91'), 'whitelist did not override a source CIDR');
-    assertHardBanResult(fridg3_hard_ban_whitelist_write([]), 'could not clear hard-ban whitelist');
+    assertHardBanResult(!fridge_hard_ban_contains('66.0.0.0'), 'address above cross-bucket IPv4 CIDR was matched');
+    assertHardBanResult(fridge_hard_ban_contains('203.0.113.91'), 'source IPv4 CIDR was not matched');
+    assertHardBanResult(fridge_hard_ban_contains('21ff:ffff::1'), 'cross-bucket IPv6 CIDR was not matched');
+    assertHardBanResult(!fridge_hard_ban_contains('2200::1'), 'address above cross-bucket IPv6 CIDR was matched');
+    assertHardBanResult(fridge_hard_ban_contains('2001:db8:abcd::42'), 'source IPv6 CIDR was not matched');
+    assertHardBanResult(!fridge_hard_ban_contains('192.0.2.1'), 'unlisted IP was matched');
+    assertHardBanResult(fridge_hard_ban_whitelist_write(['198.51.100.8', '203.0.113.91']), 'could not write hard-ban whitelist');
+    assertHardBanResult(!fridge_hard_ban_contains('198.51.100.8'), 'whitelist did not override a manual hard ban');
+    assertHardBanResult(!fridge_hard_ban_contains('203.0.113.91'), 'whitelist did not override a source CIDR');
+    assertHardBanResult(fridge_hard_ban_whitelist_write([]), 'could not clear hard-ban whitelist');
 
     $identifier = str_repeat('a', 64);
     $_SERVER['HTTP_USER_AGENT'] = 'hard-ban-test-agent';
-    assertHardBanResult(fridg3_hard_ban_register_identifier('198.51.100.8', $identifier), 'banned identity was not registered');
-    assertHardBanResult(fridg3_hard_ban_check_client('192.0.2.44', $identifier), 'strict mode did not propagate the identity ban');
-    assertHardBanResult(fridg3_hard_ban_whitelist_write(['192.0.2.44']), 'could not write identity whitelist override');
-    assertHardBanResult(!fridg3_hard_ban_check_client('192.0.2.44', $identifier), 'whitelist did not override an identity hard ban');
-    assertHardBanResult(fridg3_hard_ban_whitelist_write([]), 'could not clear identity whitelist override');
-    assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.44'), 'strict mode copied an associated IP into the effective IP ban set');
-    assertHardBanResult(!fridg3_hard_ban_source_contains('198.51.100.8'), 'manual hard ban leaked into the source-list index');
-    $identityData = fridg3_hard_ban_load_identities();
+    assertHardBanResult(fridge_hard_ban_register_identifier('198.51.100.8', $identifier), 'banned identity was not registered');
+    assertHardBanResult(fridge_hard_ban_check_client('192.0.2.44', $identifier), 'strict mode did not propagate the identity ban');
+    assertHardBanResult(fridge_hard_ban_whitelist_write(['192.0.2.44']), 'could not write identity whitelist override');
+    assertHardBanResult(!fridge_hard_ban_check_client('192.0.2.44', $identifier), 'whitelist did not override an identity hard ban');
+    assertHardBanResult(fridge_hard_ban_whitelist_write([]), 'could not clear identity whitelist override');
+    assertHardBanResult(!fridge_hard_ban_contains('192.0.2.44'), 'strict mode copied an associated IP into the effective IP ban set');
+    assertHardBanResult(!fridge_hard_ban_source_contains('198.51.100.8'), 'manual hard ban leaked into the source-list index');
+    $identityData = fridge_hard_ban_load_identities();
     assertHardBanResult(
-        fridg3_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.44'),
+        fridge_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.44'),
         'strict mode did not retain the associated IP in its identity record'
     );
     assertHardBanResult(
-        fridg3_hard_ban_ips_equal((string)$identityData['identities'][$identifier]['primaryIp'], '198.51.100.8'),
+        fridge_hard_ban_ips_equal((string)$identityData['identities'][$identifier]['primaryIp'], '198.51.100.8'),
         'strict mode replaced the original primary IP with an associated IP'
     );
 
     // A legacy propagated IP can still be present in the manual list. A new
     // identifier seen there must inherit the existing root instead of making
     // that associated IP a second primary.
-    file_put_contents(fridg3_hard_ban_path(), "198.51.100.8\n192.0.2.44\n");
+    file_put_contents(fridge_hard_ban_path(), "198.51.100.8\n192.0.2.44\n");
     $associatedIdentifier = str_repeat('b', 64);
-    assertHardBanResult(fridg3_hard_ban_register_identifier('192.0.2.44', $associatedIdentifier), 'associated identity was not registered');
-    $identityData = fridg3_hard_ban_load_identities();
+    assertHardBanResult(fridge_hard_ban_register_identifier('192.0.2.44', $associatedIdentifier), 'associated identity was not registered');
+    $identityData = fridge_hard_ban_load_identities();
     assertHardBanResult(
-        fridg3_hard_ban_ips_equal((string)$identityData['identities'][$associatedIdentifier]['primaryIp'], '198.51.100.8'),
+        fridge_hard_ban_ips_equal((string)$identityData['identities'][$associatedIdentifier]['primaryIp'], '198.51.100.8'),
         'associated identity created a new primary IP'
     );
 
-    assertHardBanResult(fridg3_hard_ban_set_strict_enabled(false), 'could not disable strict hard bans');
-    assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.44'), 'disabling strict mode did not release a previously propagated IP');
-    assertHardBanResult(fridg3_hard_ban_contains('198.51.100.8'), 'disabling strict mode released the original banned IP');
-    assertHardBanResult(!fridg3_hard_ban_check_client('192.0.2.45', $identifier), 'relaxed mode punished a future IP');
-    assertHardBanResult(!fridg3_hard_ban_contains('192.0.2.45'), 'relaxed mode added a future IP to the hard-ban list');
-    $identityData = fridg3_hard_ban_load_identities();
+    assertHardBanResult(fridge_hard_ban_set_strict_enabled(false), 'could not disable strict hard bans');
+    assertHardBanResult(!fridge_hard_ban_contains('192.0.2.44'), 'disabling strict mode did not release a previously propagated IP');
+    assertHardBanResult(fridge_hard_ban_contains('198.51.100.8'), 'disabling strict mode released the original banned IP');
+    assertHardBanResult(!fridge_hard_ban_check_client('192.0.2.45', $identifier), 'relaxed mode punished a future IP');
+    assertHardBanResult(!fridge_hard_ban_contains('192.0.2.45'), 'relaxed mode added a future IP to the hard-ban list');
+    $identityData = fridge_hard_ban_load_identities();
     assertHardBanResult(
-        !fridg3_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.45'),
+        !fridge_hard_ban_list_contains((array)$identityData['identities'][$identifier]['ips'], '192.0.2.45'),
         'relaxed mode wrote a future IP to the ignored identity store'
     );
-    assertHardBanResult(!fridg3_hard_ban_register_identifier('198.51.100.8', str_repeat('b', 64)), 'relaxed mode registered a new identity');
-    assertHardBanResult(fridg3_hard_ban_check_client('198.51.100.8', $identifier), 'relaxed mode did not enforce the specifically banned IP');
-    assertHardBanResult(fridg3_hard_ban_set_strict_enabled(true), 'could not re-enable strict hard bans');
-    assertHardBanResult(fridg3_hard_ban_set_enforcement_enabled(false), 'could not disable hard-ban enforcement');
-    assertHardBanResult(!fridg3_hard_ban_check_client('198.51.100.8', $identifier), 'disabled enforcement still blocked a banned IP');
-    assertHardBanResult(fridg3_hard_ban_set_enforcement_enabled(true), 'could not re-enable hard-ban enforcement');
-    assertHardBanResult(fridg3_hard_ban_check_client('198.51.100.8', $identifier), 're-enabled enforcement did not block a banned IP');
-    $hardBansBeforePreview = file_get_contents(fridg3_hard_ban_path());
-    assertHardBanResult(fridg3_hard_ban_would_block_client('192.0.2.46', $identifier), 'read-only preview missed a strict identity ban');
-    assertHardBanResult(file_get_contents(fridg3_hard_ban_path()) === $hardBansBeforePreview, 'read-only preview modified the hard-ban list');
-    $initialIndex = fridg3_hard_ban_source_index();
+    assertHardBanResult(!fridge_hard_ban_register_identifier('198.51.100.8', str_repeat('b', 64)), 'relaxed mode registered a new identity');
+    assertHardBanResult(fridge_hard_ban_check_client('198.51.100.8', $identifier), 'relaxed mode did not enforce the specifically banned IP');
+    assertHardBanResult(fridge_hard_ban_set_strict_enabled(true), 'could not re-enable strict hard bans');
+    assertHardBanResult(fridge_hard_ban_set_enforcement_enabled(false), 'could not disable hard-ban enforcement');
+    assertHardBanResult(!fridge_hard_ban_check_client('198.51.100.8', $identifier), 'disabled enforcement still blocked a banned IP');
+    assertHardBanResult(fridge_hard_ban_set_enforcement_enabled(true), 'could not re-enable hard-ban enforcement');
+    assertHardBanResult(fridge_hard_ban_check_client('198.51.100.8', $identifier), 're-enabled enforcement did not block a banned IP');
+    $hardBansBeforePreview = file_get_contents(fridge_hard_ban_path());
+    assertHardBanResult(fridge_hard_ban_would_block_client('192.0.2.46', $identifier), 'read-only preview missed a strict identity ban');
+    assertHardBanResult(file_get_contents(fridge_hard_ban_path()) === $hardBansBeforePreview, 'read-only preview modified the hard-ban list');
+    $initialIndex = fridge_hard_ban_source_index();
     assertHardBanResult($initialIndex !== null, 'source index was not created');
-    assertHardBanResult(fridg3_hard_ban_source_index() === $initialIndex, 'unchanged source index was not reused');
+    assertHardBanResult(fridge_hard_ban_source_index() === $initialIndex, 'unchanged source index was not reused');
 
     file_put_contents(
         $nestedSourceRoot . DIRECTORY_SEPARATOR . 'small.txt',
         "198.18.0.0/15\n",
         FILE_APPEND
     );
-    assertHardBanResult(fridg3_hard_ban_contains('198.19.255.254'), 'new source CIDR was not matched after invalidation');
-    assertHardBanResult(fridg3_hard_ban_source_index() !== $initialIndex, 'changed source list did not invalidate the index');
+    assertHardBanResult(fridge_hard_ban_contains('198.19.255.254'), 'new source CIDR was not matched after invalidation');
+    assertHardBanResult(fridge_hard_ban_source_index() !== $initialIndex, 'changed source list did not invalidate the index');
 
-    file_put_contents(fridg3_hard_ban_path(), "198.51.100.8\n192.0.2.1\n");
-    assertHardBanResult(fridg3_hard_ban_contains('192.0.2.1'), 'manual list update was hidden by source-result memoization');
+    file_put_contents(fridge_hard_ban_path(), "198.51.100.8\n192.0.2.1\n");
+    assertHardBanResult(fridge_hard_ban_contains('192.0.2.1'), 'manual list update was hidden by source-result memoization');
 
     $oversizedPath = $sourceRoot . DIRECTORY_SEPARATOR . 'oversized-token.txt';
     file_put_contents($oversizedPath, str_repeat('x', 1024 * 1024) . "\n192.0.2.56\n");
-    assertHardBanResult(fridg3_hard_ban_contains('192.0.2.56'), 'entry after oversized token was not matched');
+    assertHardBanResult(fridge_hard_ban_contains('192.0.2.56'), 'entry after oversized token was not matched');
 
     $largePath = $sourceRoot . DIRECTORY_SEPARATOR . 'large-valid-list.txt';
     $handle = fopen($largePath, 'wb');
@@ -195,8 +195,8 @@ try {
     fclose($handle);
 
     $memoryBefore = memory_get_peak_usage(true);
-    assertHardBanResult(fridg3_hard_ban_contains('192.0.2.55'), 'entry at the end of the large source list was not matched');
-    $largeIndex = fridg3_hard_ban_source_index();
+    assertHardBanResult(fridge_hard_ban_contains('192.0.2.55'), 'entry at the end of the large source list was not matched');
+    $largeIndex = fridge_hard_ban_source_index();
     assertHardBanResult($largeIndex !== null, 'large source index was not created');
     assertHardBanIndexIsSorted($largeIndex);
     $additionalPeakMemory = memory_get_peak_usage(true) - $memoryBefore;

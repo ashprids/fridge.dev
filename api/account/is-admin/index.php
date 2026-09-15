@@ -5,11 +5,11 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 header('Content-Type: application/json');
 
 $isAdmin = (isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']));
-fridg3_refresh_is_admin_cookie($isAdmin);
+fridge_refresh_is_admin_cookie($isAdmin);
 
 echo json_encode(['isAdmin' => $isAdmin], JSON_UNESCAPED_SLASHES);
 ?>

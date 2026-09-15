@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib.php';
 
 $id = mdp_share_id_from_request();

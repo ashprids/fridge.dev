@@ -5,8 +5,8 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
-fridg3_refresh_current_user_posting_restriction();
+fridge_start_session();
+fridge_refresh_current_user_posting_restriction();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'targeted-notifications.php';
@@ -17,10 +17,10 @@ $description = 'send a message to the guestbook.';
 $status_message = '';
 $status_class = 'success';
 $hasPosted = false;
-$postingRestricted = fridg3_current_user_posting_restricted();
+$postingRestricted = fridge_current_user_posting_restricted();
 
 $client_ip = guestbook_client_ip();
-$isClientIpBanned = fridg3_feed_is_ip_banned($client_ip);
+$isClientIpBanned = fridge_feed_is_current_client_ip_banned($client_ip);
 if ($isClientIpBanned) {
     $status_message = 'your IP address has been restricted.';
     $status_class = 'error';
@@ -41,7 +41,7 @@ if (is_file($ip_index_path)) {
 }
 
 // Mark if this IP already posted (for UI disable)
-if (isset($ip_index[$client_ip])) {
+if (!fridge_current_user_bypasses_ip_restrictions() && isset($ip_index[$client_ip])) {
     $hasPosted = true;
 }
 
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status_message = 'message cannot be empty.';
         $status_class = 'error';
     } else {
-        if (isset($ip_index[$client_ip])) {
+        if (!fridge_current_user_bypasses_ip_restrictions() && isset($ip_index[$client_ip])) {
             $hasPosted = true;
             $status_message = 'you have already posted to the guestbook.';
             $status_class = 'error';
@@ -109,16 +109,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $filename = date('Y-m-d_H-i-s') . '_' . $suffix . '.txt';
             $filepath = $posts_dir . DIRECTORY_SEPARATOR . $filename;
 
-            $written = fridg3_guestbook_write_entry($filepath, $timestamp_line, $name, $message, $client_ip);
+            $originalMessage = $message;
+            $message = fridge_feed_apply_guest_filter($message, true);
+            $written = fridge_guestbook_write_entry($filepath, $timestamp_line, $name, $message, $client_ip);
             if ($written === false) {
-                fridg3_debug_submission_log('[SUBMISSION] guestbook entry save failed');
+                fridge_debug_submission_log('[SUBMISSION] guestbook entry save failed');
                 $status_message = 'could not save your message. please try again later.';
                 $status_class = 'error';
             } else {
-                fridg3_debug_submission_log('[SUBMISSION] guestbook entry save succeeded attachments=0');
+                if ($message !== $originalMessage) fridge_guestbook_store_filtered_original($filename, $originalMessage);
+                fridge_debug_submission_log('[SUBMISSION] guestbook entry save succeeded attachments=0');
                 $ip_index[$client_ip] = $filename;
                 @file_put_contents($ip_index_path, json_encode($ip_index, JSON_PRETTY_PRINT), LOCK_EX);
-                if (!fridg3_targeted_notifications_notify_admins('new guestbook entry', $name . ' added a new guestbook entry.', '/guestbook', date('Y-m-d H:i:s'), 'guestbook-' . pathinfo($filename, PATHINFO_FILENAME))) {
+                if (!fridge_targeted_notifications_notify_admins('new guestbook entry', $name . ' added a new guestbook entry.', '/guestbook', date('Y-m-d H:i:s'), 'guestbook-' . pathinfo($filename, PATHINFO_FILENAME))) {
                     error_log('guestbook entry ' . $filename . ' admin inbox notification failed');
                 }
                 header('Location: /guestbook');
@@ -198,9 +201,11 @@ $button_state = $hasPosted || $isClientIpBanned
     : 'data-tooltip="please note: you can only post one message here!"';
 $content = str_replace('{status}', $status_html, $content);
 $content = str_replace('{post_button_attrs}', $button_state, $content);
-if ($postingRestricted) {
-    $content = fridg3_disable_composer_controls($content);
-    $content = str_replace('<form id="guestbook-form"', fridg3_posting_restriction_notice() . '<form id="guestbook-form"', $content);
+if ($postingRestricted || $isClientIpBanned) {
+    $blockedNotice = $postingRestricted
+        ? fridge_posting_restriction_notice()
+        : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
+    $content = preg_replace('/<form id="guestbook-form".*?<\/form>/s', $blockedNotice, $content, 1) ?: $content;
 }
 $html = str_replace('{content}', $content, $template);
 $html = str_replace('{title}', $title, $html);

@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $title = 'example markdown title';
 $description = 'example page rendered from Markdown.';
@@ -34,7 +34,7 @@ if ($render_helper_path) {
 
 // Example of a route-specific non-process PHP debug entry. Shared request and
 // included-file entries are emitted automatically by lib/debug.php on all pages.
-fridg3_debug_log('[PHP] formatting Markdown example page initialized');
+fridge_debug_log('[PHP] formatting Markdown example page initialized');
 
 $template_name = function_exists('get_preferred_template_name')
     ? get_preferred_template_name(__DIR__)

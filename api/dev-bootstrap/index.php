@@ -6,14 +6,14 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $renderHelperPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'render.php';
 if (is_file($renderHelperPath)) {
     require_once $renderHelperPath;
 }
 
-const FRIDG3_DEV_BOOTSTRAP_FOLDER_ID = '1dltxdqQjfUfGwEEXVxUrOw5fuv9nk_ex';
+const FRIDGE_DEV_BOOTSTRAP_FOLDER_ID = '1dltxdqQjfUfGwEEXVxUrOw5fuv9nk_ex';
 
 function dev_bootstrap_debug_text(string $value): string
 {
@@ -24,6 +24,10 @@ function dev_bootstrap_debug_text(string $value): string
 
 function dev_bootstrap_emit(string $stage, int $progress, string $message, array $extra = []): void
 {
+    $abortMarker = (string)($GLOBALS['devBootstrapAbortMarker'] ?? '');
+    if ($abortMarker !== '' && is_file($abortMarker)) {
+        throw new RuntimeException('download aborted because the page was closed or refreshed');
+    }
     $progress = max(0, min(100, $progress));
     $debug = '[BOOTSTRAP] server update stage=' . dev_bootstrap_debug_text($stage)
         . ' progress=' . $progress . '% popup_text="' . dev_bootstrap_debug_text($message) . '"';
@@ -33,23 +37,32 @@ function dev_bootstrap_emit(string $stage, int $progress, string $message, array
     if (isset($extra['archive']) && is_string($extra['archive']) && trim($extra['archive']) !== '') {
         $debug .= ' archive="' . dev_bootstrap_debug_text(basename($extra['archive'])) . '"';
     }
-    fridg3_debug_log($debug);
-    echo json_encode(array_merge([
+    fridge_debug_log($debug);
+    $event = array_merge([
         'ok' => true,
         'stage' => $stage,
         'progress' => $progress,
         'message' => $message,
         'debug' => $debug,
-    ], $extra), JSON_UNESCAPED_SLASHES) . "\n";
+    ], $extra);
+    $statusPath = (string)($GLOBALS['devBootstrapStatusPath'] ?? '');
+    if ($statusPath !== '') {
+        @file_put_contents($statusPath, json_encode($event, JSON_UNESCAPED_SLASHES), LOCK_EX);
+        return;
+    }
+    echo json_encode($event, JSON_UNESCAPED_SLASHES) . "\n";
     @ob_flush();
     flush();
+    if (connection_aborted()) {
+        throw new RuntimeException('__DEV_BOOTSTRAP_CLIENT_ABORTED__');
+    }
 }
 
 function dev_bootstrap_fail(string $message, int $status = 500): never
 {
     http_response_code($status);
     $debug = '[BOOTSTRAP] server failure progress=100% HTTP=' . $status . ' popup_text="' . dev_bootstrap_debug_text($message) . '"';
-    fridg3_debug_log($debug);
+    fridge_debug_log($debug);
     echo json_encode([
         'ok' => false,
         'progress' => 100,
@@ -127,12 +140,12 @@ function dev_bootstrap_probe_content_length_with_system(string $url, string $cur
     if ($curlBin !== '') {
         $cmd = escapeshellcmd($curlBin)
             . ' -L --silent --show-error --head --connect-timeout 20'
-            . ' -A ' . escapeshellarg('fridg3-dev-bootstrap/1.0')
+            . ' -A ' . escapeshellarg('fridge-dev-bootstrap/1.0')
             . ' ' . escapeshellarg($url);
     } elseif ($wgetBin !== '') {
         $cmd = escapeshellcmd($wgetBin)
             . ' --spider --server-response --timeout=20 --tries=1'
-            . ' --user-agent=' . escapeshellarg('fridg3-dev-bootstrap/1.0')
+            . ' --user-agent=' . escapeshellarg('fridge-dev-bootstrap/1.0')
             . ' ' . escapeshellarg($url)
             . ' 2>&1';
     } else {
@@ -183,7 +196,7 @@ function dev_bootstrap_http_get(string $url): string
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_CONNECTTIMEOUT => 20,
             CURLOPT_TIMEOUT => 60,
-            CURLOPT_USERAGENT => 'fridg3-dev-bootstrap/1.0',
+            CURLOPT_USERAGENT => 'fridge-dev-bootstrap/1.0',
         ]);
         $body = curl_exec($ch);
         $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -200,7 +213,7 @@ function dev_bootstrap_http_get(string $url): string
             'follow_location' => 1,
             'max_redirects' => 5,
             'timeout' => 60,
-            'user_agent' => 'fridg3-dev-bootstrap/1.0',
+            'user_agent' => 'fridge-dev-bootstrap/1.0',
         ],
     ]);
     $body = @file_get_contents($url, false, $context);
@@ -374,7 +387,7 @@ function dev_bootstrap_download_drive_file(array $archive, string $destPath): vo
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_CONNECTTIMEOUT => 20,
         CURLOPT_TIMEOUT => 0,
-        CURLOPT_USERAGENT => 'fridg3-dev-bootstrap/1.0',
+        CURLOPT_USERAGENT => 'fridge-dev-bootstrap/1.0',
         CURLOPT_NOPROGRESS => false,
         CURLOPT_HEADERFUNCTION => static function ($resource, string $header) use (&$knownTotal): int {
             if (preg_match('/^content-length:\s*(\d+)/i', trim($header), $match) === 1) {
@@ -384,10 +397,7 @@ function dev_bootstrap_download_drive_file(array $archive, string $destPath): vo
         },
         CURLOPT_PROGRESSFUNCTION => static function ($resource, float $downloadTotal, float $downloaded) use (&$lastProgress, &$lastLogAt, &$knownTotal): int {
             $total = (int)max($downloadTotal, $knownTotal);
-            if ($total <= 0) {
-                return 0;
-            }
-            $progress = 28 + (int)floor(($downloaded / $total) * 42);
+            $progress = $total > 0 ? 28 + (int)floor(($downloaded / $total) * 42) : $lastProgress;
             $now = microtime(true);
             if ($progress > $lastProgress || $now - $lastLogAt >= 1.0) {
                 $lastProgress = min(70, $progress);
@@ -444,7 +454,7 @@ function dev_bootstrap_system_download(string $downloadUrl, string $destPath, in
         $tool = 'curl';
         $cmd = escapeshellcmd($curlBin)
             . ' -L --fail --connect-timeout 20 --retry 2 --retry-delay 1 --silent --show-error'
-            . ' -A ' . escapeshellarg('fridg3-dev-bootstrap/1.0')
+            . ' -A ' . escapeshellarg('fridge-dev-bootstrap/1.0')
             . ' -o ' . escapeshellarg($destPath)
             . ' ' . escapeshellarg($downloadUrl);
     } elseif ($wgetBin !== '') {
@@ -452,7 +462,7 @@ function dev_bootstrap_system_download(string $downloadUrl, string $destPath, in
         $cmd = escapeshellcmd($wgetBin)
             . ' -O ' . escapeshellarg($destPath)
             . ' --timeout=20 --tries=3 --no-verbose'
-            . ' --user-agent=' . escapeshellarg('fridg3-dev-bootstrap/1.0')
+            . ' --user-agent=' . escapeshellarg('fridge-dev-bootstrap/1.0')
             . ' ' . escapeshellarg($downloadUrl);
     } else {
         throw new RuntimeException('could not open Google Drive download stream'
@@ -547,7 +557,7 @@ function dev_bootstrap_stream_download(string $downloadUrl, string $destPath, in
             'follow_location' => 1,
             'max_redirects' => 5,
             'timeout' => 0,
-            'user_agent' => 'fridg3-dev-bootstrap/1.0',
+            'user_agent' => 'fridge-dev-bootstrap/1.0',
         ],
     ]);
     $in = @fopen($downloadUrl, 'rb', false, $context);
@@ -589,16 +599,14 @@ function dev_bootstrap_stream_download(string $downloadUrl, string $destPath, in
             throw new RuntimeException('failed while writing downloaded archive');
         }
         $downloaded += strlen($chunk);
-        if ($total > 0) {
-            $progress = 28 + (int)floor(($downloaded / $total) * 42);
-            $now = microtime(true);
-            if ($progress > $lastProgress || $now - $lastLogAt >= 1.0) {
-                $lastProgress = min(70, $progress);
-                $lastLogAt = $now;
-                dev_bootstrap_emit('download', $lastProgress, 'downloading archive...', [
-                    'log' => dev_bootstrap_download_log($downloaded, $total),
-                ]);
-            }
+        $progress = $total > 0 ? 28 + (int)floor(($downloaded / $total) * 42) : $lastProgress;
+        $now = microtime(true);
+        if ($progress > $lastProgress || $now - $lastLogAt >= 1.0) {
+            $lastProgress = min(70, $progress);
+            $lastLogAt = $now;
+            dev_bootstrap_emit('download', $lastProgress, 'downloading archive...', [
+                'log' => dev_bootstrap_download_log($downloaded, $total),
+            ]);
         }
     }
     fclose($in);
@@ -752,45 +760,93 @@ function dev_bootstrap_extract_zip_with_unzip(string $zipPath, string $extractDi
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Content-Type: application/json');
-    dev_bootstrap_fail('method not allowed', 405);
-}
-
 set_time_limit(0);
 ignore_user_abort(true);
-header('Content-Type: application/x-ndjson; charset=utf-8');
-header('Cache-Control: no-cache, no-store, must-revalidate');
-header('X-Accel-Buffering: no');
-
-while (ob_get_level() > 0) {
-    @ob_end_flush();
-}
-
 $root = dirname(__DIR__, 2);
-$isLocalDev = function_exists('fridg3_is_local_dev_server') && fridg3_is_local_dev_server();
+$isWorker = PHP_SAPI === 'cli' && (($argv[1] ?? '') === '--worker');
+$isLocalDev = function_exists('fridge_is_local_dev_server') && fridge_is_local_dev_server();
 $isAdmin = isset($_SESSION['user']) && !empty($_SESSION['user']['isAdmin']);
 $hasAdminAccount = dev_bootstrap_has_admin_account($root);
+$requestToken = strtolower(trim((string)($isWorker ? ($argv[2] ?? '') : ($_SERVER['HTTP_X_FRIDGE_BOOTSTRAP_TOKEN'] ?? $_GET['token'] ?? ''))));
+$bootstrapRoot = $root . DIRECTORY_SEPARATOR . '.bootstrap';
+$statusPath = $bootstrapRoot . DIRECTORY_SEPARATOR . 'status-' . $requestToken . '.json';
 
-if (!$isLocalDev) {
+if (!$isWorker && !$isLocalDev) {
     dev_bootstrap_fail('dev data bootstrap is only available when developer mode is on.', 403);
 }
-if (!$isAdmin && $hasAdminAccount) {
+if (!$isWorker && !$isAdmin && $hasAdminAccount) {
     dev_bootstrap_fail('admin login required to replace local data.', 403);
 }
-session_write_close();
 
-dev_bootstrap_emit('initialize', 2, 'preparing temporary bootstrap workspace...', [
-    'log' => 'authorization passed; request detached from the session lock',
-]);
+if (!$isWorker && isset($_GET['ack_abort']) && $_GET['ack_abort'] === '1') {
+    @unlink($root . DIRECTORY_SEPARATOR . '.dev-data-download-aborted');
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true], JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
-$bootstrapRoot = $root . DIRECTORY_SEPARATOR . '.bootstrap';
+if (!$isWorker && isset($_GET['status']) && $_GET['status'] === '1') {
+    if (preg_match('/^[a-f0-9]{32}$/', $requestToken) !== 1) dev_bootstrap_fail('invalid bootstrap token', 400);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $status = is_file($statusPath) ? (string)@file_get_contents($statusPath) : '';
+    echo $status !== '' ? $status : json_encode(['ok' => true, 'stage' => 'initialize', 'progress' => 0, 'message' => 'starting...']);
+    exit;
+}
+
+if (!$isWorker && isset($_GET['abort']) && $_GET['abort'] === '1') {
+    if (preg_match('/^[a-f0-9]{32}$/', $requestToken) !== 1) dev_bootstrap_fail('invalid bootstrap token', 400);
+    $currentStatus = is_file($statusPath) ? json_decode((string)@file_get_contents($statusPath), true) : null;
+    if (is_array($currentStatus) && ($currentStatus['finished'] ?? false) === true && ($currentStatus['ok'] ?? false) === true) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => true, 'alreadyFinished' => true], JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+    $abortRoot = $root . DIRECTORY_SEPARATOR . '.bootstrap';
+    if (!is_dir($abortRoot)) @mkdir($abortRoot, 0777, true);
+    @file_put_contents($abortRoot . DIRECTORY_SEPARATOR . 'abort-' . $requestToken, '1', LOCK_EX);
+    @file_put_contents($root . DIRECTORY_SEPARATOR . '.dev-data-download-aborted', (string)time(), LOCK_EX);
+    $abortDataPath = $root . DIRECTORY_SEPARATOR . 'data';
+    if (file_exists($abortDataPath) || is_link($abortDataPath)) dev_bootstrap_remove_path($abortDataPath);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+if (!$isWorker) {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') dev_bootstrap_fail('method not allowed', 405);
+    if (preg_match('/^[a-f0-9]{32}$/', $requestToken) !== 1) dev_bootstrap_fail('invalid bootstrap token', 400);
+    if (!is_dir($bootstrapRoot)) @mkdir($bootstrapRoot, 0777, true);
+    @unlink($bootstrapRoot . DIRECTORY_SEPARATOR . 'abort-' . $requestToken);
+    @file_put_contents($statusPath, json_encode(['ok' => true, 'stage' => 'initialize', 'progress' => 0, 'message' => 'starting...', 'finished' => false]), LOCK_EX);
+    session_write_close();
+    $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__FILE__) . ' --worker ' . escapeshellarg($requestToken) . ' > /dev/null 2>&1 &';
+    @exec($command);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    http_response_code(202);
+    echo json_encode(['ok' => true, 'jobStarted' => true, 'token' => $requestToken], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+if (preg_match('/^[a-f0-9]{32}$/', $requestToken) !== 1) {
+    exit(1);
+}
+$GLOBALS['devBootstrapStatusPath'] = $statusPath;
+
+$abortMarker = $bootstrapRoot . DIRECTORY_SEPARATOR . 'abort-' . $requestToken;
+$GLOBALS['devBootstrapAbortMarker'] = $abortMarker;
 $tmpRoot = $bootstrapRoot . DIRECTORY_SEPARATOR . 'run-' . bin2hex(random_bytes(6));
 $zipPath = $tmpRoot . DIRECTORY_SEPARATOR . 'dev-data.zip';
 $extractDir = $tmpRoot . DIRECTORY_SEPARATOR . 'extract';
 $dataPath = $root . DIRECTORY_SEPARATOR . 'data';
+$bootstrapError = null;
+$bootstrapWasAborted = false;
 
 try {
+    dev_bootstrap_emit('initialize', 2, 'preparing temporary bootstrap workspace...', [
+        'log' => 'authorization passed; background worker started',
+    ]);
     if (!@mkdir($bootstrapRoot, 0777, true) && !is_dir($bootstrapRoot)) {
         throw new RuntimeException('could not create .bootstrap directory');
     }
@@ -806,7 +862,7 @@ try {
     ]);
 
     dev_bootstrap_emit('listing', 10, 'checking Google Drive folder...');
-    $archive = dev_bootstrap_latest_archive_from_drive(FRIDG3_DEV_BOOTSTRAP_FOLDER_ID);
+    $archive = dev_bootstrap_latest_archive_from_drive(FRIDGE_DEV_BOOTSTRAP_FOLDER_ID);
     dev_bootstrap_emit('found', 24, 'found ' . $archive['name'], [
         'archive' => $archive['name'],
     ]);
@@ -845,15 +901,24 @@ try {
     dev_bootstrap_emit('done', 100, 'dev data installed from ' . $archive['name'], [
         'archive' => $archive['name'],
     ]);
+    @unlink($abortMarker);
 } catch (Throwable $e) {
-    dev_bootstrap_fail($e->getMessage());
+    $bootstrapWasAborted = is_file($abortMarker) || $e->getMessage() === '__DEV_BOOTSTRAP_CLIENT_ABORTED__';
+    if ($bootstrapWasAborted) {
+        if (file_exists($dataPath) || is_link($dataPath)) dev_bootstrap_remove_path($dataPath);
+        @file_put_contents($root . DIRECTORY_SEPARATOR . '.dev-data-download-aborted', (string)time(), LOCK_EX);
+        @unlink($abortMarker);
+    }
+    $bootstrapError = $e;
 } finally {
     if (is_dir($tmpRoot)) {
         try {
             dev_bootstrap_remove_path($tmpRoot);
-            dev_bootstrap_emit('cleanup', 100, isset($archive['name']) ? 'dev data installed from ' . $archive['name'] : 'cleaning temporary bootstrap files...', [
-                'log' => 'temporary download and extraction workspace removed',
-            ]);
+            if (!$bootstrapWasAborted && !connection_aborted()) {
+                dev_bootstrap_emit('cleanup', 100, isset($archive['name']) ? 'dev data installed from ' . $archive['name'] : 'cleaning temporary bootstrap files...', [
+                    'log' => 'temporary download and extraction workspace removed',
+                ]);
+            }
         } catch (Throwable $ignored) {
             /* best effort */
         }
@@ -862,5 +927,27 @@ try {
         @rmdir($bootstrapRoot);
     }
 }
+
+if ($bootstrapError instanceof Throwable) {
+    if ($bootstrapWasAborted) {
+        @unlink($statusPath);
+        if (is_dir($bootstrapRoot)) {
+            try {
+                dev_bootstrap_remove_path($bootstrapRoot);
+            } catch (Throwable $ignored) {
+                /* best effort */
+            }
+        }
+        exit(0);
+    }
+    $event = ['ok' => false, 'finished' => true, 'progress' => 100, 'message' => $bootstrapError->getMessage()];
+    @file_put_contents($statusPath, json_encode($event, JSON_UNESCAPED_SLASHES), LOCK_EX);
+    exit(1);
+}
+
+$completedStatus = is_file($statusPath) ? json_decode((string)@file_get_contents($statusPath), true) : [];
+if (!is_array($completedStatus)) $completedStatus = [];
+$completedStatus['finished'] = true;
+@file_put_contents($statusPath, json_encode($completedStatus, JSON_UNESCAPED_SLASHES), LOCK_EX);
 
 ?>

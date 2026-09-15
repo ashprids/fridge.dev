@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    const debugLog = message => window.fridg3DebugClientLog?.(`[discord export viewer] ${message}`);
+    const debugLog = message => window.fridgeDebugClientLog?.(`[discord export viewer] ${message}`);
 
     function initDiscordExportViewer() {
         try {
@@ -215,6 +215,7 @@
                 const timestamp = document.createElement('span');
                 timestamp.className = 'discord-timestamp';
                 timestamp.textContent = formatTimestamp(msg && msg.timestamp);
+                timestamp.dataset.exactDatetime = safeText(msg && msg.timestamp);
                 header.append(author, timestamp);
                 if (searchActive || imagesOnly) {
                     const jumpButton = document.createElement('button');
@@ -236,6 +237,7 @@
             function renderChunk(reset) {
                 if (reset) { messagesEl.innerHTML = ''; renderedCount = 0; }
                 filteredMessages.slice(renderedCount, renderedCount + PAGE_SIZE).forEach(msg => messagesEl.appendChild(createMessageEl(msg)));
+                if (typeof window.initTooltips === 'function') window.initTooltips();
                 renderedCount = Math.min(renderedCount + PAGE_SIZE, filteredMessages.length);
                 loadMoreBtn.style.display = renderedCount < filteredMessages.length ? 'block' : 'none';
                 updateStatus();
@@ -338,6 +340,6 @@
         }
     }
 
-    window.fridg3InitDiscordExportViewer = initDiscordExportViewer;
+    window.fridgeInitDiscordExportViewer = initDiscordExportViewer;
     initDiscordExportViewer();
 }());

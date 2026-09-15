@@ -4,7 +4,7 @@ while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'toast.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 
@@ -14,8 +14,8 @@ $description = 'log into your fridge.dev account.';
 $login_error = '';
 $login_success = false;
 $login_maintenance_denied = false;
-$maintenance_mode = function_exists('fridg3_session_work_in_progress_enabled')
-    && fridg3_session_work_in_progress_enabled();
+$maintenance_mode = function_exists('fridge_session_work_in_progress_enabled')
+    && fridge_session_work_in_progress_enabled();
 
 // If already logged in, redirect to homepage
 if (isset($_SESSION['user'])) {
@@ -84,21 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($login_error === '') {
     
-            if (fridg3_toast_is_reserved_username($username)) {
+            if (fridge_toast_is_reserved_username($username)) {
                 $toastAdminUsername = trim((string)($_POST['toast_admin_username'] ?? ''));
                 $toastAdminPassword = (string)($_POST['toast_admin_password'] ?? '');
 
-                if (fridg3_toast_verify_admin_credentials($toastAdminUsername, $toastAdminPassword)) {
-                    $toastUser = fridg3_toast_session_user();
+                if (fridge_toast_verify_admin_credentials($toastAdminUsername, $toastAdminPassword)) {
+                    $toastUser = fridge_toast_session_user();
                     if ($maintenance_mode && empty($toastUser['isAdmin'])) {
                         $login_maintenance_denied = true;
                         $login_error = 'maintenance mode is admin-only right now.';
                     } else {
                         session_regenerate_id(true);
                         $_SESSION['user'] = $toastUser;
-                        fridg3_refresh_is_admin_cookie(false);
-                        if (function_exists('fridg3_clear_legacy_session_cookie')) {
-                            fridg3_clear_legacy_session_cookie();
+                        fridge_refresh_is_admin_cookie(false);
+                        if (function_exists('fridge_clear_legacy_session_cookie')) {
+                            fridge_clear_legacy_session_cookie();
                         }
                         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                         $login_success = true;
@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     'name' => htmlspecialchars($account['name'], ENT_QUOTES, 'UTF-8'),
                                     'isAdmin' => (bool)($account['isAdmin'] ?? false),
                                     'isModerator' => (bool)($account['isModerator'] ?? false),
-                                    'postingRestricted' => (bool)($account['postingRestricted'] ?? false),
+                                    'postingRestricted' => !empty($account['postingRestricted']) || !empty($account['accountBanned']),
                                     'mustResetPassword' => !empty($account['mustResetPassword']),
                                     'emailAddress' => htmlspecialchars((string)($account['emailAddress'] ?? ''), ENT_QUOTES, 'UTF-8'),
                                     'allowedPages' => array_map(function ($page) {
@@ -158,14 +158,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 ];
 
                                 // Expose admin flag to client for WIP bypass (non-HttpOnly)
-                                fridg3_refresh_is_admin_cookie($_SESSION['user']['isAdmin']);
-                                if (function_exists('fridg3_clear_legacy_session_cookie')) {
-                                    fridg3_clear_legacy_session_cookie();
+                                fridge_refresh_is_admin_cookie($_SESSION['user']['isAdmin']);
+                                if (function_exists('fridge_clear_legacy_session_cookie')) {
+                                    fridge_clear_legacy_session_cookie();
                                 }
 
                                 // Rotate CSRF token after a successful login
                                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-                                fridg3_feed_record_account_ip((string)$account['username'], fridg3_feed_client_ip());
+                                fridge_feed_record_account_ip((string)$account['username'], fridge_feed_client_ip());
                                 
                                 $login_success = true;
                                 session_write_close();

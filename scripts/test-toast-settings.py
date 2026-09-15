@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix='bot-mode-check-') as tmp:
  (root/'data/etc/toast-dm-history.json').write_text('{}')
  credentials=root/'api/toast-credentials/index.php';credentials.write_text(credentials.read_text().replace("file_get_contents('php://input')","getenv('TEST_BODY')"))
  (root/'run.php').write_text('''<?php
- define('FRIDG3_SKIP_ACCESS_LOG',true); session_save_path(sys_get_temp_dir());session_start();
+ define('FRIDGE_SKIP_ACCESS_LOG',true); session_save_path(sys_get_temp_dir());session_start();
  $_SESSION=['user'=>json_decode(getenv('TEST_USER'),true)]; if(!$_SESSION['user'])$_SESSION=[]; $_SESSION['toast_radio_csrf']='fixture-token'; $_SESSION['toast_credentials_csrf']='fixture-token'; $_SESSION['toast_chat_csrf']='fixture-token'; $_SESSION['csrf_token']='fixture-token';
  $_SERVER['REQUEST_URI']=getenv('TEST_PATH');$_SERVER['REQUEST_METHOD']=getenv('TEST_METHOD')?:'GET';$_SERVER['HTTP_HOST']='fridge.dev';
  $_SERVER['REMOTE_ADDR']='203.0.113.42';$_POST=json_decode(getenv('TEST_BODY')?:'{}',true);$_GET=[];
@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='bot-mode-check-') as tmp:
  ''')
  bot={'username':'toast','name':'Toast','isHardcodedToast':True,'isAdmin':False,'allowedPages':['feed','comments']}
  def run(file,path,user=bot,method='GET',body={}):
-  env=dict(os.environ,TEST_FILE=file,TEST_PATH=path,TEST_USER=json.dumps(user),TEST_METHOD=method,TEST_BODY=json.dumps(body),FRIDG3_TOAST_CHAT_DATA_DIR=str(root/'chats'))
+  env=dict(os.environ,TEST_FILE=file,TEST_PATH=path,TEST_USER=json.dumps(user),TEST_METHOD=method,TEST_BODY=json.dumps(body),**{'FRIDG3_TOAST_CHAT_DATA_DIR':str(root/'chats')})
   r=subprocess.run(['php',str(root/'run.php')],env=env,capture_output=True,text=True)
   assert r.returncode==0,(file,r.stderr)
   assert 'Fatal' not in r.stderr and 'Warning' not in r.stderr,(file,r.stderr)

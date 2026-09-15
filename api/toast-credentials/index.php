@@ -1,13 +1,13 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__, 2) . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 function toast_credentials_response(array $data, int $status = 200): never {
     http_response_code($status); echo json_encode($data); exit;
 }
-if (!fridg3_toast_is_current_user()) toast_credentials_response(['ok'=>false,'error'=>'Toast access required.'],403);
+if (!fridge_toast_is_current_user()) toast_credentials_response(['ok'=>false,'error'=>'Toast access required.'],403);
 $_SESSION['toast_credentials_csrf'] ??= bin2hex(random_bytes(32));
 $path = dirname(__DIR__, 2) . '/data/etc/toast.json';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

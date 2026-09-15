@@ -1,14 +1,14 @@
 <?php
 require_once __DIR__ . '/session.php';
 require_once __DIR__ . '/feed.php';
-fridg3_start_session();
-fridg3_feed_refresh_session_user();
+fridge_start_session();
+fridge_feed_refresh_session_user();
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 function toast_radio_response(array $data, int $status = 200): never {
     http_response_code($status); echo json_encode($data, JSON_UNESCAPED_SLASHES); exit;
 }
-if (empty($_SESSION['user']['isAdmin']) && !fridg3_toast_is_current_user()) toast_radio_response(['ok'=>false, 'error'=>'Admin or Toast access required.'],403);
+if (empty($_SESSION['user']['isAdmin']) && !fridge_toast_is_current_user()) toast_radio_response(['ok'=>false, 'error'=>'Admin or Toast access required.'],403);
 $_SESSION['toast_radio_csrf'] ??= bin2hex(random_bytes(32));
 $path = dirname(__DIR__) . '/data/etc/toast.json';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

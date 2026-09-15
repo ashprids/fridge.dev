@@ -6,7 +6,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $rootDir = dirname(__DIR__);
 require_once $rootDir . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
@@ -330,16 +330,17 @@ function contact_notify_admin_accounts(array $submission): bool {
     $senderEmail = trim((string)($submission['email'] ?? ''));
     $message = $senderName . ($senderEmail !== '' ? ' (' . $senderEmail . ')' : '') . ' submitted a new contact form message.';
     $createdDate = date('Y-m-d H:i:s', (int)($submission['createdAt'] ?? time()));
-    return fridg3_targeted_notifications_notify_admins('new contact submission', $message, '/contact?dashboard=1', $createdDate, 'contact-' . $submissionId);
+    return fridge_targeted_notifications_notify_admins('new contact submission', $message, '/contact?dashboard=1', $createdDate, 'contact-' . $submissionId);
 }
 
 contact_refresh_current_user_permissions();
-fridg3_refresh_current_user_posting_restriction();
+fridge_refresh_current_user_posting_restriction();
 $csrfToken = contact_create_csrf_token();
-$contactPostingRestricted = fridg3_current_user_posting_restricted();
-$contactIpBanned = fridg3_feed_is_ip_banned(fridg3_feed_client_ip());
+$contactPostingRestricted = fridge_current_user_posting_restricted();
+$contactBypassesIpRestrictions = fridge_current_user_bypasses_ip_restrictions();
+$contactIpBanned = fridge_feed_is_current_client_ip_banned();
 $contactSubmissionBlocked = $contactPostingRestricted || $contactIpBanned;
-$contactCooldownRemaining = contact_cooldown_remaining($rateLimitPath);
+$contactCooldownRemaining = $contactBypassesIpRestrictions ? 0 : contact_cooldown_remaining($rateLimitPath);
 
 if (isset($_GET['dashboard'])) {
     if (!contact_user_is_admin()) {
@@ -376,7 +377,7 @@ if (isset($_GET['dashboard'])) {
         $notifyError = trim((string)($submission['notifyError'] ?? ''));
         $submissionIp = trim((string)($submission['ip'] ?? ''));
         $displayIp = filter_var($submissionIp, FILTER_VALIDATE_IP) ? 'IP: ' . $submissionIp : 'No IP associated';
-        $showNotifyError = $notifyError !== '' && !fridg3_is_local_dev_server();
+        $showNotifyError = $notifyError !== '' && !fridge_is_local_dev_server();
         $cards[] = '<article class="chat-admin-card contact-admin-card">'
             . '<div class="contact-admin-copy">'
             . '<div class="contact-admin-header">'
@@ -453,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'too many links. keep it human.';
     }
     if ($errors === []) {
-        $contactCooldownRemaining = contact_claim_cooldown($rateLimitPath);
+        $contactCooldownRemaining = $contactBypassesIpRestrictions ? 0 : contact_claim_cooldown($rateLimitPath);
         if ($contactCooldownRemaining > 0) {
             $errors[] = 'please wait ' . contact_format_cooldown($contactCooldownRemaining) . ' before sending another message.';
         } elseif ($contactCooldownRemaining < 0) {
@@ -501,7 +502,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $challenge = contact_create_challenge();
-$contactCooldownRemaining = contact_cooldown_remaining($rateLimitPath);
+$contactCooldownRemaining = $contactBypassesIpRestrictions ? 0 : contact_cooldown_remaining($rateLimitPath);
 $cooldownUntil = $contactCooldownRemaining > 0 ? time() + $contactCooldownRemaining : 0;
 $sendButtonAttributes = $contactCooldownRemaining > 0
     ? ' disabled aria-disabled="true" class="form-button-disabled" data-contact-cooldown-until="' . $cooldownUntil . '"'
@@ -569,9 +570,9 @@ $content = str_replace(
 
 if ($contactSubmissionBlocked) {
     $restrictionNotice = $contactPostingRestricted
-        ? fridg3_posting_restriction_notice()
+        ? fridge_posting_restriction_notice()
         : '<p class="posting-restriction-message">your IP address has been restricted.</p>';
-    $content = fridg3_disable_composer_controls($content);
+    $content = fridge_disable_composer_controls($content);
     $content = $restrictionNotice . $content;
 }
 

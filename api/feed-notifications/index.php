@@ -4,7 +4,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'targeted-notifications.php';
 
@@ -54,7 +54,7 @@ function feed_notifications_plain_text(string $text, int $maxLength = 220): stri
 
 function feed_notifications_load_posts(): array {
     $posts = [];
-    $files = glob(fridg3_feed_posts_dir() . DIRECTORY_SEPARATOR . '*.txt');
+    $files = glob(fridge_feed_posts_dir() . DIRECTORY_SEPARATOR . '*.txt');
     if ($files === false) {
         return $posts;
     }
@@ -88,7 +88,7 @@ function feed_notifications_load_posts(): array {
 
 function feed_notifications_accounts_index(): array {
     $index = [];
-    foreach (fridg3_feed_load_accounts()['accounts'] as $account) {
+    foreach (fridge_feed_load_accounts()['accounts'] as $account) {
         $username = strtolower(trim((string)($account['username'] ?? '')));
         if ($username === '') {
             continue;
@@ -119,7 +119,7 @@ function feed_notifications_mentions(string $body, array $accountsIndex): array 
 
 function feed_notifications_event(string $key, string $type, string $actor, bool $actorIsGuest, string $action, string $body, string $format, string $url, string $date): array {
     $actorLabel = $actorIsGuest ? $actor : '@' . ltrim($actor, '@');
-    $bodyHtml = fridg3_feed_render_post_body($body, $format === 'v2' ? 'v2' : 'legacy');
+    $bodyHtml = fridge_feed_render_post_body($body, $format === 'v2' ? 'v2' : 'legacy');
     $plainBodySource = preg_replace('/<[^>]+>/', ' ', $bodyHtml);
     return [
         'key' => $key,
@@ -136,7 +136,7 @@ function feed_notifications_event(string $key, string $type, string $actor, bool
 }
 
 function feed_notifications_inbox_state_path(): string {
-    return fridg3_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'notification-inbox-state.json';
+    return fridge_feed_find_root() . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'notification-inbox-state.json';
 }
 
 function feed_notifications_inbox_identity(string $usernameKey, string $guestBrowserId, string $clientIp = ''): string {
@@ -161,7 +161,7 @@ function feed_notifications_save_inbox_state(array $state): bool {
     if (!is_dir($dir)) @mkdir($dir, 0775, true);
     $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     $saved = $encoded !== false && @file_put_contents($path, $encoded, LOCK_EX) !== false;
-    if ($saved) fridg3_notification_revision_touch();
+    if ($saved) fridge_notification_revision_touch();
     return $saved;
 }
 
@@ -229,8 +229,8 @@ function feed_notifications_dismiss_inbox(string $identity, array $keys): bool {
 
 $currentUsername = isset($_SESSION['user']['username']) ? ltrim((string)$_SESSION['user']['username'], '@') : '';
 $currentUsernameKey = strtolower($currentUsername);
-$guestBrowserId = fridg3_feed_normalize_guest_browser_id((string)($_GET['guestBrowserId'] ?? $_POST['guestBrowserId'] ?? ''));
-$currentClientIp = fridg3_feed_client_ip();
+$guestBrowserId = fridge_feed_normalize_guest_browser_id((string)($_GET['guestBrowserId'] ?? $_POST['guestBrowserId'] ?? ''));
+$currentClientIp = fridge_feed_client_ip();
 
 $posts = feed_notifications_load_posts();
 $accountsIndex = feed_notifications_accounts_index();
@@ -260,7 +260,7 @@ foreach ($posts as $postId => $post) {
         }
     }
 
-    $replies = fridg3_feed_load_replies((string)$postId);
+    $replies = fridge_feed_load_replies((string)$postId);
     $repliesById = [];
     foreach ($replies as $reply) {
         $replyId = (string)($reply['id'] ?? '');
@@ -328,8 +328,8 @@ foreach ($posts as $postId => $post) {
         }
 
         if ($guestBrowserId !== '') {
-            $parentGuestBrowserId = is_array($parentReply) ? fridg3_feed_normalize_guest_browser_id((string)($parentReply['guestBrowserId'] ?? '')) : '';
-            $replyGuestBrowserId = fridg3_feed_normalize_guest_browser_id((string)($reply['guestBrowserId'] ?? ''));
+            $parentGuestBrowserId = is_array($parentReply) ? fridge_feed_normalize_guest_browser_id((string)($parentReply['guestBrowserId'] ?? '')) : '';
+            $replyGuestBrowserId = fridge_feed_normalize_guest_browser_id((string)($reply['guestBrowserId'] ?? ''));
             if ($parentGuestBrowserId === $guestBrowserId && $replyGuestBrowserId !== $guestBrowserId) {
                 $events[] = feed_notifications_event(
                     'guest-comment-reply:' . $postId . ':' . $replyId . ':' . $guestBrowserId,
@@ -355,7 +355,7 @@ if ($currentUsernameKey === '') {
     $events = array_values(array_filter($events, static fn(array $event): bool => str_starts_with((string)($event['key'] ?? ''), 'guest-comment-reply:')));
 }
 
-foreach (fridg3_targeted_notifications_load() as $targeted) {
+foreach (fridge_targeted_notifications_load() as $targeted) {
     $targetType = (string)($targeted['targetType'] ?? '');
     $target = strtolower((string)($targeted['target'] ?? ''));
     if (!(($targetType === 'user' && $currentUsernameKey !== '' && $target === $currentUsernameKey)
@@ -363,7 +363,7 @@ foreach (fridg3_targeted_notifications_load() as $targeted) {
         || ($targetType === 'audience' && $target === 'users' && $currentUsernameKey !== '')
         || ($targetType === 'audience' && $target === 'guests' && $currentUsernameKey === ''))) continue;
     $message = (string)($targeted['message'] ?? '');
-    $messageHtml = fridg3_feed_render_post_body($message, 'v2');
+    $messageHtml = fridge_feed_render_post_body($message, 'v2');
     $events[] = [
         'key' => 'targeted:' . (string)($targeted['id'] ?? ''), 'type' => 'targeted',
         'title' => (string)($targeted['title'] ?? 'notification'), 'actor' => '', 'actorIsGuest' => false, 'action' => '',
@@ -372,7 +372,7 @@ foreach (fridg3_targeted_notifications_load() as $targeted) {
     ];
 }
 
-$ipRestriction = fridg3_feed_banned_ip_record($currentClientIp);
+$ipRestriction = fridge_feed_banned_ip_record($currentClientIp);
 if ($ipRestriction !== null) {
     $reason = trim((string)($ipRestriction['reason'] ?? ''));
     $notificationId = trim((string)($ipRestriction['notificationId'] ?? ''));

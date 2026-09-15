@@ -11,7 +11,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'journal.php';
 
@@ -70,7 +70,7 @@ if (isset($_SESSION['user'])) {
 $template = str_replace('{user_greeting}', $user_greeting, $template);
 
 $title = 'homepage';
-$description = 'welcome to fridge.dev, a personal website and sometimes even an online community.';
+$description = 'Explore fridge.dev: a personal website and creative community with original music, journal stories, feed updates, web tools, Minecraft worlds, and independent projects.';
 
 $content_path = find_template_file('content.html');
 if (!$content_path) {
@@ -135,14 +135,14 @@ if (is_dir($postsDir)) {
         if ($count >= 1) break;
         $raw = @file_get_contents($file);
         if ($raw === false) continue;
-        $parsedPost = fridg3_feed_parse_post($raw);
+        $parsedPost = fridge_feed_parse_post($raw);
         $username = $parsedPost['username'];
         $dateLine = $parsedPost['date'];
         $body = $parsedPost['body'];
         $safeUser = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
         $ago = $humanize($dateLine);
         $safeAgo = htmlspecialchars($ago, ENT_QUOTES, 'UTF-8');
-        $safeBody = fridg3_feed_render_post_body($body, $parsedPost['format']);
+        $safeBody = fridge_feed_render_post_body($body, $parsedPost['format']);
 
         $postId = urlencode(basename($file, '.txt'));
         $postIdRaw = basename($file, '.txt');
@@ -160,7 +160,7 @@ if (is_dir($postsDir)) {
             . '<div id="post" style="cursor: pointer;">'
             . '<div id="post-header">'
             . '<span id="post-username">@' . $safeUser . '</span>'
-            . '<span id="post-date-feed">' . $safeAgo . ' • ' . $editIcon . '<span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="' . $bookmarkIconClass . ' fa-bookmark"></i></span></span>'
+            . '<span id="post-date-feed" data-exact-datetime="' . htmlspecialchars((string)$dateLine, ENT_QUOTES, 'UTF-8') . '">' . $safeAgo . ' • ' . $editIcon . '<span id="post-bookmark-feed" data-tooltip="save post" data-post-id="' . $postId . '"><i class="' . $bookmarkIconClass . ' fa-bookmark"></i></span></span>'
             . '</div>'
             . ($parsedPost['format'] === 'v2' ? $safeBody : '<span id="post-content">' . $safeBody . '</span>')
             . '</div>'
@@ -200,12 +200,12 @@ if (isset($_SESSION['user']) && !empty($_SESSION['user']['username'])) {
 }
 
 if (is_dir($journalDir)) {
-    $postFiles = fridg3_journal_post_files($journalDir);
+    $postFiles = fridge_journal_post_files($journalDir);
     $posts = [];
 
     foreach ($postFiles as $pf) {
         $rawPost = @file_get_contents($pf);
-        $parsedPost = $rawPost !== false ? fridg3_journal_parse_post($rawPost) : null;
+        $parsedPost = $rawPost !== false ? fridge_journal_parse_post($rawPost) : null;
         if ($parsedPost === null) {
             continue;
         }
@@ -317,7 +317,7 @@ if (is_dir($musicDir)) {
             . ' data-album-artist="frdg3"'
             . ' data-album-tracks="' . $album['songs'] . '">'
             . '<div class="grid-item">'
-            . '<img class="grid-image" src="' . $album['art'] . '" alt="' . $album['name'] . '">'
+            . '<img class="grid-image" loading="lazy" decoding="async" src="' . $album['art'] . '" alt="' . $album['name'] . '">'
             . '<div class="grid-caption">' . $album['name'] . '</div>'
             . '<div class="grid-subcaption">' . $album['type'] . '<br>' . $album['caption'] . '</div>'
             . '</div></a>';

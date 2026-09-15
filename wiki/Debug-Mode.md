@@ -50,7 +50,7 @@ The available filters are `settings`, `network`, `warnings`, and `errors`. Share
 First-party scripts can add concise entries with:
 
 ```js
-window.fridg3DebugClientLog?.('[feature] useful event description');
+window.fridgeDebugClientLog?.('[feature] useful event description');
 ```
 
 Use a stable bracketed feature tag so entries are searchable. Log state transitions and outcomes, not keystrokes, animation frames, complete objects, or repetitive polling success.
@@ -72,12 +72,12 @@ The server filters are `loaded`, `process`, `warnings`, and `errors`. `loaded` c
 After loading `lib/render.php` or `lib/debug.php`, add a route-specific message with:
 
 ```php
-fridg3_debug_log('[PHP] formatting example page initialized');
+fridge_debug_log('[PHP] formatting example page initialized');
 ```
 
 `/formatting/example` is the canonical working example. Values are converted to text and truncated to 2,000 characters, but callers must sanitize them before logging.
 
-For rendered admin pages, `lib/render.php` embeds request-local entries as JSON in the page. SPA navigation imports that payload into the existing overlay. For admin JSON requests made while debug mode is enabled, the fetch wrapper sends `X-Fridg3-Debug: 1`; eligible responses return a base64-encoded `X-Fridg3-Debug-Logs` header. The header is capped to a small selection of recent entries so it remains within practical HTTP header limits. Non-admin responses receive neither transport.
+For rendered admin pages, `lib/render.php` embeds request-local entries as JSON in the page. SPA navigation imports that payload into the existing overlay. For admin JSON requests made while debug mode is enabled, the fetch wrapper sends `X-Fridge-Debug: 1`; eligible responses return a base64-encoded `X-Fridge-Debug-Logs` header. The header is capped to a small selection of recent entries so it remains within practical HTTP header limits. Non-admin responses receive neither transport.
 
 ### Submissions and Redirects
 
@@ -113,7 +113,7 @@ Restart the Python service after deploying these changes. Its service user needs
 
 The access tab is an admin-only view of `data/etc/access.json`, a permission-restricted JSON array capped at the latest 10,000 page visits. The development-data archive excludes this sensitive file.
 
-The shutdown runtime records only direct top-level document navigation executed through `index.php`. Normal browser navigation is identified with Fetch Metadata; fridge.dev SPA navigation explicitly sends `X-Fridg3-Page-Navigation: 1`. Older browsers fall back to a non-XHR request that accepts HTML.
+The shutdown runtime records only direct top-level document navigation executed through `index.php`. Normal browser navigation is identified with Fetch Metadata; fridge.dev SPA navigation explicitly sends `X-Fridge-Page-Navigation: 1`. Older browsers fall back to a non-XHR request that accepts HTML.
 
 The logger excludes API calls, `/chat`, every `/error` path, images, media, scripts, stylesheets, attachments, polling, hard-ban authorization checks, and other subresources. Missing pages retain the originally requested path and are recorded once with status `404`.
 

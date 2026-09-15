@@ -1,4 +1,4 @@
-const bookmarksDebugLog = message => window.fridg3DebugClientLog?.(`[bookmarks] ${message}`);
+const bookmarksDebugLog = message => window.fridgeDebugClientLog?.(`[bookmarks] ${message}`);
 
 function isLoggedIn() {
     try {
@@ -428,6 +428,7 @@ function enhanceBookmarksPage() {
 
                     const dateSpan = document.createElement('span');
                     dateSpan.id = 'post-date-feed';
+                    dateSpan.dataset.exactDatetime = data.date || '';
 
                     const bookmarkSpan = document.createElement('span');
                     bookmarkSpan.id = 'post-bookmark-feed';

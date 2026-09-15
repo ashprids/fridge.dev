@@ -3,7 +3,7 @@
 $sessionBootstrapDir = __DIR__;
 while (!file_exists($sessionBootstrapDir . '/lib/session.php') && dirname($sessionBootstrapDir) !== $sessionBootstrapDir) $sessionBootstrapDir = dirname($sessionBootstrapDir);
 require_once $sessionBootstrapDir . '/lib/session.php';
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . '/account/admin/helpers.php';
 require_once dirname(__DIR__, 2) . '/lib/moderator-audit.php';
 require_once dirname(__DIR__, 2) . '/lib/feed.php';
@@ -49,7 +49,7 @@ function audit_log_render_post(array $snapshot, array $details, string $action, 
     }
 
     $format = (string)($snapshot['format'] ?? 'legacy');
-    $renderedBody = fridg3_feed_render_post_body($body, $format);
+    $renderedBody = fridge_feed_render_post_body($body, $format);
     if (str_contains($action, 'reply')) {
         return '<div class="restricted-ip-history-entry"><span class="restricted-ip-history-state">feed reply</span>'
             . '<div class="feed-reply"><div class="feed-reply-header"><span class="feed-reply-username"><em>' . $safeAuthor . '</em></span>'
@@ -64,7 +64,7 @@ function audit_log_render_post(array $snapshot, array $details, string $action, 
 
 $searchQuery = trim((string)($_GET['q'] ?? ''));
 $safeSearchQuery = audit_log_h($searchQuery);
-$records = fridg3_moderator_audit_load();
+$records = fridge_moderator_audit_load();
 usort($records, static function (array $a, array $b): int {
     $aTime = strtotime((string)($a['timestamp'] ?? '')) ?: 0;
     $bTime = strtotime((string)($b['timestamp'] ?? '')) ?: 0;

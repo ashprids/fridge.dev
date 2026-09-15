@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'image-thumbnails.php';
 
 $title = 'gallery';
@@ -102,7 +102,7 @@ if (is_dir($imagesDir)) {
     foreach ($pageImages as $img) {
         $filename = basename($img['path']);
         $url = '/data/images/' . rawurlencode($filename);
-        $thumbnailPath = fridg3_image_thumbnail_path($img['path'], $thumbnailDir);
+        $thumbnailPath = fridge_image_thumbnail_path($img['path'], $thumbnailDir);
         $thumbnailUrl = $thumbnailPath !== null
             ? '/data/images/thumbnails/' . rawurlencode(basename($thumbnailPath))
             : $url;

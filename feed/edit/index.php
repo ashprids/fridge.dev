@@ -5,9 +5,9 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
-fridg3_feed_refresh_session_user();
+fridge_feed_refresh_session_user();
 
 // Require logged-in user
 if (!isset($_SESSION['user']) || !isset($_SESSION['user']['username'])) {
@@ -40,7 +40,7 @@ if (!file_exists($postPath)) {
 
 // Load post and verify permissions
 $raw = file_get_contents($postPath);
-$parsedPost = fridg3_feed_parse_post((string)$raw);
+$parsedPost = fridge_feed_parse_post((string)$raw);
 $postFormat = $parsedPost['format'];
 $postUsername = $parsedPost['username'];
 $postDate = $parsedPost['date'];
@@ -51,8 +51,8 @@ $currentUser = $_SESSION['user']['username'] ?? '';
 $isAdmin = $_SESSION['user']['isAdmin'] ?? false;
 $isModerator = $_SESSION['user']['isModerator'] ?? false;
 $canEdit = ($currentUser === $postUsername) || $isAdmin
-    || ($isModerator && !fridg3_feed_account_is_admin($postUsername));
-$postingRestricted = fridg3_current_user_posting_restricted();
+    || ($isModerator && !fridge_feed_account_is_admin($postUsername));
+$postingRestricted = fridge_current_user_posting_restricted();
 
 if (!$canEdit) {
     header('Location: /feed');
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Check if delete action
     if (isset($_POST['delete'])) {
         $postIdNoExt = pathinfo(basename((string)$postId), PATHINFO_FILENAME);
-        $postIpRecord = fridg3_feed_load_post_ips()[$postIdNoExt] ?? [];
+        $postIpRecord = fridge_feed_load_post_ips()[$postIdNoExt] ?? [];
         $postIp = is_array($postIpRecord) ? (string)($postIpRecord['ip'] ?? '') : '';
         // Parse post content for images in /data/images and delete them
         $imagesDir = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'images';
@@ -86,31 +86,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        fridg3_feed_delete_post_voice_files($postIdNoExt, $postBody);
+        fridge_feed_delete_post_voice_files($postIdNoExt, $postBody);
         
         // Delete the post file
         if (@unlink($postPath)) {
-            fridg3_feed_archive_ip_content($postIp, 'feed_post', $postIdNoExt, [
+            fridge_feed_archive_ip_content($postIp, 'feed_post', $postIdNoExt, [
                 'username' => $postUsername,
                 'date' => $postDate,
                 'body' => $postBody,
                 'format' => $postFormat,
                 'postId' => $postIdNoExt,
             ]);
-            fridg3_moderator_audit_log('deleted feed post', ['postId' => $postIdNoExt, 'author' => $postUsername], [
+            fridge_moderator_audit_log('deleted feed post', ['postId' => $postIdNoExt, 'author' => $postUsername], [
                 'body' => $postBody,
                 'format' => $postFormat,
             ]);
         }
-        foreach (fridg3_feed_load_replies($postIdNoExt) as $deletedReply) {
-            fridg3_feed_archive_ip_content(
+        foreach (fridge_feed_load_replies($postIdNoExt) as $deletedReply) {
+            fridge_feed_archive_ip_content(
                 (string)($deletedReply['ip'] ?? ''),
                 'feed_reply',
                 $postIdNoExt . ':' . (string)($deletedReply['id'] ?? ''),
                 array_merge($deletedReply, ['postId' => $postIdNoExt])
             );
         }
-        @unlink(fridg3_feed_replies_dir() . DIRECTORY_SEPARATOR . $postIdNoExt . '.json');
+        @unlink(fridge_feed_replies_dir() . DIRECTORY_SEPARATOR . $postIdNoExt . '.json');
         
         // Redirect back to feed
         header('Location: /feed');
@@ -120,11 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newContent = trim($_POST['content'] ?? '');
     
     $mediaMap = isset($_FILES['images']) && is_array($_FILES['images'])
-        ? fridg3_feed_process_uploaded_media($_FILES['images'])
+        ? fridge_feed_process_uploaded_media($_FILES['images'])
         : [];
-    $newContent = fridg3_feed_replace_media_placeholders($newContent, $mediaMap, $postFormat === 'v2');
+    $newContent = fridge_feed_replace_media_placeholders($newContent, $mediaMap, $postFormat === 'v2');
     if (preg_match('/\[(?:media|img|audio|video):\d+\]/i', $newContent) === 1) {
-        fridg3_feed_delete_media_files_from_content($newContent);
+        fridge_feed_delete_media_files_from_content($newContent);
         header('Location: /feed/edit?post=' . rawurlencode(pathinfo(basename($postId), PATHINFO_FILENAME)) . '&error=' . rawurlencode('media upload failed. files must be supported and no larger than 8 MB.'));
         exit;
     }
@@ -133,14 +133,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $prefix = $postFormat === 'v2' ? 'v2' . PHP_EOL : '';
     $text = $prefix . '@' . $postUsername . PHP_EOL . $postDate . PHP_EOL . $newContent . PHP_EOL;
     if (file_put_contents($postPath, $text) !== false) {
-        fridg3_moderator_audit_log('edited feed post', ['postId' => pathinfo(basename((string)$postId), PATHINFO_FILENAME), 'author' => $postUsername], [
+        fridge_moderator_audit_log('edited feed post', ['postId' => pathinfo(basename((string)$postId), PATHINFO_FILENAME), 'author' => $postUsername], [
             'body' => $postBody,
             'format' => $postFormat,
         ], [
             'body' => $newContent,
             'format' => $postFormat,
         ]);
-        fridg3_notification_revision_touch();
+        fridge_notification_revision_touch();
     }
 
     // Redirect back to feed
@@ -210,13 +210,13 @@ $content = str_replace('<textarea id="bbcode-textbox" name="content"></textarea>
                        $content);
 if ($postingRestricted) {
     $deleteButton = '<button id="two-buttons" type="submit" form="delete-feed-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>';
-    $content = fridg3_disable_composer_controls($content);
+    $content = fridge_disable_composer_controls($content);
     $content = str_replace(
         '<button disabled id="two-buttons" type="submit" form="delete-feed-post-form" data-tooltip="this is permanent and cannot be undone!">delete post</button>',
         $deleteButton,
         $content
     );
-    $content = str_replace('<form id="create-post-form"', fridg3_posting_restriction_notice() . '<form id="create-post-form"', $content);
+    $content = str_replace('<form id="create-post-form"', fridge_posting_restriction_notice() . '<form id="create-post-form"', $content);
 }
 
 $html = str_replace('{content}', $content, $template);

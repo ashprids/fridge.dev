@@ -3,19 +3,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'debug.php';
 
-const FRIDG3_HARD_BAN_COOKIE = 'fridg3_hard_ban_id';
+const FRIDGE_HARD_BAN_COOKIE = 'fridg3_hard_ban_id';
 
-if (!function_exists('fridg3_hard_ban_settings_path')) {
-    function fridg3_hard_ban_settings_path(): string
+if (!function_exists('fridge_hard_ban_settings_path')) {
+    function fridge_hard_ban_settings_path(): string
     {
         return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-ban-settings.json';
     }
 }
 
-if (!function_exists('fridg3_hard_ban_strict_enabled')) {
-    function fridg3_hard_ban_strict_enabled(): bool
+if (!function_exists('fridge_hard_ban_strict_enabled')) {
+    function fridge_hard_ban_strict_enabled(): bool
     {
-        $path = fridg3_hard_ban_settings_path();
+        $path = fridge_hard_ban_settings_path();
         if (!is_file($path)) {
             return true;
         }
@@ -26,10 +26,10 @@ if (!function_exists('fridg3_hard_ban_strict_enabled')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_enforcement_enabled')) {
-    function fridg3_hard_ban_enforcement_enabled(): bool
+if (!function_exists('fridge_hard_ban_enforcement_enabled')) {
+    function fridge_hard_ban_enforcement_enabled(): bool
     {
-        $path = fridg3_hard_ban_settings_path();
+        $path = fridge_hard_ban_settings_path();
         if (!is_file($path)) {
             return true;
         }
@@ -40,10 +40,10 @@ if (!function_exists('fridg3_hard_ban_enforcement_enabled')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_write_settings')) {
-    function fridg3_hard_ban_write_settings(array $updates): bool
+if (!function_exists('fridge_hard_ban_write_settings')) {
+    function fridge_hard_ban_write_settings(array $updates): bool
     {
-        $path = fridg3_hard_ban_settings_path();
+        $path = fridge_hard_ban_settings_path();
         $directory = dirname($path);
         if (!is_dir($directory) && !@mkdir($directory, 0750, true)) {
             return false;
@@ -83,39 +83,39 @@ if (!function_exists('fridg3_hard_ban_write_settings')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_set_enforcement_enabled')) {
-    function fridg3_hard_ban_set_enforcement_enabled(bool $enabled): bool
+if (!function_exists('fridge_hard_ban_set_enforcement_enabled')) {
+    function fridge_hard_ban_set_enforcement_enabled(bool $enabled): bool
     {
-        return fridg3_hard_ban_write_settings(['enforcementEnabled' => $enabled]);
+        return fridge_hard_ban_write_settings(['enforcementEnabled' => $enabled]);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_set_strict_enabled')) {
-    function fridg3_hard_ban_set_strict_enabled(bool $enabled): bool
+if (!function_exists('fridge_hard_ban_set_strict_enabled')) {
+    function fridge_hard_ban_set_strict_enabled(bool $enabled): bool
     {
-        if (!$enabled && fridg3_hard_ban_strict_enabled() && !fridg3_hard_ban_release_associated_ips()) {
+        if (!$enabled && fridge_hard_ban_strict_enabled() && !fridge_hard_ban_release_associated_ips()) {
             return false;
         }
-        return fridg3_hard_ban_write_settings(['strictIdentityEnforcement' => $enabled]);
+        return fridge_hard_ban_write_settings(['strictIdentityEnforcement' => $enabled]);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_path')) {
-    function fridg3_hard_ban_path(): string
+if (!function_exists('fridge_hard_ban_path')) {
+    function fridge_hard_ban_path(): string
     {
         return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-banned-ips.txt';
     }
 }
 
-if (!function_exists('fridg3_hard_ban_source_directory')) {
-    function fridg3_hard_ban_source_directory(): string
+if (!function_exists('fridge_hard_ban_source_directory')) {
+    function fridge_hard_ban_source_directory(): string
     {
         return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'banlists';
     }
 }
 
-if (!function_exists('fridg3_hard_ban_parse')) {
-    function fridg3_hard_ban_parse(string $raw): array
+if (!function_exists('fridge_hard_ban_parse')) {
+    function fridge_hard_ban_parse(string $raw): array
     {
         $tokens = preg_split('/\s+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $ips = [];
@@ -142,8 +142,8 @@ if (!function_exists('fridg3_hard_ban_parse')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_normalize_cidr')) {
-    function fridg3_hard_ban_normalize_cidr(string $candidate): ?string
+if (!function_exists('fridge_hard_ban_normalize_cidr')) {
+    function fridge_hard_ban_normalize_cidr(string $candidate): ?string
     {
         $parts = explode('/', trim($candidate));
         if (count($parts) !== 2 || filter_var($parts[0], FILTER_VALIDATE_IP) === false || !ctype_digit($parts[1])) {
@@ -177,10 +177,10 @@ if (!function_exists('fridg3_hard_ban_normalize_cidr')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_load')) {
-    function fridg3_hard_ban_load(): array
+if (!function_exists('fridge_hard_ban_load')) {
+    function fridge_hard_ban_load(): array
     {
-        $path = fridg3_hard_ban_path();
+        $path = fridge_hard_ban_path();
         if (!is_file($path)) {
             return [];
         }
@@ -190,14 +190,14 @@ if (!function_exists('fridg3_hard_ban_load')) {
             return [];
         }
 
-        return fridg3_hard_ban_parse($raw)['ips'];
+        return fridge_hard_ban_parse($raw)['ips'];
     }
 }
 
-if (!function_exists('fridg3_hard_ban_whitelist_load')) {
-    function fridg3_hard_ban_whitelist_load(): array
+if (!function_exists('fridge_hard_ban_whitelist_load')) {
+    function fridge_hard_ban_whitelist_load(): array
     {
-        $path = fridg3_hard_ban_settings_path();
+        $path = fridge_hard_ban_settings_path();
         if (!is_file($path)) {
             return [];
         }
@@ -207,14 +207,14 @@ if (!function_exists('fridg3_hard_ban_whitelist_load')) {
             return [];
         }
 
-        return fridg3_hard_ban_parse(implode(' ', array_map('strval', $decoded['whitelistedIps'])))['ips'];
+        return fridge_hard_ban_parse(implode(' ', array_map('strval', $decoded['whitelistedIps'])))['ips'];
     }
 }
 
-if (!function_exists('fridg3_hard_ban_source_paths')) {
-    function fridg3_hard_ban_source_paths(): array
+if (!function_exists('fridge_hard_ban_source_paths')) {
+    function fridge_hard_ban_source_paths(): array
     {
-        $directory = fridg3_hard_ban_source_directory();
+        $directory = fridge_hard_ban_source_directory();
         if (!is_dir($directory)) {
             return [];
         }
@@ -253,8 +253,8 @@ if (!function_exists('fridg3_hard_ban_source_paths')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_source_tokens')) {
-    function fridg3_hard_ban_source_tokens(string $path): Generator
+if (!function_exists('fridge_hard_ban_source_tokens')) {
+    function fridge_hard_ban_source_tokens(string $path): Generator
     {
         $handle = @fopen($path, 'rb');
         if ($handle === false) {
@@ -310,8 +310,8 @@ if (!function_exists('fridg3_hard_ban_source_tokens')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_entry_contains_packed')) {
-    function fridg3_hard_ban_entry_contains_packed(string $entry, string $packedCandidate): bool
+if (!function_exists('fridge_hard_ban_entry_contains_packed')) {
+    function fridge_hard_ban_entry_contains_packed(string $entry, string $packedCandidate): bool
     {
         if (!str_contains($entry, '/')) {
             $normalizedCandidate = (string)@inet_ntop($packedCandidate);
@@ -330,7 +330,7 @@ if (!function_exists('fridg3_hard_ban_entry_contains_packed')) {
                 && hash_equals($packedEntry, $packedCandidate);
         }
 
-        $cidr = fridg3_hard_ban_normalize_cidr($entry);
+        $cidr = fridge_hard_ban_normalize_cidr($entry);
         if ($cidr === null) {
             return false;
         }
@@ -355,8 +355,8 @@ if (!function_exists('fridg3_hard_ban_entry_contains_packed')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_source_signature')) {
-    function fridg3_hard_ban_source_signature(array $paths): string
+if (!function_exists('fridge_hard_ban_source_signature')) {
+    function fridge_hard_ban_source_signature(array $paths): string
     {
         $sources = [];
         foreach ($paths as $path) {
@@ -380,15 +380,15 @@ if (!function_exists('fridg3_hard_ban_source_signature')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_index_cache_directory')) {
-    function fridg3_hard_ban_index_cache_directory(): string
+if (!function_exists('fridge_hard_ban_index_cache_directory')) {
+    function fridge_hard_ban_index_cache_directory(): string
     {
-        return fridg3_hard_ban_source_directory() . DIRECTORY_SEPARATOR . 'index';
+        return fridge_hard_ban_source_directory() . DIRECTORY_SEPARATOR . 'index';
     }
 }
 
-if (!function_exists('fridg3_hard_ban_remove_directory')) {
-    function fridg3_hard_ban_remove_directory(string $path): void
+if (!function_exists('fridge_hard_ban_remove_directory')) {
+    function fridge_hard_ban_remove_directory(string $path): void
     {
         if (!is_dir($path)) {
             return;
@@ -413,8 +413,8 @@ if (!function_exists('fridg3_hard_ban_remove_directory')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_clean_index_directory')) {
-    function fridg3_hard_ban_clean_index_directory(string $cacheDirectory, ?string $currentSignature = null): void
+if (!function_exists('fridge_hard_ban_clean_index_directory')) {
+    function fridge_hard_ban_clean_index_directory(string $cacheDirectory, ?string $currentSignature = null): void
     {
         $entries = @scandir($cacheDirectory);
         if ($entries === false) {
@@ -429,7 +429,7 @@ if (!function_exists('fridg3_hard_ban_clean_index_directory')) {
 
             $path = $cacheDirectory . DIRECTORY_SEPARATOR . $entry;
             if (str_starts_with($entry, '.build-')) {
-                fridg3_hard_ban_remove_directory($path);
+                fridge_hard_ban_remove_directory($path);
                 continue;
             }
 
@@ -440,21 +440,21 @@ if (!function_exists('fridg3_hard_ban_clean_index_directory')) {
                 && is_file($path . DIRECTORY_SEPARATOR . '.ready')
                 && (int)@filemtime($path . DIRECTORY_SEPARATOR . '.ready') < $oldIndexCutoff
             ) {
-                fridg3_hard_ban_remove_directory($path);
+                fridge_hard_ban_remove_directory($path);
             }
         }
     }
 }
 
-if (!function_exists('fridg3_hard_ban_entry_range')) {
-    function fridg3_hard_ban_entry_range(string $entry): ?array
+if (!function_exists('fridge_hard_ban_entry_range')) {
+    function fridge_hard_ban_entry_range(string $entry): ?array
     {
         if (!str_contains($entry, '/')) {
             $packed = @inet_pton($entry);
             return $packed === false ? null : [$packed, $packed];
         }
 
-        $cidr = fridg3_hard_ban_normalize_cidr($entry);
+        $cidr = fridge_hard_ban_normalize_cidr($entry);
         if ($cidr === null) {
             return null;
         }
@@ -482,8 +482,8 @@ if (!function_exists('fridg3_hard_ban_entry_range')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_write_merged_records')) {
-    function fridg3_hard_ban_write_merged_records(array $records, int $recordLength, $handle): bool
+if (!function_exists('fridge_hard_ban_write_merged_records')) {
+    function fridge_hard_ban_write_merged_records(array $records, int $recordLength, $handle): bool
     {
         if ($records === []) {
             return true;
@@ -521,8 +521,8 @@ if (!function_exists('fridg3_hard_ban_write_merged_records')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_sort_and_merge_bucket')) {
-    function fridg3_hard_ban_sort_and_merge_bucket(string $path, int $recordLength): bool
+if (!function_exists('fridge_hard_ban_sort_and_merge_bucket')) {
+    function fridge_hard_ban_sort_and_merge_bucket(string $path, int $recordLength): bool
     {
         $sourceHandle = @fopen($path, 'rb');
         if ($sourceHandle === false) {
@@ -557,7 +557,7 @@ if (!function_exists('fridg3_hard_ban_sort_and_merge_bucket')) {
                     $succeeded = false;
                     break;
                 }
-                $runSucceeded = fridg3_hard_ban_write_merged_records($records, $recordLength, $runHandle);
+                $runSucceeded = fridge_hard_ban_write_merged_records($records, $recordLength, $runHandle);
                 fclose($runHandle);
                 if (!$runSucceeded) {
                     @unlink($runPath);
@@ -678,8 +678,8 @@ if (!function_exists('fridg3_hard_ban_sort_and_merge_bucket')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_build_source_index')) {
-    function fridg3_hard_ban_build_source_index(array $paths, string $buildDirectory): bool
+if (!function_exists('fridge_hard_ban_build_source_index')) {
+    function fridge_hard_ban_build_source_index(array $paths, string $buildDirectory): bool
     {
         if (!@mkdir($buildDirectory, 0700, true) && !is_dir($buildDirectory)) {
             return false;
@@ -690,8 +690,8 @@ if (!function_exists('fridg3_hard_ban_build_source_index')) {
         $succeeded = true;
         try {
             foreach ($paths as $path) {
-                foreach (fridg3_hard_ban_source_tokens($path) as $entry) {
-                    $range = fridg3_hard_ban_entry_range($entry);
+                foreach (fridge_hard_ban_source_tokens($path) as $entry) {
+                    $range = fridge_hard_ban_entry_range($entry);
                     if ($range === null) {
                         continue;
                     }
@@ -737,7 +737,7 @@ if (!function_exists('fridg3_hard_ban_build_source_index')) {
         if ($succeeded) {
             foreach ($bucketPaths as $bucketKey => $bucketPath) {
                 $recordLength = str_starts_with($bucketKey, '4-') ? 6 : 30;
-                if (!fridg3_hard_ban_sort_and_merge_bucket($bucketPath, $recordLength)) {
+                if (!fridge_hard_ban_sort_and_merge_bucket($bucketPath, $recordLength)) {
                     $succeeded = false;
                     break;
                 }
@@ -745,7 +745,7 @@ if (!function_exists('fridg3_hard_ban_build_source_index')) {
         }
 
         if (!$succeeded || @file_put_contents($buildDirectory . DIRECTORY_SEPARATOR . '.ready', "1\n", LOCK_EX) === false) {
-            fridg3_hard_ban_remove_directory($buildDirectory);
+            fridge_hard_ban_remove_directory($buildDirectory);
             return false;
         }
 
@@ -753,16 +753,16 @@ if (!function_exists('fridg3_hard_ban_build_source_index')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_source_index')) {
-    function fridg3_hard_ban_source_index(): ?string
+if (!function_exists('fridge_hard_ban_source_index')) {
+    function fridge_hard_ban_source_index(): ?string
     {
-        $cacheDirectory = fridg3_hard_ban_index_cache_directory();
+        $cacheDirectory = fridge_hard_ban_index_cache_directory();
         if (!is_dir($cacheDirectory) && !@mkdir($cacheDirectory, 0700, true)) {
             return null;
         }
 
-        $paths = fridg3_hard_ban_source_paths();
-        $signature = fridg3_hard_ban_source_signature($paths);
+        $paths = fridge_hard_ban_source_paths();
+        $signature = fridge_hard_ban_source_signature($paths);
         $indexDirectory = $cacheDirectory . DIRECTORY_SEPARATOR . $signature;
         if (is_file($indexDirectory . DIRECTORY_SEPARATOR . '.ready')) {
             return $indexDirectory;
@@ -777,33 +777,33 @@ if (!function_exists('fridg3_hard_ban_source_index')) {
         }
 
         try {
-            fridg3_hard_ban_clean_index_directory($cacheDirectory);
+            fridge_hard_ban_clean_index_directory($cacheDirectory);
             for ($attempt = 0; $attempt < 2; $attempt++) {
-                $paths = fridg3_hard_ban_source_paths();
-                $signature = fridg3_hard_ban_source_signature($paths);
+                $paths = fridge_hard_ban_source_paths();
+                $signature = fridge_hard_ban_source_signature($paths);
                 $indexDirectory = $cacheDirectory . DIRECTORY_SEPARATOR . $signature;
                 if (is_file($indexDirectory . DIRECTORY_SEPARATOR . '.ready')) {
-                    fridg3_hard_ban_clean_index_directory($cacheDirectory, $signature);
+                    fridge_hard_ban_clean_index_directory($cacheDirectory, $signature);
                     return $indexDirectory;
                 }
 
                 $buildDirectory = $cacheDirectory . DIRECTORY_SEPARATOR . '.build-' . bin2hex(random_bytes(8));
-                if (!fridg3_hard_ban_build_source_index($paths, $buildDirectory)) {
+                if (!fridge_hard_ban_build_source_index($paths, $buildDirectory)) {
                     return null;
                 }
 
-                $currentPaths = fridg3_hard_ban_source_paths();
-                if (fridg3_hard_ban_source_signature($currentPaths) !== $signature) {
-                    fridg3_hard_ban_remove_directory($buildDirectory);
+                $currentPaths = fridge_hard_ban_source_paths();
+                if (fridge_hard_ban_source_signature($currentPaths) !== $signature) {
+                    fridge_hard_ban_remove_directory($buildDirectory);
                     continue;
                 }
 
                 if (!@rename($buildDirectory, $indexDirectory) && !is_file($indexDirectory . DIRECTORY_SEPARATOR . '.ready')) {
-                    fridg3_hard_ban_remove_directory($buildDirectory);
+                    fridge_hard_ban_remove_directory($buildDirectory);
                     return null;
                 }
 
-                fridg3_hard_ban_clean_index_directory($cacheDirectory, $signature);
+                fridge_hard_ban_clean_index_directory($cacheDirectory, $signature);
                 return $indexDirectory;
             }
         } finally {
@@ -815,8 +815,8 @@ if (!function_exists('fridg3_hard_ban_source_index')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_source_index_contains')) {
-    function fridg3_hard_ban_source_index_contains(string $indexDirectory, string $packedCandidate): bool
+if (!function_exists('fridge_hard_ban_source_index_contains')) {
+    function fridge_hard_ban_source_index_contains(string $indexDirectory, string $packedCandidate): bool
     {
         $version = strlen($packedCandidate) === 4 ? '4' : '6';
         $bucket = str_pad(dechex(ord($packedCandidate[0])), 2, '0', STR_PAD_LEFT);
@@ -865,8 +865,8 @@ if (!function_exists('fridg3_hard_ban_source_index_contains')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_source_contains')) {
-    function fridg3_hard_ban_source_contains(string $candidate): bool
+if (!function_exists('fridge_hard_ban_source_contains')) {
+    function fridge_hard_ban_source_contains(string $candidate): bool
     {
         $packedCandidate = @inet_pton(trim($candidate));
         if ($packedCandidate === false) {
@@ -879,15 +879,15 @@ if (!function_exists('fridg3_hard_ban_source_contains')) {
             return $results[$normalizedCandidate];
         }
 
-        $indexDirectory = fridg3_hard_ban_source_index();
+        $indexDirectory = fridge_hard_ban_source_index();
         if ($indexDirectory !== null) {
-            $results[$normalizedCandidate] = fridg3_hard_ban_source_index_contains($indexDirectory, $packedCandidate);
+            $results[$normalizedCandidate] = fridge_hard_ban_source_index_contains($indexDirectory, $packedCandidate);
             return $results[$normalizedCandidate];
         }
 
-        foreach (fridg3_hard_ban_source_paths() as $path) {
-            foreach (fridg3_hard_ban_source_tokens($path) as $entry) {
-                if (fridg3_hard_ban_entry_contains_packed($entry, $packedCandidate)) {
+        foreach (fridge_hard_ban_source_paths() as $path) {
+            foreach (fridge_hard_ban_source_tokens($path) as $entry) {
+                if (fridge_hard_ban_entry_contains_packed($entry, $packedCandidate)) {
                     $results[$normalizedCandidate] = true;
                     return true;
                 }
@@ -899,10 +899,10 @@ if (!function_exists('fridg3_hard_ban_source_contains')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_write')) {
-    function fridg3_hard_ban_write(array $ips): bool
+if (!function_exists('fridge_hard_ban_write')) {
+    function fridge_hard_ban_write(array $ips): bool
     {
-        $path = fridg3_hard_ban_path();
+        $path = fridge_hard_ban_path();
         $directory = dirname($path);
         if (!is_dir($directory) && !@mkdir($directory, 0750, true)) {
             return false;
@@ -928,17 +928,17 @@ if (!function_exists('fridg3_hard_ban_write')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_whitelist_write')) {
-    function fridg3_hard_ban_whitelist_write(array $ips): bool
+if (!function_exists('fridge_hard_ban_whitelist_write')) {
+    function fridge_hard_ban_whitelist_write(array $ips): bool
     {
-        $parsed = fridg3_hard_ban_parse(implode(' ', array_map('strval', $ips)));
+        $parsed = fridge_hard_ban_parse(implode(' ', array_map('strval', $ips)));
         return $parsed['invalid'] === []
-            && fridg3_hard_ban_write_settings(['whitelistedIps' => $parsed['ips']]);
+            && fridge_hard_ban_write_settings(['whitelistedIps' => $parsed['ips']]);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_client_ip')) {
-    function fridg3_hard_ban_client_ip(): string
+if (!function_exists('fridge_hard_ban_client_ip')) {
+    function fridge_hard_ban_client_ip(): string
     {
         foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_TRUE_CLIENT_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $header) {
             if (empty($_SERVER[$header])) {
@@ -956,8 +956,8 @@ if (!function_exists('fridg3_hard_ban_client_ip')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_contains')) {
-    function fridg3_hard_ban_contains(string $candidate): bool
+if (!function_exists('fridge_hard_ban_contains')) {
+    function fridge_hard_ban_contains(string $candidate): bool
     {
         $packedCandidate = @inet_pton(trim($candidate));
         if ($packedCandidate === false) {
@@ -965,30 +965,30 @@ if (!function_exists('fridg3_hard_ban_contains')) {
         }
 
         $normalizedCandidate = (string)@inet_ntop($packedCandidate);
-        if (fridg3_hard_ban_list_contains(fridg3_hard_ban_whitelist_load(), $normalizedCandidate)) {
+        if (fridge_hard_ban_list_contains(fridge_hard_ban_whitelist_load(), $normalizedCandidate)) {
             return false;
         }
-        return fridg3_hard_ban_list_contains(fridg3_hard_ban_load(), $normalizedCandidate)
-            || fridg3_hard_ban_source_contains($normalizedCandidate);
+        return fridge_hard_ban_list_contains(fridge_hard_ban_load(), $normalizedCandidate)
+            || fridge_hard_ban_source_contains($normalizedCandidate);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_identity_path')) {
-    function fridg3_hard_ban_identity_path(): string
+if (!function_exists('fridge_hard_ban_identity_path')) {
+    function fridge_hard_ban_identity_path(): string
     {
         return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'etc' . DIRECTORY_SEPARATOR . 'hard-ban-identities.json';
     }
 }
 
-if (!function_exists('fridg3_hard_ban_valid_identifier')) {
-    function fridg3_hard_ban_valid_identifier(string $identifier): bool
+if (!function_exists('fridge_hard_ban_valid_identifier')) {
+    function fridge_hard_ban_valid_identifier(string $identifier): bool
     {
         return preg_match('/^[a-f0-9]{64}$/', $identifier) === 1;
     }
 }
 
-if (!function_exists('fridg3_hard_ban_ips_equal')) {
-    function fridg3_hard_ban_ips_equal(string $left, string $right): bool
+if (!function_exists('fridge_hard_ban_ips_equal')) {
+    function fridge_hard_ban_ips_equal(string $left, string $right): bool
     {
         $leftPacked = @inet_pton($left);
         $rightPacked = @inet_pton($right);
@@ -996,8 +996,8 @@ if (!function_exists('fridg3_hard_ban_ips_equal')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_list_contains')) {
-    function fridg3_hard_ban_list_contains(array $ips, string $candidate): bool
+if (!function_exists('fridge_hard_ban_list_contains')) {
+    function fridge_hard_ban_list_contains(array $ips, string $candidate): bool
     {
         $packedCandidate = @inet_pton(trim($candidate));
         if ($packedCandidate === false) {
@@ -1005,7 +1005,7 @@ if (!function_exists('fridg3_hard_ban_list_contains')) {
         }
 
         foreach ($ips as $ip) {
-            if (fridg3_hard_ban_entry_contains_packed((string)$ip, $packedCandidate)) {
+            if (fridge_hard_ban_entry_contains_packed((string)$ip, $packedCandidate)) {
                 return true;
             }
         }
@@ -1013,10 +1013,10 @@ if (!function_exists('fridg3_hard_ban_list_contains')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_load_identities')) {
-    function fridg3_hard_ban_load_identities(): array
+if (!function_exists('fridge_hard_ban_load_identities')) {
+    function fridge_hard_ban_load_identities(): array
     {
-        $path = fridg3_hard_ban_identity_path();
+        $path = fridge_hard_ban_identity_path();
         if (!is_file($path)) {
             return ['identities' => []];
         }
@@ -1028,10 +1028,10 @@ if (!function_exists('fridg3_hard_ban_load_identities')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_write_identities')) {
-    function fridg3_hard_ban_write_identities(array $data): bool
+if (!function_exists('fridge_hard_ban_write_identities')) {
+    function fridge_hard_ban_write_identities(array $data): bool
     {
-        $path = fridg3_hard_ban_identity_path();
+        $path = fridge_hard_ban_identity_path();
         $directory = dirname($path);
         if (!is_dir($directory) && !@mkdir($directory, 0750, true)) {
             return false;
@@ -1044,12 +1044,12 @@ if (!function_exists('fridg3_hard_ban_write_identities')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_filter_group_ips')) {
-    function fridg3_hard_ban_filter_group_ips(array $hardBans, array $groupIps): array
+if (!function_exists('fridge_hard_ban_filter_group_ips')) {
+    function fridge_hard_ban_filter_group_ips(array $hardBans, array $groupIps): array
     {
         return array_values(array_filter($hardBans, static function ($hardBan) use ($groupIps): bool {
             foreach ($groupIps as $groupIp) {
-                if (fridg3_hard_ban_ips_equal((string)$hardBan, (string)$groupIp)) {
+                if (fridge_hard_ban_ips_equal((string)$hardBan, (string)$groupIp)) {
                     return false;
                 }
             }
@@ -1058,10 +1058,10 @@ if (!function_exists('fridg3_hard_ban_filter_group_ips')) {
     }
 }
 
-if (!function_exists('fridg3_hard_ban_release_associated_ips')) {
-    function fridg3_hard_ban_release_associated_ips(): bool
+if (!function_exists('fridge_hard_ban_release_associated_ips')) {
+    function fridge_hard_ban_release_associated_ips(): bool
     {
-        $data = fridg3_hard_ban_load_identities();
+        $data = fridge_hard_ban_load_identities();
         $primaryIps = [];
         $associatedIps = [];
         foreach ($data['identities'] as $record) {
@@ -1074,7 +1074,7 @@ if (!function_exists('fridg3_hard_ban_release_associated_ips')) {
             }
             foreach ((array)($record['ips'] ?? []) as $knownIp) {
                 $knownIp = (string)$knownIp;
-                if (filter_var($knownIp, FILTER_VALIDATE_IP) !== false && !fridg3_hard_ban_ips_equal($knownIp, $primaryIp)) {
+                if (filter_var($knownIp, FILTER_VALIDATE_IP) !== false && !fridge_hard_ban_ips_equal($knownIp, $primaryIp)) {
                     $associatedIps[] = $knownIp;
                 }
             }
@@ -1082,7 +1082,7 @@ if (!function_exists('fridg3_hard_ban_release_associated_ips')) {
 
         $removableIps = array_values(array_filter($associatedIps, static function (string $associatedIp) use ($primaryIps): bool {
             foreach ($primaryIps as $primaryIp) {
-                if (fridg3_hard_ban_ips_equal($associatedIp, $primaryIp)) {
+                if (fridge_hard_ban_ips_equal($associatedIp, $primaryIp)) {
                     return false;
                 }
             }
@@ -1092,26 +1092,26 @@ if (!function_exists('fridg3_hard_ban_release_associated_ips')) {
             return true;
         }
 
-        $hardBans = fridg3_hard_ban_load();
-        $updatedHardBans = fridg3_hard_ban_filter_group_ips($hardBans, $removableIps);
-        return $updatedHardBans === $hardBans || fridg3_hard_ban_write($updatedHardBans);
+        $hardBans = fridge_hard_ban_load();
+        $updatedHardBans = fridge_hard_ban_filter_group_ips($hardBans, $removableIps);
+        return $updatedHardBans === $hardBans || fridge_hard_ban_write($updatedHardBans);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_admin_save')) {
-    function fridg3_hard_ban_admin_save(array $requestedIps): bool
+if (!function_exists('fridge_hard_ban_admin_save')) {
+    function fridge_hard_ban_admin_save(array $requestedIps): bool
     {
-        if (!fridg3_hard_ban_strict_enabled()) {
-            return fridg3_hard_ban_write($requestedIps);
+        if (!fridge_hard_ban_strict_enabled()) {
+            return fridge_hard_ban_write($requestedIps);
         }
-        $data = fridg3_hard_ban_load_identities();
+        $data = fridge_hard_ban_load_identities();
         $releasedPrimaries = [];
         foreach ($data['identities'] as $record) {
             $primaryIp = is_array($record) ? (string)($record['primaryIp'] ?? '') : '';
             if (
                 $primaryIp !== ''
-                && !fridg3_hard_ban_list_contains($requestedIps, $primaryIp)
-                && !fridg3_hard_ban_source_contains($primaryIp)
+                && !fridge_hard_ban_list_contains($requestedIps, $primaryIp)
+                && !fridge_hard_ban_source_contains($primaryIp)
             ) {
                 $releasedPrimaries[$primaryIp] = true;
             }
@@ -1120,30 +1120,30 @@ if (!function_exists('fridg3_hard_ban_admin_save')) {
         foreach (array_keys($releasedPrimaries) as $primaryIp) {
             $groupIps = [$primaryIp];
             foreach ($data['identities'] as $identifier => $record) {
-                if (!is_array($record) || !fridg3_hard_ban_ips_equal((string)($record['primaryIp'] ?? ''), $primaryIp)) {
+                if (!is_array($record) || !fridge_hard_ban_ips_equal((string)($record['primaryIp'] ?? ''), $primaryIp)) {
                     continue;
                 }
                 $groupIps = array_merge($groupIps, (array)($record['ips'] ?? []));
                 unset($data['identities'][$identifier]);
             }
-            $requestedIps = fridg3_hard_ban_filter_group_ips($requestedIps, $groupIps);
+            $requestedIps = fridge_hard_ban_filter_group_ips($requestedIps, $groupIps);
         }
 
-        if (!fridg3_hard_ban_write($requestedIps)) {
+        if (!fridge_hard_ban_write($requestedIps)) {
             return false;
         }
-        return fridg3_hard_ban_write_identities($data);
+        return fridge_hard_ban_write_identities($data);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_register_identifier')) {
-    function fridg3_hard_ban_register_identifier(string $ip, string $identifier): bool
+if (!function_exists('fridge_hard_ban_register_identifier')) {
+    function fridge_hard_ban_register_identifier(string $ip, string $identifier): bool
     {
-        if (!fridg3_hard_ban_strict_enabled() || !fridg3_hard_ban_valid_identifier($identifier) || !fridg3_hard_ban_contains($ip)) {
+        if (!fridge_hard_ban_strict_enabled() || !fridge_hard_ban_valid_identifier($identifier) || !fridge_hard_ban_contains($ip)) {
             return false;
         }
 
-        $data = fridg3_hard_ban_load_identities();
+        $data = fridge_hard_ban_load_identities();
         $existingRecord = is_array($data['identities'][$identifier] ?? null) ? $data['identities'][$identifier] : [];
         $primaryIp = (string)($existingRecord['primaryIp'] ?? $ip);
         foreach ($data['identities'] as $record) {
@@ -1151,7 +1151,7 @@ if (!function_exists('fridg3_hard_ban_register_identifier')) {
                 continue;
             }
             foreach ((array)($record['ips'] ?? []) as $knownIp) {
-                if (fridg3_hard_ban_ips_equal((string)$knownIp, $ip)) {
+                if (fridge_hard_ban_ips_equal((string)$knownIp, $ip)) {
                     $primaryIp = (string)($record['primaryIp'] ?? $ip);
                     break 2;
                 }
@@ -1160,7 +1160,7 @@ if (!function_exists('fridg3_hard_ban_register_identifier')) {
 
         $record = $existingRecord;
         $knownIps = array_values(array_filter(array_map('strval', (array)($record['ips'] ?? [])), static fn(string $knownIp): bool => filter_var($knownIp, FILTER_VALIDATE_IP) !== false));
-        if (!fridg3_hard_ban_list_contains($knownIps, $ip)) {
+        if (!fridge_hard_ban_list_contains($knownIps, $ip)) {
             $knownIps[] = $ip;
         }
         $now = gmdate(DATE_ATOM);
@@ -1171,92 +1171,92 @@ if (!function_exists('fridg3_hard_ban_register_identifier')) {
             'lastSeen' => $now,
             'userAgentHash' => hash('sha256', (string)($_SERVER['HTTP_USER_AGENT'] ?? '')),
         ];
-        return fridg3_hard_ban_write_identities($data);
+        return fridge_hard_ban_write_identities($data);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_observe_identifier')) {
-    function fridg3_hard_ban_observe_identifier(string $ip, string $identifier): bool
+if (!function_exists('fridge_hard_ban_observe_identifier')) {
+    function fridge_hard_ban_observe_identifier(string $ip, string $identifier): bool
     {
-        if (!fridg3_hard_ban_strict_enabled() || !fridg3_hard_ban_valid_identifier($identifier) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+        if (!fridge_hard_ban_strict_enabled() || !fridge_hard_ban_valid_identifier($identifier) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
             return false;
         }
-        $data = fridg3_hard_ban_load_identities();
+        $data = fridge_hard_ban_load_identities();
         $record = $data['identities'][$identifier] ?? null;
         if (!is_array($record)) {
             return false;
         }
         $knownIps = array_values(array_filter(array_map('strval', (array)($record['ips'] ?? [])), static fn(string $knownIp): bool => filter_var($knownIp, FILTER_VALIDATE_IP) !== false));
-        if (!fridg3_hard_ban_list_contains($knownIps, $ip)) {
+        if (!fridge_hard_ban_list_contains($knownIps, $ip)) {
             $knownIps[] = $ip;
         }
         $record['ips'] = $knownIps;
         $record['lastSeen'] = gmdate(DATE_ATOM);
         $record['userAgentHash'] = hash('sha256', (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
         $data['identities'][$identifier] = $record;
-        return fridg3_hard_ban_write_identities($data);
+        return fridge_hard_ban_write_identities($data);
     }
 }
 
-if (!function_exists('fridg3_hard_ban_check_client')) {
-    function fridg3_hard_ban_check_client(string $ip, string $identifier): bool
+if (!function_exists('fridge_hard_ban_check_client')) {
+    function fridge_hard_ban_check_client(string $ip, string $identifier): bool
     {
-        if (!fridg3_hard_ban_enforcement_enabled()) {
+        if (!fridge_hard_ban_enforcement_enabled()) {
             return false;
         }
-        if (fridg3_hard_ban_list_contains(fridg3_hard_ban_whitelist_load(), $ip)) {
+        if (fridge_hard_ban_list_contains(fridge_hard_ban_whitelist_load(), $ip)) {
             return false;
         }
-        if (!fridg3_hard_ban_strict_enabled()) {
+        if (!fridge_hard_ban_strict_enabled()) {
             // Relaxed mode deliberately ignores the complete identity store.
-            return fridg3_hard_ban_contains($ip);
+            return fridge_hard_ban_contains($ip);
         }
-        if (!fridg3_hard_ban_valid_identifier($identifier)) {
-            return fridg3_hard_ban_contains($ip);
+        if (!fridge_hard_ban_valid_identifier($identifier)) {
+            return fridge_hard_ban_contains($ip);
         }
 
-        $manualHardBans = fridg3_hard_ban_load();
-        $data = fridg3_hard_ban_load_identities();
+        $manualHardBans = fridge_hard_ban_load();
+        $data = fridge_hard_ban_load_identities();
         $record = $data['identities'][$identifier] ?? null;
         if (!is_array($record)) {
-            return fridg3_hard_ban_contains($ip);
+            return fridge_hard_ban_contains($ip);
         }
 
         $primaryIp = (string)($record['primaryIp'] ?? '');
-        if ($primaryIp === '' || !fridg3_hard_ban_contains($primaryIp)) {
-            fridg3_hard_ban_admin_save($manualHardBans);
-            return fridg3_hard_ban_contains($ip);
+        if ($primaryIp === '' || !fridge_hard_ban_contains($primaryIp)) {
+            fridge_hard_ban_admin_save($manualHardBans);
+            return fridge_hard_ban_contains($ip);
         }
 
         // Enforce the association directly. Associated IPs belong only in the
         // identity record; they must never become manual bans or source-index
         // entries merely because this browser used them.
-        fridg3_hard_ban_observe_identifier($ip, $identifier);
+        fridge_hard_ban_observe_identifier($ip, $identifier);
         return true;
     }
 }
 
-if (!function_exists('fridg3_hard_ban_would_block_client')) {
-    function fridg3_hard_ban_would_block_client(string $ip, string $identifier): bool
+if (!function_exists('fridge_hard_ban_would_block_client')) {
+    function fridge_hard_ban_would_block_client(string $ip, string $identifier): bool
     {
-        if (!fridg3_hard_ban_enforcement_enabled()) {
+        if (!fridge_hard_ban_enforcement_enabled()) {
             return false;
         }
-        if (fridg3_hard_ban_list_contains(fridg3_hard_ban_whitelist_load(), $ip)) {
+        if (fridge_hard_ban_list_contains(fridge_hard_ban_whitelist_load(), $ip)) {
             return false;
         }
-        if (fridg3_hard_ban_contains($ip)) {
+        if (fridge_hard_ban_contains($ip)) {
             return true;
         }
-        if (!fridg3_hard_ban_strict_enabled() || !fridg3_hard_ban_valid_identifier($identifier)) {
+        if (!fridge_hard_ban_strict_enabled() || !fridge_hard_ban_valid_identifier($identifier)) {
             return false;
         }
-        $data = fridg3_hard_ban_load_identities();
+        $data = fridge_hard_ban_load_identities();
         $record = $data['identities'][$identifier] ?? null;
         if (!is_array($record)) {
             return false;
         }
         $primaryIp = (string)($record['primaryIp'] ?? '');
-        return $primaryIp !== '' && fridg3_hard_ban_contains($primaryIp);
+        return $primaryIp !== '' && fridge_hard_ban_contains($primaryIp);
     }
 }

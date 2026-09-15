@@ -8,7 +8,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
 require_once $sessionBootstrapDir . "/lib/session.php";
 require_once $sessionBootstrapDir . "/lib/targeted-notifications.php";
 require_once $sessionBootstrapDir . "/lib/video-embeds.php";
-fridg3_start_session();
+fridge_start_session();
 
 $title = 'chat';
 $description = 'one-time private conversations without account setup.';
@@ -955,13 +955,13 @@ function chat_link_embeds_html(string $body, array $metadata = []): string {
         $host = strtolower((string)($parts['host'] ?? 'link'));
         $path = (string)($parts['path'] ?? '');
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        $video = fridg3_external_video_embed_data($url);
+        $video = fridge_external_video_embed_data($url);
         $giphyUrl = chat_giphy_embed_url($url);
         $meta = is_array($metadata[$url] ?? null) ? $metadata[$url] : [];
         $cardTitle = trim((string)($meta['title'] ?? '')) ?: $host;
         $cardDescription = trim((string)($meta['description'] ?? ''));
         if ($video !== null) {
-            $html .= '<div class="chat-link-embed chat-link-video">' . fridg3_external_video_embed_html($video) . '</div>';
+            $html .= '<div class="chat-link-embed chat-link-video">' . fridge_external_video_embed_html($video) . '</div>';
         } elseif ($giphyUrl !== null) {
             $html .= '<div class="chat-link-embed chat-link-video chat-link-giphy"><iframe src="' . chat_h($giphyUrl) . '" title="Giphy animation" loading="lazy" allowfullscreen></iframe></div>';
         } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'], true)) {
@@ -1211,7 +1211,7 @@ function chat_message_html(array $conversation, string $viewerRole): string {
         }
 
         $html .= '<article class="' . chat_h(implode(' ', $messageClasses)) . '" data-message-id="' . chat_h((string)($message['id'] ?? '')) . '" data-message-own="' . ($isOwn ? '1' : '0') . '" data-message-deleted="' . ($isDeleted ? '1' : '0') . '">'
-            . '<div class="chat-message-meta"><strong>' . chat_h($senderLabel) . '</strong><span>' . chat_h($time) . '</span></div>'
+            . '<div class="chat-message-meta"><strong>' . chat_h($senderLabel) . '</strong><span data-exact-datetime="' . chat_h(date(DATE_ATOM, $createdAt)) . '">' . chat_h($time) . '</span></div>'
             . '<div class="chat-message-quote-source" hidden>' . chat_h($messageSummary) . '</div>'
             . $replyHtml
             . ($body !== '' ? '<div class="chat-message-body">' . $body . '</div>' : '')
@@ -1228,7 +1228,7 @@ chat_refresh_current_user_permissions();
 $conversationId = chat_get_conversation_id_from_request();
 $action = (string)($_POST['action'] ?? $_GET['action'] ?? '');
 $canManage = chat_user_can_manage();
-$postingRestricted = fridg3_current_user_posting_restricted();
+$postingRestricted = fridge_current_user_posting_restricted();
 
 if ($action === 'status' && $conversationId !== '') {
     chat_json_response(['exists' => is_file(chat_conversation_path($chatDataDir, $conversationId))]);
@@ -1649,7 +1649,7 @@ if ($conversationId !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $conversationName = trim((string)($conversation['name'] ?? 'private chat'));
         $deletedConversation = chat_delete_conversation($chatDataDir, $conversationId);
         if ($deletedConversation && $canManage && $participantUsername !== '' && !chat_username_is_admin($participantUsername)) {
-            fridg3_targeted_notifications_notify_user(
+            fridge_targeted_notifications_notify_user(
                 $participantUsername,
                 'Conversation ended',
                 'Your conversation with fridge.dev (' . ($conversationName !== '' ? $conversationName : 'private chat') . ') was ended.',
@@ -1740,7 +1740,7 @@ if ($conversationId !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($conversationSaved && $viewerRole === 'participant') {
                 $conversationName = trim((string)($conversation['name'] ?? 'recipient'));
                 if ($conversationName === '') $conversationName = 'recipient';
-                fridg3_targeted_notifications_replace_admin_group(
+                fridge_targeted_notifications_replace_admin_group(
                     'chat-message',
                     'New chat message',
                     'There is a new reply to the conversation with ' . $conversationName . '.',
@@ -1751,7 +1751,7 @@ if ($conversationId !== '' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($conversationSaved && $viewerRole === 'manager') {
                 $participantUsername = trim((string)($conversation['participantUsername'] ?? ''));
                 if ($participantUsername !== '' && !chat_username_is_admin($participantUsername)) {
-                    fridg3_targeted_notifications_replace_user_group(
+                    fridge_targeted_notifications_replace_user_group(
                         $participantUsername,
                         'chat-message',
                         'New chat message',
@@ -1851,7 +1851,7 @@ if ($conversationId !== '') {
     if ($recipientName === '') {
         $recipientName = 'recipient';
     }
-    $chatScript = '<script src="/js/chat-conversation.js?v=20260909-toast-chat-3"></script>';
+    $chatScript = '<script src="/js/chat-conversation.js?v=20260915-namespace-1"></script>';
     $canDeleteConversation = chat_user_can_delete_conversation($conversation, $canManage);
     $canRevokeConversation = chat_user_is_admin()
         && (!empty($conversation['participantHash']) || !empty($conversation['participantUsername']));
@@ -1889,7 +1889,7 @@ if ($conversationId !== '') {
     if ($postingRestricted) {
         $content = (string)preg_replace_callback(
             '/<form class="chat-send-form".*?<\/form>/s',
-            static fn (array $matches): string => fridg3_posting_restriction_notice() . fridg3_disable_composer_controls($matches[0]),
+            static fn (array $matches): string => fridge_posting_restriction_notice() . fridge_disable_composer_controls($matches[0]),
             $content,
             1
         );
@@ -1949,7 +1949,7 @@ $content = str_replace(
 if ($postingRestricted) {
     $content = (string)preg_replace_callback(
         '/<form id="chat-create-form".*?<\/form>/s',
-        static fn (array $matches): string => fridg3_posting_restriction_notice() . fridg3_disable_composer_controls($matches[0]),
+        static fn (array $matches): string => fridge_posting_restriction_notice() . fridge_disable_composer_controls($matches[0]),
         $content,
         1
     );

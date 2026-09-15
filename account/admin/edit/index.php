@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'helpers.php';
 require_once dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
@@ -58,7 +58,17 @@ $formUsername = (string)($account['username'] ?? '');
 $formName = (string)($account['name'] ?? '');
 $formEmailAddress = (string)($account['emailAddress'] ?? '');
 $accountIps = array_values(array_filter(array_map('strval', (array)($account['ips'] ?? [])), static fn(string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP) !== false));
-$accountIpsHtml = $accountIps === [] ? '<span class="account-ip-empty">no recorded IPs</span>' : implode('', array_map(static fn(string $ip): string => '<code class="account-ip-value">' . htmlspecialchars($ip, ENT_QUOTES, 'UTF-8') . '</code>', $accountIps));
+$compactIp = static function (string $ip): string {
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false || ($packed = @inet_pton($ip)) === false) return $ip;
+    $groups = array_values(unpack('n8', $packed));
+    return ':' . implode(':', array_map(static fn(int $group): string => dechex($group), array_slice($groups, -4)));
+};
+$accountIpsHtml = '<span data-guest-ip-menu-config data-csrf="' . htmlspecialchars((string)$_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '"></span>';
+$accountIpsHtml .= $accountIps === [] ? '<span class="account-ip-empty">no recorded IPs</span>' : implode('', array_map(static function (string $ip) use ($compactIp): string {
+    $safeIp = htmlspecialchars($ip, ENT_QUOTES, 'UTF-8');
+    $tooltip = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? ' data-tooltip="' . $safeIp . '"' : '';
+    return '<code class="account-ip-value guest-ip-address" tabindex="0" role="button" data-guest-ip-actions="1" data-ip="' . $safeIp . '" data-ip-admin="1"' . $tooltip . '>' . htmlspecialchars($compactIp($ip), ENT_QUOTES, 'UTF-8') . '</code>';
+}, $accountIps));
 $formIsAdmin = !empty($account['isAdmin']);
 $formIsModerator = !empty($account['isModerator']);
 $formPostingRestricted = !empty($account['postingRestricted']);
@@ -96,7 +106,7 @@ function account_admin_parse_feed_post_file(string $path): ?array {
 }
 
 function account_admin_delete_feed_images_from_content(string $content): void {
-    $imagesDir = fridg3_feed_images_dir();
+    $imagesDir = fridge_feed_images_dir();
     preg_match_all('/\[img=\/data\/images\/([^\]]+)\]/i', $content, $matches);
     foreach ($matches[1] ?? [] as $imageFile) {
         $imagePath = $imagesDir . DIRECTORY_SEPARATOR . basename((string)$imageFile);
@@ -114,17 +124,17 @@ function account_admin_delete_feed_post_file(string $postPath): bool {
 
     $postId = pathinfo(basename($postPath), PATHINFO_FILENAME);
     account_admin_delete_feed_images_from_content((string)$postData['body']);
-    foreach (fridg3_feed_load_replies($postId) as $reply) {
+    foreach (fridge_feed_load_replies($postId) as $reply) {
         account_admin_delete_feed_images_from_content((string)($reply['body'] ?? ''));
     }
-    fridg3_feed_delete_post_voice_files($postId, (string)$postData['body']);
-    @unlink(fridg3_feed_replies_dir() . DIRECTORY_SEPARATOR . $postId . '.json');
+    fridge_feed_delete_post_voice_files($postId, (string)$postData['body']);
+    @unlink(fridge_feed_replies_dir() . DIRECTORY_SEPARATOR . $postId . '.json');
     return @unlink($postPath);
 }
 
 function account_admin_delete_user_feed_posts(string $username): array {
     $safeUsername = ltrim(trim($username), '@');
-    $postsDir = fridg3_feed_posts_dir();
+    $postsDir = fridge_feed_posts_dir();
     $deleted = 0;
     $failed = 0;
 
@@ -237,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($formUsername === '' || $formName === '') {
                 $errorMessage = 'username and name are required.';
-            } elseif (fridg3_toast_is_reserved_username($formUsername)) {
+            } elseif (fridge_toast_is_reserved_username($formUsername)) {
                 $errorMessage = 'toast is a reserved hardcoded account.';
             } elseif (!preg_match('/^[a-z0-9_-]{1,50}$/i', $formUsername)) {
                 $errorMessage = 'username must be 1-50 characters (letters, numbers, underscores, hyphens).';
@@ -327,7 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $_SESSION['user']['name'] = htmlspecialchars($formName, ENT_QUOTES, 'UTF-8');
                                 $_SESSION['user']['isAdmin'] = $formIsAdmin;
                                 $_SESSION['user']['isModerator'] = $formIsModerator;
-                                $_SESSION['user']['postingRestricted'] = $formPostingRestricted;
+                                $_SESSION['user']['postingRestricted'] = $formPostingRestricted || !empty($updatedAccount['accountBanned']);
                                 $_SESSION['user']['mustResetPassword'] = !empty($updatedAccount['mustResetPassword']);
                                 $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
                                     return htmlspecialchars((string)$page, ENT_QUOTES, 'UTF-8');

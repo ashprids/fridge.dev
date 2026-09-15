@@ -71,7 +71,7 @@ Run these commands after replacing `my-theme` with the chosen ID:
 
 ```bash
 php -r '$v=json_decode(file_get_contents("themes/my-theme.json"), true); echo json_last_error_msg(), "\n";'
-php -r 'require "lib/render.php"; echo json_encode(array_values(array_map(fn($t) => ["id" => $t["id"], "name" => $t["name"]], fridg3_list_themes(__DIR__))), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";'
+php -r 'require "lib/render.php"; echo json_encode(array_values(array_map(fn($t) => ["id" => $t["id"], "name" => $t["name"]], fridge_list_themes(__DIR__))), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";'
 git diff --check -- themes/my-theme.json themes/lib/my-theme themes/thumbnails/my-theme.svg
 ```
 

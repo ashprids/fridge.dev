@@ -7,27 +7,27 @@ html[data-theme-accent="red"]:not(.access-high-contrast) body.base16-theme {
 
 html[data-theme-accent="orange"]:not(.access-high-contrast) body.base16-theme {
     --base0D: #DE935F;
-    --base-accent-ink: #1D1F21;
+    --base-accent-ink: #1F1F1F;
 }
 
 html[data-theme-accent="yellow"]:not(.access-high-contrast) body.base16-theme {
     --base0D: #F0C674;
-    --base-accent-ink: #1D1F21;
+    --base-accent-ink: #1F1F1F;
 }
 
 html[data-theme-accent="green"]:not(.access-high-contrast) body.base16-theme {
     --base0D: #B5BD68;
-    --base-accent-ink: #1D1F21;
+    --base-accent-ink: #1F1F1F;
 }
 
 html[data-theme-accent="aqua"]:not(.access-high-contrast) body.base16-theme {
     --base0D: #8ABEB7;
-    --base-accent-ink: #1D1F21;
+    --base-accent-ink: #1F1F1F;
 }
 
 html[data-theme-accent="purple"]:not(.access-high-contrast) body.base16-theme {
     --base0D: #B294BB;
-    --base-accent-ink: #1D1F21;
+    --base-accent-ink: #1F1F1F;
 }
 
 html[data-theme-accent="brown"]:not(.access-high-contrast) body.base16-theme {

@@ -5,7 +5,7 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 
 $renderHelperPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'render.php';
 if (is_file($renderHelperPath)) {
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $rootDir = dirname(__DIR__, 2);
-$themes = function_exists('fridg3_list_themes') ? fridg3_list_themes($rootDir) : [];
+$themes = function_exists('fridge_list_themes') ? fridge_list_themes($rootDir) : [];
 $themeList = [
     [
         'id' => 'default',
@@ -40,8 +40,8 @@ foreach ($themes as $theme) {
     ];
 }
 
-$selected = function_exists('fridg3_get_preferred_theme_id')
-    ? fridg3_get_preferred_theme_id($rootDir)
+$selected = function_exists('fridge_get_preferred_theme_id')
+    ? fridge_get_preferred_theme_id($rootDir)
     : 'default';
 
 echo json_encode([

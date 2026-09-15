@@ -157,7 +157,7 @@ function account_admin_require_admin(): void {
         $_SESSION['user']['name'] = htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8');
         $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
         $_SESSION['user']['isModerator'] = (bool)($account['isModerator'] ?? false);
-        $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
+        $_SESSION['user']['postingRestricted'] = !empty($account['postingRestricted']) || !empty($account['accountBanned']);
         $_SESSION['user']['emailAddress'] = htmlspecialchars((string)($account['emailAddress'] ?? ''), ENT_QUOTES, 'UTF-8');
         $_SESSION['user']['allowedPages'] = array_map(static function ($page) {
             return htmlspecialchars((string)$page, ENT_QUOTES, 'UTF-8');
@@ -185,7 +185,7 @@ function account_admin_require_moderator(): void {
         $_SESSION['user']['name'] = htmlspecialchars((string)($account['name'] ?? ''), ENT_QUOTES, 'UTF-8');
         $_SESSION['user']['isAdmin'] = (bool)($account['isAdmin'] ?? false);
         $_SESSION['user']['isModerator'] = (bool)($account['isModerator'] ?? false);
-        $_SESSION['user']['postingRestricted'] = (bool)($account['postingRestricted'] ?? false);
+        $_SESSION['user']['postingRestricted'] = !empty($account['postingRestricted']) || !empty($account['accountBanned']);
         break;
     }
     if (!$found || (empty($_SESSION['user']['isAdmin']) && empty($_SESSION['user']['isModerator']))) {

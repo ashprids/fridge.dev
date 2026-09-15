@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-$temp = sys_get_temp_dir() . '/fridg3-toast-chat-test-' . bin2hex(random_bytes(5));
+$temp = sys_get_temp_dir() . '/fridge-toast-chat-test-' . bin2hex(random_bytes(5));
 putenv('FRIDG3_TOAST_CHAT_DATA_DIR=' . $temp);
 require dirname(__DIR__) . '/lib/toast-chat.php';
 

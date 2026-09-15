@@ -1,9 +1,9 @@
 <?php
 
-define('FRIDG3_SKIP_ACCESS_LOG', true);
+define('FRIDGE_SKIP_ACCESS_LOG', true);
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'session.php';
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'hard-ban.php';
-fridg3_start_session();
+fridge_start_session();
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -15,7 +15,7 @@ if (!isset($_SESSION['user']['isAdmin']) || $_SESSION['user']['isAdmin'] !== tru
 }
 
 if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
-    $action = (string)($_SERVER['HTTP_X_FRIDG3_DEBUG_ACTION'] ?? '');
+    $action = (string)($_SERVER['HTTP_X_FRIDGE_DEBUG_ACTION'] ?? '');
     if (
         strcasecmp((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') !== 0
         || !in_array($action, ['clear', 'hard-ban', 'whitelist'], true)
@@ -33,7 +33,7 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
             exit;
         }
 
-        $directory = dirname(fridg3_hard_ban_path());
+        $directory = dirname(fridge_hard_ban_path());
         if (!is_dir($directory) && !@mkdir($directory, 0750, true) && !is_dir($directory)) {
             http_response_code(500);
             echo json_encode(['ok' => false, 'error' => 'hard_ban_write_failed']);
@@ -49,23 +49,23 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
 
         $saved = false;
         if ($action === 'whitelist') {
-            $whitelist = fridg3_hard_ban_whitelist_load();
-            if (!fridg3_hard_ban_list_contains($whitelist, $ip)) {
+            $whitelist = fridge_hard_ban_whitelist_load();
+            if (!fridge_hard_ban_list_contains($whitelist, $ip)) {
                 $whitelist[] = $ip;
             }
-            $saved = fridg3_hard_ban_whitelist_write($whitelist);
+            $saved = fridge_hard_ban_whitelist_write($whitelist);
         } else {
-            $hardBans = fridg3_hard_ban_load();
-            if (!fridg3_hard_ban_list_contains($hardBans, $ip)) {
+            $hardBans = fridge_hard_ban_load();
+            if (!fridge_hard_ban_list_contains($hardBans, $ip)) {
                 $hardBans[] = $ip;
             }
-            $saved = fridg3_hard_ban_admin_save($hardBans);
+            $saved = fridge_hard_ban_admin_save($hardBans);
             if ($saved) {
                 $whitelist = array_values(array_filter(
-                    fridg3_hard_ban_whitelist_load(),
-                    static fn(string $allowedIp): bool => !fridg3_hard_ban_ips_equal($allowedIp, $ip)
+                    fridge_hard_ban_whitelist_load(),
+                    static fn(string $allowedIp): bool => !fridge_hard_ban_ips_equal($allowedIp, $ip)
                 ));
-                $saved = fridg3_hard_ban_whitelist_write($whitelist);
+                $saved = fridge_hard_ban_whitelist_write($whitelist);
             }
         }
 
@@ -85,7 +85,7 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
         exit;
     }
 
-    $logPath = fridg3_access_log_path();
+    $logPath = fridge_access_log_path();
     $directory = dirname($logPath);
     if (!is_dir($directory) && !@mkdir($directory, 0750, true) && !is_dir($directory)) {
         http_response_code(500);
@@ -129,7 +129,7 @@ foreach ((array)($accounts['accounts'] ?? []) as $account) {
 }
 $banResults = [];
 $entries = [];
-foreach (fridg3_read_access_logs() as $entry) {
+foreach (fridge_read_access_logs() as $entry) {
     if (!is_array($entry)) continue;
     $ip = (string)($entry['ip'] ?? 'unknown');
     $username = (string)($entry['username'] ?? '');
@@ -138,7 +138,7 @@ foreach (fridg3_read_access_logs() as $entry) {
         $role = $username === '' ? 'guest' : (isset($adminUsernames[strtolower($username)]) ? 'admin' : 'user');
     }
     if (!array_key_exists($ip, $banResults)) {
-        $banResults[$ip] = fridg3_hard_ban_contains($ip);
+        $banResults[$ip] = fridge_hard_ban_contains($ip);
     }
     $entries[] = [
         'timestamp' => (string)($entry['timestamp'] ?? ''),

@@ -44,6 +44,7 @@
     --scrollbar-thumb-border: var(--bg);
 }
 
+
 ::selection {
     background: var(--selection-bg);
     color: var(--selection-fg);
@@ -1393,13 +1394,60 @@ body.mobile-template .site-ip-popup {
     user-select: none;
 }
 
-.account-ip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.account-ip-disclosure { margin-top: 6px; }
+.account-ip-disclosure > summary { cursor: pointer; color: var(--subtle); }
+.account-ip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .account-ip-value {
-    padding: 4px 6px;
+    display: inline-block;
+    padding: 1px 6px;
     border: 1px solid var(--border);
+    background-color: rgba(255, 255, 255, 0.06);
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    font-size: 0.95em;
+    line-height: 1.2;
+    vertical-align: baseline;
+}
+.guest-ip-address {
+    display: inline-block;
+    cursor: context-menu;
+    font-family: "MainRegular", var(--emoji-font), monospace;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+}
+.account-ip-value.guest-ip-address { text-decoration: none; }
+.guest-lookup-button {
+    display: inline-block;
+    width: auto;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--links) 34%, var(--bg));
+    border-color: var(--links);
+    color: var(--fg);
     font-family: "MainRegular", var(--emoji-font), monospace;
     font-size: 14px;
+    line-height: normal;
+    text-decoration: none;
+    cursor: pointer;
 }
+.guest-lookup-button:hover { background: color-mix(in srgb, var(--links) 52%, var(--bg)); color: var(--fg); }
+.guest-activity-replying-to { color: var(--subtle); font-family: "MainItalic", var(--emoji-font), monospace; font-weight: normal; }
+.guest-ip-address:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.site-action-menu.guest-ip-context-menu {
+    position: fixed;
+    z-index: 10020;
+    display: block;
+    min-width: 190px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--bg) 96%, var(--fg) 4%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.guest-account-card { cursor: pointer; }
+.guest-activity-item { margin-bottom: 12px; }
+.guest-activity-item .site-icon-button { margin-top: 8px; }
 .account-ip-empty { color: var(--subtle); font-family: "MainItalic", var(--emoji-font), monospace; }
 
 #content [data-tooltip]:not(a) {
@@ -3699,14 +3747,12 @@ body .theme-accent-swatch {
 
 .theme-accent-picker-button {
     position: relative;
-    padding-right: 30px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding-right: 9px;
 }
 
 .theme-accent-picker-button .theme-accent-picker-chevron {
-    position: absolute;
-    right: 9px;
-    top: 50%;
-    transform: translateY(-50%);
+    display: none;
 }
 
 .theme-accent-picker-label {
@@ -4831,6 +4877,7 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 }
 
 .site-action-menu > summary,
+.site-icon-button,
 #post-bookmark,
 #post-bookmark-feed,
 .journal-post-edit,
@@ -4859,6 +4906,12 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
     display: flex;
 }
 
+.site-icon-button {
+    display: inline-flex !important;
+    margin: 0 !important;
+    font: 12px/1 "MainRegular", var(--emoji-font), monospace !important;
+}
+
 .journal-post-edit,
 #mdpaste-font-toggle {
     align-self: center;
@@ -4866,6 +4919,7 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 
 /* Keep icon colours independent of each theme's surrounding card surface. */
 .site-action-menu > summary > i,
+.site-icon-button > i,
 #post-bookmark > i,
 #post-bookmark-feed > i,
 .journal-post-edit > i,
@@ -4876,6 +4930,8 @@ body.blackprint-theme .content-pagination .guestbook-page-btn {
 .site-action-menu > summary:hover > i,
 .site-action-menu > summary:focus-visible > i,
 .site-action-menu[open] > summary > i,
+.site-icon-button:hover > i,
+.site-icon-button:focus-visible > i,
 #post-bookmark:hover > i,
 #post-bookmark:focus-visible > i,
 #post-bookmark-feed:hover > i,
@@ -5028,6 +5084,28 @@ button.site-action-menu-item:focus-visible {
     backdrop-filter: brightness(0.62);
 }
 
+html.dev-server-closed,
+body.dev-server-closed {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+}
+
+body.dev-server-closed > :not(.dev-server-closed-popup) {
+    pointer-events: none !important;
+    user-select: none !important;
+}
+
+body.dev-server-closed * {
+    animation-play-state: paused !important;
+}
+
+.site-popup-overlay.dev-server-closed-popup {
+    z-index: 2147483647;
+    background: rgba(0, 0, 0, 0.78) !important;
+    backdrop-filter: blur(7px) brightness(0.42) !important;
+    -webkit-backdrop-filter: blur(7px) brightness(0.42) !important;
+}
+
 .site-popup-overlay.is-closing {
     opacity: 0;
     transition: opacity 150ms ease;
@@ -5059,6 +5137,21 @@ button.site-action-menu-item:focus-visible {
     line-height: 1.45;
     overflow-wrap: anywhere;
 }
+
+.missing-dev-data-popup .site-popup-detail {
+    white-space: pre-line;
+}
+
+.backup-restore-dialog .site-popup-detail { white-space: pre-line; }
+.backup-restore-dialog .site-popup-dialog { max-height: 90dvh; overflow-y: auto; }
+body .site-popup-overlay.backup-restore-confirm .site-popup-dialog .site-popup-ok {
+    background: #a52a32 !important;
+    color: #fff !important;
+    border-color: #a52a32 !important;
+}
+.backup-restore-meter { width: 100%; }
+.backup-maintenance-locked { opacity: .45; cursor: not-allowed; }
+body.backup-restore-locked { overflow: hidden; }
 
 .site-popup-detail p {
     margin: 0;
@@ -5536,7 +5629,7 @@ body.mobile-template #debug-console #show-debug-console.is-in-debug-console {
 }
 
 .bbcode-btn {
-    background-color: transparent;
+    background-color: color-mix(in srgb, var(--bg) 82%, #000);
     color: var(--fg);
     border: 1px solid var(--border);
     padding: 6px 10px;
@@ -5544,6 +5637,10 @@ body.mobile-template #debug-console #show-debug-console.is-in-debug-console {
     font-size: 14px;
     font-family: "MainRegular", var(--emoji-font), monospace;
     transition: background-color 0.2s;
+}
+
+.guest-account-ban-form {
+    margin-top: 12px;
 }
 
 .bbcode-btn:hover {
@@ -8755,7 +8852,7 @@ pre code.hljs {
 html.theme-switch-transition::after {
     content: "";
     position: fixed;
-    inset: 0;
+    inset: -120px;
     z-index: 2147483647;
     pointer-events: all;
     background: #000;
@@ -10932,6 +11029,57 @@ body.mobile-template #title-animation-always-setting {
 
 body.mobile-template #show-sidebar.mobile-menu-toggle {
     border-radius: 0 !important;
+    touch-action: none;
+}
+
+html.mobile-menu-button-is-dragging,
+html.mobile-menu-button-is-dragging body {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    touch-action: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+html.mobile-menu-button-is-dragging * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
+
+body.mobile-template #mobile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10010;
+    display: block;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 1;
+    transition: opacity 180ms ease;
+}
+
+body.mobile-template.sidebar-is-hidden #mobile-menu-backdrop {
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.mobile-template #mini-player.toast-radio #mini-player-seek {
+    display: none !important;
+}
+
+body.mobile-template #mini-player.player-notice-highlight {
+    animation: player-notice-highlight 1.6s ease-out;
+}
+
+@keyframes player-notice-highlight {
+    0%, 35% { outline: 3px solid var(--links); outline-offset: 3px; }
+    100% { outline-color: transparent; outline-offset: 8px; }
+}
+
+.site-notification-toast.is-persistent {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, 0);
 }
 
 body.mobile-template #show-sidebar .mobile-menu-notification-badge {

@@ -59,6 +59,25 @@ This setup is simple but honestly pretty smart for a repo with lots of inline ma
 
 ## Broad Refactors Checklist
 
+### Shared code names
+
+Use `fridge_` for shared PHP functions, `fridge` for JavaScript globals, and
+`FRIDGE_` for internal constants. Shared browser events use `fridge:`, DOM
+metadata uses `data-fridge-`, and internal HTTP headers use `X-Fridge-`. Update
+both producers and consumers together, including inline scripts, tests and
+deployment workflows. Bump the versions of affected browser scripts in templates,
+page content and `lib/render.php` so cached modules use the same names.
+
+Existing cookies, browser storage keys, restore workspace paths and environment
+configuration retain their legacy names for compatibility. These string values
+are deliberately separate from code identifiers: changing them can lose login
+sessions, hard-ban identities, private chat access, dismissed notices, encryption
+keys or pending backup recovery. Published external URLs and download filenames
+also keep their actual destinations. Any future rename of these values needs a
+separate migration that preserves existing state.
+
+### Review surfaces
+
 Before making a sweeping change, review:
 
 - Root files: `index.php`, `content.html`, `template.html`, `template_mobile.html`, `main.js`, `style.css`

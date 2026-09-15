@@ -1,7 +1,7 @@
 (function () {
 "use strict";
 
-const debugLog = message => window.fridg3DebugClientLog?.(`[mdpaste] ${message}`);
+const debugLog = message => window.fridgeDebugClientLog?.(`[mdpaste] ${message}`);
 const fileInput = document.getElementById("markdown-file");
 const uploadButton = document.getElementById("markdown-upload-button");
 const markdownInput = document.getElementById("markdown-input");
@@ -146,7 +146,7 @@ async function renderPreview() {
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) throw new Error(data.error || "could not render preview.");
         preview.innerHTML = data.html;
-        if (typeof window.fridg3RenderMdpasteEnhancements === "function") await window.fridg3RenderMdpasteEnhancements(preview);
+        if (typeof window.fridgeRenderMdpasteEnhancements === "function") await window.fridgeRenderMdpasteEnhancements(preview);
         if (typeof window.hljs !== "undefined") {
             preview.querySelectorAll("pre code").forEach(block => window.hljs.highlightElement(block));
         }

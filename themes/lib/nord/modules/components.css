@@ -20,6 +20,8 @@ body.nord-theme :is(
     box-shadow: none !important;
 }
 
+body.nord-theme button.site-action-menu-item{background:transparent!important;color:var(--fg)!important;border:0!important;border-radius:2px!important}body.nord-theme button.site-action-menu-item:hover{background:color-mix(in srgb,var(--links) 22%,transparent)!important;color:var(--fg)!important}body.nord-theme .site-icon-button{background:transparent!important;color:var(--subtle)!important;border:0!important}
+
 body.nord-theme :is(select, .dropdown, .bbcode-dropdown) option {
     background: var(--theme-input);
     color: var(--theme-ink);
@@ -31,7 +33,7 @@ body.nord-theme :is(input, textarea, select, .text-input, .dropdown, .bbcode-dro
 }
 
 body.nord-theme :is(
-    button:where(:not(#mdpaste-font-toggle)),
+    button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)),
     #search-button,
     #form-button,
     #two-buttons,
@@ -53,8 +55,12 @@ body.nord-theme :is(
         color var(--theme-transition-duration) ease;
 }
 
+body.nord-theme .bbcode-btn {
+    background: var(--theme-surface) !important;
+}
+
 body.nord-theme :is(
-    button:where(:not(#mdpaste-font-toggle)),
+    button:where(:not(#mdpaste-font-toggle):not(.site-action-menu-item):not(.site-icon-button)),
     #search-button,
     #form-button,
     #two-buttons,

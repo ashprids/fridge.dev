@@ -5,10 +5,10 @@ while (!file_exists($sessionBootstrapDir . "/lib/session.php") && dirname($sessi
     $sessionBootstrapDir = dirname($sessionBootstrapDir);
 }
 require_once $sessionBootstrapDir . "/lib/session.php";
-fridg3_start_session();
+fridge_start_session();
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'feed.php';
 require_once dirname(__DIR__) . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'guestbook.php';
-fridg3_feed_refresh_session_user();
+fridge_feed_refresh_session_user();
 
 $title = 'guestbook';
 $description = 'messages left by visitors.';
@@ -66,42 +66,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $moderationIp = trim((string)($_POST['ip'] ?? ''));
     if ($canModerate && $moderationAction === 'ban_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
         $guestName = trim((string)($_POST['guest_name'] ?? 'Anonymous'));
-        $banned = fridg3_feed_ban_guest_ip($moderationIp, (string)$_SESSION['user']['username'], $guestName, (string)($_POST['ban_reason'] ?? ''));
+        $banned = fridge_feed_ban_guest_ip($moderationIp, (string)$_SESSION['user']['username'], $guestName, (string)($_POST['ban_reason'] ?? ''));
         $_SESSION['guestbook_status'] = $banned ? 'IP banned from feed and guestbook posting.' : 'unable to ban that IP.';
-        if ($banned) fridg3_moderator_audit_log('banned IP', ['ip' => $moderationIp, 'username' => $guestName, 'reason' => (string)($_POST['ban_reason'] ?? '')]);
+        if ($banned) fridge_moderator_audit_log('banned IP', ['ip' => $moderationIp, 'username' => $guestName, 'reason' => (string)($_POST['ban_reason'] ?? '')]);
         header('Location: /guestbook');
         exit;
     }
     if ($canModerate && $moderationAction === 'unban_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
-        $unbanned = fridg3_feed_unban_ip($moderationIp);
+        $unbanned = fridge_feed_unban_ip($moderationIp);
         $_SESSION['guestbook_status'] = $unbanned ? 'IP unbanned.' : 'unable to unban that IP.';
-        if ($unbanned) fridg3_moderator_audit_log('unbanned IP', ['ip' => $moderationIp]);
+        if ($unbanned) fridge_moderator_audit_log('unbanned IP', ['ip' => $moderationIp]);
         header('Location: /guestbook');
         exit;
     }
     if ($canModerate && $moderationAction === 'purge_ip' && filter_var($moderationIp, FILTER_VALIDATE_IP)) {
-        if (!fridg3_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
+        if (!fridge_feed_verify_current_admin_password((string)($_POST['admin_password'] ?? ''))) {
             $_SESSION['guestbook_status'] = 'password did not match. purge cancelled.';
         } else {
-            $feedResult = fridg3_feed_purge_guest_replies_by_ip($moderationIp);
-            $guestbookResult = fridg3_guestbook_purge_entries_by_ip($moderationIp);
+            $feedResult = fridge_feed_purge_guest_replies_by_ip($moderationIp);
+            $guestbookResult = fridge_guestbook_purge_entries_by_ip($moderationIp);
             $_SESSION['guestbook_status'] = 'purged '
                 . ((int)$feedResult['deleted'] + (int)$guestbookResult['deleted'])
                 . ' guest item(s) for this IP.';
-            fridg3_moderator_audit_log('purged IP content', ['ip' => $moderationIp, 'deleted' => (int)$feedResult['deleted'] + (int)$guestbookResult['deleted'], 'failed' => (int)$feedResult['failed'] + (int)$guestbookResult['failed']]);
+            fridge_moderator_audit_log('purged IP content', ['ip' => $moderationIp, 'deleted' => (int)$feedResult['deleted'] + (int)$guestbookResult['deleted'], 'failed' => (int)$feedResult['failed'] + (int)$guestbookResult['failed']]);
         }
         header('Location: /guestbook');
         exit;
     }
 
     $deleteFile = basename($_POST['delete_file'] ?? '');
-    $deletedEntry = fridg3_guestbook_load_entry($deleteFile);
+    $deletedEntry = fridge_guestbook_load_entry($deleteFile);
     $isOwner = isset($ip_index[$clientIp]) && $ip_index[$clientIp] === $deleteFile;
     $canDelete = $canModerate || $isOwner;
 
-    if ($canDelete && fridg3_guestbook_delete_entry($deleteFile)) {
+    if ($canDelete && fridge_guestbook_delete_entry($deleteFile)) {
         $_SESSION['guestbook_status'] = 'post deleted.';
-        fridg3_moderator_audit_log('deleted guestbook post', ['file' => $deleteFile, 'author' => (string)($deletedEntry['name'] ?? '')], [
+        fridge_moderator_audit_log('deleted guestbook post', ['file' => $deleteFile, 'author' => (string)($deletedEntry['name'] ?? '')], [
             'name' => (string)($deletedEntry['name'] ?? ''),
             'body' => (string)($deletedEntry['message'] ?? ''),
         ]);
@@ -111,52 +111,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     header('Location: /guestbook');
     exit;
-}
-
-// Convert absolute timestamp (Y/m/d H:i:s) to a short relative string like "13h ago"
-function guestbook_relative_time(string $timestamp): string {
-    $dt = DateTime::createFromFormat('Y/m/d H:i:s', $timestamp);
-    if (!$dt) {
-        return '';
-    }
-
-    $now = new DateTime('now');
-    $diffSeconds = $now->getTimestamp() - $dt->getTimestamp();
-    if ($diffSeconds < 0) {
-        $diffSeconds = 0;
-    }
-
-    if ($diffSeconds < 60) {
-        return $diffSeconds . 's ago';
-    }
-
-    $minutes = intdiv($diffSeconds, 60);
-    if ($minutes < 60) {
-        return $minutes . 'm ago';
-    }
-
-    $hours = intdiv($minutes, 60);
-    if ($hours < 24) {
-        return $hours . 'h ago';
-    }
-
-    $days = intdiv($hours, 24);
-    if ($days < 7) {
-        return $days . 'd ago';
-    }
-
-    $weeks = intdiv($days, 7);
-    if ($weeks < 5) {
-        return $weeks . 'w ago';
-    }
-
-    $months = intdiv($days, 30);
-    if ($months < 12) {
-        return $months . 'mo ago';
-    }
-
-    $years = intdiv($days, 365);
-    return $years . 'y ago';
 }
 
 // Return sorted guestbook files (newest first)
@@ -169,8 +123,8 @@ function guestbook_get_files(string $postsDir): array {
         return [];
     }
     usort($files, function($a, $b) {
-        $aEntry = fridg3_guestbook_parse_entry((string)@file_get_contents($a), basename($a));
-        $bEntry = fridg3_guestbook_parse_entry((string)@file_get_contents($b), basename($b));
+        $aEntry = fridge_guestbook_parse_entry((string)@file_get_contents($a), basename($a));
+        $bEntry = fridge_guestbook_parse_entry((string)@file_get_contents($b), basename($b));
         $aTime = strtotime((string)($aEntry['timestamp'] ?? '')) ?: (filemtime($a) ?: 0);
         $bTime = strtotime((string)($bEntry['timestamp'] ?? '')) ?: (filemtime($b) ?: 0);
         $order = $bTime <=> $aTime;
@@ -192,7 +146,7 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
             continue;
         }
 
-        $entry = fridg3_guestbook_parse_entry($raw, basename($file));
+        $entry = fridge_guestbook_parse_entry($raw, basename($file));
         if ($entry === null) {
             continue;
         }
@@ -215,21 +169,34 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
 
         $safeTimestamp = htmlspecialchars($timestampLine !== '' ? $timestampLine : 'unknown time', ENT_QUOTES, 'UTF-8');
         $safeName = htmlspecialchars($nameLine !== '' ? $nameLine : 'Anonymous', ENT_QUOTES, 'UTF-8');
-        $safeMessage = nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'));
+        $storedOriginalMessage = fridge_guestbook_filtered_original(basename($file));
+        $originalMessage = $isAdmin ? $storedOriginalMessage : '';
+        if ($originalMessage !== '') {
+            $revealedMessage = htmlspecialchars(fridge_feed_apply_guest_filter($originalMessage, true, true), ENT_QUOTES, 'UTF-8');
+            $safeMessage = preg_replace_callback('/\[tooltip=&quot;[^&]*&quot;\]\[filter-original=([a-zA-Z0-9+\/=]+)\](.*?)\[\/filter-original\]\[\/tooltip\]/i', static function (array $match): string {
+                $original = base64_decode($match[1], true);
+                return $original === false ? $match[2] : '<span class="filtered-word" data-tooltip="' . htmlspecialchars(fridge_feed_filter_tooltip_text(), ENT_QUOTES, 'UTF-8') . '" data-context-tooltip="original: ' . htmlspecialchars($original, ENT_QUOTES, 'UTF-8') . '">' . $match[2] . '</span>';
+            }, $revealedMessage) ?? $revealedMessage;
+            $safeMessage = nl2br($safeMessage);
+        } else {
+            $safeMessage = nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'));
+        }
         $guestNameIpAttribute = $isAdmin
             ? ' data-context-tooltip="' . (filter_var($entryIp, FILTER_VALIDATE_IP) ? 'IP: ' . htmlspecialchars($entryIp, ENT_QUOTES, 'UTF-8') : 'No IP associated') . '"'
             : '';
 
-        $relative = guestbook_relative_time($timestampLine);
+        $relative = fridge_guestbook_relative_time($timestampLine);
         $displayTime = $relative !== '' ? $relative : $safeTimestamp;
-        $timeHtml = '<span id="post-date-feed" title="' . $safeTimestamp . '">' . $displayTime . '</span>';
+        $timeHtml = '<span id="post-date-feed" data-exact-datetime="' . $safeTimestamp . '">' . $displayTime . '</span>';
 
         $menuItems = '';
         $safeFile = htmlspecialchars(basename($file), ENT_QUOTES, 'UTF-8');
         $isOwner = isset($ipIndex[$clientIp]) && $ipIndex[$clientIp] === basename($file);
         if ($isAdmin || $isOwner) {
             $editUrl = '/guestbook/edit?file=' . rawurlencode($safeFile);
-            $menuItems .= '<a class="site-action-menu-item" href="' . $editUrl . '"><i class="fa-solid fa-pen"></i><span>edit</span></a>';
+            if ($isAdmin || $storedOriginalMessage === '') {
+                $menuItems .= '<a class="site-action-menu-item" href="' . $editUrl . '"><i class="fa-solid fa-pen"></i><span>edit</span></a>';
+            }
             $menuItems .= '<form class="site-action-menu-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-confirm-title="delete guestbook entry?" data-confirm-detail="this removes the guestbook entry from the site." data-confirm-text="delete" data-cancel-text="cancel">'
                 . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
                 . '<input type="hidden" name="delete_file" value="' . $safeFile . '">'
@@ -240,7 +207,7 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
         if ($isAdmin && filter_var($entryIp, FILTER_VALIDATE_IP)) {
             $safeIp = htmlspecialchars($entryIp, ENT_QUOTES, 'UTF-8');
             $menuItems .= '<a class="site-action-menu-item" href="/settings/guests/?q=' . rawurlencode($entryIp) . '"><i class="fa-solid fa-magnifying-glass"></i><span>manage IP</span></a>';
-            if (!fridg3_feed_is_ip_banned($entryIp)) {
+            if (!fridge_feed_is_ip_banned($entryIp)) {
                 $menuItems .= '<form class="site-action-menu-form" method="POST" action="/guestbook/index.php" data-site-confirm="1" data-ban-reason-prompt="1" data-confirm-title="ban IP?" data-confirm-detail="this blocks feed replies and guestbook posts from this IP." data-confirm-text="continue" data-cancel-text="cancel">'
                     . '<input type="hidden" name="csrf_token" value="' . $csrfToken . '">'
                     . '<input type="hidden" name="moderation_action" value="ban_ip">'
@@ -275,7 +242,7 @@ function render_guestbook_posts(array $files, bool $isAdmin, string $clientIp, a
             . '<span id="post-username"' . $guestNameIpAttribute . '>' . $safeName . '</span>'
             . $rightSide
             . '</div>'
-            . '<span id="post-content">' . $safeMessage . '</span>'
+            . '<span id="post-content" data-rendered-content="1">' . $safeMessage . '</span>'
             . '</div></div>';
     }
 
@@ -380,8 +347,8 @@ $posts_html = render_guestbook_posts(
 $pagination_html = render_guestbook_pagination($currentPage, $totalPages);
 
 $leave_button_attrs = 'data-tooltip="post to the guestbook"';
-$isClientIpBanned = fridg3_feed_is_ip_banned($clientIp);
-if (isset($ip_index[$clientIp]) || $isClientIpBanned) {
+$isClientIpBanned = fridge_feed_is_current_client_ip_banned($clientIp);
+if ((!fridge_current_user_bypasses_ip_restrictions() && isset($ip_index[$clientIp])) || $isClientIpBanned) {
     $leave_button_attrs = 'disabled aria-disabled="true" class="form-button-disabled" data-tooltip="'
         . ($isClientIpBanned ? 'your IP address has been restricted.' : 'you can only post here once!')
         . '"';
