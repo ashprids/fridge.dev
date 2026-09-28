@@ -415,7 +415,7 @@ if (!function_exists('fridge_paginate_static_post_list')) {
         $replacement = (string)$wrapper[1] . PHP_EOL . implode(PHP_EOL, $visibleCards) . PHP_EOL . (string)$wrapper[4];
         if ($totalPages > 1) {
             $previous = $currentPage > 1
-                ? '<a class="guestbook-page-btn pagination-arrow" href="' . htmlspecialchars($route, ENT_QUOTES, 'UTF-8') . '?page=' . ($currentPage - 1) . '#content-footer" aria-label="previous page">&lsaquo;</a>'
+                ? '<a class="guestbook-page-btn pagination-arrow" href="' . htmlspecialchars($route, ENT_QUOTES, 'UTF-8') . ($currentPage > 2 ? '?page=' . ($currentPage - 1) : '') . '#content-footer" aria-label="previous page">&lsaquo;</a>'
                 : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';
             $next = $currentPage < $totalPages
                 ? '<a class="guestbook-page-btn pagination-arrow" href="' . htmlspecialchars($route, ENT_QUOTES, 'UTF-8') . '?page=' . ($currentPage + 1) . '#content-footer" aria-label="next page">&rsaquo;</a>'
@@ -667,7 +667,7 @@ if (!function_exists('apply_preferred_theme_stylesheet')) {
 
     function fridge_inject_shared_runtime_scripts($template) {
         $scripts = [
-            '/main.js' => '/main.js?v=20260915-canonical-1',
+            '/main.js' => '/main.js?v=20260928-pagination-1',
             '/js/settings.js' => '/js/settings.js?v=20260915-canonical-1',
             '/js/fruity-dance.js' => '/js/fruity-dance.js?v=20260915-custom-tracking-2',
             '/js/sidebar-player.js' => '/js/sidebar-player.js?v=20260915-event-notifications-1',

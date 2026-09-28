@@ -2668,9 +2668,12 @@ function initContentPagination(root = document) {
         if (!route || !Number.isInteger(current) || !Number.isInteger(total) || total < 2) return;
 
         const pageUrl = page => {
-            const params = new URLSearchParams({ page: String(page) });
+            // Page 1 is the bare route; the server redirects ?page=1 to it.
+            const params = new URLSearchParams();
+            if (page > 1) params.set('page', String(page));
             if (search) params.set('q', search);
-            return route + '?' + params.toString() + '#content-footer';
+            const query = params.toString();
+            return route + (query ? '?' + query : '') + '#content-footer';
         };
         const tokenCount = pages => {
             let count = pages.length;

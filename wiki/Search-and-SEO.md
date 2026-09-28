@@ -34,7 +34,18 @@ preferred form. It removes `legacy_domain`, collapses listing `page=1`, maps
 and removes them from individual feed and journal post URLs. Nginx routes
 no-slash public aliases through this canonicalizer so several corrections are
 combined into one redirect. Internal navigation and pagination should link
-directly to these canonical forms.
+directly to these canonical forms; page 1 of a listing links to the bare route
+(for example `/feed/` or `/feed/?q=term`), never `?page=1`. The query string is
+only rebuilt when a parameter is actually removed, so equivalent encodings such
+as `q=a+b` and `q=a%20b` never cause a redirect.
+
+The canonicalizer runs only for GET/HEAD page requests. It is skipped for
+scripts under `/api/` and for any script that defines
+`FRIDGE_SKIP_CANONICAL_REDIRECT`. This matters for the hard-ban
+`auth_request` checker: nginx hands it the visitor's `REQUEST_URI`, so a
+canonical redirect there would be returned as the checker's status, and nginx
+treats any authorization status other than 2xx/401/403 as a `500` for the
+visitor.
 
 Redirects, canonical links, and sitemap inclusion reinforce one another. Google still makes the final canonical selection, and existing mobile results disappear only after recrawling. Do not block the old host in robots.txt: crawlers must see its redirect. See [Google's canonicalization guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls).
 

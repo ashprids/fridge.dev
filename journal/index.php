@@ -41,8 +41,13 @@ function render_journal_pagination(int $currentPage, int $totalPages, string $se
     if ($totalPages <= 1) {
         return '';
     }
-    $query = $searchQuery !== '' ? '&q=' . urlencode($searchQuery) : '';
-    $pageUrl = static fn(int $page): string => '/journal/?page=' . $page . $query . '#content-footer';
+    // Page 1 is the bare route; ?page=1 is redirected to it by lib/canonical.php.
+    $pageUrl = static function (int $page) use ($searchQuery): string {
+        $query = [];
+        if ($page > 1) $query['page'] = $page;
+        if ($searchQuery !== '') $query['q'] = $searchQuery;
+        return '/journal/' . ($query === [] ? '' : '?' . http_build_query($query)) . '#content-footer';
+    };
     $items = $currentPage > 1
         ? '<a class="guestbook-page-btn pagination-arrow" href="' . $pageUrl($currentPage - 1) . '" aria-label="previous page">&lsaquo;</a>'
         : '<span class="guestbook-page-btn pagination-arrow disabled" aria-hidden="true">&lsaquo;</span>';

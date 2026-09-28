@@ -266,7 +266,7 @@ function render_guestbook_pagination(int $currentPage, int $totalPages): string 
         if ($isCurrent) {
             $items .= '<span class="' . $class . '"' . $aria . '>' . $label . '</span>';
         } else {
-            $items .= '<a class="' . $class . '" href="/guestbook/?page=' . $i . '#content-footer">' . $label . '</a>';
+            $items .= '<a class="' . $class . '" href="/guestbook/' . ($i > 1 ? '?page=' . $i : '') . '#content-footer">' . $label . '</a>';
         }
     }
     return '<nav class="guestbook-pagination content-pagination" aria-label="guestbook pages" data-pagination-route="/guestbook/" data-pagination-current="' . $currentPage . '" data-pagination-total="' . $totalPages . '" data-pagination-search="">' . $items . '</nav>';
