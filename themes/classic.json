@@ -1,7 +1,0 @@
-{
-  "name": "classic",
-  "description": "the original compact theme with full custom colour controls",
-  "thumbnail": "thumbnails/classic.svg",
-  "html": "classic/classic.html",
-  "css": "classic/classic.css"
-}

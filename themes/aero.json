@@ -1,8 +1,0 @@
-{
-  "name": "aero",
-  "description": "a bright Frutiger Aero world of glass, blue skies, and green hills",
-  "thumbnail": "thumbnails/aero.svg",
-  "html": "aero/aero.html",
-  "css": "aero/aero.css",
-  "base": "blackprint"
-}
